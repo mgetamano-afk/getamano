@@ -3,9 +3,11 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import ShareECard from "../components/ShareECard";
+import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { ShieldCheck, Phone, MessageSquare, FileText, Share2, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft } from "lucide-react";
+import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProviderECard() {
@@ -17,6 +19,10 @@ export default function ProviderECard() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showMessage, setShowMessage] = useState(false);
+  const [msgBody, setMsgBody] = useState("");
+  const [msgSubject, setMsgSubject] = useState("");
+  const [lightbox, setLightbox] = useState(null);
 
   useEffect(() => {
     api.get(`/providers/by-slug/${slug}`).then(r => setP(r.data)).finally(() => setLoading(false));
@@ -34,15 +40,20 @@ export default function ProviderECard() {
     } catch (e) { toast.error("Error"); }
   };
 
-  const share = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try { await navigator.share({ title: p.business_name, url }); } catch {}
-    } else {
-      await navigator.clipboard.writeText(url);
-      toast.success("Enlace copiado");
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    if (!user) { toast.error("Inicia sesión para enviar mensajes"); return; }
+    try {
+      await api.post("/messages", { provider_id: p.provider_id, body: msgBody, subject: msgSubject || "Solicitud" });
+      toast.success("Mensaje enviado");
+      setShowMessage(false); setMsgBody(""); setMsgSubject("");
+      trackClick();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Error");
     }
   };
+
+  const share = null;
 
   const submitReview = async (e) => {
     e.preventDefault();
@@ -86,7 +97,7 @@ export default function ProviderECard() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
             <div className="flex flex-col md:flex-row gap-6 items-start">
               <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-slate-100 border-4 border-white shadow-md overflow-hidden -mt-16 md:-mt-20 flex-shrink-0">
-                {p.logo_url ? <img src={p.logo_url} alt="logo" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-blue-500 to-orange-500 flex items-center justify-center text-white font-display font-bold text-2xl">{p.business_name.charAt(0)}</div>}
+                {p.logo_url ? <img src={buildFileUrl(p.logo_url)} alt="logo" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-blue-500 to-orange-500 flex items-center justify-center text-white font-display font-bold text-2xl">{p.business_name.charAt(0)}</div>}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -109,20 +120,18 @@ export default function ProviderECard() {
                   <Phone className="w-4 h-4" /> {t("provider.call")}
                 </a>
               )}
-              {p.email && (
-                <a href={`mailto:${p.email}`} onClick={trackClick} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
-                  <MessageSquare className="w-4 h-4" /> {t("provider.message")}
-                </a>
-              )}
-              <button onClick={trackClick} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
+              <button onClick={() => setShowMessage(true)} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
+                <MessageSquare className="w-4 h-4" /> {t("provider.message")}
+              </button>
+              <button onClick={() => setShowMessage(true)} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
                 <FileText className="w-4 h-4" /> {t("provider.quote")}
               </button>
-              <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-map-button">
-                <MapPin className="w-4 h-4" /> {t("provider.map")}
-              </a>
-              <button onClick={share} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-share-button">
-                <Share2 className="w-4 h-4" /> {t("provider.share")}
-              </button>
+              {!p.is_home_based && p.city && (
+                <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-map-button">
+                  <MapPin className="w-4 h-4" /> {t("provider.map")}
+                </a>
+              )}
+              <ShareECard businessName={p.business_name} slug={p.slug} description={p.description} />
             </div>
             <button onClick={addFavorite} className="mt-2 text-sm text-slate-500 hover:text-orange-500 flex items-center gap-1" data-testid="ecard-favorite-button">
               <Heart className="w-4 h-4" /> Guardar en favoritos
@@ -133,6 +142,19 @@ export default function ProviderECard() {
         {/* Details grid */}
         <div className="grid md:grid-cols-3 gap-5 mt-6 px-4 md:px-8">
           <div className="md:col-span-2 space-y-5">
+            {/* Gallery */}
+            {p.gallery?.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-gallery">
+                <h3 className="font-display font-semibold text-slate-900 mb-3">Galería de trabajos</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {p.gallery.map(g => (
+                    <button key={g.id} onClick={() => setLightbox(g)} className="aspect-square rounded-xl overflow-hidden bg-slate-100 hover:opacity-90 transition" data-testid={`ecard-gallery-${g.id}`}>
+                      <img src={buildFileUrl(g.url)} alt={g.caption || ""} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {p.services?.length > 0 && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-display font-semibold text-slate-900 mb-3">{t("provider.services")}</h3>
@@ -194,7 +216,11 @@ export default function ProviderECard() {
               </div>
             </div>
             <div className="bg-white rounded-2xl border border-slate-200 p-6 text-sm space-y-3">
-              {p.address && <div className="flex items-start gap-2 text-slate-700"><MapPin className="w-4 h-4 text-slate-400 mt-0.5" /> {p.address}, {p.city}, {p.state} {p.zip_code}</div>}
+              {p.is_home_based ? (
+                <div className="flex items-start gap-2 text-slate-700"><HomeIcon className="w-4 h-4 text-orange-500 mt-0.5" /> <span>Servicio móvil / desde casa{p.city ? ` · ${p.city}, ${p.state}` : ""}</span></div>
+              ) : (
+                p.address && <div className="flex items-start gap-2 text-slate-700"><MapPin className="w-4 h-4 text-slate-400 mt-0.5" /> {p.address}, {p.city}, {p.state} {p.zip_code}</div>
+              )}
               {p.phone && <div className="flex items-center gap-2 text-slate-700"><Phone className="w-4 h-4 text-slate-400" /> {p.phone}</div>}
               {p.email && <div className="flex items-center gap-2 text-slate-700"><Mail className="w-4 h-4 text-slate-400" /> {p.email}</div>}
               {p.website && <div className="flex items-center gap-2 text-slate-700"><Globe className="w-4 h-4 text-slate-400" /> <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{p.website}</a></div>}
@@ -206,6 +232,30 @@ export default function ProviderECard() {
             </div>
           </aside>
         </div>
+
+        {/* Message modal */}
+        {showMessage && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-4" onClick={() => setShowMessage(false)} data-testid="message-modal">
+            <div className="bg-white rounded-t-3xl md:rounded-2xl w-full md:max-w-md p-6" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display font-semibold text-lg text-slate-900">Enviar mensaje a {p.business_name}</h3>
+                <button onClick={() => setShowMessage(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={sendMessage} className="space-y-3" data-testid="message-form">
+                <input value={msgSubject} onChange={e => setMsgSubject(e.target.value)} placeholder="Asunto (ej. Cotización)" className="w-full h-11 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid="message-subject-input" />
+                <textarea required value={msgBody} onChange={e => setMsgBody(e.target.value)} placeholder="Describe lo que necesitas..." rows={5} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid="message-body-input" />
+                <button type="submit" className="btn-primary w-full justify-center" data-testid="message-send-submit">Enviar</button>
+                {!user && <p className="text-xs text-slate-500 text-center">Necesitas iniciar sesión para enviar mensajes.</p>}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {lightbox && (
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setLightbox(null)} data-testid="gallery-lightbox">
+            <img src={buildFileUrl(lightbox.url)} alt={lightbox.caption || ""} className="max-w-full max-h-full rounded-2xl" />
+          </div>
+        )}
       </main>
       <Footer />
     </div>

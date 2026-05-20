@@ -1,0 +1,70 @@
+{
+  "summary": "Iteration 2 testing of getmano: 32/32 iteration-1 regression tests PASS; 14/14 new iteration-2 tests PASS after cleaning a stale duplicate seed doc. All NEW backend endpoints work (upload, files, gallery add/remove, plan change, messaging full flow client<->provider with unread tracking, users/me update). Frontend: landing, login (Google + Apple-disabled + Facebook-disabled), register, demo provider login, 4-tab provider dashboard, /messages, /profile, public eCard with share modal (WhatsApp/Facebook/SMS/Email/Copy) and Mensaje button all render & work. CRITICAL FINDINGS: (a) Two provider_profiles docs with same slug existed for demo provider (no unique index on slug, seed-data drift caused stale duplicate with mismatched user_id — broke messaging, /providers/me, and self-message guard). I deleted the stale doc to unblock testing — but main agent must add a unique index on provider_profiles.slug and/or fix the seed to be re-entrant. (b) ProviderProfileIn pydantic model does NOT declare the new fields is_home_based, latitude, longitude, additional_categories — they are silently dropped on POST/PUT (Pydantic strips unknowns). Even though the UI sends them, they never persist. (c) The agent_to_agent context note says gallery is part of the model but ProviderProfileIn doesn't have it either — only the $push gallery endpoint works.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/providers, PUT /api/providers/me", "issue": "ProviderProfileIn does NOT declare is_home_based, latitude, longitude, additional_categories, gallery. Pydantic silently drops these on input — UI sends them, backend persists nothing. Need to add fields to ProviderProfileIn (and to ProviderProfile model).", "priority": "HIGH"},
+      {"endpoint": "db.provider_profiles (seed/index)", "issue": "No unique index on `slug`. Demo provider had TWO profile docs with the same slug 'maria-cleaning-services-sallisaw-ok' (user_id mismatch with demo.provider user). This breaks GET /providers/me, messaging conversation routing (provider_user_id from stale doc), and self-message guard. RCA: previous test runs or restarts re-inserted; seed only checks user existence not profile existence atomically. Mitigation: add unique index on slug; make seed idempotent on provider_profiles (find by slug, not just by user).", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/providers/me/gallery", "issue": "Accepts arbitrary URL strings (no validation it points to /api/files/... or is http(s)). Could be abused with javascript: URLs in caption rendering — confirm frontend escapes."},
+      {"endpoint": "POST /api/messages", "issue": "subject defaults to 'Solicitud' only on first message; reply does not allow updating subject. Acceptable but worth noting."},
+      {"endpoint": "GET /api/files/{path}", "issue": "Returns 404 only when the DB record is missing; if storage returns 403/500 we surface 502. No CDN caching headers (Cache-Control) — images are reproxied each request."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Register page", "issue": "Form fields lack stable name/data-testid attributes (input[name=name], input[name=email] not present). Hard to target in automation. Add data-testid='register-name-input', 'register-email-input', 'register-password-input', 'register-submit-button', 'register-role-provider', 'register-role-client'.", "selector": "form inputs on /register", "priority": "MEDIUM"},
+      {"component": "Login page", "issue": "Email/password inputs also missing data-testid for automation (only [data-testid=login-google-button|login-apple-button|login-facebook-button] exist).", "selector": "form inputs on /login", "priority": "LOW"},
+      {"component": "Provider eCard", "issue": "Gallery section not rendered on demo eCard because demo seed has no gallery items. After provider uploads, verify it appears. Consider seeding 2-3 gallery items on demo for showcase.", "selector": "ecard gallery section", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Provider onboarding wizard", "issue": "Could not fully exercise the wizard programmatically due to missing data-testid on /register form. Visually the Register page is correct (Google active, Apple/FB disabled with 'próximamente'). Recommend main agent self-test the 6-step wizard end-to-end after adding data-testid attributes.", "affected_selectors": ["/register form", "/provider/onboarding steps"]},
+      {"flow": "Address autocomplete", "issue": "Nominatim is rate-limited public service; flaky for automated tests. Did not test the populate-city/state/zip behavior automatically. Recommend manual verification.", "affected_selectors": ["AddressAutocomplete input"]}
+    ],
+    "design_issues": [
+      {"screen": "Provider dashboard", "issues": ["Looks clean. 4 tabs visible (Perfil/Galería/Mensajes/Suscripción). KPIs cards readable. Local físico / Desde casa toggle clear. ‘Categorías adicionales’ chip group works visually. Logo+Cover upload zones present."]},
+      {"screen": "Pre-login 401 console noise", "issues": ["GET /api/auth/me returns 401 (expected) but is logged as console error on landing and login pages. Iteration-1 carryover. Catch silently in AuthContext."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/iteration2_test.py",
+    "/app/test_reports/pytest/iteration2_results.xml"
+  ],
+  "action_items": [
+    "Add is_home_based, latitude, longitude, additional_categories, gallery fields to ProviderProfileIn so POST/PUT actually persist them (currently silently dropped)",
+    "Add unique index on db.provider_profiles.slug (and likely on user_id) to prevent duplicate-profile drift",
+    "Make seed() idempotent on provider_profiles (find by slug, not just by user existence)",
+    "Add data-testid attributes to /register form inputs (name/email/password/role-provider/role-client/submit) and to /login email/password inputs",
+    "Seed demo provider with 2-3 gallery items so the eCard gallery section renders for visitors",
+    "Silently swallow 401 from /api/auth/me on initial unauthenticated page load to clean console",
+    "Consider rate-limiting POST /api/providers/{id}/contact-click (still unauthenticated from iteration 1)",
+    "Validate GalleryItemIn.url to be http(s):// or /api/files/ paths (avoid XSS/javascript: URLs)"
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to ~850 lines (iteration 1: ~580). Split into modules (auth, providers, messaging, storage, admin, models, db) before it grows further.",
+    "ProviderProfileIn missing the new fields — biggest functional gap; UI sends, backend drops.",
+    "init_storage uses module-level global `_storage_key` — fine for single worker but not safe under multi-process supervisor. Wrap in lock or move to lazy per-request init with cache invalidation.",
+    "put_object/get_object reinit logic on 403 retries only once and uses `global _storage_key` mutation — works but better to encapsulate in a small client class.",
+    "send_message creates conversation_id but doesn't validate that body is non-empty (allows empty messages). Add `min_length=1` on MessageIn.body.",
+    "list_messages marks read unconditionally for the viewing side — good. But no pagination (limit 500). Add cursor.",
+    "POST /api/providers/me/gallery does not enforce a per-provider gallery cap (free plan should be limited to e.g. 3 photos per plans definition). Business rule not enforced server-side.",
+    "Plan change is mock (acknowledged) but no audit log written for plan changes. Consider audit_logs entry.",
+    "PUT /api/users/me allows arbitrary `picture` URL — same XSS/javascript: URL risk as gallery. Validate.",
+    "JWT_SECRET still falls back to 'getmano-dev-secret-change-me' default if env missing — should fail-fast in production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration2_test.py (new — 14 tests)",
+    "Manually deleted 1 stale duplicate doc from db.provider_profiles (slug=maria-cleaning-services-sallisaw-ok with user_id=user_cc2bae084f50) to unblock /providers/me and messaging tests"
+  ],
+  "success_rate": {
+    "backend": "100% (iteration-1: 32/32; iteration-2: 14/14) after stale-duplicate cleanup",
+    "frontend": "~95% (all critical pages load: landing, login w/ Google+Apple-disabled+FB-disabled, register, dashboard 4 tabs, eCard share+message, /messages, /profile). Onboarding wizard not auto-exercised due to missing data-testid on /register form."
+  },
+  "test_credentials": "admin@getmano.com/admin123, demo.provider@getmano.com/provider123 — both work after duplicate cleanup",
+  "seed_data_creation": "Tests created TEST_-prefixed users, provider profiles, reviews, conversations, messages, uploaded files. No teardown.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests live in /app/backend/tests/backend_test.py (iter-1) and /app/backend/tests/iteration2_test.py (iter-2 NEW endpoints). Run both: pytest /app/backend/tests/ -v. If iteration2 messaging tests fail with 'provider should see the conversation', it means demo provider's slug has a duplicate stale doc again — delete via: db.provider_profiles.delete_many({'slug':'maria-cleaning-services-sallisaw-ok','user_id':{'$ne':<current demo user_id>}}). The REAL fix is for main agent to add a unique index on slug + idempotent seed. ProviderProfileIn STILL lacks the new fields (is_home_based, latitude, longitude, additional_categories, gallery) — POST/PUT will keep silently dropping them until model is updated. Onboarding wizard frontend was not auto-tested due to missing data-testid on /register form — main agent should add them or self-test manually.",
+  "rca_of_issue": "DUPLICATE PROVIDER PROFILE: db.provider_profiles had two docs with slug='maria-cleaning-services-sallisaw-ok'. Doc A had user_id=user_cc2bae084f50 (stale, no matching user). Doc B had user_id=user_dd013c7efcff (current demo.provider user). Cause: seed() checks `if not await db.users.find_one(...)` then inserts BOTH a user and a provider_profile inside that block; if users collection is wiped/reset but provider_profiles isn't, the next seed re-inserts a NEW user (new uuid) and a NEW provider_profile (also new uuid) while the old provider_profile remains, producing two profiles for one slug. get_provider_by_slug uses find_one which returned the stale Doc A first, so messaging set provider_user_id=user_cc2bae... and the actual demo.provider user (user_dd013c7...) couldn't see their own conversations. Mitigation applied: deleted stale Doc A. Permanent fix: add unique index `provider_profiles.slug` and make seed idempotent on provider_profiles by slug, not by user."
+}

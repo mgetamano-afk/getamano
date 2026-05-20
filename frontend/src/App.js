@@ -11,10 +11,13 @@ import AuthCallback from "./pages/AuthCallback";
 import Search from "./pages/Search";
 import ProviderECard from "./pages/ProviderECard";
 import ProviderDashboard from "./pages/ProviderDashboard";
+import ProviderOnboarding from "./pages/ProviderOnboarding";
 import ClientDashboard from "./pages/ClientDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Plans from "./pages/Plans";
 import DashboardRouter from "./pages/DashboardRouter";
+import Messages from "./pages/Messages";
+import UserProfile from "./pages/UserProfile";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function AppRouter() {
@@ -33,6 +36,9 @@ function AppRouter() {
       <Route path="/dashboard/provider" element={<ProviderDashboard />} />
       <Route path="/dashboard/client" element={<ClientDashboard />} />
       <Route path="/dashboard/admin" element={<AdminDashboard />} />
+      <Route path="/provider/onboarding" element={<ProviderOnboarding />} />
+      <Route path="/messages" element={<Messages />} />
+      <Route path="/profile" element={<UserProfile />} />
       <Route path="/plans" element={<Plans />} />
     </Routes>
   );

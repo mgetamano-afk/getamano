@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query, UploadFile, File, Header
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -10,6 +10,7 @@ import uuid
 import bcrypt
 import jwt
 import httpx
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Literal
@@ -26,6 +27,54 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'getmano-dev-secret-change-me')
 JWT_ALGO = 'HS256'
 JWT_EXP_DAYS = 7
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+
+# Emergent Object Storage
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "getmano"
+_storage_key = None
+
+def init_storage():
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_KEY:
+        raise RuntimeError("EMERGENT_LLM_KEY not configured")
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120,
+    )
+    if resp.status_code == 403:
+        # reinit and retry once
+        global _storage_key
+        _storage_key = None
+        key = init_storage()
+        resp = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data, timeout=120,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path: str):
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    if resp.status_code == 403:
+        global _storage_key
+        _storage_key = None
+        key = init_storage()
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 app = FastAPI(title="getmano API")
 api_router = APIRouter(prefix="/api")
@@ -122,6 +171,27 @@ class VerificationActionIn(BaseModel):
     status: VerificationStatus
     note: Optional[str] = ""
 
+class UserUpdateIn(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    picture: Optional[str] = None
+    language: Optional[str] = None
+
+class MessageIn(BaseModel):
+    provider_id: str
+    body: str
+    subject: Optional[str] = ""
+
+class MessageReplyIn(BaseModel):
+    body: str
+
+class PlanChangeIn(BaseModel):
+    plan: Literal["free", "pro", "premium"]
+
+class GalleryItemIn(BaseModel):
+    url: str
+    caption: Optional[str] = ""
+
 # ============ HELPERS ============
 def hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
@@ -202,6 +272,13 @@ DEFAULT_CATEGORIES = [
 
 @app.on_event("startup")
 async def seed():
+    # init storage (non-fatal if unavailable)
+    try:
+        init_storage()
+        logger.info("Storage initialized")
+    except Exception as e:
+        logger.warning(f"Storage init failed: {e}")
+
     if await db.categories.count_documents({}) == 0:
         docs = []
         for c in DEFAULT_CATEGORIES:
@@ -566,6 +643,197 @@ async def list_plans():
         {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 19, "features_es": ["eCard completa", "Badge destacado", "Hasta 15 fotos", "Analytics avanzados", "Mejor posición en búsquedas", "Botón de cotización", "Soporte prioritario"], "features_en": ["Full eCard", "Featured badge", "Up to 15 photos", "Advanced analytics", "Better search ranking", "Quote button", "Priority support"], "highlight": True},
         {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 49, "features_es": ["Proveedor destacado", "Aparece en homepage", "Campañas promocionales", "Mayor visibilidad por ciudad", "QR personalizado", "Reportes avanzados"], "features_en": ["Featured provider", "Homepage placement", "Promo campaigns", "City-wide visibility", "Custom QR", "Advanced reports"], "highlight": False},
     ]
+
+# ============ INCLUDE ROUTER ============
+@api_router.put("/users/me")
+async def update_user(payload: UserUpdateIn, user: User = Depends(get_current_user)):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        return user.model_dump(mode="json")
+    await db.users.update_one({"user_id": user.user_id}, {"$set": update})
+    doc = await db.users.find_one({"user_id": user.user_id}, {"_id": 0, "password_hash": 0})
+    if isinstance(doc.get("created_at"), str):
+        doc["created_at"] = datetime.fromisoformat(doc["created_at"])
+    return User(**doc).model_dump(mode="json")
+
+# ============ UPLOAD ============
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
+MAX_UPLOAD_SIZE = 8 * 1024 * 1024  # 8 MB
+
+@api_router.post("/upload")
+async def upload(file: UploadFile = File(...), user: User = Depends(get_current_user)):
+    content_type = file.content_type or "application/octet-stream"
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Only image files allowed (jpg/png/webp/gif)")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="File too large (max 8MB)")
+    ext = (file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin").lower()
+    if ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
+        ext = content_type.split("/")[-1]
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/uploads/{user.user_id}/{file_id}.{ext}"
+    try:
+        result = put_object(path, data, content_type)
+    except Exception as e:
+        logger.exception("Upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    await db.files.insert_one({
+        "file_id": file_id,
+        "user_id": user.user_id,
+        "storage_path": result["path"],
+        "original_filename": file.filename or "",
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"file_id": file_id, "path": result["path"], "url": f"/api/files/{result['path']}"}
+
+@api_router.get("/files/{path:path}")
+async def download(path: str):
+    record = await db.files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        data, ct = get_object(path)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Storage error: {e}")
+    return Response(content=data, media_type=record.get("content_type") or ct)
+
+# ============ GALLERY ============
+@api_router.post("/providers/me/gallery")
+async def add_gallery_item(payload: GalleryItemIn, user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    item = {
+        "id": f"g_{uuid.uuid4().hex[:10]}",
+        "url": payload.url,
+        "caption": payload.caption or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.provider_profiles.update_one({"user_id": user.user_id}, {"$push": {"gallery": item}})
+    return item
+
+@api_router.delete("/providers/me/gallery/{item_id}")
+async def remove_gallery_item(item_id: str, user: User = Depends(get_current_user)):
+    await db.provider_profiles.update_one(
+        {"user_id": user.user_id}, {"$pull": {"gallery": {"id": item_id}}}
+    )
+    return {"ok": True}
+
+# ============ PLAN CHANGE (mock - no Stripe) ============
+@api_router.post("/providers/me/plan")
+async def change_plan(payload: PlanChangeIn, user: User = Depends(get_current_user)):
+    result = await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"plan": payload.plan, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True, "plan": payload.plan}
+
+# ============ MESSAGING ============
+@api_router.post("/messages")
+async def send_message(payload: MessageIn, user: User = Depends(get_current_user)):
+    provider = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    if provider["user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot message yourself")
+    # find or create conversation (client_id, provider_id)
+    conv_key = {"client_id": user.user_id, "provider_id": payload.provider_id}
+    conv = await db.conversations.find_one(conv_key, {"_id": 0})
+    now = datetime.now(timezone.utc).isoformat()
+    if not conv:
+        conv = {
+            **conv_key,
+            "conversation_id": f"conv_{uuid.uuid4().hex[:12]}",
+            "provider_user_id": provider["user_id"],
+            "client_name": user.name,
+            "business_name": provider["business_name"],
+            "logo_url": provider.get("logo_url", ""),
+            "slug": provider["slug"],
+            "subject": payload.subject or "Solicitud",
+            "last_message": payload.body[:140],
+            "last_at": now,
+            "unread_for_provider": True,
+            "unread_for_client": False,
+            "created_at": now,
+        }
+        await db.conversations.insert_one(conv)
+    else:
+        await db.conversations.update_one(
+            {"conversation_id": conv["conversation_id"]},
+            {"$set": {"last_message": payload.body[:140], "last_at": now, "unread_for_provider": True}}
+        )
+    msg = {
+        "message_id": f"msg_{uuid.uuid4().hex[:10]}",
+        "conversation_id": conv["conversation_id"],
+        "sender_id": user.user_id,
+        "sender_role": "client",
+        "body": payload.body,
+        "created_at": now,
+    }
+    await db.messages.insert_one(msg)
+    msg.pop("_id", None)
+    return msg
+
+@api_router.post("/messages/{conversation_id}/reply")
+async def reply_message(conversation_id: str, payload: MessageReplyIn, user: User = Depends(get_current_user)):
+    conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    is_provider = conv["provider_user_id"] == user.user_id
+    is_client = conv["client_id"] == user.user_id
+    if not (is_provider or is_client):
+        raise HTTPException(status_code=403, detail="Not your conversation")
+    now = datetime.now(timezone.utc).isoformat()
+    msg = {
+        "message_id": f"msg_{uuid.uuid4().hex[:10]}",
+        "conversation_id": conversation_id,
+        "sender_id": user.user_id,
+        "sender_role": "provider" if is_provider else "client",
+        "body": payload.body,
+        "created_at": now,
+    }
+    await db.messages.insert_one(msg)
+    update = {"last_message": payload.body[:140], "last_at": now}
+    if is_provider:
+        update["unread_for_client"] = True
+        update["unread_for_provider"] = False
+    else:
+        update["unread_for_provider"] = True
+        update["unread_for_client"] = False
+    await db.conversations.update_one({"conversation_id": conversation_id}, {"$set": update})
+    msg.pop("_id", None)
+    return msg
+
+@api_router.get("/conversations")
+async def list_conversations(user: User = Depends(get_current_user)):
+    query = {"$or": [{"client_id": user.user_id}, {"provider_user_id": user.user_id}]}
+    convs = await db.conversations.find(query, {"_id": 0}).sort("last_at", -1).to_list(200)
+    # mark which side I am
+    for c in convs:
+        c["my_role"] = "provider" if c["provider_user_id"] == user.user_id else "client"
+        c["unread"] = c["unread_for_provider"] if c["my_role"] == "provider" else c["unread_for_client"]
+    return convs
+
+@api_router.get("/conversations/{conversation_id}/messages")
+async def list_messages(conversation_id: str, user: User = Depends(get_current_user)):
+    conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Not found")
+    is_provider = conv["provider_user_id"] == user.user_id
+    is_client = conv["client_id"] == user.user_id
+    if not (is_provider or is_client):
+        raise HTTPException(status_code=403, detail="Not your conversation")
+    # mark read for the side viewing
+    update = {"unread_for_provider": False} if is_provider else {"unread_for_client": False}
+    await db.conversations.update_one({"conversation_id": conversation_id}, {"$set": update})
+    msgs = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    return {"conversation": conv, "messages": msgs}
 
 # ============ INCLUDE ROUTER ============
 app.include_router(api_router)

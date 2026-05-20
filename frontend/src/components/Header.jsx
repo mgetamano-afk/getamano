@@ -1,14 +1,23 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Globe, LogOut, User as UserIcon, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Globe, LogOut, User as UserIcon, Menu, X, MessageCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { api } from "../lib/api";
 
 export default function Header() {
   const { user, logout } = useAuth();
   const { t, lang, changeLang } = useI18n();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!user) { setUnread(0); return; }
+    api.get("/conversations").then(r => {
+      setUnread((r.data || []).filter(c => c.unread).length);
+    }).catch(() => {});
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -36,6 +45,10 @@ export default function Header() {
             </button>
             {user ? (
               <>
+                <Link to="/messages" className="relative p-2 text-slate-600 hover:text-blue-600" data-testid="nav-messages" aria-label="messages">
+                  <MessageCircle className="w-5 h-5" />
+                  {unread > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unread}</span>}
+                </Link>
                 <Link to="/dashboard" className="btn-outline" data-testid="nav-dashboard">
                   <UserIcon className="w-4 h-4 inline mr-1" /> {t("nav.dashboard")}
                 </Link>
@@ -65,7 +78,9 @@ export default function Header() {
             </button>
             {user ? (
               <>
+                <Link to="/messages" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium">Mensajes {unread > 0 && <span className="ml-1 bg-orange-500 text-white text-xs rounded-full px-2">{unread}</span>}</Link>
                 <Link to="/dashboard" onClick={() => setOpen(false)} className="block px-4 py-2 text-blue-600 font-medium">{t("nav.dashboard")}</Link>
+                <Link to="/profile" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium">Mi perfil</Link>
                 <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-red-600 font-medium">{t("nav.logout")}</button>
               </>
             ) : (
