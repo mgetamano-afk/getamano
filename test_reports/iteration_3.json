@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 3 backend retest after fixes claimed in iter-2 report. 52/53 tests PASS (32 iter-1 + 14 iter-2 + 6/7 iter-3). All five new ProviderProfileIn fields (is_home_based, latitude, longitude, additional_categories, gallery) now persist correctly on BOTH POST /api/providers and PUT /api/providers/me — verified via response + GET re-read. Unique indexes confirmed on provider_profiles.slug, provider_profiles.user_id, users.email — duplicate email registration now correctly rejected with 4xx. Only one provider_profiles doc exists for demo slug (no drift). Full messaging round-trip, upload+files, gallery add/remove, plan change, users/me update all green. ONE FAILURE: demo provider eCard gallery has 0 items, NOT 3 — the main agent's claimed fix (c) 'seed idempotent by provider_profiles slug' was NOT applied: server.py line 316 still gates the entire demo-provider seed block on `if not await db.users.find_one({email:'demo.provider@getmano.com'})`. Because the demo user already existed from a prior iteration, the rewrite of the provider_profiles insert (which now contains the 3 gallery items g_seed1/2/3) NEVER ran on restart. Net result: existing demo profile has gallery=[].",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "seed() in server.py:~316", "issue": "Demo provider gallery items (g_seed1/g_seed2/g_seed3) not present in DB (gallery=[]). Root cause: seed block is gated by `db.users.find_one({email:'demo.provider@getmano.com'})` — since the user already existed, the new provider_profiles insert (with 3 gallery items) was skipped. Fix needs to either (a) check `db.provider_profiles.find_one({slug: DEMO_SLUG})` and upsert gallery if missing, or (b) delete-then-reseed demo provider profile, or (c) run a one-shot migration that $set's gallery on the existing demo doc. Main agent's iter-2 claim that 'seed is now idempotent by slug' is NOT reflected in the committed code."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/iteration2_test.py",
+    "/app/backend/tests/iteration3_test.py",
+    "/app/test_reports/pytest/iteration3_results.xml"
+  ],
+  "action_items": [
+    "Make the demo-provider seed idempotent by slug (not by user existence) — currently the gallery items code path is dead for any DB where the demo user already exists. Suggested patch: replace `if not await db.users.find_one({...demo.provider...})` with separate checks: ensure user exists OR insert; THEN `if not await db.provider_profiles.find_one({slug: DEMO_SLUG})` insert profile; ELSE `$set` gallery on the existing doc when it's empty.",
+    "(Carryover, low priority) seed demo with non-empty gallery so frontend eCard gallery section renders for visitors — directly fixed by the action above.",
+    "(Carryover from iter-2) add data-testid attributes to /register form fields for E2E automation.",
+    "(Carryover from iter-2) validate gallery URL is http(s) or /api/files/ to prevent javascript: XSS.",
+    "(Carryover from iter-2) consider rate-limiting POST /api/providers/{id}/contact-click."
+  ],
+  "critical_code_review_comments": [
+    "server.py:316 — seed block remains gated by user existence; main agent's claim of slug-based idempotency is FALSE.",
+    "server.py is now ~875 lines — still recommend splitting into modules (auth, providers, messaging, storage, admin) before further growth.",
+    "ProviderProfileIn now has all 5 new fields (verified). Good fix. Consider adding pydantic validators: latitude in [-90,90], longitude in [-180,180].",
+    "GalleryItemIn still accepts arbitrary URL string — add URL scheme whitelist to block javascript:/data: URLs.",
+    "No per-plan gallery cap enforced server-side (free=3 photos rule from plans definition); business rule lives only in UI.",
+    "JWT_SECRET still has insecure default fallback — should fail fast in production env."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration3_test.py (new — 7 tests verifying iter-2 fixes)"
+  ],
+  "success_rate": {"backend": "98% (52/53)", "frontend": "not tested this iteration (per request)"},
+  "test_credentials": "admin@getmano.com/admin123, demo.provider@getmano.com/provider123 — both work",
+  "seed_data_creation": "Tests create TEST_-prefixed users, provider profiles, conversations, messages, uploaded files. No teardown (consistent with prior iterations).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "ProviderProfileIn fixes confirmed — POST/PUT now persist is_home_based, latitude, longitude, additional_categories, gallery (iteration3_test.py::TestCreateProviderPersistsNewFields and TestUpdateProviderPersistsNewFields). Unique indexes on provider_profiles.slug, provider_profiles.user_id, users.email all working. The ONE residual issue is purely in seed() at server.py:316 — gated by user existence so new gallery seed items never inserted into the pre-existing demo doc. Quick verification after main agent's fix: `curl $BACKEND/api/providers/by-slug/maria-cleaning-services-sallisaw-ok | jq '.gallery | length'` should return 3. Re-run `pytest /app/backend/tests/ -v` — should be 53/53 green.",
+  "rca_of_issue": "DEMO PROVIDER GALLERY EMPTY: server.py:316 wraps user creation + provider_profile creation + gallery insertion inside a single `if not await db.users.find_one({email:'demo.provider@getmano.com'})` block. On a DB where the demo user already exists from any prior iteration (which is the case here — user_dd013c7efcff has existed since iter-2), the entire block — including the new code that inserts gallery items g_seed1/2/3 — is skipped. The existing provider_profiles doc retains its original gallery=[] from when it was first created. Mitigation: do NOT bundle user-existence and profile-existence checks together; check each collection independently and upsert profile.gallery when the profile exists but gallery is empty. Alternative one-shot fix: `db.provider_profiles.update_one({slug:'maria-cleaning-services-sallisaw-ok'}, {'$set': {'gallery': [g_seed1,g_seed2,g_seed3]}})` in a migration script."
+}

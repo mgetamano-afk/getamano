@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
       const { data } = await api.get("/auth/me");
       setUser(data);
     } catch {
+      // Silently ignore 401 on initial load (unauthenticated visitors)
       setUser(null);
     } finally {
       setLoading(false);

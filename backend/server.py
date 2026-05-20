@@ -118,6 +118,7 @@ class ProviderProfileIn(BaseModel):
     business_name: str
     legal_name: Optional[str] = None
     category_id: str
+    additional_categories: List[str] = []
     description: Optional[str] = ""
     phone: Optional[str] = ""
     email: Optional[str] = ""
@@ -126,6 +127,9 @@ class ProviderProfileIn(BaseModel):
     city: Optional[str] = ""
     state: Optional[str] = ""
     zip_code: Optional[str] = ""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_home_based: bool = False
     languages: List[str] = ["es", "en"]
     services: List[str] = []
     service_areas: List[str] = []
@@ -133,6 +137,7 @@ class ProviderProfileIn(BaseModel):
     logo_url: Optional[str] = ""
     cover_url: Optional[str] = ""
     photos: List[str] = []
+    gallery: List[dict] = []
     social: dict = {}
     price_range: Optional[str] = "quote"
 
@@ -279,6 +284,16 @@ async def seed():
     except Exception as e:
         logger.warning(f"Storage init failed: {e}")
 
+    # Indexes (idempotent)
+    try:
+        await db.provider_profiles.create_index("slug", unique=True)
+        await db.provider_profiles.create_index("user_id", unique=True)
+        await db.users.create_index("email", unique=True)
+        await db.user_sessions.create_index("session_token", unique=True)
+        await db.conversations.create_index([("client_id", 1), ("provider_id", 1)], unique=True)
+    except Exception as e:
+        logger.warning(f"Index creation: {e}")
+
     if await db.categories.count_documents({}) == 0:
         docs = []
         for c in DEFAULT_CATEGORIES:
@@ -307,26 +322,33 @@ async def seed():
             "language": "es", "created_at": datetime.now(timezone.utc).isoformat()
         })
         cleaning_cat = await db.categories.find_one({"slug": "cleaning"}, {"_id": 0})
-        slug = "maria-cleaning-services-sallisaw-ok"
         await db.provider_profiles.insert_one({
             "provider_id": f"prov_{uuid.uuid4().hex[:12]}",
-            "user_id": prov_user_id, "slug": slug,
+            "user_id": prov_user_id, "slug": DEMO_SLUG,
             "business_name": "María's Cleaning Services",
             "legal_name": "Maria Gonzalez LLC",
             "category_id": cleaning_cat["category_id"],
+            "additional_categories": [],
             "description": "Limpieza profesional residencial y comercial. Más de 8 años de experiencia sirviendo a familias latinas en Oklahoma.",
             "phone": "+1 (918) 555-0123",
             "email": "maria@example.com",
             "website": "",
             "address": "123 Main St",
             "city": "Sallisaw", "state": "OK", "zip_code": "74955",
+            "latitude": 35.461, "longitude": -94.787,
+            "is_home_based": False,
             "languages": ["es", "en"],
             "services": ["Limpieza profunda", "Limpieza regular", "Post-construcción", "Mudanzas"],
             "service_areas": ["Sallisaw, OK", "Muldrow, OK", "Fort Smith, AR"],
             "hours": {"mon": "8:00-18:00", "tue": "8:00-18:00", "wed": "8:00-18:00", "thu": "8:00-18:00", "fri": "8:00-18:00", "sat": "9:00-15:00", "sun": "Cerrado"},
             "logo_url": "https://images.unsplash.com/photo-1775178120132-f0ff7fd5cb40?w=200",
             "cover_url": "https://images.unsplash.com/photo-1775178120132-f0ff7fd5cb40?w=1200",
-            "photos": ["https://images.unsplash.com/photo-1775178120132-f0ff7fd5cb40?w=800"],
+            "photos": [],
+            "gallery": [
+                {"id": "g_seed1", "url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800", "caption": "Limpieza profunda de cocina", "created_at": datetime.now(timezone.utc).isoformat()},
+                {"id": "g_seed2", "url": "https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800", "caption": "Baño impecable", "created_at": datetime.now(timezone.utc).isoformat()},
+                {"id": "g_seed3", "url": "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800", "caption": "Post-construcción", "created_at": datetime.now(timezone.utc).isoformat()},
+            ],
             "social": {"facebook": "", "instagram": ""},
             "price_range": "$$",
             "verification_status": "approved",
