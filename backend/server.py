@@ -312,53 +312,70 @@ async def seed():
         })
         logger.info("Seeded admin user")
 
-    # Seed a demo provider
-    if not await db.users.find_one({"email": "demo.provider@getmano.com"}):
+    # Demo provider — fully idempotent (ensures user + profile + showcase gallery)
+    DEMO_EMAIL = "demo.provider@getmano.com"
+    DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
+    demo_user = await db.users.find_one({"email": DEMO_EMAIL})
+    if not demo_user:
         prov_user_id = f"user_{uuid.uuid4().hex[:12]}"
         await db.users.insert_one({
-            "user_id": prov_user_id, "email": "demo.provider@getmano.com",
+            "user_id": prov_user_id, "email": DEMO_EMAIL,
             "password_hash": hash_password("provider123"),
             "name": "María González", "role": "provider", "picture": None,
             "language": "es", "created_at": datetime.now(timezone.utc).isoformat()
         })
-        cleaning_cat = await db.categories.find_one({"slug": "cleaning"}, {"_id": 0})
-        await db.provider_profiles.insert_one({
-            "provider_id": f"prov_{uuid.uuid4().hex[:12]}",
-            "user_id": prov_user_id, "slug": DEMO_SLUG,
-            "business_name": "María's Cleaning Services",
-            "legal_name": "Maria Gonzalez LLC",
-            "category_id": cleaning_cat["category_id"],
-            "additional_categories": [],
-            "description": "Limpieza profesional residencial y comercial. Más de 8 años de experiencia sirviendo a familias latinas en Oklahoma.",
-            "phone": "+1 (918) 555-0123",
-            "email": "maria@example.com",
-            "website": "",
-            "address": "123 Main St",
-            "city": "Sallisaw", "state": "OK", "zip_code": "74955",
-            "latitude": 35.461, "longitude": -94.787,
-            "is_home_based": False,
-            "languages": ["es", "en"],
-            "services": ["Limpieza profunda", "Limpieza regular", "Post-construcción", "Mudanzas"],
-            "service_areas": ["Sallisaw, OK", "Muldrow, OK", "Fort Smith, AR"],
-            "hours": {"mon": "8:00-18:00", "tue": "8:00-18:00", "wed": "8:00-18:00", "thu": "8:00-18:00", "fri": "8:00-18:00", "sat": "9:00-15:00", "sun": "Cerrado"},
-            "logo_url": "https://images.unsplash.com/photo-1775178120132-f0ff7fd5cb40?w=200",
-            "cover_url": "https://images.unsplash.com/photo-1775178120132-f0ff7fd5cb40?w=1200",
-            "photos": [],
-            "gallery": [
-                {"id": "g_seed1", "url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800", "caption": "Limpieza profunda de cocina", "created_at": datetime.now(timezone.utc).isoformat()},
-                {"id": "g_seed2", "url": "https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800", "caption": "Baño impecable", "created_at": datetime.now(timezone.utc).isoformat()},
-                {"id": "g_seed3", "url": "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800", "caption": "Post-construcción", "created_at": datetime.now(timezone.utc).isoformat()},
-            ],
-            "social": {"facebook": "", "instagram": ""},
-            "price_range": "$$",
-            "verification_status": "approved",
-            "is_active": True, "plan": "pro",
-            "rating_avg": 0.0, "rating_count": 0,
-            "views": 0, "contact_clicks": 0,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-        logger.info("Seeded demo provider")
+    else:
+        prov_user_id = demo_user["user_id"]
+
+    cleaning_cat = await db.categories.find_one({"slug": "cleaning"}, {"_id": 0})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    demo_gallery = [
+        {"id": "g_seed1", "url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800", "caption": "Limpieza profunda de cocina", "created_at": now_iso},
+        {"id": "g_seed2", "url": "https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=800", "caption": "Baño impecable", "created_at": now_iso},
+        {"id": "g_seed3", "url": "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800", "caption": "Post-construcción", "created_at": now_iso},
+    ]
+    demo_set = {
+        "business_name": "María's Cleaning Services",
+        "legal_name": "Maria Gonzalez LLC",
+        "category_id": cleaning_cat["category_id"] if cleaning_cat else "",
+        "additional_categories": [],
+        "description": "Limpieza profesional residencial y comercial. Más de 8 años de experiencia sirviendo a familias latinas en Oklahoma.",
+        "phone": "+1 (918) 555-0123",
+        "email": "maria@example.com",
+        "website": "",
+        "address": "123 Main St",
+        "city": "Sallisaw", "state": "OK", "zip_code": "74955",
+        "latitude": 35.461, "longitude": -94.787,
+        "is_home_based": False,
+        "languages": ["es", "en"],
+        "services": ["Limpieza profunda", "Limpieza regular", "Post-construcción", "Mudanzas"],
+        "service_areas": ["Sallisaw, OK", "Muldrow, OK", "Fort Smith, AR"],
+        "hours": {"mon": "8:00-18:00", "tue": "8:00-18:00", "wed": "8:00-18:00", "thu": "8:00-18:00", "fri": "8:00-18:00", "sat": "9:00-15:00", "sun": "Cerrado"},
+        "logo_url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200",
+        "cover_url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200",
+        "photos": [],
+        "gallery": demo_gallery,
+        "social": {"facebook": "", "instagram": ""},
+        "price_range": "$$",
+        "verification_status": "approved",
+        "is_active": True, "plan": "pro",
+        "rating_avg": 0.0, "rating_count": 0,
+        "user_id": prov_user_id,
+        "slug": DEMO_SLUG,
+        "updated_at": now_iso,
+    }
+    existing_profile = await db.provider_profiles.find_one({"slug": DEMO_SLUG})
+    if not existing_profile:
+        demo_set["provider_id"] = f"prov_{uuid.uuid4().hex[:12]}"
+        demo_set["views"] = 0
+        demo_set["contact_clicks"] = 0
+        demo_set["created_at"] = now_iso
+        await db.provider_profiles.insert_one(demo_set)
+        logger.info("Seeded demo provider profile")
+    else:
+        # heal demo data on every startup so showcase is always presentable
+        await db.provider_profiles.update_one({"slug": DEMO_SLUG}, {"$set": demo_set})
+        logger.info("Demo provider profile refreshed")
 
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")

@@ -1,66 +1,89 @@
 # getmano — PRD
 
 ## Problem Statement (original, condensed)
-Construir un marketplace digital ("Tiangix Services / TiangixeCard", luego rebranded a **getmano**) que conecte a la comunidad latina en USA con proveedores de productos y servicios reales, verificados y confiables. Web app responsive, multi-rol (cliente/proveedor/admin), bilingüe ES/EN. Slogan: "Productos y servicios latinos, a la mano."
+Marketplace digital "getmano" (antes TiangixeCard) que conecta a la comunidad latina en USA con proveedores de productos y servicios reales, verificados y confiables. Web app responsive, multi-rol (cliente/proveedor/admin), bilingüe ES/EN.
 
 ## Architecture
-- **Frontend**: React 19 + React Router + Tailwind + Shadcn UI + Poppins font + Sonner toasts
-- **Backend**: FastAPI + Motor (MongoDB async) + PyJWT + bcrypt + httpx
-- **Auth**: Dual — JWT email/password cookie OR Emergent Google Auth session token (both stored in `session_token` httpOnly cookie)
-- **DB**: MongoDB. Collections: `users`, `user_sessions`, `provider_profiles`, `categories`, `reviews`, `favorites`, `audit_logs`
-- **i18n**: ES/EN dictionary in React context, persisted in localStorage
+- **Frontend**: React 19 + React Router + Tailwind + Shadcn UI + Poppins + Sonner
+- **Backend**: FastAPI + Motor (MongoDB async) + PyJWT + bcrypt + httpx + requests
+- **Storage**: Emergent Object Storage (vía EMERGENT_LLM_KEY) para logos/portadas/galería
+- **Auth**: JWT email/password + Emergent Google Auth (cookie httpOnly secure)
+- **DB collections**: `users`, `user_sessions`, `provider_profiles`, `categories`, `reviews`, `favorites`, `audit_logs`, `messages`, `conversations`, `files`
+- **i18n**: ES/EN dictionary en React context + localStorage
 
 ## User Personas
-1. **Cliente latino** — busca servicios verificados en su ciudad, deja reseñas, guarda favoritos.
-2. **Proveedor latino** — crea su eCard digital, gestiona perfil, ve analytics, recibe verificación.
-3. **Admin getmano** — aprueba/rechaza/suspende proveedores, ve métricas globales.
+1. Cliente latino — busca, guarda favoritos, deja reseñas, envía mensajes a proveedores.
+2. Proveedor latino — completa onboarding wizard, gestiona eCard, sube galería, recibe/responde mensajes, cambia plan.
+3. Admin getmano — aprueba/rechaza/suspende proveedores, ve métricas.
 
-## What's Been Implemented (2026-02-20)
-- ✅ Landing pública (Hero + buscador + 12 categorías + featured + how-it-works + benefits + testimonios + community + FAQ + footer)
-- ✅ Auth dual JWT + Emergent Google (con role-select por intención)
-- ✅ Búsqueda con filtros (categoría, ciudad, idioma, solo verificados)
-- ✅ eCard pública con URL única `/services/{slug}` (tracking de views + contact-clicks, reviews, share)
-- ✅ Provider dashboard (formulario completo: info negocio + ubicación + servicios + horarios + media + analytics)
-- ✅ Client dashboard (favoritos)
-- ✅ Admin dashboard (stats + filtro por status + acciones aprobar/rechazar/suspender + audit logs)
-- ✅ Plans page (Gratis $0 / Pro $19 / Premium $49) — UI únicamente, Stripe diferido
-- ✅ Bilingüe ES/EN con toggle en header (persistido)
-- ✅ Seed automático: 12 categorías, admin demo, proveedor demo
+## What's Been Implemented
+
+### Iteration 1 (2026-02-20)
+- Landing pública (Hero + buscador + 12 categorías + featured + how-it-works + benefits + testimonios + community + FAQ + footer)
+- Auth dual JWT + Emergent Google
+- Búsqueda con filtros (categoría, ciudad, idioma, verificados)
+- eCard pública con URL única `/services/{slug}`
+- Provider dashboard (single-page)
+- Client dashboard (favoritos)
+- Admin dashboard (verify + stats + audit logs)
+- Plans page (Gratis/Pro/Premium) — UI mockup
+- Bilingüe ES/EN
+- Seed automático: 12 categorías + admin + demo provider
+
+### Iteration 2 (2026-02-20)
+- **Galería de trabajos** de proveedores con upload vía Emergent Object Storage
+- **Compartir social** en eCard: WhatsApp, Facebook, SMS, Email, Copy link (modal nativo + fallback)
+- **Edición de perfil de usuario** (`/profile`): nombre, teléfono, idioma (email read-only)
+- **Botones UI Apple + Facebook login** (disabled "próximamente") junto a Google y Email
+- **Provider onboarding wizard** (6 pasos): Plan → Info → Location → Services → Media → Review
+- **Provider dashboard rediseñado** con 4 tabs: Perfil, Galería, Mensajes, Suscripción
+- **Local físico vs Desde casa / móvil** toggle (is_home_based)
+- **Autocompletado de direcciones** con OpenStreetMap Nominatim (sin API key)
+- **Mensajería interna** cliente ↔ proveedor (`/messages`) con conversaciones, unread, reply
+- **Cambio de plan** (mock, sin Stripe): provider puede cambiar tier desde dashboard
+- **Lat/lng** persistidos para futuros mapas
+- **Unique indexes** en provider_profiles.slug, .user_id, users.email, user_sessions.session_token, conversations(client_id, provider_id)
+- **Seed self-healing** del demo provider (refresca galería/cover/logo en cada startup)
 
 ## Test Credentials (`/app/memory/test_credentials.md`)
 - Admin: `admin@getmano.com` / `admin123`
-- Provider: `demo.provider@getmano.com` / `provider123`
-- Demo public eCard: `/services/maria-cleaning-services-sallisaw-ok`
+- Provider: `demo.provider@getmano.com` / `provider123` (3 gallery items seeded)
+- Demo eCard: `/services/maria-cleaning-services-sallisaw-ok`
 
-## Test Results (iteration_1.json)
-- Backend: 31/32 (96.9%)
-- Frontend: ~95% (all critical pages load; cosmetic items fixed post-test)
+## Test Results
+- Iteration 1: 32/32 backend (100%) + ~95% frontend
+- Iteration 2: 14/14 backend nuevos + regresión 32/32 OK
+- Iteration 3: 52/53 (98%) — falla seed gallery resuelta tras self-healing
 
 ## Prioritized Backlog
 
-### P0 (next iteration)
-- Stripe Connect + Billing integration (Gratis/Pro/Premium subscriptions, hosted onboarding for KYC)
-- Upload de imágenes real (logo/cover/photos via object storage)
-- Verificación más robusta (Twilio para teléfono, Google Places API para dirección)
-- Mensajería interna proveedor ↔ cliente
+### P0 (next)
+- **Stripe Connect + Billing** real para cobrar Pro $19 / Premium $49
+- **Apple Sign In real** (requiere Apple Developer $99/año)
+- **Facebook Login real** (requiere FB App ID/Secret)
+- Validación de URL en gallery + user picture (whitelist http(s)://, /api/files/)
+- Per-plan gallery cap server-side (free=3, pro=15, premium=∞)
+- Rate-limit en `/providers/{id}/contact-click` (actualmente abierto)
 
 ### P1
-- App móvil iOS/Android (Expo + React Native sharing types with web)
+- App móvil iOS/Android (Expo + React Native)
 - Push notifications + email transaccional (Resend/SendGrid)
-- SEO técnico: sitemap dinámico, schema.org LocalBusiness/Review/FAQ, OG images por ciudad/categoría
-- Solicitudes de cotización (workflow con estados)
-- QR personalizado por eCard
-- Pagination en /providers y /admin/providers
+- Verificación Twilio (teléfono) + Google Places (validar dirección)
+- SEO técnico: sitemap dinámico, schema.org LocalBusiness/Review/FAQ
+- Pagination en /providers, /admin/providers, /conversations/{id}/messages
+- Auditoría de cambios de plan (audit_logs)
+- WebSockets para mensajería en tiempo real
 
 ### P2
-- Matching IA y ranking por reputación + plan
+- IA matching y ranking por reputación + plan
 - WhatsApp Business API
-- Marketplace de leads pagados
+- Marketplace de leads pagados (cobrar al proveedor por solicitud entrante)
 - Programa de embajadores
-- CRM interno + automatización de onboarding
+- CRM interno
 
 ## Known Notes / Tech Debt
-- `server.py` ~580 líneas — recomendado split en módulos (auth/providers/admin/models/db)
-- `POST /api/providers/{id}/contact-click` no requiere auth (rate limit pendiente)
-- `POST /api/providers` auto-upgrade silencioso de client→provider (considerar consent explícito)
-- JWT logout es stateless (cookie se borra, token sigue válido hasta expirar) — aceptable, documentar
+- `server.py` ~880 líneas — recomendado split en módulos
+- JWT logout es stateless (cookie se borra; token sigue válido hasta expirar)
+- Storage `_storage_key` global no es safe en multi-worker
+- POST /providers auto-upgrade silencioso de client→provider
+- No CDN cache headers en `/api/files/{path}` (cada request reproxy)
