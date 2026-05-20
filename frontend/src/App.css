@@ -1,34 +1,68 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+.App { min-height: 100vh; }
+
+.gradient-text {
+    background: linear-gradient(135deg, #2563EB 0%, #F97316 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.hero-vignette {
+    background: radial-gradient(80% 60% at 50% 20%, rgba(37, 99, 235, 0.08), transparent 60%),
+                radial-gradient(60% 50% at 80% 80%, rgba(249, 115, 22, 0.08), transparent 60%);
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
+.card-lift { transition: transform .25s ease, box-shadow .25s ease; }
+.card-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.18); }
+
+.btn-primary {
+    background: #2563EB;
     color: white;
+    border-radius: 9999px;
+    padding: 0.75rem 1.75rem;
+    font-weight: 500;
+    transition: background-color .2s ease;
+}
+.btn-primary:hover { background: #1D4ED8; }
+
+.btn-secondary {
+    background: #F97316;
+    color: white;
+    border-radius: 9999px;
+    padding: 0.75rem 1.75rem;
+    font-weight: 500;
+    transition: background-color .2s ease;
+}
+.btn-secondary:hover { background: #EA580C; }
+
+.btn-outline {
+    border: 2px solid #E2E8F0;
+    color: #334155;
+    border-radius: 9999px;
+    padding: calc(0.75rem - 2px) 1.75rem;
+    background: transparent;
+    font-weight: 500;
+    transition: all .2s ease;
+}
+.btn-outline:hover { border-color: #2563EB; color: #2563EB; }
+
+.badge-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #F0FDF4;
+    color: #15803D;
+    border: 1px solid #BBF7D0;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
 }
 
-.App-link {
-    color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Glassmorphism header */
+.glass-header {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
 }

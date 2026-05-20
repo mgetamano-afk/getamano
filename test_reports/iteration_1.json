@@ -1,0 +1,86 @@
+{
+  "summary": "First-iteration end-to-end testing of getmano (FastAPI + React + MongoDB). Backend: 31/32 pytest pass (96.9%). Frontend: landing/search/eCard/login/admin dash/provider dash/plans all load and work. Auth (JWT + cookie), categories (12), providers CRUD, reviews, favorites, admin endpoints, plans, contact-click all verified working. Only 1 backend test 'failed' due to a seed-data inconsistency (demo provider has rating_count=24 with no real review docs, so first real review recomputes count down to 1) — recompute logic itself is correct.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "seed in server.py (demo provider)",
+        "issue": "Demo provider is seeded with rating_avg=4.8 and rating_count=24 but NO matching review documents in db.reviews. After the first real review is created, the aggregate recompute resets rating_count to 1 (not 25). Either seed matching dummy review docs or set rating_avg/rating_count to 0 to reflect reality."
+      },
+      {
+        "endpoint": "POST /api/auth/logout",
+        "issue": "When called with Bearer token (no cookie), it returns {ok:true} but doesn't actually invalidate JWT tokens server-side (stateless). This is by design but worth documenting. For Emergent session tokens it does delete the session doc — works."
+      },
+      {
+        "endpoint": "POST /api/providers",
+        "issue": "Endpoint auto-upgrades a 'client' user to 'provider' role silently. Acceptable, but could surprise the client; consider returning the new role in response or requiring explicit consent."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Header / public/index.html",
+        "issue": "Page <title> is still 'Emergent | Fullstack App' — should be 'getmano'. Affects SEO and tab branding.",
+        "selector": "document.title",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Header logo",
+        "issue": "Logo icon letter is still 'T' (residual TiangixeCard branding) next to the 'getmano' wordmark. Should be 'g' or the new logo asset.",
+        "selector": "header > a > div (logo badge)",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Login page",
+        "issue": "Invalid-credentials error did not surface via standard `.error`/`[role=alert]` selectors. It may be shown via a toast — confirm a user-visible message appears for failed login. Add data-testid='login-error' for testability.",
+        "selector": "(none reliably)",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Landing hero",
+        "issues": [
+          "Pre-login GET /api/auth/me returns 401 (expected) but is logged as a console error; consider catching silently to keep console clean."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Update <title> in /app/frontend/public/index.html to 'getmano'",
+    "Update Header logo icon badge in /app/frontend/src/components/Header.jsx from 'T' to 'g' (or proper logo)",
+    "Either seed real review documents matching the demo provider's rating_count=24, OR change seed to rating_avg=0/rating_count=0 to avoid the post-review count regression",
+    "Add data-testid attributes to login error toast for better test automation",
+    "Silently swallow 401 from /api/auth/me on initial unauthenticated load (in AuthContext) so the browser console stays clean"
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~580 lines and contains seed + models + auth + all routes. Recommend splitting into modules (auth.py, providers.py, admin.py, models.py, db.py) before it grows further.",
+    "JWT_SECRET defaults to a placeholder ('getmano-dev-secret-change-me') when not in env; backend/.env has a value but in production deployments any missing env should fail-fast instead of using default.",
+    "Cookie samesite='none' with secure=True is required for cross-site iframe/preview usage, fine here.",
+    "google_session route shadows top-level `client` variable with `client_http` rename — good. Verify the Mongo client is not accidentally rebinded elsewhere.",
+    "POST /api/providers/{id}/contact-click is unauthenticated — could be abused for spam metrics. Consider rate limiting or at least requiring session.",
+    "create_provider accepts role auto-upgrade for any user without explicit confirmation; could be used to escalate a client account to 'provider' simply by hitting the endpoint.",
+    "No pagination on /api/admin/providers (limit 500) or /api/providers (limit 24, no skip/offset). Add cursor or page/page_size for scalability.",
+    "Reviews recompute does a full collection scan up to 10000 — acceptable now but consider $group aggregation in the future."
+  ],
+  "updated_files": [
+    "/app/backend/tests/__init__.py (new)",
+    "/app/backend/tests/backend_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "96.9% (31/32)",
+    "frontend": "~95% (all critical pages load; only minor branding & error-surfacing nits)"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md: admin@getmano.com/admin123 and demo.provider@getmano.com/provider123. Both work. Demo eCard slug 'maria-cleaning-services-sallisaw-ok' loads correctly.",
+  "seed_data_creation": "Tests created several TEST_-prefixed users/providers/reviews via API (no cleanup performed). Future test agents should ignore TEST_-prefixed records or main agent can add a cleanup endpoint.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite is at /app/backend/tests/backend_test.py — reuse and extend. Backend is solid (31/32). The 1 failing review-aggregate test is due to seed data, not logic. Frontend works end-to-end: landing, search filters, eCard, login routing per role, admin dash with stats and verify actions, provider dash with editable profile + analytics, plans page. Main remaining items are cosmetic branding (page title + logo letter 'T'). When admin runs the verify endpoint, the in_review→approved roundtrip succeeds.",
+  "rca_of_seed_inconsistency": "Demo provider profile is inserted in startup seed() with rating_avg=4.8 and rating_count=24, but no review documents are inserted into db.reviews. When POST /api/reviews runs, the recompute logic queries all matching reviews and overwrites rating_avg/rating_count based on that real count. Mitigation: either also seed N=24 fake review docs OR set initial rating_avg=0, rating_count=0 in seed."
+}

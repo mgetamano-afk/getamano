@@ -1,0 +1,43 @@
+import { Link } from "react-router-dom";
+import { useI18n } from "../contexts/I18nContext";
+import { Mail, MapPin } from "lucide-react";
+
+export default function Footer() {
+  const { t } = useI18n();
+  return (
+    <footer className="bg-slate-900 text-slate-300 mt-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="md:col-span-2">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white font-bold font-display">T</div>
+            <span className="font-display font-bold text-xl text-white">get<span className="text-orange-400">mano</span></span>
+          </div>
+          <p className="text-slate-400 text-sm max-w-md leading-relaxed">{t("footer.tagline")}</p>
+          <div className="mt-4 flex items-center gap-4 text-sm text-slate-400">
+            <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> USA</span>
+            <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getmano.com</span>
+          </div>
+        </div>
+        <div>
+          <h4 className="font-display font-semibold text-white mb-3">Plataforma</h4>
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/search" className="hover:text-orange-400">{t("nav.explore")}</Link></li>
+            <li><Link to="/plans" className="hover:text-orange-400">{t("nav.plans")}</Link></li>
+            <li><Link to="/register?intent=provider" className="hover:text-orange-400">{t("nav.providers")}</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-display font-semibold text-white mb-3">Legal</h4>
+          <ul className="space-y-2 text-sm">
+            <li><a href="#" className="hover:text-orange-400">Términos</a></li>
+            <li><a href="#" className="hover:text-orange-400">Privacidad</a></li>
+            <li><a href="#" className="hover:text-orange-400">Reseñas</a></li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-slate-800 py-6 text-center text-sm text-slate-500">
+        {t("footer.legal")}
+      </div>
+    </footer>
+  );
+}
