@@ -1,0 +1,146 @@
+{
+  "project_info": {
+    "name": "Tiangix Services / TiangixeCard",
+    "description": "Digital marketplace platform connecting the US Latino community with verified, reliable service providers.",
+    "slogan": "Servicios o negocios latinos verificados en todo USA.",
+    "theme": "Light Theme",
+    "archetype": "Archetype 1 (Organic & Earthy) blended with Archetype 4 (Swiss/Modern Clean)",
+    "vibe": "Warm, trustworthy, distinctly Latino-friendly but professional and serious, modern marketplace."
+  },
+  "colors": {
+    "primary": {
+      "hex": "#2563EB",
+      "tailwind": "blue-600",
+      "usage": "Trust, core interactions, verification badges, main CTAs."
+    },
+    "secondary": {
+      "hex": "#F97316",
+      "tailwind": "orange-500",
+      "usage": "Warmth, energy, secondary CTAs, highlighted text, Latino community vibe."
+    },
+    "background": {
+      "hex": "#FAFAFA",
+      "tailwind": "neutral-50",
+      "usage": "Main app background, clean and airy."
+    },
+    "surface": {
+      "hex": "#FFFFFF",
+      "tailwind": "white",
+      "usage": "Cards, forms, floating navigation."
+    },
+    "text": {
+      "primary": { "tailwind": "slate-900", "hex": "#0F172A" },
+      "secondary": { "tailwind": "slate-500", "hex": "#64748B" }
+    },
+    "success_verified": {
+      "tailwind": "green-600",
+      "hex": "#16A34A",
+      "usage": "Verified provider checkmarks, success toasts, verified badges."
+    },
+    "border": {
+      "tailwind": "slate-200",
+      "hex": "#E2E8F0"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Poppins, sans-serif",
+      "body": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-slate-900",
+      "h3": "text-xl sm:text-2xl font-medium text-slate-800",
+      "body": "text-base leading-relaxed text-slate-600",
+      "small": "text-sm text-slate-500"
+    },
+    "rules": [
+      "Never use Inter or default generic sans for headings. Apply Poppins strictly.",
+      "Headings must have tight letter spacing (tracking-tight).",
+      "Labels/Overlines must be uppercase, tiny, wide spacing (tracking-widest)."
+    ]
+  },
+  "layout_and_spacing": {
+    "philosophy": "Generous Spacing, Mobile-first. Clear visual hierarchy.",
+    "spacing_scale": "Use p-6, p-8, p-12 for containers. Cards need minimum p-6 inner padding.",
+    "border_radius": "Rounded components to feel friendly: rounded-2xl for large cards, rounded-xl for standard cards/widgets, rounded-full for buttons and badges.",
+    "grids": {
+      "marketing_bento": "Asymmetrical tetris grids for How It Works / Benefits sections.",
+      "dashboard": "Control Room layout with gap-4 or gap-6, 1px solid borders, no heavy shadows."
+    }
+  },
+  "surfaces": {
+    "header": "Crystal Glassmorphism: bg-white/80 backdrop-blur-xl border-b border-slate-200/50, fixed top z-50. Always readable.",
+    "cards": "Solid white bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300.",
+    "dashboard_panel": "Flat white background, crisp 1px borders, dense data presentation."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 py-3 h-12 md:h-14 font-medium transition-colors w-full md:w-auto text-lg",
+      "secondary": "bg-orange-500 hover:bg-orange-600 text-white rounded-full px-8 py-3 h-12 md:h-14 font-medium transition-colors w-full md:w-auto text-lg",
+      "outline": "border-2 border-slate-200 text-slate-700 hover:border-blue-600 hover:text-blue-600 rounded-full px-8 py-3 bg-transparent transition-all"
+    },
+    "forms": "Simple, large touch targets (h-12 min), rounded-xl inputs, clear labels.",
+    "badges": "Clear visual indicator. Verified: bg-green-50 text-green-700 border border-green-200 rounded-full px-3 py-1 flex items-center gap-1 text-sm font-medium."
+  },
+  "motion_and_interactions": {
+    "hover": "All interactive elements must change state. Buttons darken, cards lift slightly (-translate-y-1) and gain shadow.",
+    "focus": "focus:ring-2 focus:ring-blue-500 focus:outline-none focus:ring-offset-2",
+    "transitions": "transition-all duration-200 ease-in-out"
+  },
+  "testing": {
+    "rules": [
+      "All interactive and key informational elements MUST include a data-testid attribute.",
+      "Format: kebab-case, role-based. Example: data-testid='login-form-submit-button'."
+    ]
+  },
+  "tech_stack_rules": {
+    "framework": "React JS (.js/.jsx files, NO Typescript/tsx)",
+    "styling": "Tailwind CSS",
+    "components": "Shadcn/UI heavily customized to match the brand identity. Use raw HTML/Tailwind for complex marketing page layouts.",
+    "icons": "lucide-react (default)"
+  },
+  "media": {
+    "hero_background": [
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/f2dd1a0b-059a-45af-8ff9-693307d92fdc/images/e06985637eaa773af2b061809b8ff14146dca5e2ae81220c3c8d946ecdf7e133.png",
+        "description": "Abstract modern architectural background with warm orange and deep trust blue accents",
+        "usage": "Main landing page hero section background layer (use with bg-white/20 overlay)"
+      }
+    ],
+    "service_providers": [
+      {
+        "url": "https://images.pexels.com/photos/30640160/pexels-photo-30640160.jpeg",
+        "description": "Construction worker with hard hat",
+        "usage": "Featured provider card or category image for Handyman/Construction"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1775178120132-f0ff7fd5cb40",
+        "description": "Worker in blue uniform cleaning window",
+        "usage": "Featured provider card for Cleaning Services"
+      },
+      {
+        "url": "https://images.pexels.com/photos/28736731/pexels-photo-28736731.jpeg",
+        "description": "Catering service buffet staff",
+        "usage": "Featured provider card for Catering/Food Services"
+      }
+    ],
+    "community": [
+      {
+        "url": "https://images.unsplash.com/photo-1722252799088-4781aabc3d0f",
+        "description": "Group of young smiling people",
+        "usage": "About us / Community trust section on landing page"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build the application using standard React JS (.jsx/.js files). DO NOT create .tsx files.",
+    "Apply mobile-first design. Ensure all tap targets are at least 48px (h-12). Images should not exceed 80vh on mobile.",
+    "Use Shadcn UI components for complex interactions (Dialogs, Tabs, Forms, Select) but strip out the default 'Vercel-look'. Customize border radii (rounded-2xl) and colors to match the Tiangix guidelines.",
+    "Create a bilingual toggle (ES/EN) in the header. Ensure UI text is easily translatable.",
+    "Implement distinct dashboard views based on user role (Client vs Provider).",
+    "For the public eCard (provider profile), ensure it feels like a high-quality modern profile page (like Linktree + Airbnb listing), not an old directory listing.",
+    "Never use generic placeholder images. ONLY use the provided URLs in the media section.",
+    "Apply 'data-testid' to all interactive elements for robust testing."
+  ]
+}
