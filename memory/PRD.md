@@ -1,89 +1,76 @@
 # getmano — PRD
 
-## Problem Statement (original, condensed)
-Marketplace digital "getmano" (antes TiangixeCard) que conecta a la comunidad latina en USA con proveedores de productos y servicios reales, verificados y confiables. Web app responsive, multi-rol (cliente/proveedor/admin), bilingüe ES/EN.
+## Problem Statement
+Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
 ## Architecture
 - **Frontend**: React 19 + React Router + Tailwind + Shadcn UI + Poppins + Sonner
-- **Backend**: FastAPI + Motor (MongoDB async) + PyJWT + bcrypt + httpx + requests
-- **Storage**: Emergent Object Storage (vía EMERGENT_LLM_KEY) para logos/portadas/galería
+- **Backend**: FastAPI + Motor (MongoDB async) + PyJWT + bcrypt + httpx + requests + twilio
+- **Storage**: Emergent Object Storage para logos/portadas/galería
+- **SMS**: Twilio (modo log-only hasta tener credenciales)
 - **Auth**: JWT email/password + Emergent Google Auth (cookie httpOnly secure)
-- **DB collections**: `users`, `user_sessions`, `provider_profiles`, `categories`, `reviews`, `favorites`, `audit_logs`, `messages`, `conversations`, `files`
-- **i18n**: ES/EN dictionary en React context + localStorage
+- **i18n**: ES/EN en React context + localStorage
 
-## User Personas
-1. Cliente latino — busca, guarda favoritos, deja reseñas, envía mensajes a proveedores.
-2. Proveedor latino — completa onboarding wizard, gestiona eCard, sube galería, recibe/responde mensajes, cambia plan.
-3. Admin getmano — aprueba/rechaza/suspende proveedores, ve métricas.
+## 4 Zonas
+1. **Zone 1 — Landing pública** (`/`): hero, búsqueda, categorías, featured, FAQ
+2. **Zone 2 — Cliente** (`/buscar`, `/proveedor/:slug`): búsqueda con filtros, eCard pública con galería, share social, mensaje, cotización
+3. **Zone 3 — Proveedor** (`/dashboard/provider` con tabs, `/provider/onboarding`, `/requests`, `/messages`, `/profile`): onboarding 6 pasos, dashboard con Perfil/Galería/Solicitudes/Mensajes/Suscripción
+4. **Zone 4 — Admin Console** (`/admin/*` con DARK SIDEBAR layout): Resumen, Cola de verificación, Proveedores (search/edit/pause), Reseñas (flag/delete), Categorías y ciudades CRUD, Audit log
 
-## What's Been Implemented
+## DB Collections
+- `users`, `user_sessions`, `provider_profiles`, `categories`, `cities`, `reviews`, `favorites`, `audit_logs`, `messages`, `conversations`, `service_requests`, `files`, `sms_log`
 
-### Iteration 1 (2026-02-20)
-- Landing pública (Hero + buscador + 12 categorías + featured + how-it-works + benefits + testimonios + community + FAQ + footer)
-- Auth dual JWT + Emergent Google
-- Búsqueda con filtros (categoría, ciudad, idioma, verificados)
-- eCard pública con URL única `/services/{slug}`
-- Provider dashboard (single-page)
-- Client dashboard (favoritos)
-- Admin dashboard (verify + stats + audit logs)
-- Plans page (Gratis/Pro/Premium) — UI mockup
-- Bilingüe ES/EN
-- Seed automático: 12 categorías + admin + demo provider
+## Backend Endpoints (resumen)
+- Auth: register, login, logout, me, google/session
+- Users: PUT /users/me
+- Categories: GET / + admin POST/PUT/DELETE
+- Cities: GET (featured), admin GET/POST/DELETE
+- Providers: search, featured, by-slug, me (GET/POST/PUT), contact-click, gallery (POST/DELETE), plan, admin verify/PATCH
+- Reviews: POST + admin GET/flag/delete (recompute rating)
+- Favorites: GET/POST/DELETE
+- Service Requests: POST/GET, PUT status (provider only)
+- Messages: POST, reply, conversations GET, messages GET (mark read)
+- Upload: POST /upload + GET /files/{path}
+- Admin: stats, providers list/PATCH/verify, audit-log
 
-### Iteration 2 (2026-02-20)
-- **Galería de trabajos** de proveedores con upload vía Emergent Object Storage
-- **Compartir social** en eCard: WhatsApp, Facebook, SMS, Email, Copy link (modal nativo + fallback)
-- **Edición de perfil de usuario** (`/profile`): nombre, teléfono, idioma (email read-only)
-- **Botones UI Apple + Facebook login** (disabled "próximamente") junto a Google y Email
-- **Provider onboarding wizard** (6 pasos): Plan → Info → Location → Services → Media → Review
-- **Provider dashboard rediseñado** con 4 tabs: Perfil, Galería, Mensajes, Suscripción
-- **Local físico vs Desde casa / móvil** toggle (is_home_based)
-- **Autocompletado de direcciones** con OpenStreetMap Nominatim (sin API key)
-- **Mensajería interna** cliente ↔ proveedor (`/messages`) con conversaciones, unread, reply
-- **Cambio de plan** (mock, sin Stripe): provider puede cambiar tier desde dashboard
-- **Lat/lng** persistidos para futuros mapas
-- **Unique indexes** en provider_profiles.slug, .user_id, users.email, user_sessions.session_token, conversations(client_id, provider_id)
-- **Seed self-healing** del demo provider (refresca galería/cover/logo en cada startup)
+## SMS Events (log-only hasta poner Twilio keys)
+- ✅ Nuevo mensaje al proveedor
+- ✅ Respuesta de cualquier lado
+- ✅ Nueva solicitud de cotización
+- ✅ Cambio de estado de verificación
+- ✅ Cambio de estado de solicitud
 
 ## Test Credentials (`/app/memory/test_credentials.md`)
 - Admin: `admin@getmano.com` / `admin123`
-- Provider: `demo.provider@getmano.com` / `provider123` (3 gallery items seeded)
+- Provider: `demo.provider@getmano.com` / `provider123`
 - Demo eCard: `/services/maria-cleaning-services-sallisaw-ok`
 
 ## Test Results
-- Iteration 1: 32/32 backend (100%) + ~95% frontend
-- Iteration 2: 14/14 backend nuevos + regresión 32/32 OK
-- Iteration 3: 52/53 (98%) — falla seed gallery resuelta tras self-healing
+- Iteration 1: 32/32 backend (100%)
+- Iteration 2: 14/14 nuevos (100%)
+- Iteration 3 (esta): 76/81 (94%) — fix aplicado a PUT /users/me decorator faltante, phone agregado a RegisterIn, unique index reviews(user_id, provider_id)
 
 ## Prioritized Backlog
 
-### P0 (next)
-- **Stripe Connect + Billing** real para cobrar Pro $19 / Premium $49
-- **Apple Sign In real** (requiere Apple Developer $99/año)
-- **Facebook Login real** (requiere FB App ID/Secret)
-- Validación de URL en gallery + user picture (whitelist http(s)://, /api/files/)
-- Per-plan gallery cap server-side (free=3, pro=15, premium=∞)
-- Rate-limit en `/providers/{id}/contact-click` (actualmente abierto)
+### P0 (siguiente)
+- Activar **Twilio real** (cuando el usuario provea ACCOUNT_SID, AUTH_TOKEN, PHONE_NUMBER)
+- **Stripe Connect + Billing** (cuando usuario tenga LLC + bank)
+- Verificación OTP de teléfono al onboarding del proveedor con Twilio Verify
+- Subida real de documentos en onboarding (provider_documents collection)
 
 ### P1
 - App móvil iOS/Android (Expo + React Native)
-- Push notifications + email transaccional (Resend/SendGrid)
-- Verificación Twilio (teléfono) + Google Places (validar dirección)
-- SEO técnico: sitemap dinámico, schema.org LocalBusiness/Review/FAQ
-- Pagination en /providers, /admin/providers, /conversations/{id}/messages
-- Auditoría de cambios de plan (audit_logs)
-- WebSockets para mensajería en tiempo real
+- Email transaccional (Resend) — alternativa/complemento a SMS
+- Verificación Google Places de dirección
+- SEO técnico: sitemap dinámico, schema.org
+- Pagination en /providers, /admin/providers, /conversations, /service-requests
+- Rate limiting en /messages y /service-requests
+- Apple Sign In + Facebook Login reales
 
 ### P2
-- IA matching y ranking por reputación + plan
+- IA matching y ranking
 - WhatsApp Business API
-- Marketplace de leads pagados (cobrar al proveedor por solicitud entrante)
+- Marketplace de leads pagados
 - Programa de embajadores
 - CRM interno
-
-## Known Notes / Tech Debt
-- `server.py` ~880 líneas — recomendado split en módulos
-- JWT logout es stateless (cookie se borra; token sigue válido hasta expirar)
-- Storage `_storage_key` global no es safe en multi-worker
-- POST /providers auto-upgrade silencioso de client→provider
-- No CDN cache headers en `/api/files/{path}` (cada request reproxy)
+- Split `server.py` en módulos

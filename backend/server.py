@@ -149,6 +149,7 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str
     name: str
+    phone: Optional[str] = None
     role: Role = "client"
 
 class LoginIn(BaseModel):
@@ -373,6 +374,7 @@ async def seed():
         await db.users.create_index("email", unique=True)
         await db.user_sessions.create_index("session_token", unique=True)
         await db.conversations.create_index([("client_id", 1), ("provider_id", 1)], unique=True)
+        await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
     except Exception as e:
         logger.warning(f"Index creation: {e}")
 
@@ -471,6 +473,7 @@ async def register(payload: RegisterIn, response: Response):
         "email": payload.email.lower(),
         "password_hash": hash_password(payload.password),
         "name": payload.name,
+        "phone": payload.phone or None,
         "role": payload.role if payload.role in ("client", "provider") else "client",
         "picture": None, "language": "es",
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -981,7 +984,8 @@ async def admin_edit_provider(provider_id: str, payload: AdminProviderEditIn, ad
     })
     return {"ok": True}
 
-# ============ INCLUDE ROUTER ============
+# ============ USER UPDATE ============
+@api_router.put("/users/me")
 async def update_user(payload: UserUpdateIn, user: User = Depends(get_current_user)):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not update:
