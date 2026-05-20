@@ -9,7 +9,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white font-bold font-display">T</div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white font-bold font-display">g</div>
             <span className="font-display font-bold text-xl text-white">get<span className="text-orange-400">mano</span></span>
           </div>
           <p className="text-slate-400 text-sm max-w-md leading-relaxed">{t("footer.tagline")}</p>

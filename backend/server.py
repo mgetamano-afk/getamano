@@ -254,7 +254,7 @@ async def seed():
             "price_range": "$$",
             "verification_status": "approved",
             "is_active": True, "plan": "pro",
-            "rating_avg": 4.8, "rating_count": 24,
+            "rating_avg": 0.0, "rating_count": 0,
             "views": 0, "contact_clicks": 0,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
