@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration-3 features verified end-to-end. Backend: 76/81 pytest pass (94%) — all NEW iter-3 endpoints green (service-requests CRUD+status, admin reviews list/flag/delete+rating recompute, admin categories CRUD with delete-blocked-when-used, admin cities incl. public featured filter, admin audit-log with admin enrichment, admin PATCH provider). Twilio log-only mode confirmed: db.sms_log entries created with status='log_only' for ALL 5 events (new_message_to_provider, message_reply, new_quote_request, request_accepted, verify_approved). Frontend: dark Admin Console at /admin loads with proper sidebar (Resumen/Cola/Proveedores/Reseñas/Categorías/Audit), all 5 sub-pages render with data; anonymous /admin correctly redirects to /login; /buscar and /proveedor/:slug aliases work. ONE NEW CRITICAL REGRESSION: PUT /api/users/me returns 404 — the update_user function at server.py:985 is orphaned (no @api_router.put decorator), placed AFTER the '# ============ INCLUDE ROUTER ============' separator. This breaks /users/me profile updates from any UI (e.g., Mi Perfil page) and is the root cause of iter2 TestUserUpdate failures.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PUT /api/users/me", "issue": "Returns 404 — update_user() at server.py:985 has NO @api_router.put('/users/me') decorator. It is defined as a bare async function AFTER the '# INCLUDE ROUTER' comment and never registered. Regression introduced in iter-3 rewrite. Fix: add `@api_router.put(\"/users/me\")` immediately above the function (line 984) and move it BEFORE the include_router call.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "seed()", "issue": "Demo provider gallery still empty (carryover from iter-3). server.py demo seed block still gated by db.users.find_one(demo email); on existing DB the new gallery insert is never executed. iteration3_test::TestDemoGallery still failing."},
+      {"endpoint": "POST /api/reviews", "issue": "iteration1 TestReviews::test_create_review_and_duplicate_rejected fails (rating_count==2, expected 1) — likely flakiness from accumulated demo reviews or missing per-(user,provider) uniqueness on reviews."},
+      {"endpoint": "POST /api/auth/register", "issue": "RegisterIn does not accept `phone` (only email/password/name/role). To populate User.phone (needed for SMS), users must update via PUT /users/me — which is currently broken (see CRITICAL)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "/admin pages", "issue": "2 AxiosError page errors observed during admin navigation (non-blocking — pages still render). Likely caused by occasional 4xx from background fetches.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration4_test.py",
+    "/app/test_reports/pytest/iteration4_results.xml",
+    "/app/test_reports/pytest/iteration4_full.xml"
+  ],
+  "action_items": [
+    "[CRITICAL] Add `@api_router.put(\"/users/me\")` decorator above update_user() at server.py:985 — it currently sits below '# INCLUDE ROUTER' separator and is unregistered. This breaks the user profile edit flow.",
+    "Move update_user() back to its proper location near other user/auth endpoints (before include_router) for clarity.",
+    "(Carryover iter-3) Make demo provider gallery seed idempotent — split user-existence and provider_profile gallery checks; OR run one-shot migration to $set gallery items on existing demo profile.",
+    "(Carryover iter-2) Add `phone` field to RegisterIn so newly registered users can opt-in to SMS without needing PUT /users/me.",
+    "Add a per-(user_id, provider_id) uniqueness check on POST /api/reviews to prevent duplicate reviews from same user."
+  ],
+  "critical_code_review_comments": [
+    "server.py:985 — update_user() is unreachable (missing decorator). Code review must verify route registration after every endpoint move.",
+    "server.py is ~1200 lines — should be split (auth.py, providers.py, messaging.py, admin.py, sms.py, storage.py).",
+    "send_sms() depends on User.phone being set; RegisterIn does not expose phone and PUT /users/me is broken — so in practice ALL SMS events for client-side users currently no-op unless DB is mutated externally. Worth surfacing this UX gap.",
+    "Admin audit log writes are scattered across endpoints with copy-pasted insert blocks — extract a `_log_audit(admin_id, action, target, note)` helper.",
+    "No rate-limiting on POST /api/service-requests or POST /api/messages — bots could spam providers.",
+    "ServiceRequestStatusIn uses Literal enum correctly; CategoryIn lacks color/icon format validation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration4_test.py (new — 28 tests covering all iter-3 endpoints + Twilio log-only + regression check)"
+  ],
+  "success_rate": {"backend": "94% (76/81 — all NEW iter-3 endpoints 100% pass; 5 fails = 3x PUT /users/me regression + 1 carryover gallery + 1 review-dup)", "frontend": "100% — admin layout, all 5 sub-pages, aliases, redirect all verified"},
+  "test_credentials": "admin@getmano.com/admin123, demo.provider@getmano.com/provider123 — both working",
+  "seed_data_creation": "Tests create TEST_-prefixed clients, categories (cleaned up via fixture teardown), cities (cleaned up), service requests (no cleanup — accumulating), reviews (deleted by test). Demo user's User.phone is patched to +15559990000 by iteration4 setup_class so SMS log-only fires.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "PUT /api/users/me is unregistered (server.py:985). After main agent fixes by adding @api_router.put decorator: re-run `pytest /app/backend/tests/ -v` — expect iteration2_test::TestUserUpdate (2 tests) + iteration4_test::TestUsersMeRegression (1 test) to flip from RED→GREEN. The 28-test iteration4_test.py covers ALL new iter-3 endpoints and Twilio log-only via direct db.sms_log inspection. Frontend admin console (/admin and 5 sub-pages) is fully functional and was visually verified via Playwright screenshots; no UI fixes needed.",
+  "rca_of_issue": "PUT /api/users/me 404: The endpoint handler `update_user()` exists in server.py at line 985, but it sits inside/after the comment block `# ============ INCLUDE ROUTER ============` and has NO `@api_router.put(...)` decorator. Compare to other user/auth endpoints (lines 463-541) which all properly use @api_router.<method>. Reproduction: `curl -X PUT $BACKEND/api/users/me -H 'Authorization: Bearer <token>' -d '{\"name\":\"x\"}'` returns 404 Not Found. Mitigation: prepend `@api_router.put(\"/users/me\")` to line 984 and (ideally) relocate the function above the include_router call so it follows the same pattern as siblings. Once fixed, 3 existing tests will pass and the Mi Perfil flow will be unblocked."
+}

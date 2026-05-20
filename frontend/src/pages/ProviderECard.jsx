@@ -20,6 +20,7 @@ export default function ProviderECard() {
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
+  const [mode, setMode] = useState("message"); // "message" | "quote"
   const [msgBody, setMsgBody] = useState("");
   const [msgSubject, setMsgSubject] = useState("");
   const [lightbox, setLightbox] = useState(null);
@@ -38,6 +39,15 @@ export default function ProviderECard() {
       await api.post("/favorites", { provider_id: p.provider_id });
       toast.success("Agregado a favoritos");
     } catch (e) { toast.error("Error"); }
+  };
+
+  const sendQuoteRequest = async () => {
+    if (!user) { toast.error("Inicia sesión para pedir cotización"); return; }
+    try {
+      await api.post("/service-requests", { provider_id: p.provider_id, message: msgBody, service_type: msgSubject || "" });
+      toast.success("¡Solicitud enviada! El proveedor recibirá una notificación.");
+      setShowMessage(false); setMsgBody(""); setMsgSubject("");
+    } catch (err) { toast.error(err?.response?.data?.detail || "Error"); }
   };
 
   const sendMessage = async (e) => {
@@ -120,10 +130,10 @@ export default function ProviderECard() {
                   <Phone className="w-4 h-4" /> {t("provider.call")}
                 </a>
               )}
-              <button onClick={() => setShowMessage(true)} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
+              <button onClick={() => { setShowMessage(true); setMode("message"); }} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
                 <MessageSquare className="w-4 h-4" /> {t("provider.message")}
               </button>
-              <button onClick={() => setShowMessage(true)} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
+              <button onClick={() => { setShowMessage(true); setMode("quote"); }} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
                 <FileText className="w-4 h-4" /> {t("provider.quote")}
               </button>
               {!p.is_home_based && p.city && (
@@ -233,19 +243,21 @@ export default function ProviderECard() {
           </aside>
         </div>
 
-        {/* Message modal */}
+        {/* Message / Quote modal */}
         {showMessage && (
           <div className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-0 md:p-4" onClick={() => setShowMessage(false)} data-testid="message-modal">
             <div className="bg-white rounded-t-3xl md:rounded-2xl w-full md:max-w-md p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-semibold text-lg text-slate-900">Enviar mensaje a {p.business_name}</h3>
+                <h3 className="font-display font-semibold text-lg text-slate-900">{mode === "quote" ? `Pedir cotización a ${p.business_name}` : `Enviar mensaje a ${p.business_name}`}</h3>
                 <button onClick={() => setShowMessage(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
               </div>
-              <form onSubmit={sendMessage} className="space-y-3" data-testid="message-form">
-                <input value={msgSubject} onChange={e => setMsgSubject(e.target.value)} placeholder="Asunto (ej. Cotización)" className="w-full h-11 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid="message-subject-input" />
-                <textarea required value={msgBody} onChange={e => setMsgBody(e.target.value)} placeholder="Describe lo que necesitas..." rows={5} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid="message-body-input" />
-                <button type="submit" className="btn-primary w-full justify-center" data-testid="message-send-submit">Enviar</button>
-                {!user && <p className="text-xs text-slate-500 text-center">Necesitas iniciar sesión para enviar mensajes.</p>}
+              <form onSubmit={(e) => { e.preventDefault(); mode === "quote" ? sendQuoteRequest() : sendMessage(e); }} className="space-y-3" data-testid="message-form">
+                <input value={msgSubject} onChange={e => setMsgSubject(e.target.value)} placeholder={mode === "quote" ? "Tipo de servicio (ej. Limpieza profunda)" : "Asunto (ej. Cotización)"} className="w-full h-11 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid="message-subject-input" />
+                <textarea required value={msgBody} onChange={e => setMsgBody(e.target.value)} placeholder={mode === "quote" ? "Cuéntale al proveedor qué necesitas, dónde, fecha aproximada..." : "Escribe tu mensaje..."} rows={5} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid="message-body-input" />
+                <button type="submit" className={`${mode === "quote" ? "btn-secondary" : "btn-primary"} w-full justify-center`} data-testid="message-send-submit">
+                  {mode === "quote" ? "Enviar solicitud" : "Enviar mensaje"}
+                </button>
+                {!user && <p className="text-xs text-slate-500 text-center">Necesitas iniciar sesión.</p>}
               </form>
             </div>
           </div>

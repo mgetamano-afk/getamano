@@ -6,13 +6,14 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { GalleryUpload, buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox } from "lucide-react";
 import { toast } from "sonner";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: Settings },
   { id: "galeria", label: "Galería", Icon: ImageIcon },
+  { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
   { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
   { id: "suscripcion", label: "Suscripción", Icon: CreditCard },
 ];
@@ -25,6 +26,7 @@ export default function ProviderDashboard() {
   const [categories, setCategories] = useState([]);
   const [plans, setPlans] = useState([]);
   const [conversations, setConversations] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("perfil");
   const [saving, setSaving] = useState(false);
@@ -269,6 +271,36 @@ export default function ProviderDashboard() {
                   <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center text-slate-500">
                     <ImageIcon className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                     <p>Aún no tienes fotos en tu galería.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab === "solicitudes" && (
+              <div data-testid="dashboard-requests">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="font-display font-semibold text-lg text-slate-900">Solicitudes de cotización</h3>
+                    <p className="text-sm text-slate-500">{requests.filter(r => r.status === "pending").length} pendientes</p>
+                  </div>
+                  <Link to="/requests" className="btn-outline text-sm">Ver todas</Link>
+                </div>
+                {requests.length === 0 ? (
+                  <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-10 text-center text-slate-500">
+                    <Inbox className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                    <p>Aún no recibes solicitudes.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl">
+                    {requests.slice(0, 5).map(r => (
+                      <Link key={r.request_id} to="/requests" className="block p-4 hover:bg-slate-50">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium text-slate-900 text-sm">{r.client_name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "pending" ? "bg-yellow-50 text-yellow-700" : r.status === "accepted" ? "bg-blue-50 text-blue-700" : r.status === "completed" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{r.status}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate mt-1">{r.message}</p>
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>

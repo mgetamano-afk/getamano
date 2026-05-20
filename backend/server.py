@@ -76,6 +76,55 @@ def get_object(path: str):
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
+# Twilio SMS (log-only mode when credentials are absent)
+TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
+TWILIO_FROM = os.environ.get("TWILIO_PHONE_NUMBER", "").strip()
+_twilio_client = None
+
+def get_twilio():
+    global _twilio_client
+    if _twilio_client is not None:
+        return _twilio_client
+    if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
+        from twilio.rest import Client as TwilioClient
+        _twilio_client = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
+    return _twilio_client
+
+def send_sms(to_phone: str, body: str, event: str = "generic"):
+    """Send SMS or log-only if Twilio not configured. Stores attempt in db.sms_log."""
+    to_phone = (to_phone or "").strip()
+    if not to_phone:
+        return {"status": "skipped", "reason": "no phone"}
+    twilio = get_twilio()
+    record = {
+        "to": to_phone, "body": body[:300], "event": event,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if twilio is None:
+        record["status"] = "log_only"
+        logger.info(f"[SMS log-only] event={event} to={to_phone} body={body!r}")
+    else:
+        try:
+            msg = twilio.messages.create(to=to_phone, from_=TWILIO_FROM, body=body)
+            record["status"] = "sent"
+            record["sid"] = msg.sid
+        except Exception as e:
+            record["status"] = "error"
+            record["error"] = str(e)[:200]
+            logger.exception("Twilio send failed")
+    # fire-and-forget insert (sync motor here would block — use create_task)
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(db.sms_log.insert_one(dict(record)))
+        else:
+            asyncio.run(db.sms_log.insert_one(dict(record)))
+    except Exception:
+        pass
+    return record
+
 app = FastAPI(title="getmano API")
 api_router = APIRouter(prefix="/api")
 
@@ -196,6 +245,39 @@ class PlanChangeIn(BaseModel):
 class GalleryItemIn(BaseModel):
     url: str
     caption: Optional[str] = ""
+
+class ServiceRequestIn(BaseModel):
+    provider_id: str
+    message: str = Field(min_length=3, max_length=2000)
+    service_type: Optional[str] = ""
+    contact_phone: Optional[str] = ""
+    preferred_date: Optional[str] = ""
+
+class ServiceRequestStatusIn(BaseModel):
+    status: Literal["pending", "accepted", "declined", "completed"]
+
+class CategoryIn(BaseModel):
+    slug: str
+    name_es: str
+    name_en: str
+    icon: str = "Sparkles"
+    color: str = "#3B82F6"
+
+class CityIn(BaseModel):
+    name: str
+    state: str
+    featured: bool = False
+
+class AdminProviderEditIn(BaseModel):
+    business_name: Optional[str] = None
+    legal_name: Optional[str] = None
+    category_id: Optional[str] = None
+    description: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    is_active: Optional[bool] = None
+    plan: Optional[str] = None
+    verification_status: Optional[VerificationStatus] = None
 
 # ============ HELPERS ============
 def hash_password(pw: str) -> str:
@@ -658,6 +740,20 @@ async def admin_verify(provider_id: str, payload: VerificationActionIn, admin: U
         "target": provider_id, "note": payload.note,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
+
+    # SMS notify provider on status change
+    provider = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0})
+    if provider:
+        prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
+        if prov_user and prov_user.get("phone"):
+            label = {"approved": "¡Felicidades! Tu perfil fue verificado por getmano.",
+                     "rejected": "Tu solicitud de verificación fue rechazada. Revisa los requisitos.",
+                     "needs_info": "Necesitamos más información para verificar tu perfil.",
+                     "suspended": "Tu perfil fue suspendido. Contacta soporte.",
+                     "in_review": "Tu perfil está siendo revisado por nuestro equipo.",
+                     "pending": "Tu perfil está pendiente de revisión."}.get(payload.status, f"Estado actualizado: {payload.status}")
+            send_sms(prov_user["phone"], f"[getmano] {label}", event=f"verify_{payload.status}")
+
     return {"ok": True}
 
 @api_router.get("/admin/stats")
@@ -683,8 +779,209 @@ async def list_plans():
         {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 49, "features_es": ["Proveedor destacado", "Aparece en homepage", "Campañas promocionales", "Mayor visibilidad por ciudad", "QR personalizado", "Reportes avanzados"], "features_en": ["Featured provider", "Homepage placement", "Promo campaigns", "City-wide visibility", "Custom QR", "Advanced reports"], "highlight": False},
     ]
 
+# ============ SERVICE REQUESTS ============
+@api_router.post("/service-requests")
+async def create_service_request(payload: ServiceRequestIn, user: User = Depends(get_current_user)):
+    provider = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    if provider["user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot request from yourself")
+    now = datetime.now(timezone.utc).isoformat()
+    req = {
+        "request_id": f"req_{uuid.uuid4().hex[:12]}",
+        "client_id": user.user_id,
+        "client_name": user.name,
+        "client_phone": payload.contact_phone or user.phone or "",
+        "provider_id": payload.provider_id,
+        "provider_user_id": provider["user_id"],
+        "business_name": provider["business_name"],
+        "slug": provider["slug"],
+        "message": payload.message,
+        "service_type": payload.service_type or "",
+        "preferred_date": payload.preferred_date or "",
+        "status": "pending",
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.service_requests.insert_one(req)
+    await db.provider_profiles.update_one({"provider_id": payload.provider_id}, {"$inc": {"contact_clicks": 1}})
+
+    # SMS notify provider
+    prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
+    if prov_user and prov_user.get("phone"):
+        send_sms(prov_user["phone"], f"[getmano] Nueva solicitud de cotización de {user.name}: {payload.message[:120]}", event="new_quote_request")
+
+    req.pop("_id", None)
+    return req
+
+@api_router.get("/service-requests")
+async def list_service_requests(user: User = Depends(get_current_user)):
+    q = {"$or": [{"client_id": user.user_id}, {"provider_user_id": user.user_id}]}
+    items = await db.service_requests.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return items
+
+@api_router.put("/service-requests/{request_id}/status")
+async def update_request_status(request_id: str, payload: ServiceRequestStatusIn, user: User = Depends(get_current_user)):
+    req = await db.service_requests.find_one({"request_id": request_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Not found")
+    if req["provider_user_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="Only the provider can change status")
+    await db.service_requests.update_one({"request_id": request_id}, {"$set": {"status": payload.status, "updated_at": datetime.now(timezone.utc).isoformat()}})
+
+    # SMS notify client
+    client_user = await db.users.find_one({"user_id": req["client_id"]}, {"_id": 0})
+    if client_user and client_user.get("phone"):
+        label = {"accepted": "aceptó", "declined": "rechazó", "completed": "marcó como completada"}.get(payload.status, payload.status)
+        send_sms(client_user["phone"], f"[getmano] {req['business_name']} {label} tu solicitud.", event=f"request_{payload.status}")
+    return {"ok": True}
+
+# ============ ADMIN: REVIEWS MODERATION ============
+@api_router.get("/admin/reviews")
+async def admin_list_reviews(flagged: Optional[bool] = None, _: User = Depends(require_admin)):
+    q = {}
+    if flagged is not None:
+        q["is_flagged"] = flagged
+    items = await db.reviews.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    # enrich with provider business name
+    pids = list({r["provider_id"] for r in items})
+    provs = {p["provider_id"]: p for p in await db.provider_profiles.find({"provider_id": {"$in": pids}}, {"_id": 0, "provider_id": 1, "business_name": 1, "slug": 1}).to_list(500)}
+    for r in items:
+        r["provider"] = provs.get(r["provider_id"])
+    return items
+
+@api_router.post("/admin/reviews/{review_id}/flag")
+async def admin_flag_review(review_id: str, admin: User = Depends(require_admin)):
+    await db.reviews.update_one({"review_id": review_id}, {"$set": {"is_flagged": True}})
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "review:flag", "target": review_id, "note": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+@api_router.delete("/admin/reviews/{review_id}")
+async def admin_delete_review(review_id: str, admin: User = Depends(require_admin)):
+    review = await db.reviews.find_one({"review_id": review_id}, {"_id": 0})
+    if not review:
+        raise HTTPException(status_code=404, detail="Not found")
+    await db.reviews.delete_one({"review_id": review_id})
+    # recompute aggregate
+    pid = review["provider_id"]
+    all_revs = await db.reviews.find({"provider_id": pid}, {"_id": 0, "rating": 1}).to_list(10000)
+    avg = (sum(r["rating"] for r in all_revs) / len(all_revs)) if all_revs else 0.0
+    await db.provider_profiles.update_one({"provider_id": pid}, {"$set": {"rating_avg": round(avg, 2), "rating_count": len(all_revs)}})
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "review:delete", "target": review_id, "note": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+# ============ ADMIN: CATEGORIES CRUD ============
+@api_router.post("/admin/categories")
+async def admin_create_category(payload: CategoryIn, admin: User = Depends(require_admin)):
+    if await db.categories.find_one({"slug": payload.slug}):
+        raise HTTPException(status_code=400, detail="Slug already exists")
+    doc = {"category_id": f"cat_{uuid.uuid4().hex[:10]}", **payload.model_dump()}
+    await db.categories.insert_one(doc)
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "category:create", "target": doc["category_id"], "note": payload.slug,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    doc.pop("_id", None)
+    return doc
+
+@api_router.put("/admin/categories/{category_id}")
+async def admin_update_category(category_id: str, payload: CategoryIn, admin: User = Depends(require_admin)):
+    result = await db.categories.update_one({"category_id": category_id}, {"$set": payload.model_dump()})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "category:update", "target": category_id, "note": payload.slug,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+@api_router.delete("/admin/categories/{category_id}")
+async def admin_delete_category(category_id: str, admin: User = Depends(require_admin)):
+    used = await db.provider_profiles.count_documents({"category_id": category_id})
+    if used > 0:
+        raise HTTPException(status_code=400, detail=f"Used by {used} providers")
+    await db.categories.delete_one({"category_id": category_id})
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "category:delete", "target": category_id, "note": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+# ============ ADMIN: CITIES ============
+@api_router.get("/admin/cities")
+async def admin_list_cities(_: User = Depends(require_admin)):
+    cities = await db.cities.find({}, {"_id": 0}).sort("featured", -1).to_list(500)
+    return cities
+
+@api_router.post("/admin/cities")
+async def admin_create_city(payload: CityIn, admin: User = Depends(require_admin)):
+    existing = await db.cities.find_one({"name": payload.name, "state": payload.state})
+    if existing:
+        raise HTTPException(status_code=400, detail="City already exists")
+    doc = {"city_id": f"city_{uuid.uuid4().hex[:10]}", **payload.model_dump()}
+    await db.cities.insert_one(doc)
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "city:create", "target": doc["city_id"], "note": f"{payload.name}, {payload.state}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/admin/cities/{city_id}")
+async def admin_delete_city(city_id: str, admin: User = Depends(require_admin)):
+    await db.cities.delete_one({"city_id": city_id})
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "city:delete", "target": city_id, "note": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+@api_router.get("/cities")
+async def public_cities():
+    return await db.cities.find({"featured": True}, {"_id": 0}).limit(50).to_list(50)
+
+# ============ ADMIN: AUDIT LOG ============
+@api_router.get("/admin/audit-log")
+async def admin_audit_log(limit: int = 100, _: User = Depends(require_admin)):
+    logs = await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    admin_ids = list({log["admin_id"] for log in logs})
+    admins = {u["user_id"]: u for u in await db.users.find({"user_id": {"$in": admin_ids}}, {"_id": 0, "user_id": 1, "name": 1, "email": 1}).to_list(100)}
+    for log in logs:
+        log["admin"] = admins.get(log["admin_id"])
+    return logs
+
+# ============ ADMIN: PROVIDER EDIT (override) ============
+@api_router.patch("/admin/providers/{provider_id}")
+async def admin_edit_provider(provider_id: str, payload: AdminProviderEditIn, admin: User = Depends(require_admin)):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        return {"ok": True}
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.provider_profiles.update_one({"provider_id": provider_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    await db.audit_logs.insert_one({
+        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
+        "action": "provider:edit", "target": provider_id, "note": ",".join(update.keys()),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
 # ============ INCLUDE ROUTER ============
-@api_router.put("/users/me")
 async def update_user(payload: UserUpdateIn, user: User = Depends(get_current_user)):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not update:
@@ -816,6 +1113,12 @@ async def send_message(payload: MessageIn, user: User = Depends(get_current_user
         "created_at": now,
     }
     await db.messages.insert_one(msg)
+
+    # SMS notify provider
+    prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
+    if prov_user and prov_user.get("phone"):
+        send_sms(prov_user["phone"], f"[getmano] Nuevo mensaje de {user.name}: {payload.body[:120]}", event="new_message_to_provider")
+
     msg.pop("_id", None)
     return msg
 
@@ -846,6 +1149,14 @@ async def reply_message(conversation_id: str, payload: MessageReplyIn, user: Use
         update["unread_for_provider"] = True
         update["unread_for_client"] = False
     await db.conversations.update_one({"conversation_id": conversation_id}, {"$set": update})
+
+    # SMS notify the other party
+    other_user_id = conv["client_id"] if is_provider else conv["provider_user_id"]
+    other_user = await db.users.find_one({"user_id": other_user_id}, {"_id": 0})
+    if other_user and other_user.get("phone"):
+        sender_label = conv["business_name"] if is_provider else user.name
+        send_sms(other_user["phone"], f"[getmano] {sender_label}: {payload.body[:140]}", event="message_reply")
+
     msg.pop("_id", None)
     return msg
 
