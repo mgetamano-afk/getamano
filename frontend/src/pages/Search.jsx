@@ -25,6 +25,7 @@ export default function Search() {
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
 
   useEffect(() => {
     api.get("/categories").then(r => setCategories(r.data));
@@ -42,9 +43,16 @@ export default function Search() {
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     setParams(qs);
+    // counts query: same filters minus owner_identity
+    const countsQs = { ...qs };
+    delete countsQs.owner_identity;
     try {
-      const { data } = await api.get("/providers", { params: qs });
+      const [{ data }, countsRes] = await Promise.all([
+        api.get("/providers", { params: qs }),
+        api.get("/providers/identity-counts", { params: countsQs }).catch(() => ({ data: null })),
+      ]);
       setProviders(data);
+      if (countsRes?.data) setIdentityCounts(countsRes.data);
     } finally {
       setLoading(false);
     }
@@ -77,6 +85,8 @@ export default function Search() {
         <div className="flex flex-wrap items-center gap-2 mb-6" data-testid="identity-filter-chips">
           {IDENTITY_CHIPS.map(chip => {
             const active = ownerIdentity === chip.id;
+            const countKey = chip.id || "all";
+            const count = identityCounts[countKey] ?? 0;
             return (
               <button
                 key={chip.id || "all"}
@@ -93,6 +103,16 @@ export default function Search() {
               >
                 {chip.emoji && <span aria-hidden="true">{chip.emoji}</span>}
                 {chip.label}
+                <span
+                  className="ml-1 inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full text-[11px] font-semibold tabular-nums"
+                  style={{
+                    backgroundColor: active ? "rgba(255,255,255,0.22)" : "#EBF8F7",
+                    color: active ? "#FFFFFF" : "#025F67",
+                  }}
+                  data-testid={`identity-chip-count-${chip.id || "all"}`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}

@@ -761,6 +761,47 @@ async def search_providers(
         p["category"] = cats.get(p.get("category_id"))
     return providers
 
+@api_router.get("/providers/identity-counts")
+async def providers_identity_counts(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    zip_code: Optional[str] = None,
+    verified: Optional[bool] = None,
+    language: Optional[str] = None,
+    country: Optional[str] = DEFAULT_COUNTRY,
+):
+    """Counts of active providers by owner_identity respecting current search filters
+    (excluding the owner_identity filter). Used by inclusive identity chips on /search."""
+    query = {"is_active": True}
+    if country:
+        query["country"] = country
+    if category:
+        cat = await db.categories.find_one({"slug": category}, {"_id": 0})
+        if cat:
+            query["category_id"] = cat["category_id"]
+    if city:
+        query["city"] = {"$regex": city, "$options": "i"}
+    if state:
+        query["state"] = {"$regex": f"^{state}$", "$options": "i"}
+    if zip_code:
+        query["zip_code"] = zip_code
+    if verified:
+        query["verification_status"] = "approved"
+    if language:
+        query["languages"] = language
+    if q:
+        query["$or"] = [
+            {"business_name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"services": {"$regex": q, "$options": "i"}},
+        ]
+    total = await db.provider_profiles.count_documents(query)
+    latino = await db.provider_profiles.count_documents({**query, "owner_identity": "latino"})
+    american = await db.provider_profiles.count_documents({**query, "owner_identity": "american"})
+    return {"all": total, "latino": latino, "american": american}
+
 @api_router.get("/providers/featured")
 async def featured_providers():
     providers = await db.provider_profiles.find(
