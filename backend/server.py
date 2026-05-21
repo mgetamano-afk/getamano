@@ -786,6 +786,7 @@ async def search_providers(
     latino_owned: Optional[bool] = None,
     owner_identity: Optional[Literal["latino", "american"]] = None,
     country: Optional[str] = DEFAULT_COUNTRY,
+    has_video: Optional[bool] = None,
     limit: int = 24,
 ):
     query = {"is_active": True}
@@ -809,6 +810,8 @@ async def search_providers(
         query["latino_owned"] = "yes"
     if owner_identity:
         query["owner_identity"] = owner_identity
+    if has_video:
+        query["video_url"] = {"$exists": True, "$ne": ""}
     if q:
         query["$or"] = [
             {"business_name": {"$regex": q, "$options": "i"}},

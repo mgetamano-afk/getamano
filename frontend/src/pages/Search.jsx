@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video } from "lucide-react";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
 
@@ -23,6 +23,7 @@ export default function Search() {
   const [verifiedOnly, setVerifiedOnly] = useState(params.get("verified") === "true");
   const [language, setLanguage] = useState(params.get("language") || "");
   const [ownerIdentity, setOwnerIdentity] = useState(params.get("owner_identity") || "");
+  const [hasVideo, setHasVideo] = useState(params.get("has_video") === "true");
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -56,13 +57,14 @@ export default function Search() {
     if (e) e.preventDefault();
     setLoading(true);
     const qs = {};
-    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, ...overrides };
+    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, hasVideo, ...overrides };
     if (cur.q) qs.q = cur.q;
     if (cur.city) qs.city = cur.city;
     if (cur.category) qs.category = cur.category;
     if (cur.verifiedOnly) qs.verified = "true";
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
+    if (cur.hasVideo) qs.has_video = "true";
     const urlQs = { ...qs };
     if (view !== "list") urlQs.view = view;
     setParams(urlQs);
@@ -84,13 +86,14 @@ export default function Search() {
   // Fetch map data progressively (geocodes up to 5 per call server-side; we call up to 6 times)
   const fetchMap = async (overrides = {}, bbox = null) => {
     const qs = {};
-    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, ...overrides };
+    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, hasVideo, ...overrides };
     if (cur.q) qs.q = cur.q;
     if (cur.city) qs.city = cur.city;
     if (cur.category) qs.category = cur.category;
     if (cur.verifiedOnly) qs.verified = "true";
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
+    if (cur.hasVideo) qs.has_video = "true";
     if (bbox) {
       qs.min_lat = bbox.min_lat;
       qs.max_lat = bbox.max_lat;
@@ -213,6 +216,29 @@ export default function Search() {
             );
           })}
 
+          {/* Video filter chip */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !hasVideo;
+              setHasVideo(next);
+              doSearch(null, { hasVideo: next });
+              if (view === "map" || view === "split") fetchMap({ hasVideo: next });
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all border"
+            style={{
+              backgroundColor: hasVideo ? "#025F67" : "#FFFFFF",
+              color: hasVideo ? "#FFFFFF" : "#025F67",
+              borderColor: hasVideo ? "#025F67" : "#BCC5CC",
+            }}
+            data-testid="filter-has-video"
+            aria-pressed={hasVideo}
+            title="Solo proveedores con video de presentación"
+          >
+            <Video className="w-3.5 h-3.5" />
+            Con video
+          </button>
+
           {/* View toggle: Lista | Split | Mapa */}
           <div className="ml-auto inline-flex items-center rounded-full border overflow-hidden" style={{ borderColor: "#BCC5CC", backgroundColor: "#FFFFFF" }} data-testid="view-toggle">
             <button
@@ -306,6 +332,11 @@ export default function Search() {
                                 <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                               </span>
                             )}
+                            {p.video_url && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: "#025F67" }} data-testid={`split-video-badge-${p.slug}`}>
+                                <Video className="w-2.5 h-2.5" /> Video
+                              </span>
+                            )}
                             <OwnerIdentityBadge identity={p.owner_identity} size="sm" />
                           </div>
                         </div>
@@ -385,6 +416,15 @@ export default function Search() {
                       {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" />}
                       {p.verification_status === "approved" && (
                         <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> {t("provider.verified")}</div>
+                      )}
+                      {p.video_url && (
+                        <div
+                          className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white shadow"
+                          style={{ backgroundColor: "rgba(2, 95, 103, 0.92)" }}
+                          data-testid={`card-video-badge-${p.slug}`}
+                        >
+                          <Video className="w-3 h-3" /> Video
+                        </div>
                       )}
                     </div>
                     <div className="p-5">

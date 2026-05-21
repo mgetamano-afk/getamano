@@ -1,0 +1,56 @@
+{
+  "summary": "Tested has_video filter + 'Con video' chip + video badges. Backend filter works perfectly on /api/providers. Frontend LIST view works perfectly (chip toggle, URL sync, badge on María's card). BUG: SPLIT view does not honor the has_video filter and the split-video-badge never renders because /api/providers/map ignores has_video and does not return video_url in its response payload.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/providers/map",
+        "issue": "Endpoint does NOT accept has_video query parameter. FastAPI silently drops it because the parameter is not declared in the signature (server.py lines 1230-1244). Frontend Search.jsx fetchMap() correctly sends has_video=true (line 96) but backend ignores it -> split view shows ALL 23 providers even when filter is active.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "/api/providers/map",
+        "issue": "Response items (server.py lines 1317-1332) do NOT include the video_url field. As a result, the mini-cards in split view never render the split-video-badge even for María. The frontend condition `{p.video_url && ...}` is always false for mapProviders.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Search > Split view + Con video filter",
+        "issue": "Split view list iterates over mapProviders (Search.jsx line 295) which comes from /api/providers/map. Since the map endpoint ignores has_video and never returns video_url, (a) the filter has no effect in split view (shows 23 instead of 1) and (b) split-video-badge-maria-cleaning-services-sallisaw-ok never appears.",
+        "affected_selectors": ["[data-testid=\"split-video-badge-maria-cleaning-services-sallisaw-ok\"]", "[data-testid=\"split-view\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration14_video_filter_test.py",
+    "/app/test_reports/pytest/iteration14_results.xml"
+  ],
+  "action_items": [
+    "Backend: add `has_video: Optional[bool] = None` parameter to /api/providers/map (server.py ~line 1244) and apply `if has_video: query['video_url'] = {'$exists': True, '$ne': ''}` before the find().",
+    "Backend: include `video_url` in the items dict appended at server.py lines 1317-1332 (e.g. `'video_url': p.get('video_url')`) so the split-view mini-card can render the badge.",
+    "Optional: keep the list-view behavior as-is — it already works correctly."
+  ],
+  "critical_code_review_comments": [
+    "Search.jsx duplicates filter serialization logic between doSearch() and fetchMap() (lines 60-67 vs 89-96) — would be safer to extract a buildFilterQs(state, overrides) helper. Otherwise every new filter has to be added in two places (which is exactly how the has_video on /providers/map was missed).",
+    "The split view counter `({mapProviders.length})` (Search.jsx line 284) shows total_with_coords from /providers/map, which is inconsistent with list-view's `providers.length`. When filters diverge between the two endpoints, the count visibly contradicts the list.",
+    "/api/providers/map (server.py line 1229) duplicates a large chunk of filter logic from /api/providers — consider extracting `_build_provider_query(...)` so future filters apply automatically to both."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration14_video_filter_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% on /api/providers (4/4 tests), but /api/providers/map fails the integration requirement",
+    "frontend": "List view 100% — chip toggle, URL sync, active styling (#025F67 bg, white text), Maria's card-video-badge all verified. Split view: chip + URL OK but filter not applied and split-video-badge missing."
+  },
+  "test_credentials": "Not used (public endpoints only). Demo provider with video remains at slug=maria-cleaning-services-sallisaw-ok with video_url=/api/files/getamano/videos/user_3e47ee2b3526/78e5cdc0-f73b-466e-b837-28b8833c90c0.mp4",
+  "seed_data_creation": "None. Demo video already present from previous sprint.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/iteration14_video_filter_test.py covers /api/providers?has_video flag (4 tests, all pass). After main agent patches /api/providers/map to accept has_video and to include video_url in response items, re-run the frontend split-view test: navigate to /buscar?view=split&has_video=true and assert (1) result count is 1, (2) [data-testid=split-video-badge-maria-cleaning-services-sallisaw-ok] is visible. List view already works — no need to re-test it.",
+  "rca of the issue": "Root cause: the 'Con video' feature was implemented on /api/providers (list endpoint) but the equivalent code path on /api/providers/map (used by the split view list AND map) was not updated. fetchMap() in Search.jsx correctly forwards has_video=true, but FastAPI silently drops unknown query params, so the filter is a no-op. Additionally, the map endpoint projects only a curated subset of fields and video_url was not added — so even after fixing the filter, the badge would still not render. Reproduction: open /buscar?view=split&has_video=true. Expected: 1 result (María) with Video badge inline. Actual: 23 results, María visible but no Video badge. Mitigation: see action_items 1 and 2."
+}
