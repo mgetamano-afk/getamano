@@ -5,6 +5,13 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
 import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter } from "lucide-react";
+import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
+
+const IDENTITY_CHIPS = [
+  { id: "", label: "Todos" },
+  { id: "latino", label: "Dueños Latinos", emoji: "🤝" },
+  { id: "american", label: "Dueños Americanos", emoji: "🤝" },
+];
 
 export default function Search() {
   const [params, setParams] = useSearchParams();
@@ -14,6 +21,7 @@ export default function Search() {
   const [category, setCategory] = useState(params.get("category") || "");
   const [verifiedOnly, setVerifiedOnly] = useState(params.get("verified") === "true");
   const [language, setLanguage] = useState(params.get("language") || "");
+  const [ownerIdentity, setOwnerIdentity] = useState(params.get("owner_identity") || "");
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,15 +30,17 @@ export default function Search() {
     api.get("/categories").then(r => setCategories(r.data));
   }, []);
 
-  const doSearch = async (e) => {
+  const doSearch = async (e, overrides = {}) => {
     if (e) e.preventDefault();
     setLoading(true);
     const qs = {};
-    if (q) qs.q = q;
-    if (city) qs.city = city;
-    if (category) qs.category = category;
-    if (verifiedOnly) qs.verified = "true";
-    if (language) qs.language = language;
+    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, ...overrides };
+    if (cur.q) qs.q = cur.q;
+    if (cur.city) qs.city = cur.city;
+    if (cur.category) qs.category = cur.category;
+    if (cur.verifiedOnly) qs.verified = "true";
+    if (cur.language) qs.language = cur.language;
+    if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     setParams(qs);
     try {
       const { data } = await api.get("/providers", { params: qs });
@@ -41,6 +51,11 @@ export default function Search() {
   };
 
   useEffect(() => { doSearch(); /* eslint-disable-next-line */ }, []);
+
+  const selectIdentity = (id) => {
+    setOwnerIdentity(id);
+    doSearch(null, { ownerIdentity: id });
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -57,6 +72,31 @@ export default function Search() {
           </div>
           <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
         </form>
+
+        {/* Identity chips (inclusive filter, no flags) */}
+        <div className="flex flex-wrap items-center gap-2 mb-6" data-testid="identity-filter-chips">
+          {IDENTITY_CHIPS.map(chip => {
+            const active = ownerIdentity === chip.id;
+            return (
+              <button
+                key={chip.id || "all"}
+                type="button"
+                onClick={() => selectIdentity(chip.id)}
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all border ${active ? "shadow-sm" : "hover:border-slate-300"}`}
+                style={{
+                  backgroundColor: active ? "#025F67" : "#FFFFFF",
+                  color: active ? "#FFFFFF" : "#025F67",
+                  borderColor: active ? "#025F67" : "#BCC5CC",
+                }}
+                data-testid={`identity-chip-${chip.id || "all"}`}
+                aria-pressed={active}
+              >
+                {chip.emoji && <span aria-hidden="true">{chip.emoji}</span>}
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="grid lg:grid-cols-[260px_1fr] gap-6">
           {/* Filters */}
@@ -120,10 +160,11 @@ export default function Search() {
                         )}
                       </div>
                       {p.category && (
-                        <span className="inline-block mt-2 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>
+                        <span className="inline-block mt-2 mr-2 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>
                           {lang === "es" ? p.category.name_es : p.category.name_en}
                         </span>
                       )}
+                      {p.owner_identity && <span className="inline-block mt-2"><OwnerIdentityBadge identity={p.owner_identity} size="sm" /></span>}
                       {p.description && <p className="text-sm text-slate-600 mt-3 line-clamp-2">{p.description}</p>}
                     </div>
                   </Link>
