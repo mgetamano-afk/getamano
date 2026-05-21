@@ -51,6 +51,7 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 - Iteration 3: 76/81 (94%) — fix aplicado a PUT /users/me decorator faltante, phone agregado a RegisterIn, unique index reviews(user_id, provider_id)
 - Iteration 5 (Feb 2026): 31/31 nuevos (100%) — Maestro v1 verificado E2E (promo GETAMANO50, likes toggle, latino_owned filter, 4 tiers). 108/112 overall (96%). Frontend smoke 5/5.
   - Fix aplicado: PUT /providers/me ahora usa model_dump(exclude_unset=True) para evitar wipe silencioso de gallery/photos/services. Verificado vía curl: gallery preservada en updates parciales.
+- Iteration 6 (Feb 21, 2026): 13/13 backend + 10/10 frontend (100%). Validado rename getmano→getamano (zero stale strings), paleta nueva (Scooter/Alabaster/Heather/Lagoon/Sapphire), Weekly Market Pulse end-to-end (endpoint + notificación + card). Sin issues críticos. Pre-existing 401 transients en /admin/ceo persisten (heredado iter-5).
 - Feb 2026 (post iter 5): Compañerismo & social proof
   - `FoundingCounter` con avatares de últimos 3 founders + ciudad + time-ago + polling 20s + tiers de urgencia.
   - `ProviderGreeting` cálido en dashboard: saludo time-of-day, frase del día rotativa, píldoras de actividad empáticas (mensajes, vistas, requests).
@@ -85,6 +86,20 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
     - **Índices nuevos**: provider_profiles (country+category+city, country+state, users country), quote_requests (provider+date, country+category+city), provider_rates (category+city+country, provider+active).
     - **Filtros**: `GET /api/providers?country=US` por default. Compatible con expansión multi-país.
     - **Modelo User** ampliado con `country: str = "US"` para que aparezca en `/auth/login` response y context del front.
+  - **REBRAND + PALETA (Feb 21, 2026)**:
+    - Rename global "getmano" → "getamano" (case-sensitive: GETMANO/Getmano/getmano + dominios @getmano.com → @getamano.com + promo GETMANO50 → GETAMANO50). 28 archivos modificados (frontend src + backend + memory). Logos en Header/Footer arreglados (texto partido HTML).
+    - **Nueva paleta de 5 colores** aplicada:
+      - `#2F9D94` Scooter (primario, reemplaza el naranja)
+      - `#F7F6F2` Alabaster (fondo principal)
+      - `#BCC5CC` Heather (bordes, secundarios)
+      - `#025F67` Blue Lagoon (títulos, acentos fuertes)
+      - `#063154` Sapphire (footer)
+    - Implementado vía override del palette Tailwind `orange-*` y `amber-*` apuntando a escalas Scooter/Lagoon (cero refactor masivo de clases), CSS variables `--primary/--accent/--background/--border` actualizadas, hex hardcoded reemplazados en App.css/Landing/Footer/Header/Leaderboard/FoundingCounter/MilestoneCelebration. Brand tokens nuevos: `brand.scooter/alabaster/heather/lagoon/sapphire`. Selection color y meta theme-color actualizados.
+  - **WEEKLY MARKET PULSE (Feb 21, 2026)** — Evolución del Data Flywheel:
+    - **Backend**: helpers `_compute_market_pulse(category_id, city, country)` (5 agregaciones: quotes esta semana vs prior, top budget, top size, avg rates actuales vs históricas) y `_build_market_pulse_note()`. Endpoint nuevo `GET /api/providers/me/market-pulse` retorna payload con `weekly_quotes/delta_quotes_pct/avg_min/avg_max/delta_price_pct/top_budget_range/top_project_size/has_signal/category_name`. Privacy: `has_signal = (weekly_quotes + rate_sample_size) >= 3`. Cuando no hay datos suficientes: `available:false, reason:"not_enough_data"`. Constante `BUDGET_LABEL` agregada al módulo.
+    - **Notificación inteligente**: integrado a `_compute_notifications_for_user` — cada proveedor recibe automáticamente la notificación "📊 Pulso semanal de {Categoría} en {Ciudad}" cuando hay señal (category=`market_pulse`, key=`weekly_market_pulse`, CTA → /dashboard/provider?tab=tarifas). Visible en NotificationBell.
+    - **Frontend**: nuevo componente `MarketPulseCard.jsx` (3 estados: loading skeleton, empty/educational, full card) renderizado en ProviderDashboard arriba de los stats. 3 stat blocks (Cotizaciones con delta % vs semana anterior, Precio promedio con delta histórico, Lo más pedido con budget+tamaño) + insight accionable inteligente que cambia según delta. Diseño glass-morphism con gradiente Alabaster→Scooter sutil.
+    - **Testing**: iteration 6 — 13/13 backend + 10/10 frontend (100%).
 
 ## Prioritized Backlog
 
