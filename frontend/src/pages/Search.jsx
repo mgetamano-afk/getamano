@@ -4,8 +4,9 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon } from "lucide-react";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
+import ProvidersMap from "../components/ProvidersMap";
 
 const IDENTITY_CHIPS = [
   { id: "", label: "Todos" },
@@ -27,6 +28,9 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
   const [stuck, setStuck] = useState(false);
+  const [view, setView] = useState(params.get("view") === "map" ? "map" : "list");
+  const [mapProviders, setMapProviders] = useState([]);
+  const [mapLoading, setMapLoading] = useState(false);
   const sentinelRef = useRef(null);
 
   useEffect(() => {
@@ -54,7 +58,9 @@ export default function Search() {
     if (cur.verifiedOnly) qs.verified = "true";
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
-    setParams(qs);
+    const urlQs = { ...qs };
+    if (view === "map") urlQs.view = "map";
+    setParams(urlQs);
     // counts query: same filters minus owner_identity
     const countsQs = { ...qs };
     delete countsQs.owner_identity;
@@ -70,11 +76,48 @@ export default function Search() {
     }
   };
 
+  // Fetch map data progressively (geocodes up to 5 per call server-side; we call up to 6 times)
+  const fetchMap = async (overrides = {}) => {
+    const qs = {};
+    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, ...overrides };
+    if (cur.q) qs.q = cur.q;
+    if (cur.city) qs.city = cur.city;
+    if (cur.category) qs.category = cur.category;
+    if (cur.verifiedOnly) qs.verified = "true";
+    if (cur.language) qs.language = cur.language;
+    if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
+    setMapLoading(true);
+    try {
+      let attempt = 0;
+      let lastItems = [];
+      let lastMatched = 0;
+      while (attempt < 6) {
+        const { data } = await api.get("/providers/map", { params: qs });
+        lastItems = data.items || [];
+        lastMatched = data.total_matched || 0;
+        setMapProviders(lastItems);
+        // If we have all matched providers with coords, or no geocoding happened this call, stop
+        if (lastItems.length >= lastMatched || data.geocoded_this_call === 0) break;
+        attempt += 1;
+      }
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === "map") {
+      fetchMap();
+    }
+    // eslint-disable-next-line
+  }, [view]);
+
   useEffect(() => { doSearch(); /* eslint-disable-next-line */ }, []);
 
   const selectIdentity = (id) => {
     setOwnerIdentity(id);
     doSearch(null, { ownerIdentity: id });
+    if (view === "map") fetchMap({ ownerIdentity: id });
   };
 
   return (
@@ -144,6 +187,30 @@ export default function Search() {
               </button>
             );
           })}
+
+          {/* View toggle: Lista | Mapa */}
+          <div className="ml-auto inline-flex items-center rounded-full border overflow-hidden" style={{ borderColor: "#BCC5CC", backgroundColor: "#FFFFFF" }} data-testid="view-toggle">
+            <button
+              type="button"
+              onClick={() => setView("list")}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition"
+              style={{ backgroundColor: view === "list" ? "#025F67" : "transparent", color: view === "list" ? "#FFFFFF" : "#025F67" }}
+              data-testid="view-toggle-list"
+              aria-pressed={view === "list"}
+            >
+              <List className="w-4 h-4" /> Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("map")}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition"
+              style={{ backgroundColor: view === "map" ? "#025F67" : "transparent", color: view === "map" ? "#FFFFFF" : "#025F67" }}
+              data-testid="view-toggle-map"
+              aria-pressed={view === "map"}
+            >
+              <MapIcon className="w-4 h-4" /> Mapa
+            </button>
+          </div>
           </div>
         </div>
       </div>
@@ -181,10 +248,12 @@ export default function Search() {
 
           {/* Results */}
           <div>
-            <h2 className="font-display text-2xl font-semibold text-slate-900 mb-4" data-testid="search-results-title">
+            <h2 className="font-display text-2xl font-semibold mb-4" style={{ color: "#025F67" }} data-testid="search-results-title">
               {t("search.results")} <span className="text-slate-400 text-base font-normal">({providers.length})</span>
             </h2>
-            {loading ? (
+            {view === "map" ? (
+              <ProvidersMap providers={mapProviders} loading={mapLoading} />
+            ) : loading ? (
               <div className="text-center text-slate-500 py-12">{t("common.loading")}</div>
             ) : providers.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500" data-testid="search-no-results">{t("search.no_results")}</div>

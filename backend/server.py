@@ -802,6 +802,134 @@ async def providers_identity_counts(
     american = await db.provider_profiles.count_documents({**query, "owner_identity": "american"})
     return {"all": total, "latino": latino, "american": american}
 
+
+# === GEOCODING (Nominatim OpenStreetMap — free, no API key) ===
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+GEOCODE_USER_AGENT = "getamano-marketplace/1.0 (hola@getamano.us)"
+_GEOCODE_MEMO: dict = {}  # in-process cache key -> (lat, lng)
+
+
+async def _geocode_address(address: Optional[str], city: Optional[str], state: Optional[str], zip_code: Optional[str], country: str = "US") -> Optional[dict]:
+    """Geocode using Nominatim. Returns {lat, lng} or None. Cached in-memory and persisted to provider doc upstream."""
+    parts = [p for p in [address, city, state, zip_code, country] if p]
+    if not parts:
+        return None
+    key = ", ".join(str(p).strip() for p in parts).lower()
+    if key in _GEOCODE_MEMO:
+        return _GEOCODE_MEMO[key]
+    try:
+        async with httpx.AsyncClient(timeout=8.0, headers={"User-Agent": GEOCODE_USER_AGENT}) as client:
+            r = await client.get(NOMINATIM_URL, params={"q": ", ".join(parts), "format": "json", "limit": 1, "countrycodes": "us"})
+            if r.status_code != 200:
+                _GEOCODE_MEMO[key] = None
+                return None
+            data = r.json()
+            if not data:
+                _GEOCODE_MEMO[key] = None
+                return None
+            result = {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"])}
+            _GEOCODE_MEMO[key] = result
+            return result
+    except Exception as e:
+        logger.warning(f"Geocode error for {key}: {e}")
+        _GEOCODE_MEMO[key] = None
+        return None
+
+
+@api_router.get("/providers/map")
+async def providers_map(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    zip_code: Optional[str] = None,
+    verified: Optional[bool] = None,
+    language: Optional[str] = None,
+    owner_identity: Optional[Literal["latino", "american"]] = None,
+    country: Optional[str] = DEFAULT_COUNTRY,
+    limit: int = 60,
+):
+    """Returns active providers with lat/lng for map display. Geocodes missing ones at most 5 per request
+    (rate-limit safety) and persists them. The frontend can call again to fill in the rest progressively."""
+    query = {"is_active": True}
+    if country:
+        query["country"] = country
+    if category:
+        cat = await db.categories.find_one({"slug": category}, {"_id": 0})
+        if cat:
+            query["category_id"] = cat["category_id"]
+    if city:
+        query["city"] = {"$regex": city, "$options": "i"}
+    if state:
+        query["state"] = {"$regex": f"^{state}$", "$options": "i"}
+    if zip_code:
+        query["zip_code"] = zip_code
+    if verified:
+        query["verification_status"] = "approved"
+    if language:
+        query["languages"] = language
+    if owner_identity:
+        query["owner_identity"] = owner_identity
+    if q:
+        query["$or"] = [
+            {"business_name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"services": {"$regex": q, "$options": "i"}},
+        ]
+    providers = await db.provider_profiles.find(query, {"_id": 0}).limit(limit).to_list(limit)
+
+    items = []
+    geocoded_this_call = 0
+    MAX_GEOCODE_PER_CALL = 5
+    for p in providers:
+        lat = p.get("latitude")
+        lng = p.get("longitude")
+        # Skip if explicitly marked as un-geocodable
+        if p.get("geocode_failed") is True:
+            continue
+        if (lat is None or lng is None) and geocoded_this_call < MAX_GEOCODE_PER_CALL:
+            # Only attempt if we have city or zip
+            if not (p.get("city") or p.get("zip_code") or p.get("address")):
+                await db.provider_profiles.update_one(
+                    {"provider_id": p["provider_id"]},
+                    {"$set": {"geocode_failed": True}}
+                )
+                continue
+            geo = await _geocode_address(p.get("address"), p.get("city"), p.get("state"), p.get("zip_code"), country or "US")
+            geocoded_this_call += 1
+            if geo:
+                lat = geo["lat"]
+                lng = geo["lng"]
+                await db.provider_profiles.update_one(
+                    {"provider_id": p["provider_id"]},
+                    {"$set": {"latitude": lat, "longitude": lng}}
+                )
+            else:
+                await db.provider_profiles.update_one(
+                    {"provider_id": p["provider_id"]},
+                    {"$set": {"geocode_failed": True}}
+                )
+                continue
+        if lat is None or lng is None:
+            continue
+        items.append({
+            "provider_id": p["provider_id"],
+            "slug": p.get("slug"),
+            "business_name": p.get("business_name"),
+            "city": p.get("city"),
+            "state": p.get("state"),
+            "category_id": p.get("category_id"),
+            "owner_identity": p.get("owner_identity"),
+            "verified": p.get("verification_status") == "approved",
+            "rating_avg": p.get("rating_avg", 0),
+            "rating_count": p.get("rating_count", 0),
+            "logo_url": p.get("logo_url"),
+            "cover_url": p.get("cover_url"),
+            "lat": lat,
+            "lng": lng,
+        })
+    return {"items": items, "geocoded_this_call": geocoded_this_call, "total_with_coords": len(items), "total_matched": len(providers)}
+
 @api_router.get("/providers/featured")
 async def featured_providers():
     providers = await db.provider_profiles.find(
