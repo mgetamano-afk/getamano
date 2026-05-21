@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
-import { X, ArrowRight, ArrowLeft, MessageCircle, Phone as PhoneIcon, Mail, Check } from "lucide-react";
+import { X, ArrowRight, ArrowLeft, MessageCircle, Phone as PhoneIcon, Mail, Check, TrendingUp, Info } from "lucide-react";
 import { toast } from "sonner";
 
 const SIZES = [
@@ -28,6 +28,7 @@ export default function QuoteRequestModal({ open, provider, onClose }) {
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [marketRange, setMarketRange] = useState(null);
   const [form, setForm] = useState({
     description: "", category: provider?.category_name || "",
     project_size: "", requested_date: "", budget_range: "unknown",
@@ -39,6 +40,9 @@ export default function QuoteRequestModal({ open, provider, onClose }) {
     if (open) {
       setStep(1); setDone(false);
       setForm(f => ({ ...f, client_name: user?.name || "", client_phone: user?.phone || "", client_email: user?.email || "", category: provider?.category_name || "" }));
+      if (provider?.provider_id) {
+        api.get(`/market-range?provider_id=${provider.provider_id}`).then(r => setMarketRange(r.data)).catch(() => setMarketRange(null));
+      }
     }
   }, [open, user, provider]);
 
@@ -140,6 +144,15 @@ export default function QuoteRequestModal({ open, provider, onClose }) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">¿Tienes un presupuesto en mente?</label>
+                    {marketRange?.available && marketRange.hint && (
+                      <div className="mb-2 flex items-start gap-2 rounded-xl bg-gradient-to-br from-emerald-50 to-amber-50 border border-emerald-200 px-3 py-2.5" data-testid="quote-market-hint">
+                        <TrendingUp className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                        <div className="text-xs text-slate-700 leading-relaxed">
+                          <strong className="text-emerald-700">Referencia de mercado:</strong> {marketRange.hint}
+                          <span className="block text-[10px] text-slate-400 mt-0.5">Basado en {marketRange.sample_size} datos anónimos de clientes y proveedores.</span>
+                        </div>
+                      </div>
+                    )}
                     <select value={form.budget_range} onChange={e => update("budget_range", e.target.value)} className="w-full h-11 px-3 rounded-xl border border-slate-200" data-testid="quote-budget">
                       {BUDGETS.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
                     </select>

@@ -74,7 +74,17 @@ Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedo
     - **Colecciones nuevas**: `provider_rates` (tarifas auto-declaradas), `quote_requests` (cotizaciones estructuradas), `quote_responses` (respuestas con precio). Campo `paid_amount_range` en `reviews` (privado, nunca expuesto al público).
     - **Endpoints (8)**: GET/PUT `/providers/me/rates`, GET `/providers/{id}/rates` (público), POST `/quote-requests` (auth opcional / guest), GET `/providers/me/quote-requests`, POST `/quote-requests/{id}/respond`, GET `/admin/pricing-intelligence` (agregados por categoría/ciudad + ops), GET `/admin/pricing-intelligence/export.csv`, GET `/providers/me/benchmark` (solo Premium).
     - **Privacidad GOLDEN**: precios individuales NUNCA cross-user, agregados requieren n>=5, `paid_amount_range` excluido por projection en eCard público.
-    - **Frontend**: Nueva tab "Mis Tarifas" en dashboard provider con 6 price_types (por_hora/proyecto/visita/pie_cuadrado/precio_fijo/a_consultar), max 10 tarifas. Sección "Tarifas referenciales" pública en eCard con CTA "Pedir cotización exacta". `QuoteRequestModal` 3 pasos (Describe → Tamaño S/M/L + presupuesto + fecha → Contacto WhatsApp/Call/Email). Campo opcional "¿Cuánto pagaste?" en reseña con disclaimer 🔒. Sub-página admin `/admin/pricing` con stats ops (tasa de respuesta, tiempo promedio, % con precio), tabla tarifas por categoría, demanda por ciudad, export CSV anonimizado. Comparativa de mercado Premium-only con peer avg vs own avg + posición below/aligned/above + mensaje accionable.
+    - **Frontend**: Nueva tab "Mis Tarifas" en dashboard provider con 6 price_types, max 10 tarifas. Sección "Tarifas referenciales" pública en eCard con CTA "Pedir cotización exacta". `QuoteRequestModal` 3 pasos. Campo opcional "¿Cuánto pagaste?" en reseña. Sub-página admin `/admin/pricing` con stats ops, tabla tarifas por categoría, demanda por ciudad, export CSV. Comparativa de mercado Premium-only.
+  - **EVOLUCIÓN FLYWHEEL** Feb 2026:
+    - **Endpoint `GET /market-range`** público que devuelve avg_min/avg_max y hint formateado SOLO si n>=10 datos combinados (rates + reviews.paid_amount_range) por categoría+ciudad+país. Devuelve `not_enough_data, needed: 10` debajo del threshold (silencio elegante = privacidad).
+    - Banner verde-ámbar "Referencia de mercado: Otros clientes en {ciudad} pagaron entre $X y $Y por servicios similares" en el paso 2 del `QuoteRequestModal` (educar al cliente + filtrar presupuestos irreales).
+  - **ESCALABILIDAD GLOBAL (Sec 11)** Feb 2026:
+    - **Campos i18n**: `country` (default "US") en users/provider_profiles/quote_requests/provider_rates; `currency` (default "USD") en provider_rates/quote_responses.
+    - **Helpers**: `normalize_phone()` convierte cualquier formato a E.164 (`555-123-4567` → `+15551234567`, soporta + ya presente, 10 dígitos US, 11 dígitos con +1). `format_phone_display()` para UI.
+    - **Migración idempotente al startup**: backfilling country/currency en docs legacy + normalización de phones en users + provider_profiles. Logs "Sec 11 migrations applied".
+    - **Índices nuevos**: provider_profiles (country+category+city, country+state, users country), quote_requests (provider+date, country+category+city), provider_rates (category+city+country, provider+active).
+    - **Filtros**: `GET /api/providers?country=US` por default. Compatible con expansión multi-país.
+    - **Modelo User** ampliado con `country: str = "US"` para que aparezca en `/auth/login` response y context del front.
 
 ## Prioritized Backlog
 

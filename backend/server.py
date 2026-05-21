@@ -143,7 +143,44 @@ class User(BaseModel):
     picture: Optional[str] = None
     phone: Optional[str] = None
     language: str = "es"
+    country: str = "US"
     created_at: datetime
+
+# ============ INTERNATIONALIZATION HELPERS (Sec 11) ============
+DEFAULT_COUNTRY = "US"
+DEFAULT_CURRENCY = "USD"
+
+def normalize_phone(raw: Optional[str]) -> Optional[str]:
+    """Normalize phone numbers to E.164 format. US default."""
+    if not raw:
+        return raw
+    s = str(raw).strip()
+    if not s:
+        return s
+    has_plus = s.startswith("+")
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        return raw
+    if has_plus:
+        return "+" + digits
+    if len(digits) == 10:
+        return "+1" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    # Already includes country code (>11 digits) without +
+    if len(digits) > 10:
+        return "+" + digits
+    return raw  # leave as-is for unusual formats
+
+def format_phone_display(e164: Optional[str], country: str = "US") -> str:
+    """Pretty-print E.164 phone for UI."""
+    if not e164:
+        return ""
+    s = str(e164).strip()
+    digits = re.sub(r"\D", "", s)
+    if country == "US" and len(digits) == 11 and digits.startswith("1"):
+        return f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    return s
 
 class RegisterIn(BaseModel):
     email: EmailStr
@@ -416,12 +453,39 @@ async def seed():
     try:
         await db.provider_profiles.create_index("slug", unique=True)
         await db.provider_profiles.create_index("user_id", unique=True)
+        await db.provider_profiles.create_index([("country", 1), ("category_id", 1), ("city", 1)])
+        await db.provider_profiles.create_index([("country", 1), ("state", 1)])
         await db.users.create_index("email", unique=True)
+        await db.users.create_index("country")
         await db.user_sessions.create_index("session_token", unique=True)
         await db.conversations.create_index([("client_id", 1), ("provider_id", 1)], unique=True)
         await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
+        await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
+        await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
+        await db.provider_rates.create_index([("category_id", 1), ("city", 1), ("country", 1)])
+        await db.provider_rates.create_index([("provider_id", 1), ("is_active", 1)])
     except Exception as e:
         logger.warning(f"Index creation: {e}")
+
+    # Migrations (idempotent): backfill country/currency on legacy docs
+    try:
+        await db.provider_profiles.update_many({"country": {"$exists": False}}, {"$set": {"country": DEFAULT_COUNTRY}})
+        await db.users.update_many({"country": {"$exists": False}}, {"$set": {"country": DEFAULT_COUNTRY}})
+        await db.quote_requests.update_many({"country": {"$exists": False}}, {"$set": {"country": DEFAULT_COUNTRY}})
+        await db.provider_rates.update_many({"country": {"$exists": False}}, {"$set": {"country": DEFAULT_COUNTRY, "currency": DEFAULT_CURRENCY}})
+        await db.quote_responses.update_many({"currency": {"$exists": False}}, {"$set": {"currency": DEFAULT_CURRENCY}})
+        # Normalize phones on users + provider_profiles (idempotent)
+        async for u in db.users.find({"phone": {"$nin": [None, ""]}}, {"_id": 0, "user_id": 1, "phone": 1}):
+            norm = normalize_phone(u.get("phone"))
+            if norm and norm != u.get("phone"):
+                await db.users.update_one({"user_id": u["user_id"]}, {"$set": {"phone": norm}})
+        async for p in db.provider_profiles.find({"phone": {"$nin": [None, ""]}}, {"_id": 0, "provider_id": 1, "phone": 1}):
+            norm = normalize_phone(p.get("phone"))
+            if norm and norm != p.get("phone"):
+                await db.provider_profiles.update_one({"provider_id": p["provider_id"]}, {"$set": {"phone": norm}})
+        logger.info("Sec 11 migrations: country/currency/phone-normalize applied")
+    except Exception as e:
+        logger.warning(f"Sec 11 migration warn: {e}")
 
     if await db.categories.count_documents({}) == 0:
         docs = []
@@ -534,9 +598,10 @@ async def register(payload: RegisterIn, response: Response):
         "email": payload.email.lower(),
         "password_hash": hash_password(payload.password),
         "name": payload.name,
-        "phone": payload.phone or None,
+        "phone": normalize_phone(payload.phone),
         "role": payload.role if payload.role in ("client", "provider") else "client",
         "picture": None, "language": "es",
+        "country": DEFAULT_COUNTRY,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(user_doc)
@@ -627,9 +692,12 @@ async def search_providers(
     verified: Optional[bool] = None,
     language: Optional[str] = None,
     latino_owned: Optional[bool] = None,
+    country: Optional[str] = DEFAULT_COUNTRY,
     limit: int = 24,
 ):
     query = {"is_active": True}
+    if country:
+        query["country"] = country
     if category:
         cat = await db.categories.find_one({"slug": category}, {"_id": 0})
         if cat:
@@ -710,10 +778,14 @@ async def create_provider(payload: ProviderProfileIn, user: User = Depends(get_c
         slug = f"{base_slug}-{i}"
         i += 1
     now = datetime.now(timezone.utc).isoformat()
+    payload_data = payload.model_dump()
+    if payload_data.get("phone"):
+        payload_data["phone"] = normalize_phone(payload_data["phone"])
     doc = {
         "provider_id": f"prov_{uuid.uuid4().hex[:12]}",
         "user_id": user.user_id, "slug": slug,
-        **payload.model_dump(),
+        **payload_data,
+        "country": DEFAULT_COUNTRY,
         "verification_status": "pending",
         "is_active": True, "plan": "free",
         "rating_avg": 0.0, "rating_count": 0,
@@ -730,6 +802,8 @@ async def update_my_provider(payload: ProviderProfileIn, user: User = Depends(ge
     if not existing:
         raise HTTPException(status_code=404, detail="No provider profile")
     update = payload.model_dump(exclude_unset=True)
+    if "phone" in update and update["phone"]:
+        update["phone"] = normalize_phone(update["phone"])
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": update})
     doc = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
@@ -2511,6 +2585,8 @@ async def upsert_my_rates(payload: ProviderRatesBulkIn, user: User = Depends(get
             "category_id": prof.get("category_id"),
             "city": prof.get("city"),
             "state": prof.get("state"),
+            "country": DEFAULT_COUNTRY,
+            "currency": DEFAULT_CURRENCY,
             "service_name": r.service_name,
             "price_type": r.price_type,
             "price_min": r.price_min,
@@ -2530,6 +2606,69 @@ async def get_public_rates(provider_id: str):
     """Public read of a provider's rates (shown in eCard)."""
     rates = await db.provider_rates.find({"provider_id": provider_id, "is_active": True}, {"_id": 0, "rate_id": 1, "service_name": 1, "price_type": 1, "price_min": 1, "price_max": 1, "unit_note": 1}).sort("created_at", 1).to_list(20)
     return {"rates": rates}
+
+@api_router.get("/market-range")
+async def public_market_range(provider_id: Optional[str] = None, category_id: Optional[str] = None, city: Optional[str] = None, state: Optional[str] = None, country: str = DEFAULT_COUNTRY):
+    """Public market price range (educates clients during Quote Modal).
+    Returns aggregated min/max ONLY when n>=10 to protect individual privacy.
+    Combines: provider_rates (declared) + reviews.paid_amount_range (actual paid).
+    """
+    # If provider_id given, infer category+city from profile
+    if provider_id and (not category_id or not city):
+        prof = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0, "category_id": 1, "city": 1, "state": 1, "country": 1})
+        if prof:
+            category_id = category_id or prof.get("category_id")
+            city = city or prof.get("city")
+            state = state or prof.get("state")
+            country = prof.get("country") or country
+    if not category_id:
+        return {"available": False, "reason": "no_category"}
+    rate_match = {"is_active": True, "category_id": category_id, "country": country, "price_min": {"$ne": None}}
+    if city:
+        rate_match["city"] = city
+    agg = await db.provider_rates.aggregate([
+        {"$match": rate_match},
+        {"$group": {"_id": None, "avg_min": {"$avg": "$price_min"}, "avg_max": {"$avg": "$price_max"}, "min_price": {"$min": "$price_min"}, "max_price": {"$max": "$price_max"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    # Paid ranges from reviews (anonymous)
+    paid_pipeline = [
+        {"$lookup": {"from": "provider_profiles", "localField": "provider_id", "foreignField": "provider_id", "as": "prof"}},
+        {"$unwind": "$prof"},
+        {"$match": {"prof.category_id": category_id, "paid_amount_range": {"$nin": [None, "", "prefer_not_to_say"]}}},
+        {"$group": {"_id": "$paid_amount_range", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    if city:
+        paid_pipeline[2]["$match"]["prof.city"] = city
+    paid_rows = await db.reviews.aggregate(paid_pipeline).to_list(20)
+    paid_total = sum(r["count"] for r in paid_rows)
+    rate_n = agg[0]["count"] if agg else 0
+    total_n = rate_n + paid_total
+    # PRIVACY THRESHOLD: need >=10 data points to expose
+    if total_n < 10:
+        return {"available": False, "reason": "not_enough_data", "sample_size": total_n, "needed": 10}
+    response = {
+        "available": True,
+        "category_id": category_id,
+        "city": city,
+        "country": country,
+        "currency": DEFAULT_CURRENCY,
+        "sample_size": total_n,
+    }
+    if agg:
+        a = agg[0]
+        response.update({
+            "avg_min": round(a["avg_min"], 0),
+            "avg_max": round(a["avg_max"] or a["avg_min"], 0),
+            "absolute_min": round(a["min_price"], 0),
+            "absolute_max": round(a["max_price"] or a["min_price"], 0),
+        })
+    if paid_rows:
+        response["top_paid_range"] = paid_rows[0]["_id"]
+    # Build a human-readable hint
+    if response.get("avg_min") and response.get("avg_max"):
+        response["hint"] = f"Otros clientes en {city or 'tu zona'} pagaron entre ${int(response['avg_min'])} y ${int(response['avg_max'])} por servicios similares."
+    return response
 
 @api_router.post("/quote-requests")
 async def create_quote_request(payload: QuoteRequestIn, request: Request):
@@ -2557,13 +2696,14 @@ async def create_quote_request(payload: QuoteRequestIn, request: Request):
         "provider_id": payload.provider_id,
         "client_id": user.user_id if user else None,
         "client_name": payload.client_name or (user.name if user else ""),
-        "client_phone": payload.client_phone or "",
+        "client_phone": normalize_phone(payload.client_phone) if payload.client_phone else "",
         "client_email": payload.client_email or (user.email if user else ""),
         "preferred_contact": payload.preferred_contact,
         "category": payload.category or prof.get("category_id") or "",
         "category_id": prof.get("category_id"),
         "city": prof.get("city"),
         "state": prof.get("state"),
+        "country": DEFAULT_COUNTRY,
         "description": payload.description,
         "project_size": payload.project_size,
         "budget_range": payload.budget_range or "unknown",
@@ -2600,6 +2740,7 @@ async def respond_to_quote(quote_request_id: str, payload: QuoteResponseIn, user
         "quoted_price": payload.quoted_price,
         "price_type": payload.price_type or "a_consultar",
         "price_shown_to_client": payload.price_shown_to_client,
+        "currency": DEFAULT_CURRENCY,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.quote_responses.insert_one(doc)
