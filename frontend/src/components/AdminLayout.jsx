@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown, DollarSign } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const NAV = [
   { path: "/admin", label: "Resumen", Icon: LayoutDashboard, exact: true },
   { path: "/admin/ceo", label: "Panel CEO", Icon: Crown, highlight: true },
+  { path: "/admin/pricing", label: "Inteligencia de precios", Icon: DollarSign },
   { path: "/admin/queue", label: "Cola de verificación", Icon: ShieldCheck },
   { path: "/admin/providers", label: "Proveedores", Icon: Users },
   { path: "/admin/reviews", label: "Reseñas", Icon: MessageSquare },

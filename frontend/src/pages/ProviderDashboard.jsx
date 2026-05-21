@@ -6,16 +6,18 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { GalleryUpload, buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import MilestoneCelebration from "../components/MilestoneCelebration";
 import AchievementJournal from "../components/AchievementJournal";
 import ShareLinkCard from "../components/ShareLinkCard";
+import ProviderRates from "../components/ProviderRates";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: Settings },
+  { id: "tarifas", label: "Mis Tarifas", Icon: DollarSign },
   { id: "galeria", label: "Galería", Icon: ImageIcon },
   { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
   { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
@@ -350,6 +352,10 @@ export default function ProviderDashboard() {
                   </div>
                 )}
               </div>
+            )}
+
+            {tab === "tarifas" && (
+              <ProviderRates plan={profile?.plan} />
             )}
 
             {tab === "diario" && (

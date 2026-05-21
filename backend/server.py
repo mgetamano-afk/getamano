@@ -209,6 +209,7 @@ class ReviewIn(BaseModel):
     provider_id: str
     rating: int = Field(ge=1, le=5)
     comment: Optional[str] = ""
+    paid_amount_range: Optional[Literal["<100", "100-300", "300-700", "700-1500", ">1500", "prefer_not_to_say"]] = None
 
 class Review(BaseModel):
     review_id: str
@@ -218,6 +219,34 @@ class Review(BaseModel):
     rating: int
     comment: str
     created_at: datetime
+
+class ProviderRateIn(BaseModel):
+    service_name: str = Field(min_length=2, max_length=120)
+    price_type: Literal["por_hora", "por_proyecto", "por_visita", "por_pie_cuadrado", "precio_fijo", "a_consultar"]
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    unit_note: Optional[str] = ""
+
+class ProviderRatesBulkIn(BaseModel):
+    rates: list[ProviderRateIn] = Field(default_factory=list, max_length=10)
+
+class QuoteRequestIn(BaseModel):
+    provider_id: str
+    description: str = Field(min_length=5, max_length=2000)
+    category: Optional[str] = ""
+    project_size: Literal["small", "medium", "large"]
+    requested_date: Optional[str] = None
+    budget_range: Optional[Literal["<100", "100-300", "300-700", "700-1500", ">1500", "unknown"]] = "unknown"
+    client_name: Optional[str] = ""
+    client_phone: Optional[str] = ""
+    client_email: Optional[str] = ""
+    preferred_contact: Literal["whatsapp", "call", "email"] = "whatsapp"
+
+class QuoteResponseIn(BaseModel):
+    response_text: str = Field(min_length=2, max_length=2000)
+    quoted_price: Optional[float] = None
+    price_type: Optional[Literal["por_hora", "por_proyecto", "a_consultar"]] = "a_consultar"
+    price_shown_to_client: bool = True
 
 class FavoriteIn(BaseModel):
     provider_id: str
@@ -653,7 +682,7 @@ async def get_provider_by_slug(slug: str):
     # increment views
     await db.provider_profiles.update_one({"slug": slug}, {"$inc": {"views": 1}})
     # reviews
-    reviews = await db.reviews.find({"provider_id": p["provider_id"]}, {"_id": 0}).sort("created_at", -1).limit(20).to_list(20)
+    reviews = await db.reviews.find({"provider_id": p["provider_id"]}, {"_id": 0, "paid_amount_range": 0}).sort("created_at", -1).limit(20).to_list(20)
     p["reviews"] = reviews
     return p
 
@@ -722,6 +751,7 @@ async def create_review(payload: ReviewIn, user: User = Depends(get_current_user
         "provider_id": payload.provider_id,
         "user_id": user.user_id, "user_name": user.name,
         "rating": payload.rating, "comment": payload.comment or "",
+        "paid_amount_range": payload.paid_amount_range,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.reviews.insert_one(review)
@@ -2453,6 +2483,322 @@ async def dismiss_notification(notification_id: str, user: User = Depends(get_cu
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"ok": True}
+
+# ============ DATA FLYWHEEL (Sec 10): Provider Rates, Quotes, Pricing Intelligence ============
+# Privacy rule (GOLDEN): individual prices/budgets are NEVER exposed across users.
+# Aggregates require min 5 data points. Only admin sees raw analytics.
+
+@api_router.get("/providers/me/rates")
+async def get_my_rates(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    rates = await db.provider_rates.find({"provider_id": prof["provider_id"], "is_active": True}, {"_id": 0}).sort("created_at", 1).to_list(20)
+    return {"rates": rates}
+
+@api_router.put("/providers/me/rates")
+async def upsert_my_rates(payload: ProviderRatesBulkIn, user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1, "category_id": 1, "city": 1, "state": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    # Soft-delete existing
+    await db.provider_rates.update_many({"provider_id": prof["provider_id"]}, {"$set": {"is_active": False}})
+    inserted = []
+    for r in payload.rates[:10]:
+        doc = {
+            "rate_id": f"rate_{uuid.uuid4().hex[:10]}",
+            "provider_id": prof["provider_id"],
+            "category_id": prof.get("category_id"),
+            "city": prof.get("city"),
+            "state": prof.get("state"),
+            "service_name": r.service_name,
+            "price_type": r.price_type,
+            "price_min": r.price_min,
+            "price_max": r.price_max,
+            "unit_note": r.unit_note or "",
+            "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.provider_rates.insert_one(doc)
+        doc.pop("_id", None)
+        inserted.append(doc)
+    return {"rates": inserted}
+
+@api_router.get("/providers/{provider_id}/rates")
+async def get_public_rates(provider_id: str):
+    """Public read of a provider's rates (shown in eCard)."""
+    rates = await db.provider_rates.find({"provider_id": provider_id, "is_active": True}, {"_id": 0, "rate_id": 1, "service_name": 1, "price_type": 1, "price_min": 1, "price_max": 1, "unit_note": 1}).sort("created_at", 1).to_list(20)
+    return {"rates": rates}
+
+@api_router.post("/quote-requests")
+async def create_quote_request(payload: QuoteRequestIn, request: Request):
+    """Submit a structured quote request. Auth optional (guest allowed)."""
+    user = None
+    token = request.cookies.get("session_token")
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+    if token:
+        try:
+            payload_jwt = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+            uid = payload_jwt.get("user_id")
+            if uid:
+                u = await db.users.find_one({"user_id": uid}, {"_id": 0})
+                if u:
+                    user = User(**u)
+        except Exception:
+            user = None
+    prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0, "category_id": 1, "city": 1, "state": 1, "business_name": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    doc = {
+        "quote_request_id": f"qr_{uuid.uuid4().hex[:12]}",
+        "provider_id": payload.provider_id,
+        "client_id": user.user_id if user else None,
+        "client_name": payload.client_name or (user.name if user else ""),
+        "client_phone": payload.client_phone or "",
+        "client_email": payload.client_email or (user.email if user else ""),
+        "preferred_contact": payload.preferred_contact,
+        "category": payload.category or prof.get("category_id") or "",
+        "category_id": prof.get("category_id"),
+        "city": prof.get("city"),
+        "state": prof.get("state"),
+        "description": payload.description,
+        "project_size": payload.project_size,
+        "budget_range": payload.budget_range or "unknown",
+        "requested_date": payload.requested_date,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.quote_requests.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/providers/me/quote-requests")
+async def list_my_quote_requests(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not prof:
+        return {"items": []}
+    items = await db.quote_requests.find({"provider_id": prof["provider_id"]}, {"_id": 0}).sort("created_at", -1).limit(100).to_list(100)
+    return {"items": items}
+
+@api_router.post("/quote-requests/{quote_request_id}/respond")
+async def respond_to_quote(quote_request_id: str, payload: QuoteResponseIn, user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not prof:
+        raise HTTPException(status_code=403, detail="Provider only")
+    qr = await db.quote_requests.find_one({"quote_request_id": quote_request_id}, {"_id": 0})
+    if not qr or qr.get("provider_id") != prof["provider_id"]:
+        raise HTTPException(status_code=404, detail="Quote request not found")
+    doc = {
+        "quote_response_id": f"qrsp_{uuid.uuid4().hex[:12]}",
+        "quote_request_id": quote_request_id,
+        "provider_id": prof["provider_id"],
+        "response_text": payload.response_text,
+        "quoted_price": payload.quoted_price,
+        "price_type": payload.price_type or "a_consultar",
+        "price_shown_to_client": payload.price_shown_to_client,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.quote_responses.insert_one(doc)
+    await db.quote_requests.update_one(
+        {"quote_request_id": quote_request_id},
+        {"$set": {"status": "responded", "responded_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    doc.pop("_id", None)
+    return doc
+
+# === Pricing Intelligence (Admin only) ===
+@api_router.get("/admin/pricing-intelligence")
+async def admin_pricing_intelligence(
+    admin: User = Depends(require_admin),
+    category_id: Optional[str] = None,
+    state: Optional[str] = None,
+    days: int = 365,
+):
+    since = (datetime.now(timezone.utc) - timedelta(days=max(days, 1))).isoformat()
+    cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(200)}
+
+    # Rates by category
+    rate_match: dict = {"is_active": True, "price_min": {"$ne": None}}
+    if category_id:
+        rate_match["category_id"] = category_id
+    if state:
+        rate_match["state"] = state
+    rates_agg = await db.provider_rates.aggregate([
+        {"$match": rate_match},
+        {"$group": {
+            "_id": "$category_id",
+            "avg_min": {"$avg": "$price_min"},
+            "avg_max": {"$avg": "$price_max"},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 30},
+    ]).to_list(30)
+    by_category = []
+    for r in rates_agg:
+        cid = r["_id"]
+        # Most common budget for this category
+        budget_rows = await db.quote_requests.aggregate([
+            {"$match": {"category_id": cid, "budget_range": {"$nin": [None, "", "unknown"]}, "created_at": {"$gte": since}}},
+            {"$group": {"_id": "$budget_range", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 1},
+        ]).to_list(1)
+        # Most common paid range from reviews
+        paid_rows = await db.reviews.aggregate([
+            {"$lookup": {"from": "provider_profiles", "localField": "provider_id", "foreignField": "provider_id", "as": "prof"}},
+            {"$unwind": "$prof"},
+            {"$match": {"prof.category_id": cid, "paid_amount_range": {"$nin": [None, "", "prefer_not_to_say"]}}},
+            {"$group": {"_id": "$paid_amount_range", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 1},
+        ]).to_list(1)
+        by_category.append({
+            "category_id": cid,
+            "category_name": cats.get(cid, {}).get("name_es", cid),
+            "avg_min": round(r["avg_min"] or 0, 2),
+            "avg_max": round(r["avg_max"] or 0, 2),
+            "sample_size": r["count"],
+            "top_budget_range": budget_rows[0]["_id"] if budget_rows else None,
+            "top_paid_range": paid_rows[0]["_id"] if paid_rows else None,
+        })
+
+    # Demand by city
+    city_match = {"created_at": {"$gte": since}}
+    if state:
+        city_match["state"] = state
+    city_rows = await db.quote_requests.aggregate([
+        {"$match": city_match},
+        {"$group": {
+            "_id": {"city": "$city", "state": "$state"},
+            "count": {"$sum": 1},
+            "top_category": {"$push": "$category_id"},
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 20},
+    ]).to_list(20)
+    demand = []
+    for c in city_rows:
+        if not c["_id"].get("city"):
+            continue
+        top_cat = max(set(c["top_category"]), key=c["top_category"].count) if c["top_category"] else None
+        demand.append({
+            "city": c["_id"]["city"], "state": c["_id"].get("state"),
+            "count": c["count"],
+            "top_category": cats.get(top_cat, {}).get("name_es", top_cat),
+        })
+
+    # Response rate metrics
+    total_quotes = await db.quote_requests.count_documents({"created_at": {"$gte": since}})
+    responded = await db.quote_requests.count_documents({"created_at": {"$gte": since}, "status": "responded"})
+    response_rate = round((responded / total_quotes) * 100, 1) if total_quotes else 0
+    # Avg response time (hours) — only responded
+    rt_pipeline = [
+        {"$match": {"created_at": {"$gte": since}, "status": "responded", "responded_at": {"$ne": None}}},
+        {"$project": {
+            "_id": 0,
+            "delta": {"$divide": [{"$subtract": [
+                {"$dateFromString": {"dateString": "$responded_at"}},
+                {"$dateFromString": {"dateString": "$created_at"}}
+            ]}, 3600000]}
+        }},
+        {"$group": {"_id": None, "avg": {"$avg": "$delta"}}},
+    ]
+    rt_rows = await db.quote_requests.aggregate(rt_pipeline).to_list(1)
+    avg_response_hours = round(rt_rows[0]["avg"], 1) if rt_rows else None
+    # % responses with price
+    with_price = await db.quote_responses.count_documents({"quoted_price": {"$ne": None}, "created_at": {"$gte": since}})
+    total_responses = await db.quote_responses.count_documents({"created_at": {"$gte": since}})
+    price_rate = round((with_price / total_responses) * 100, 1) if total_responses else 0
+
+    return {
+        "filters": {"category_id": category_id, "state": state, "days": days},
+        "by_category": by_category,
+        "demand_by_city": demand,
+        "operations": {
+            "total_quotes": total_quotes, "responded": responded, "response_rate_pct": response_rate,
+            "avg_response_hours": avg_response_hours,
+            "responses_total": total_responses, "responses_with_price": with_price, "price_rate_pct": price_rate,
+        },
+    }
+
+@api_router.get("/admin/pricing-intelligence/export.csv")
+async def admin_pricing_intelligence_csv(admin: User = Depends(require_admin)):
+    """Export anonymized pricing data."""
+    import csv
+    from io import StringIO
+    from fastapi.responses import Response as FastResponse
+    out = StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["type", "category_id", "state", "city", "price_min", "price_max", "price_type", "budget_range", "paid_range", "created_at"])
+    async for r in db.provider_rates.find({"is_active": True}, {"_id": 0}):
+        writer.writerow(["rate", r.get("category_id"), r.get("state"), r.get("city"), r.get("price_min"), r.get("price_max"), r.get("price_type"), "", "", r.get("created_at")])
+    async for q in db.quote_requests.find({}, {"_id": 0}):
+        writer.writerow(["quote_request", q.get("category_id"), q.get("state"), q.get("city"), "", "", "", q.get("budget_range"), "", q.get("created_at")])
+    async for rv in db.reviews.find({"paid_amount_range": {"$ne": None}}, {"_id": 0}):
+        prof = await db.provider_profiles.find_one({"provider_id": rv.get("provider_id")}, {"_id": 0, "category_id": 1, "state": 1, "city": 1})
+        writer.writerow(["review_paid", prof.get("category_id") if prof else "", prof.get("state") if prof else "", prof.get("city") if prof else "", "", "", "", "", rv.get("paid_amount_range"), rv.get("created_at")])
+    return FastResponse(content=out.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=getmano-pricing.csv"})
+
+# === Market Benchmark (Premium plan only) ===
+@api_router.get("/providers/me/benchmark")
+async def my_benchmark(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    plan = prof.get("plan", "free")
+    if plan != "premium":
+        return {"available": False, "reason": "premium_only", "plan": plan}
+    own_rates = await db.provider_rates.find({"provider_id": prof["provider_id"], "is_active": True}, {"_id": 0}).to_list(10)
+    if not own_rates:
+        return {"available": False, "reason": "no_rates"}
+    # Aggregate same category + city, excluding self
+    peers = await db.provider_rates.aggregate([
+        {"$match": {
+            "is_active": True,
+            "category_id": prof.get("category_id"),
+            "city": prof.get("city"),
+            "provider_id": {"$ne": prof["provider_id"]},
+            "price_min": {"$ne": None},
+        }},
+        {"$group": {"_id": None, "avg_min": {"$avg": "$price_min"}, "avg_max": {"$avg": "$price_max"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    if not peers or peers[0]["count"] < 5:
+        return {"available": False, "reason": "not_enough_data", "sample_size": peers[0]["count"] if peers else 0}
+    p = peers[0]
+    own_min = sum((r["price_min"] or 0) for r in own_rates if r.get("price_min")) / max(sum(1 for r in own_rates if r.get("price_min")), 1)
+    own_max = sum((r["price_max"] or 0) for r in own_rates if r.get("price_max")) / max(sum(1 for r in own_rates if r.get("price_max")), 1)
+    # Position: below / aligned / above
+    avg_peer = (p["avg_min"] + p["avg_max"]) / 2 if p.get("avg_max") else p["avg_min"]
+    avg_own = (own_min + own_max) / 2 if own_max else own_min
+    diff_pct = round(((avg_own - avg_peer) / max(avg_peer, 1)) * 100, 1) if avg_peer else 0
+    if abs(diff_pct) <= 10:
+        position = "aligned"
+        message = "Tu precio está alineado con el promedio de tu ciudad. Buen posicionamiento."
+    elif diff_pct < 0:
+        position = "below"
+        message = "Tu precio está por debajo del promedio. Considera ajustarlo para reflejar tu valor real."
+    else:
+        position = "above"
+        message = "Tu precio está sobre el promedio. Asegúrate de comunicar lo que justifica esa prima (galería, reseñas, experiencia)."
+    cats = {c["category_id"]: c for c in await db.categories.find({"category_id": prof.get("category_id")}, {"_id": 0}).to_list(1)}
+    return {
+        "available": True,
+        "category": cats.get(prof.get("category_id"), {}).get("name_es", "tu categoría"),
+        "city": prof.get("city"), "state": prof.get("state"),
+        "peer_avg_min": round(p["avg_min"], 2),
+        "peer_avg_max": round(p["avg_max"] or p["avg_min"], 2),
+        "own_avg_min": round(own_min, 2),
+        "own_avg_max": round(own_max, 2),
+        "sample_size": p["count"],
+        "position": position,
+        "diff_pct": diff_pct,
+        "message": message,
+    }
 
 app.include_router(api_router)
 

@@ -12,6 +12,8 @@ import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe
 import WhatsAppButton from "../components/WhatsAppButton";
 import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
+import QuoteRequestModal from "../components/QuoteRequestModal";
+import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
 
 export default function ProviderECard() {
@@ -29,9 +31,14 @@ export default function ProviderECard() {
   const [msgSubject, setMsgSubject] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [showECardModal, setShowECardModal] = useState(false);
+  const [showQuote, setShowQuote] = useState(false);
+  const [rates, setRates] = useState([]);
 
   useEffect(() => {
-    api.get(`/providers/by-slug/${slug}`).then(r => setP(r.data)).finally(() => setLoading(false));
+    api.get(`/providers/by-slug/${slug}`).then(r => {
+      setP(r.data);
+      api.get(`/providers/${r.data.provider_id}/rates`).then(rr => setRates(rr.data?.rates || [])).catch(() => {});
+    }).finally(() => setLoading(false));
   }, [slug]);
 
   const trackClick = () => {
@@ -70,16 +77,17 @@ export default function ProviderECard() {
 
   const share = null;
 
+  const [paidRange, setPaidRange] = useState("");
   const submitReview = async (e) => {
     e.preventDefault();
     if (!user) { toast.error("Inicia sesión para reseñar"); return; }
     setSubmitting(true);
     try {
-      await api.post("/reviews", { provider_id: p.provider_id, rating, comment });
+      await api.post("/reviews", { provider_id: p.provider_id, rating, comment, paid_amount_range: paidRange || null });
       toast.success("Gracias por tu reseña");
       const r = await api.get(`/providers/by-slug/${slug}`);
       setP(r.data);
-      setComment("");
+      setComment(""); setPaidRange("");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Error");
     } finally {
@@ -144,8 +152,8 @@ export default function ProviderECard() {
               <button onClick={() => { setShowMessage(true); setMode("message"); }} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
                 <MessageSquare className="w-4 h-4" /> {t("provider.message")}
               </button>
-              <button onClick={() => { setShowMessage(true); setMode("quote"); }} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
-                <FileText className="w-4 h-4" /> {t("provider.quote")}
+              <button onClick={() => setShowQuote(true)} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
+                <FileText className="w-4 h-4" /> Pedir cotización
               </button>
               {!p.is_home_based && p.city && (
                 <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-map-button">
@@ -186,6 +194,31 @@ export default function ProviderECard() {
                 </div>
               </div>
             )}
+
+            {rates.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-rates">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h3 className="font-display font-semibold text-slate-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-orange-500" /> Tarifas referenciales
+                  </h3>
+                  <button onClick={() => setShowQuote(true)} className="text-xs text-orange-600 font-semibold hover:underline" data-testid="ecard-rates-quote-cta">Pedir cotización exacta →</button>
+                </div>
+                <ul className="divide-y divide-slate-100">
+                  {rates.map(r => (
+                    <li key={r.rate_id} className="py-3 flex items-start justify-between gap-3" data-testid={`ecard-rate-${r.rate_id}`}>
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900 text-sm">{r.service_name}</div>
+                        {r.unit_note && <div className="text-xs text-slate-500 mt-0.5">{r.unit_note}</div>}
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <div className="font-display font-bold text-slate-900 text-sm">{formatRate(r)}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">Los precios son una referencia. Pide una cotización personalizada para tu proyecto.</p>
+              </div>
+            )}
             {p.service_areas?.length > 0 && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-display font-semibold text-slate-900 mb-3">{t("provider.areas")}</h3>
@@ -208,6 +241,18 @@ export default function ProviderECard() {
                     ))}
                   </div>
                   <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Comparte tu experiencia..." className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-blue-600" rows={3} data-testid="review-comment-input" />
+                  <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">¿Cuánto pagaste? <span className="font-normal text-slate-500">(opcional, anónimo)</span></label>
+                    <select value={paidRange} onChange={e => setPaidRange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm bg-white" data-testid="review-paid-range">
+                      <option value="">No quiero decir</option>
+                      <option value="<100">Menos de $100</option>
+                      <option value="100-300">$100 – $300</option>
+                      <option value="300-700">$300 – $700</option>
+                      <option value="700-1500">$700 – $1,500</option>
+                      <option value=">1500">Más de $1,500</option>
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">🔒 Nunca mostraremos esto en público. Solo nos ayuda a entender precios de mercado.</p>
+                  </div>
                   <button type="submit" disabled={submitting} className="btn-primary mt-2 text-sm" data-testid="review-submit">Enviar reseña</button>
                 </form>
               )}
@@ -289,6 +334,7 @@ export default function ProviderECard() {
         )}
 
         {showECardModal && <ECardModal provider={p} onClose={() => setShowECardModal(false)} />}
+        <QuoteRequestModal open={showQuote} provider={p} onClose={() => setShowQuote(false)} />
       </main>
       <Footer />
     </div>
