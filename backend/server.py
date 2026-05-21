@@ -9,6 +9,7 @@ import re
 import uuid
 import bcrypt
 import jwt
+from catalog import CATALOG as FULL_CATALOG, SECTOR_LABELS, SECTOR_COLORS, CITIES as SEO_CITIES
 import httpx
 import requests
 from pathlib import Path
@@ -521,6 +522,29 @@ async def seed():
         await db.categories.insert_many(docs)
         logger.info(f"Seeded {len(docs)} categories")
 
+    # Seed full catalog (173 categories) — idempotent: only inserts slugs not yet present
+    existing_slugs = {c["slug"] for c in await db.categories.find({}, {"_id": 0, "slug": 1}).to_list(500)}
+    new_docs = []
+    for item in FULL_CATALOG:
+        if item["slug"] not in existing_slugs:
+            new_docs.append({
+                "category_id": f"cat_{uuid.uuid4().hex[:10]}",
+                "slug": item["slug"],
+                "name_es": item["name_es"],
+                "name_en": item["name_en"],
+                "sector": item["sector"],
+                "sector_label": SECTOR_LABELS.get(item["sector"], item["sector"]),
+                "license_flag": item["license"],
+                "color": SECTOR_COLORS.get(item["sector"], "#2F9D94"),
+                "icon": "🛠️",
+            })
+    if new_docs:
+        await db.categories.insert_many(new_docs)
+        logger.info(f"Seeded {len(new_docs)} new catalog categories (total now {len(existing_slugs) + len(new_docs)})")
+    # Ensure license_flag/sector exist on legacy categories
+    await db.categories.update_many({"license_flag": {"$exists": False}}, {"$set": {"license_flag": "green"}})
+    await db.categories.update_many({"sector": {"$exists": False}}, {"$set": {"sector": "hogar", "sector_label": "Hogar y mantenimiento"}})
+
     # Seed an admin
     if not await db.users.find_one({"email": "admin@getamano.com"}):
         admin_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -706,7 +730,7 @@ async def logout(request: Request, response: Response):
 # ============ CATEGORIES ============
 @api_router.get("/categories")
 async def list_categories():
-    cats = await db.categories.find({}, {"_id": 0}).to_list(100)
+    cats = await db.categories.find({}, {"_id": 0}).to_list(500)
     return cats
 
 # ============ PROVIDERS ============
@@ -801,6 +825,159 @@ async def providers_identity_counts(
     latino = await db.provider_profiles.count_documents({**query, "owner_identity": "latino"})
     american = await db.provider_profiles.count_documents({**query, "owner_identity": "american"})
     return {"all": total, "latino": latino, "american": american}
+
+
+# ============ SEO LOCAL: CITIES + STATS PER CITY/CATEGORY ============
+@api_router.get("/seo/cities")
+async def seo_cities():
+    """Return all SEO-target cities for hub /ciudades."""
+    items = []
+    for c in SEO_CITIES:
+        count = await db.provider_profiles.count_documents({"is_active": True, "city": {"$regex": f"^{c['name']}$", "$options": "i"}})
+        items.append({**c, "providers_count": count})
+    items.sort(key=lambda x: -x["providers_count"])
+    return {"items": items, "total": len(items)}
+
+
+@api_router.get("/seo/sectors")
+async def seo_sectors():
+    """Return categories grouped by sector for hub /servicios."""
+    cats = await db.categories.find({}, {"_id": 0}).to_list(500)
+    by_sector: dict = {}
+    for c in cats:
+        s = c.get("sector", "hogar")
+        by_sector.setdefault(s, []).append(c)
+    out = []
+    for sector_key, sector_label in SECTOR_LABELS.items():
+        items = by_sector.get(sector_key, [])
+        if not items:
+            continue
+        # add provider counts per category
+        for cat in items:
+            cat["providers_count"] = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"]})
+        items.sort(key=lambda x: -x.get("providers_count", 0))
+        out.append({"sector": sector_key, "label": sector_label, "color": SECTOR_COLORS.get(sector_key, "#2F9D94"), "categories": items})
+    return {"sectors": out}
+
+
+@api_router.get("/seo/city/{city_slug}")
+async def seo_city_detail(city_slug: str):
+    """Return categories available in a given city + count per category."""
+    city = next((c for c in SEO_CITIES if c["slug"] == city_slug), None)
+    if not city:
+        raise HTTPException(status_code=404, detail="City not found")
+    pipeline = [
+        {"$match": {"is_active": True, "city": {"$regex": f"^{city['name']}$", "$options": "i"}}},
+        {"$group": {"_id": "$category_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    agg = await db.provider_profiles.aggregate(pipeline).to_list(500)
+    cat_ids = [a["_id"] for a in agg if a["_id"]]
+    cats = await db.categories.find({"category_id": {"$in": cat_ids}}, {"_id": 0}).to_list(500)
+    cat_map = {c["category_id"]: c for c in cats}
+    items = []
+    for a in agg:
+        c = cat_map.get(a["_id"])
+        if c:
+            items.append({**c, "providers_count": a["count"]})
+    return {"city": city, "categories": items, "total_providers": sum(a["count"] for a in agg)}
+
+
+@api_router.get("/seo/category/{category_slug}")
+async def seo_category_detail(category_slug: str):
+    """Return cities where a given category has providers."""
+    cat = await db.categories.find_one({"slug": category_slug}, {"_id": 0})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    items = []
+    for c in SEO_CITIES:
+        count = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{c['name']}$", "$options": "i"}})
+        if count > 0:
+            items.append({**c, "providers_count": count})
+    items.sort(key=lambda x: -x["providers_count"])
+    return {"category": cat, "cities": items, "total_cities": len(items)}
+
+
+@api_router.get("/seo/page/{category_slug}/{city_slug}")
+async def seo_page_data(category_slug: str, city_slug: str):
+    """All data needed by the SEO landing page /servicios/{cat}/{city}."""
+    cat = await db.categories.find_one({"slug": category_slug}, {"_id": 0})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    city = next((c for c in SEO_CITIES if c["slug"] == city_slug), None)
+    if not city:
+        raise HTTPException(status_code=404, detail="City not found")
+    providers = await db.provider_profiles.find(
+        {"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{city['name']}$", "$options": "i"}},
+        {"_id": 0}
+    ).limit(12).to_list(12)
+    PLAN_RANK = {"premium": 0, "pro": 1, "basic": 2, "free": 3}
+    providers.sort(key=lambda p: (-p.get("rating_count", 0), PLAN_RANK.get(p.get("plan", "free"), 9)))
+    # related: same category in other cities (top 4) + other categories in same city (top 4)
+    related_cities = []
+    for c in SEO_CITIES:
+        if c["slug"] == city_slug:
+            continue
+        cnt = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{c['name']}$", "$options": "i"}})
+        related_cities.append({**c, "count": cnt})
+    related_cities.sort(key=lambda x: -x["count"])
+    related_cities = [c for c in related_cities if c["count"] > 0][:4] or [{**c, "count": 0} for c in SEO_CITIES if c["slug"] != city_slug][:4]
+    # related categories
+    same_sector_cats = await db.categories.find({"sector": cat.get("sector"), "slug": {"$ne": cat["slug"]}}, {"_id": 0}).limit(4).to_list(4)
+    return {
+        "category": cat,
+        "city": city,
+        "providers": providers,
+        "related_cities": related_cities,
+        "related_categories": same_sector_cats,
+    }
+
+
+# ============ SITEMAP.XML + ROBOTS.TXT ============
+from fastapi.responses import PlainTextResponse, Response
+
+@app.get("/api/sitemap.xml")
+async def sitemap():
+    base = "https://getamano.us"
+    urls = [
+        f"<url><loc>{base}/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>",
+        f"<url><loc>{base}/servicios</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>",
+        f"<url><loc>{base}/ciudades</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>",
+        f"<url><loc>{base}/plans</loc><priority>0.8</priority><changefreq>monthly</changefreq></url>",
+        f"<url><loc>{base}/comunidad</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>",
+        f"<url><loc>{base}/terminos</loc><priority>0.3</priority><changefreq>monthly</changefreq></url>",
+        f"<url><loc>{base}/privacidad</loc><priority>0.3</priority><changefreq>monthly</changefreq></url>",
+    ]
+    cats = await db.categories.find({}, {"_id": 0, "slug": 1}).to_list(500)
+    for cat in cats:
+        urls.append(f"<url><loc>{base}/servicios/{cat['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+        for city in SEO_CITIES:
+            urls.append(f"<url><loc>{base}/servicios/{cat['slug']}/{city['slug']}</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>")
+    for city in SEO_CITIES:
+        urls.append(f"<url><loc>{base}/ciudades/{city['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+    providers = await db.provider_profiles.find({"is_active": True}, {"_id": 0, "slug": 1}).to_list(2000)
+    for p in providers:
+        if p.get("slug"):
+            urls.append(f"<url><loc>{base}/proveedor/{p['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/api/robots.txt", response_class=PlainTextResponse)
+async def robots():
+    return """User-agent: *
+Allow: /
+Allow: /servicios/
+Allow: /ciudades/
+Allow: /proveedor/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://getamano.us/sitemap.xml
+"""
 
 
 # === GEOCODING (Nominatim OpenStreetMap — free, no API key) ===

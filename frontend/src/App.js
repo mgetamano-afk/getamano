@@ -36,6 +36,13 @@ import Privacy from "./pages/legal/Privacy";
 import ReviewsPolicy from "./pages/legal/ReviewsPolicy";
 import Cookies from "./pages/legal/Cookies";
 
+// SEO hub pages
+import SeoServicesIndex from "./pages/seo/SeoServicesIndex";
+import SeoCitiesIndex from "./pages/seo/SeoCitiesIndex";
+import SeoCityDetail from "./pages/seo/SeoCityDetail";
+import SeoCategoryDetail from "./pages/seo/SeoCategoryDetail";
+import SeoPage from "./pages/seo/SeoPage";
+
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function AppRouter() {
   const location = useLocation();
@@ -87,6 +94,13 @@ function AppRouter() {
       <Route path="/privacidad" element={<Privacy />} />
       <Route path="/politica-resenas" element={<ReviewsPolicy />} />
       <Route path="/cookies" element={<Cookies />} />
+
+      {/* SEO hub routes */}
+      <Route path="/servicios" element={<SeoServicesIndex />} />
+      <Route path="/servicios/:categorySlug" element={<SeoCategoryDetail />} />
+      <Route path="/servicios/:categorySlug/:citySlug" element={<SeoPage />} />
+      <Route path="/ciudades" element={<SeoCitiesIndex />} />
+      <Route path="/ciudades/:citySlug" element={<SeoCityDetail />} />
     </Routes>
   );
 }

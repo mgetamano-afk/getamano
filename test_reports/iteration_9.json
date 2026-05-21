@@ -1,0 +1,40 @@
+{
+  "summary": "Sprint 1 retest: 173-category catalog + SEO local routes + sitemap/robots. BACKEND: 18/18 pytest pass (after fixing /api/categories .to_list(100)→500 limit found during testing). All 5 new SEO endpoints return correct data (14 sectors, 184 cats, 23 cities, related cities/cats ≤4, sitemap=4413 URLs, robots.txt with all required directives, 404s on unknown slugs). Regression endpoints still green: /api/providers, /api/providers/featured, /api/promo-codes/founding-status, /api/providers/identity-counts, /api/auth/login (admin+provider). FRONTEND: all 5 new routes render correctly. /servicios: 14 sector sections + 184 cat-link-* + canonical + ld+json. /ciudades: 23 city-link-* cards. /ciudades/sallisaw: breadcrumbs + city-cat-links + empty CTA. /servicios/limpieza-hogar: breadcrumbs + empty state (expected, demo provider uses legacy 'cleaning' slug). /servicios/limpieza-hogar/sallisaw (SEO critical): correct <title>, seo-h1, breadcrumbs (4 levels), seo-intro, seo-why, seo-faq, 1 ld+json containing [BreadcrumbList, ItemList, FAQPage], providers list empty (expected). Bonus /servicios/cleaning/sallisaw shows 1 provider element. Footer on / shows footer-services→/servicios + footer-cities→/ciudades. /search regression green: 24 results, Lista/Split/Mapa toggles, identity chips, no real JS errors (only pre-existing /api/auth/me 401 noise).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/categories", "issue": "Was capped at .to_list(100) which truncated the 184-cat seed. FIXED in this iteration (raised to 500). Verified via test_categories_legacy_listing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration9_sprint1_seo_test.py",
+    "/app/test_reports/pytest/iteration9_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/api/categories had a silent .to_list(100) ceiling that masked the new 184-cat seed; raised to 500 (fixed). Recommend a generic constant MAX_CATEGORIES or paginated response if catalog grows beyond ~500.",
+    "Sitemap currently emits ~4413 URLs (184 cats × 23 cities + others). Google's per-sitemap limit is 50k URLs/50MB — currently fine, but plan a sitemap-index split before catalog × cities crosses that threshold.",
+    "server.py is now ~3530 lines after Sprint 1; modularization (auth, providers, seo, sitemap, admin, market-pulse, promo) is increasingly urgent.",
+    "/api/seo/sectors iterates SECTOR_LABELS in dict order; if dict order is what defines display order, ensure SECTOR_LABELS stays ordered intentionally (Python 3.7+ preserves insertion).",
+    "/api/seo/category and /api/seo/page perform N+1 count_documents calls across 23 cities. For 184 cats × 23 cities that's fine on demand but a single $facet/$group aggregation would be more efficient and reduce DB round trips."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (raised /api/categories to_list limit 100→500)",
+    "/app/backend/tests/iteration9_sprint1_seo_test.py (new — 18 tests covering SEO routes + sitemap/robots + regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (18/18 after the to_list fix)",
+    "frontend": "100% (all 6 SEO routes + footer + /search regression green)"
+  },
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123",
+  "seed_data_creation": "None. Catalog is seeded idempotently at backend startup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Sprint 1 (catálogo 173 cats + SEO local + sitemap/robots) fully verified. The /api/categories limit was raised 100→500 during testing — note this if future iterations grow the catalog further. Pre-existing /api/auth/me 401 console noise is unrelated. /servicios/cleaning/sallisaw (legacy slug) is the right URL to demo a non-empty SEO page until the demo provider is migrated to category_id matching 'limpieza-hogar' slug.",
+  "rca_of_the_issue": "Issue found during regression test_categories_legacy_listing: GET /api/categories returned only 100 of 184 seeded cats because line 733 of server.py used `.to_list(100)`. This silently truncated the new Sprint 1 catalog for any frontend consumer of /api/categories (legacy /search dropdown, admin tools). Fix: bump to_list to 500."
+}

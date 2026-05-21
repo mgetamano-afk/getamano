@@ -24,6 +24,8 @@ export default function Footer() {
           <h4 className="font-display font-semibold text-white mb-3">Plataforma</h4>
           <ul className="space-y-2 text-sm">
             <li><Link to="/search" className="hover:text-white transition" data-testid="footer-explore">{t("nav.explore")}</Link></li>
+            <li><Link to="/servicios" className="hover:text-white transition" data-testid="footer-services">Todos los servicios</Link></li>
+            <li><Link to="/ciudades" className="hover:text-white transition" data-testid="footer-cities">Ciudades</Link></li>
             <li><Link to="/plans" className="hover:text-white transition" data-testid="footer-plans">{t("nav.plans")}</Link></li>
             <li><Link to="/register?intent=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>
           </ul>

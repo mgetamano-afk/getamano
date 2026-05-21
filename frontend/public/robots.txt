@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /servicios/
+Allow: /ciudades/
+Allow: /proveedor/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://getamano.us/api/sitemap.xml
