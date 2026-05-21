@@ -48,6 +48,7 @@ function AppRouter() {
       <Route path="/buscar" element={<Search />} />
       <Route path="/services/:slug" element={<ProviderECard />} />
       <Route path="/proveedor/:slug" element={<ProviderECard />} />
+      <Route path="/p/:slug" element={<ProviderECard />} />
 
       {/* Zone 3: Provider + Client Dashboards */}
       <Route path="/dashboard" element={<DashboardRouter />} />

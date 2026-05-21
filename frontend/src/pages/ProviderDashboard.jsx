@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import MilestoneCelebration from "../components/MilestoneCelebration";
 import AchievementJournal from "../components/AchievementJournal";
+import ShareLinkCard from "../components/ShareLinkCard";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -121,6 +122,7 @@ export default function ProviderDashboard() {
           unreadMessages={unread}
           newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
         />
+        <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
@@ -250,6 +252,15 @@ export default function ProviderDashboard() {
                   </div>
                 </Section>
 
+                <Section title="Redes sociales (opcional)">
+                  <div className="md:col-span-2 text-xs text-slate-500 mb-1">Solo tu usuario (ej. <code>migrand_negocio</code>) — sin la @. También puedes pegar la URL completa.</div>
+                  <Field label="Instagram" value={form.social?.instagram || ""} onChange={v => update("social", { ...form.social, instagram: v })} placeholder="mi_negocio" testid="form-social-instagram" />
+                  <Field label="Facebook" value={form.social?.facebook || ""} onChange={v => update("social", { ...form.social, facebook: v })} placeholder="mipaginafb" testid="form-social-facebook" />
+                  <Field label="TikTok" value={form.social?.tiktok || ""} onChange={v => update("social", { ...form.social, tiktok: v })} placeholder="mi_negocio_tk" testid="form-social-tiktok" />
+                  <Field label="YouTube" value={form.social?.youtube || ""} onChange={v => update("social", { ...form.social, youtube: v })} placeholder="canalYT o URL" testid="form-social-youtube" />
+                  <Field label="LinkedIn" value={form.social?.linkedin || ""} onChange={v => update("social", { ...form.social, linkedin: v })} placeholder="usuario-li" testid="form-social-linkedin" />
+                </Section>
+
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                   <button type="submit" disabled={saving} className="btn-primary" data-testid="provider-save-button">
                     {saving ? "Guardando..." : "Guardar cambios"}
@@ -342,7 +353,7 @@ export default function ProviderDashboard() {
             )}
 
             {tab === "diario" && (
-              <AchievementJournal businessNameProp={profile?.business_name} />
+              <AchievementJournal businessNameProp={profile?.business_name} logoUrl={profile?.logo_url} />
             )}
 
             {tab === "suscripcion" && (
@@ -390,13 +401,13 @@ function StatCard({ icon: Icon, label, value, color, capitalize, testid }) {
     </div>
   );
 }
-function Field({ label, value, onChange, required, testid, textarea, full }) {
+function Field({ label, value, onChange, required, testid, textarea, full, placeholder }) {
   return (
     <div className={full ? "md:col-span-2" : ""}>
       <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       {textarea
-        ? <textarea required={required} value={value || ""} onChange={e => onChange(e.target.value)} rows={3} className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-600 outline-none" data-testid={testid} />
-        : <input required={required} value={value || ""} onChange={e => onChange(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid={testid} />}
+        ? <textarea required={required} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3} className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-600 outline-none" data-testid={testid} />
+        : <input required={required} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid={testid} />}
     </div>
   );
 }

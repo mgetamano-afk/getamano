@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { Sparkles, Trophy, Calendar, Lock, Share2, TrendingUp, Heart, Eye, Phone, Star, ThumbsUp } from "lucide-react";
+import { Sparkles, Trophy, Calendar, Lock, Share2, TrendingUp, Heart, Eye, Phone, Star, ThumbsUp, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import AchievementImageGenerator from "./AchievementImageGenerator";
+import { buildFileUrl } from "./ImageUpload";
 
 const TIER_STYLE = {
   silver:   { dot: "bg-slate-300",  ring: "ring-slate-200",  label: "text-slate-500",  card: "bg-white" },
@@ -47,9 +49,10 @@ function StatPill({ Icon, label, value, color }) {
   );
 }
 
-export default function AchievementJournal({ businessNameProp }) {
+export default function AchievementJournal({ businessNameProp, logoUrl }) {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("timeline");
+  const [imageEntry, setImageEntry] = useState(null);
 
   useEffect(() => {
     api.get("/providers/me/journal").then(r => setData(r.data)).catch(() => {});
@@ -59,6 +62,7 @@ export default function AchievementJournal({ businessNameProp }) {
 
   const { journey_start, business_name, entries = [], locked = [], stats = {} } = data;
   const bizName = businessNameProp || business_name || "tu negocio";
+  const logoFullUrl = logoUrl ? buildFileUrl(logoUrl) : null;
 
   const shareEntry = async (entry) => {
     const url = `${window.location.origin}/`;
@@ -149,9 +153,14 @@ export default function AchievementJournal({ businessNameProp }) {
                       <h3 className="font-display text-base font-bold text-slate-900 leading-tight">{e.title}</h3>
                       <p className="mt-1 text-sm text-slate-600 leading-relaxed">{e.message}</p>
                     </div>
-                    <button onClick={() => shareEntry(e)} className="flex-shrink-0 w-8 h-8 rounded-full hover:bg-white/80 flex items-center justify-center text-slate-400 hover:text-orange-600 transition opacity-0 group-hover:opacity-100" data-testid={`journal-share-${e.milestone_id}`} title="Compartir logro">
-                      <Share2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex flex-col gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition">
+                      <button onClick={() => setImageEntry(e)} className="w-8 h-8 rounded-full hover:bg-white/80 flex items-center justify-center text-slate-400 hover:text-orange-600 transition" data-testid={`journal-image-${e.milestone_id}`} title="Crear imagen para redes">
+                        <ImageIcon className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => shareEntry(e)} className="w-8 h-8 rounded-full hover:bg-white/80 flex items-center justify-center text-slate-400 hover:text-orange-600 transition" data-testid={`journal-share-${e.milestone_id}`} title="Compartir logro">
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -230,6 +239,14 @@ export default function AchievementJournal({ businessNameProp }) {
           )}
         </div>
       )}
+
+      <AchievementImageGenerator
+        open={!!imageEntry}
+        entry={imageEntry}
+        businessName={bizName}
+        logoUrl={logoFullUrl}
+        onClose={() => setImageEntry(null)}
+      />
     </div>
   );
 }

@@ -469,7 +469,7 @@ async def seed():
         "cover_url": "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200",
         "photos": [],
         "gallery": demo_gallery,
-        "social": {"facebook": "", "instagram": ""},
+        "social": {"instagram": "maria_cleaning_ok", "facebook": "mariascleaning", "tiktok": "maria_clean", "youtube": ""},
         "price_range": "$$",
         "verification_status": "approved",
         "is_active": True, "plan": "pro",

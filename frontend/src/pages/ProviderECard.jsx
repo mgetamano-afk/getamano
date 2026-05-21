@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ShareECard from "../components/ShareECard";
+import SocialLinks from "../components/SocialLinks";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -246,6 +247,12 @@ export default function ProviderECard() {
               {p.phone && <div className="flex items-center gap-2 text-slate-700"><Phone className="w-4 h-4 text-slate-400" /> {p.phone}</div>}
               {p.email && <div className="flex items-center gap-2 text-slate-700"><Mail className="w-4 h-4 text-slate-400" /> {p.email}</div>}
               {p.website && <div className="flex items-center gap-2 text-slate-700"><Globe className="w-4 h-4 text-slate-400" /> <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{p.website}</a></div>}
+              {(p.social && Object.values(p.social).some(v => v)) && (
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-2">Síguelo en redes</div>
+                  <SocialLinks social={p.social} variant="compact" />
+                </div>
+              )}
               {p.languages?.length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-2 border-t border-slate-100">
                   {p.languages.map(l => <span key={l} className="text-xs px-2 py-0.5 rounded-full bg-slate-100">{l.toUpperCase()}</span>)}
