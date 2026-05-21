@@ -2106,6 +2106,354 @@ async def public_stats():
     avg = round(avg_doc[0]["avg"], 1) if avg_doc else 4.9
     return {"providers": max(total, 100), "states": max(len([s for s in states if s]), 12), "rating": avg}
 
+# ============ NOTIFICATIONS (inteligentes para proveedores y clientes) ============
+# Notification templates. Each generator returns a list of dicts (key, title, body, cta_label, cta_url, icon, priority).
+# `key` is stable per user so re-fetches don't duplicate.
+
+PRIO_NUMERIC = {"high": 0, "medium": 1, "low": 2}
+
+def _provider_notifications(user: dict, profile: dict, ctx: dict) -> list[dict]:
+    """Generate notifications for a provider based on their profile state."""
+    notes = []
+    first = (user.get("name") or "").split(" ")[0] or "compañer@"
+    slug = profile.get("slug")
+    gallery_count = len(profile.get("gallery") or profile.get("photos") or [])
+    services_count = len(profile.get("services") or [])
+    description = (profile.get("description") or "").strip()
+    plan = profile.get("plan", "free")
+    has_logo = bool(profile.get("logo_url"))
+    views = profile.get("views", 0) or 0
+    rating_count = profile.get("rating_count", 0) or 0
+
+    # eCard completion nudges
+    if gallery_count == 0:
+        notes.append({
+            "key": "ecard_no_gallery",
+            "category": "ecard_completion",
+            "title": "Tu eCard está esperando fotos 📸",
+            "body": f"{first}, los negocios con galería convierten 3x más. Sube 3-5 fotos hoy.",
+            "cta_label": "Subir fotos",
+            "cta_url": "/dashboard/provider?tab=galeria",
+            "icon": "image", "priority": "high",
+        })
+    elif gallery_count < 3:
+        notes.append({
+            "key": "ecard_few_photos",
+            "category": "ecard_completion",
+            "title": "Agrega más fotos a tu galería",
+            "body": f"Tienes {gallery_count} foto{'s' if gallery_count != 1 else ''}. Con 5+ tu eCard se ve mucho más profesional.",
+            "cta_label": "Agregar fotos",
+            "cta_url": "/dashboard/provider?tab=galeria",
+            "icon": "image", "priority": "medium",
+        })
+    if services_count < 3:
+        notes.append({
+            "key": "ecard_few_services",
+            "category": "ecard_completion",
+            "title": "Agrega más servicios a tu eCard",
+            "body": f"Tienes {services_count} servicio{'s' if services_count != 1 else ''}. Lista al menos 3-5 para aparecer en más búsquedas.",
+            "cta_label": "Editar servicios",
+            "cta_url": "/dashboard/provider?tab=perfil",
+            "icon": "list", "priority": "high" if services_count == 0 else "medium",
+        })
+    if not description or len(description) < 80:
+        notes.append({
+            "key": "ecard_no_description",
+            "category": "ecard_completion",
+            "title": "Cuenta tu historia",
+            "body": "Una descripción cálida (80+ caracteres) genera 2x más confianza. ¿Qué te apasiona de tu trabajo?",
+            "cta_label": "Editar perfil",
+            "cta_url": "/dashboard/provider?tab=perfil",
+            "icon": "edit", "priority": "medium",
+        })
+    if not has_logo:
+        notes.append({
+            "key": "ecard_no_logo",
+            "category": "ecard_completion",
+            "title": "Sube tu logo o foto",
+            "body": "Tu eCard sin logo se ve incompleta. Una imagen vale más que mil clicks.",
+            "cta_label": "Subir logo",
+            "cta_url": "/dashboard/provider?tab=perfil",
+            "icon": "image", "priority": "medium",
+        })
+
+    # Engagement
+    if ctx.get("unread_messages", 0) > 0:
+        n = ctx["unread_messages"]
+        notes.append({
+            "key": "unread_messages",
+            "category": "engagement",
+            "title": f"{n} mensaje{'s' if n != 1 else ''} sin leer 💬",
+            "body": "Tus clientes están esperando tu respuesta. Responde rápido para no perder oportunidades.",
+            "cta_label": "Ver mensajes",
+            "cta_url": "/dashboard/provider?tab=mensajes",
+            "icon": "message", "priority": "high",
+        })
+    if ctx.get("pending_requests", 0) > 0:
+        n = ctx["pending_requests"]
+        notes.append({
+            "key": "pending_requests",
+            "category": "engagement",
+            "title": f"{n} solicitud{'es' if n != 1 else ''} de cotización",
+            "body": "Responde rápido — el 70% de los clientes contratan al primer proveedor que responde.",
+            "cta_label": "Ver solicitudes",
+            "cta_url": "/dashboard/provider?tab=solicitudes",
+            "icon": "inbox", "priority": "high",
+        })
+
+    # Share/Growth
+    if slug and views < 10:
+        notes.append({
+            "key": "share_ecard",
+            "category": "growth",
+            "title": "Comparte tu eCard en redes",
+            "body": f"Tu eCard tiene {views} vistas. Comparte tu link en WhatsApp e Instagram para que más latinos te conozcan.",
+            "cta_label": "Compartir ahora",
+            "cta_url": "/dashboard/provider",
+            "icon": "share", "priority": "medium",
+        })
+
+    # Plan upgrade
+    if plan == "free":
+        notes.append({
+            "key": "upgrade_to_pro",
+            "category": "monetization",
+            "title": "¿Quieres aparecer primero en búsquedas? 👑",
+            "body": "Plan Pro: prioridad en búsquedas, badge destacado, sin límite de fotos. $49/mes (o gratis hasta 2027 si te haces Founding).",
+            "cta_label": "Ver planes",
+            "cta_url": "/plans",
+            "icon": "crown", "priority": "low",
+        })
+
+    # First-review nudge if zero reviews after 30+ views
+    if views >= 30 and rating_count == 0:
+        notes.append({
+            "key": "ask_first_review",
+            "category": "growth",
+            "title": "Pide tu primera reseña ⭐",
+            "body": f"Ya te vieron {views} personas pero nadie te ha calificado. Pídele a un cliente feliz que te reseñe.",
+            "cta_label": "Cómo pedir reseñas",
+            "cta_url": "/dashboard/provider?tab=diario",
+            "icon": "star", "priority": "medium",
+        })
+
+    # Wall of fame teaser
+    notes.append({
+        "key": "wall_of_fame_tip",
+        "category": "community",
+        "title": "Mira el Wall of Fame de la comunidad 🏆",
+        "body": "Cada hito que desbloqueas aparece en /comunidad. Tu historia inspira a otros latinos.",
+        "cta_label": "Ver comunidad",
+        "cta_url": "/comunidad",
+        "icon": "trophy", "priority": "low",
+    })
+
+    return notes
+
+
+def _client_notifications(user: dict, ctx: dict) -> list[dict]:
+    """Generate notifications for a client based on saved providers, recent searches, location."""
+    notes = []
+    first = (user.get("name") or "").split(" ")[0] or "compañer@"
+    city = (user.get("city") or "").strip()
+    # Favorites with recent activity
+    fav_providers = ctx.get("favorite_providers") or []
+    # Welcome / first-time
+    if ctx.get("days_since_signup", 0) <= 1 and len(fav_providers) == 0:
+        notes.append({
+            "key": "welcome_client",
+            "category": "onboarding",
+            "title": f"¡Bienvenid@ a getmano, {first}! 🧡",
+            "body": "Explora servicios latinos verificados cerca de ti. ¿Qué necesitas resolver hoy?",
+            "cta_label": "Explorar servicios",
+            "cta_url": "/buscar",
+            "icon": "search", "priority": "high",
+        })
+    # Favorites prompt — contextual ("¿Tienes algo en que Juan el mecánico pueda ayudarte?")
+    for fp in fav_providers[:3]:
+        biz = fp.get("business_name") or "este proveedor"
+        slug = fp.get("slug")
+        prov_first = (fp.get("contact_name") or biz).split(" ")[0] if fp.get("contact_name") else biz
+        cat_name = fp.get("category_name") or "servicio"
+        notes.append({
+            "key": f"check_favorite_{slug}",
+            "category": "favorites",
+            "title": f"¿Tienes algo en que {prov_first} pueda ayudarte?",
+            "body": f"Lo guardaste en favoritos. Ofrece {cat_name.lower()}. Escríbele y resuelve eso pendiente.",
+            "cta_label": "Ver eCard",
+            "cta_url": f"/p/{slug}" if slug else "/buscar",
+            "icon": "heart", "priority": "medium",
+        })
+    # Suggested provider near user
+    suggested = ctx.get("suggested_provider")
+    if suggested and not fav_providers:
+        notes.append({
+            "key": f"suggested_{suggested.get('slug')}",
+            "category": "discovery",
+            "title": f"{suggested.get('business_name', 'Un proveedor')} está cerca de ti",
+            "body": f"En {suggested.get('city') or 'tu ciudad'}, con {suggested.get('rating_avg', 0):.1f}⭐. Vale la pena conocerlo.",
+            "cta_label": "Ver eCard",
+            "cta_url": f"/p/{suggested.get('slug')}",
+            "icon": "map", "priority": "medium",
+        })
+    # Re-engagement
+    if ctx.get("days_since_last_login", 0) >= 14:
+        notes.append({
+            "key": "re_engagement",
+            "category": "retention",
+            "title": "Volvió a haber novedades 👀",
+            "body": f"Hay nuevos proveedores latinos cerca de ti{f' en {city}' if city else ''}. Echa un vistazo.",
+            "cta_label": "Ver novedades",
+            "cta_url": "/comunidad",
+            "icon": "sparkle", "priority": "low",
+        })
+    # Wall of fame teaser
+    if len(notes) < 3:
+        notes.append({
+            "key": "wall_of_fame_tip_client",
+            "category": "community",
+            "title": "Conoce a los proveedores destacados",
+            "body": "El Wall of Fame muestra los negocios latinos más activos. Una buena forma de descubrir gente confiable.",
+            "cta_label": "Ver comunidad",
+            "cta_url": "/comunidad",
+            "icon": "trophy", "priority": "low",
+        })
+    return notes
+
+
+async def _compute_notifications_for_user(user: User) -> list[dict]:
+    user_doc = await db.users.find_one({"user_id": user.user_id}, {"_id": 0}) or {}
+    notes_raw = []
+    if user.role == "provider":
+        profile = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+        if profile:
+            ctx = {
+                "unread_messages": await db.conversations.count_documents({"provider_id": profile["provider_id"], "unread_by_provider": {"$gt": 0}}) if profile.get("provider_id") else 0,
+                "pending_requests": await db.service_requests.count_documents({"provider_id": profile.get("provider_id"), "status": {"$in": ["pending", "new"]}}),
+            }
+            notes_raw = _provider_notifications(user_doc, profile, ctx)
+    else:
+        # Client (or admin) — load favorites with provider info
+        favs = await db.favorites.find({"user_id": user.user_id}, {"_id": 0}).limit(5).to_list(5)
+        fav_providers = []
+        cats_meta = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(100)}
+        for f in favs:
+            p = await db.provider_profiles.find_one({"provider_id": f.get("provider_id")}, {"_id": 0, "slug": 1, "business_name": 1, "contact_name": 1, "category_id": 1})
+            if p and not (p.get("business_name") or "").startswith("TEST_"):
+                p["category_name"] = cats_meta.get(p.get("category_id"), {}).get("name_es", "servicio")
+                fav_providers.append(p)
+        # Days since signup
+        created = user_doc.get("created_at")
+        days_since_signup = 999
+        if created:
+            try:
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00")) if isinstance(created, str) else created
+                days_since_signup = (datetime.now(timezone.utc) - dt).days
+            except Exception:
+                pass
+        # Suggested provider (top rated in same city, or any approved)
+        suggested = None
+        if user_doc.get("city"):
+            suggested = await db.provider_profiles.find_one(
+                {"city": user_doc["city"], "verification_status": "approved", "is_active": True, "business_name": {"$not": {"$regex": "^TEST_"}}},
+                {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "rating_avg": 1},
+                sort=[("rating_avg", -1), ("views", -1)],
+            )
+        if not suggested:
+            suggested = await db.provider_profiles.find_one(
+                {"verification_status": "approved", "is_active": True, "business_name": {"$not": {"$regex": "^TEST_"}}},
+                {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "rating_avg": 1},
+                sort=[("rating_avg", -1)],
+            )
+        ctx = {
+            "favorite_providers": fav_providers,
+            "days_since_signup": days_since_signup,
+            "days_since_last_login": 0,
+            "suggested_provider": suggested,
+        }
+        notes_raw = _client_notifications(user_doc, ctx)
+
+    # Upsert each by stable key
+    out = []
+    for n in notes_raw:
+        key = f"{user.user_id}::{n['key']}"
+        existing = await db.notifications.find_one({"notification_key": key}, {"_id": 0})
+        if existing:
+            # Refresh body/title in case data changed, preserve is_read & dismissed_at
+            await db.notifications.update_one(
+                {"notification_key": key},
+                {"$set": {
+                    "title": n["title"], "body": n["body"], "cta_label": n.get("cta_label"),
+                    "cta_url": n.get("cta_url"), "icon": n.get("icon"), "priority": n.get("priority"),
+                    "category": n.get("category"), "updated_at": datetime.now(timezone.utc).isoformat(),
+                }}
+            )
+            existing.update(n)
+            existing["notification_key"] = key
+            if not existing.get("dismissed_at"):
+                out.append(existing)
+        else:
+            doc = {
+                "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+                "notification_key": key,
+                "user_id": user.user_id,
+                "role": user.role,
+                "category": n.get("category"),
+                "title": n["title"],
+                "body": n["body"],
+                "cta_label": n.get("cta_label"),
+                "cta_url": n.get("cta_url"),
+                "icon": n.get("icon"),
+                "priority": n.get("priority", "medium"),
+                "is_read": False,
+                "dismissed_at": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.notifications.insert_one(doc)
+            doc.pop("_id", None)
+            out.append(doc)
+    # Sort by priority then created_at desc
+    out.sort(key=lambda x: (PRIO_NUMERIC.get(x.get("priority", "medium"), 1), x.get("is_read", False), -1 * (datetime.fromisoformat(x["created_at"].replace("Z", "+00:00")).timestamp() if x.get("created_at") else 0)))
+    return out
+
+
+@api_router.get("/notifications")
+async def get_notifications(user: User = Depends(get_current_user)):
+    notes = await _compute_notifications_for_user(user)
+    unread = sum(1 for n in notes if not n.get("is_read"))
+    return {"items": notes, "unread_count": unread}
+
+
+@api_router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user: User = Depends(get_current_user)):
+    res = await db.notifications.update_one(
+        {"notification_id": notification_id, "user_id": user.user_id},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"ok": True}
+
+
+@api_router.post("/notifications/read-all")
+async def mark_all_notifications_read(user: User = Depends(get_current_user)):
+    await db.notifications.update_many(
+        {"user_id": user.user_id, "is_read": False},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"ok": True}
+
+
+@api_router.post("/notifications/{notification_id}/dismiss")
+async def dismiss_notification(notification_id: str, user: User = Depends(get_current_user)):
+    res = await db.notifications.update_one(
+        {"notification_id": notification_id, "user_id": user.user_id},
+        {"$set": {"dismissed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"ok": True}
+
 app.include_router(api_router)
 
 app.add_middleware(

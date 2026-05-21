@@ -4,6 +4,7 @@ import { useI18n } from "../contexts/I18nContext";
 import { Globe, LogOut, User as UserIcon, Menu, X, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
+import NotificationBell from "./NotificationBell";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -55,6 +56,7 @@ export default function Header() {
                 <Link to="/dashboard" className="btn-outline" data-testid="nav-dashboard">
                   <UserIcon className="w-4 h-4 inline mr-1" /> {t("nav.dashboard")}
                 </Link>
+                <NotificationBell />
                 <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-600" data-testid="nav-logout" aria-label="logout">
                   <LogOut className="w-5 h-5" />
                 </button>
