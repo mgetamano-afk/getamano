@@ -6,8 +6,8 @@ const CATEGORY_LABELS = {
   trabajo_terminado: "Trabajo terminado",
   antes_despues: "Antes y después",
   equipo: "Mi equipo",
-  herramientas: "Herramientas",
-  negocio: "Mi negocio",
+  herramientas: "Mis herramientas",
+  negocio: "Mi negocio / local",
   otro: "Otro",
 };
 
