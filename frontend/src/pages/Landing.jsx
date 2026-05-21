@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award } from "lucide-react";
+import FoundingCounter from "../components/FoundingCounter";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -179,6 +180,11 @@ export default function Landing() {
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link to="/registro?intent=provider" className="btn-primary" data-testid="hero-cta-open-ecard">Quiero abrir mi eCard</Link>
                 <Link to="/buscar" className="px-6 py-3 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium" data-testid="hero-cta-explore">Explorar servicios</Link>
+              </div>
+
+              {/* Founding Members live urgency counter */}
+              <div className="mt-5 max-w-xl">
+                <FoundingCounter variant="hero" />
               </div>
 
               {/* Animated stats */}
