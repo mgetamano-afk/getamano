@@ -55,6 +55,7 @@ Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedo
   - `FoundingCounter` con avatares de últimos 3 founders + ciudad + time-ago + polling 20s + tiers de urgencia.
   - `ProviderGreeting` cálido en dashboard: saludo time-of-day, frase del día rotativa, píldoras de actividad empáticas (mensajes, vistas, requests).
   - Nuevo campo `recent` en GET /api/promo-codes/founding-status (top 3 founders, first_name/initial/city, fallback a business_name).
+  - **Hitos celebratorios**: 19 milestones (vistas, contactos, reseñas, planes, founding, latino_owned, primer mensaje/request, etc.) con tier silver/gold/platinum. Endpoint `GET /providers/me/milestones` detecta automáticamente, `POST /providers/me/milestones/{id}/dismiss` los cierra. Colección `provider_milestones` persiste vistos. Componente `MilestoneCelebration` con confetti CSS, emoji animado, mensaje personalizado con nombre, cola secuencial. Verificado: María logueada ve "¡Tu primera vista! 👀" → dismiss → "10 personas te han visto 🌱" con confetti.
 
 ## Prioritized Backlog
 

@@ -1387,6 +1387,133 @@ async def admin_delete_ad(ad_id: str, admin: User = Depends(require_admin)):
     await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:delete", "target": ad_id, "note": "", "created_at": datetime.now(timezone.utc).isoformat()})
     return {"ok": True}
 
+# ============ MILESTONES (hitos celebratorios) ============
+# Catalog of milestones. Each entry: id, title (ES), message (ES, can use {name}), emoji, icon, threshold checker
+MILESTONE_DEFS = [
+    {"id": "first_view",       "title": "¡Tu primera vista! 👀",         "message": "Alguien acaba de descubrirte, {name}. Esto recién empieza.",                "emoji": "👀", "tier": "silver"},
+    {"id": "ten_views",        "title": "10 personas te han visto 🌱",   "message": "Tu eCard está echando raíces. Sigue regándola, {name}.",                    "emoji": "🌱", "tier": "silver"},
+    {"id": "fifty_views",      "title": "50 vistas — vas con todo 🚀",    "message": "50 personas conocieron tu negocio. Eres oficialmente parte del movimiento.", "emoji": "🚀", "tier": "gold"},
+    {"id": "hundred_views",    "title": "¡100 vistas! 💯",                "message": "100 personas pasaron por tu eCard, {name}. Esto es comunidad creciendo.",    "emoji": "💯", "tier": "gold"},
+    {"id": "first_contact",    "title": "Primer contacto 📞",             "message": "Alguien quiso comunicarse contigo. Tu trabajo está hablando por ti.",         "emoji": "📞", "tier": "silver"},
+    {"id": "ten_contacts",     "title": "10 personas te contactaron 🔥",  "message": "10 clientes potenciales tocaron tu puerta. Vas en serio, {name}.",           "emoji": "🔥", "tier": "gold"},
+    {"id": "first_review",     "title": "¡Tu primera reseña! ⭐",          "message": "Un cliente se tomó el tiempo de calificarte. Eso vale oro.",                  "emoji": "⭐", "tier": "silver"},
+    {"id": "first_5_star",     "title": "¡Reseña 5 estrellas! 🌟",         "message": "¡5 estrellas, {name}! Qué orgullo verte brillar.",                            "emoji": "🌟", "tier": "gold"},
+    {"id": "five_reviews",     "title": "5 reseñas — eres referente 🏆",  "message": "5 clientes hablaron de ti. La confianza se está construyendo sólida.",         "emoji": "🏆", "tier": "gold"},
+    {"id": "verified",         "title": "¡Verificado! ✅",                 "message": "Eres oficialmente un proveedor verificado en getmano. Bienvenid@ a la familia.", "emoji": "✅", "tier": "platinum"},
+    {"id": "founding_member",  "title": "Founding Member 🎖️",              "message": "Eres parte de los primeros 50 que construyen getmano. Gracias por creer.",   "emoji": "🎖️", "tier": "platinum"},
+    {"id": "first_message",    "title": "Primer mensaje recibido 💬",      "message": "Alguien te escribió. Cada conversación es una posibilidad.",                  "emoji": "💬", "tier": "silver"},
+    {"id": "first_request",    "title": "¡Primera solicitud! 📨",          "message": "Tu primera cotización pedida. Respóndele con cariño — ya están considerándote.", "emoji": "📨", "tier": "silver"},
+    {"id": "first_like",       "title": "Alguien te recomienda 👍",         "message": "Un cliente te recomendó. Tu reputación está creciendo, {name}.",               "emoji": "👍", "tier": "silver"},
+    {"id": "ten_likes",        "title": "10 recomendaciones 💛",           "message": "10 personas recomiendan tu negocio. Eres parte de la red de confianza latina.",  "emoji": "💛", "tier": "gold"},
+    {"id": "plan_pro",         "title": "¡Ahora eres Pro! 💼",             "message": "Plan Pro activado. Más visibilidad, más clientes, más comunidad.",            "emoji": "💼", "tier": "gold"},
+    {"id": "plan_premium",     "title": "¡Plan Premium! 👑",              "message": "Eres top of mind en getmano, {name}. Estamos orgullos@s de acompañarte.",     "emoji": "👑", "tier": "platinum"},
+    {"id": "one_month",        "title": "Un mes en getmano 🎂",            "message": "Un mes contigo, {name}. Gracias por confiar en este camino.",                "emoji": "🎂", "tier": "gold"},
+    {"id": "latino_owned",     "title": "Negocio latino-owned 🇲🇽",        "message": "Marcaste tu negocio como latino-owned. Tu identidad es tu fuerza.",            "emoji": "🇲🇽", "tier": "silver"},
+]
+
+def _milestone_unlocked(mid: str, prof: dict, user_doc: dict, extras: dict) -> bool:
+    v = prof.get("views", 0) or 0
+    c = prof.get("contact_clicks", 0) or 0
+    rcount = prof.get("rating_count", 0) or 0
+    likes = prof.get("likes_count", 0) or 0
+    plan = prof.get("plan", "free")
+    verified = prof.get("verification_status") == "approved"
+    created_at = prof.get("created_at")
+    checks = {
+        "first_view": v >= 1,
+        "ten_views": v >= 10,
+        "fifty_views": v >= 50,
+        "hundred_views": v >= 100,
+        "first_contact": c >= 1,
+        "ten_contacts": c >= 10,
+        "first_review": rcount >= 1,
+        "first_5_star": extras.get("has_5_star", False),
+        "five_reviews": rcount >= 5,
+        "verified": verified,
+        "founding_member": bool(user_doc.get("founding_member")),
+        "first_message": extras.get("msg_count", 0) >= 1,
+        "first_request": extras.get("req_count", 0) >= 1,
+        "first_like": likes >= 1,
+        "ten_likes": likes >= 10,
+        "plan_pro": plan == "pro",
+        "plan_premium": plan == "premium",
+        "latino_owned": prof.get("latino_owned") == "yes",
+    }
+    if mid in checks:
+        return checks[mid]
+    if mid == "one_month":
+        if not created_at:
+            return False
+        try:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00")) if isinstance(created_at, str) else created_at
+            return (datetime.now(timezone.utc) - dt).days >= 30
+        except Exception:
+            return False
+    return False
+
+@api_router.get("/providers/me/milestones")
+async def my_milestones(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        return {"unlocked": [], "celebrate": []}
+    user_doc = await db.users.find_one({"user_id": user.user_id}, {"_id": 0})
+    # Gather extras
+    has_5_star = await db.reviews.find_one({"provider_id": prof["provider_id"], "rating": 5}) is not None
+    msg_count = await db.conversations.count_documents({"provider_id": prof["provider_id"]})
+    req_count = await db.service_requests.count_documents({"provider_id": prof["provider_id"]})
+    extras = {"has_5_star": has_5_star, "msg_count": msg_count, "req_count": req_count}
+    # Existing records
+    existing = {r["milestone_id"]: r async for r in db.provider_milestones.find({"user_id": user.user_id}, {"_id": 0})}
+    new_unlocked = []
+    for d in MILESTONE_DEFS:
+        if _milestone_unlocked(d["id"], prof, user_doc or {}, extras) and d["id"] not in existing:
+            rec = {
+                "record_id": f"ms_{uuid.uuid4().hex[:10]}",
+                "user_id": user.user_id,
+                "provider_id": prof["provider_id"],
+                "milestone_id": d["id"],
+                "unlocked_at": datetime.now(timezone.utc).isoformat(),
+                "seen_at": None,
+                "dismissed_at": None,
+            }
+            await db.provider_milestones.insert_one(rec)
+            rec.pop("_id", None)
+            existing[d["id"]] = rec
+            new_unlocked.append(d["id"])
+    # Build response: all unlocked + which need to celebrate (no dismissed_at)
+    defs_by_id = {d["id"]: d for d in MILESTONE_DEFS}
+    unlocked = []
+    celebrate = []
+    for mid, rec in existing.items():
+        if mid not in defs_by_id:
+            continue
+        d = defs_by_id[mid]
+        item = {
+            "milestone_id": mid,
+            "title": d["title"],
+            "message": d["message"].format(name=(user.name or "compañer@").split(" ")[0]),
+            "emoji": d["emoji"],
+            "tier": d["tier"],
+            "unlocked_at": rec["unlocked_at"],
+            "dismissed": bool(rec.get("dismissed_at")),
+        }
+        unlocked.append(item)
+        if not rec.get("dismissed_at"):
+            celebrate.append(item)
+    unlocked.sort(key=lambda x: x["unlocked_at"], reverse=True)
+    celebrate.sort(key=lambda x: x["unlocked_at"])
+    return {"unlocked": unlocked, "celebrate": celebrate, "newly_unlocked": new_unlocked}
+
+@api_router.post("/providers/me/milestones/{milestone_id}/dismiss")
+async def dismiss_milestone(milestone_id: str, user: User = Depends(get_current_user)):
+    res = await db.provider_milestones.update_one(
+        {"user_id": user.user_id, "milestone_id": milestone_id},
+        {"$set": {"dismissed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    return {"ok": True}
+
 # ============ STATS for landing (public) ============
 @api_router.get("/public/stats")
 async def public_stats():

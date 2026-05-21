@@ -9,6 +9,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
+import MilestoneCelebration from "../components/MilestoneCelebration";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -111,6 +112,7 @@ export default function ProviderDashboard() {
     <div className="min-h-screen bg-neutral-50">
       <Header />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8" data-testid="provider-dashboard">
+        <MilestoneCelebration />
         <ProviderGreeting
           user={user}
           profile={profile}
