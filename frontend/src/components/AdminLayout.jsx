@@ -43,7 +43,9 @@ export default function AdminLayout({ children, title }) {
       <aside className={`${open ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 fixed md:sticky top-0 left-0 h-screen w-64 bg-slate-900 border-r border-slate-800 z-40 transition-transform flex flex-col`} data-testid="admin-sidebar">
         <div className="p-5 border-b border-slate-800">
           <Link to="/" className="flex items-center gap-2" onClick={() => setOpen(false)} data-testid="admin-logo-link">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white font-bold">g</div>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center p-1.5" style={{ backgroundColor: "#F7F6F2" }}>
+              <img src="/getamano-logo-mark.png" alt="" className="w-full h-full object-contain" />
+            </div>
             <div>
               <div className="font-display font-bold text-white">getamano</div>
               <div className="text-[10px] uppercase tracking-widest text-slate-400">Admin console</div>

@@ -29,8 +29,8 @@ export default function Header() {
     <header className="glass-header sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to="/" className="flex items-center gap-2" data-testid="header-logo-link">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold font-display" style={{ background: "linear-gradient(135deg, #2F9D94, #025F67)" }}>g</div>
+          <Link to="/" className="flex items-center gap-2" data-testid="header-logo-link" aria-label="getamano home">
+            <img src="/getamano-logo-mark.png" alt="" className="w-10 h-10 object-contain" />
             <span className="font-display font-bold text-xl" style={{ color: "#025F67" }}>get<span style={{ color: "#2F9D94" }}>amano</span></span>
           </Link>
 

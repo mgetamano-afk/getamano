@@ -53,9 +53,10 @@ export default function Register() {
       <Header />
       <main className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+          <img src="/getamano-logo-mark.png" alt="getamano" className="w-16 h-16 mx-auto mb-3 object-contain" />
           {step === 1 ? (
             <>
-              <h1 className="font-display text-3xl font-bold text-slate-900 text-center" data-testid="register-intent-title">{t("auth.welcome")}</h1>
+              <h1 className="font-display text-3xl font-bold text-center" style={{ color: "#025F67" }} data-testid="register-intent-title">{t("auth.welcome")}</h1>
               <p className="text-slate-500 text-center mt-2">{t("auth.intent")}</p>
               <div className="mt-8 space-y-3">
                 {intentOptions.map(o => (
@@ -75,7 +76,7 @@ export default function Register() {
             </>
           ) : (
             <>
-              <h1 className="font-display text-3xl font-bold text-slate-900 text-center" data-testid="register-form-title">{t("auth.signup")}</h1>
+              <h1 className="font-display text-3xl font-bold text-center" style={{ color: "#025F67" }} data-testid="register-form-title">{t("auth.signup")}</h1>
               <p className="text-slate-500 text-center mt-2">{intentOptions.find(o => o.id === intent)?.label}</p>
 
               <form onSubmit={onSubmit} className="mt-8 space-y-4" data-testid="register-form">

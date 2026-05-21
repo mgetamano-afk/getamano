@@ -83,7 +83,9 @@ export default function ShareLinkCard({ slug, businessName }) {
       <button onClick={copy}
         className="relative w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/95 hover:bg-white text-left transition group"
         data-testid="share-link-copy-btn">
-        <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">g</span>
+        <span className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center p-0.5" style={{ backgroundColor: "#EBF8F7" }}>
+          <img src="/getamano-logo-mark.png" alt="" className="w-full h-full object-contain" />
+        </span>
         <span className="flex-1 min-w-0 truncate text-sm text-slate-900 font-medium" data-testid="share-link-url">{displayUrl}</span>
         <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition ${copied ? "bg-green-500 text-white" : "bg-slate-900 text-white group-hover:bg-orange-600"}`}>
           {copied ? <><Check className="w-3 h-3" />Copiado</> : <><Copy className="w-3 h-3" />Copiar</>}
