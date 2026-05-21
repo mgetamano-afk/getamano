@@ -82,7 +82,7 @@ export default function Search() {
   };
 
   // Fetch map data progressively (geocodes up to 5 per call server-side; we call up to 6 times)
-  const fetchMap = async (overrides = {}) => {
+  const fetchMap = async (overrides = {}, bbox = null) => {
     const qs = {};
     const cur = { q, city, category, verifiedOnly, language, ownerIdentity, ...overrides };
     if (cur.q) qs.q = cur.q;
@@ -91,23 +91,34 @@ export default function Search() {
     if (cur.verifiedOnly) qs.verified = "true";
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
+    if (bbox) {
+      qs.min_lat = bbox.min_lat;
+      qs.max_lat = bbox.max_lat;
+      qs.min_lng = bbox.min_lng;
+      qs.max_lng = bbox.max_lng;
+    }
     setMapLoading(true);
     try {
+      // With bbox: single call (no progressive geocoding). Without bbox: up to 6 calls
+      const maxAttempts = bbox ? 1 : 6;
       let attempt = 0;
       let lastItems = [];
       let lastMatched = 0;
-      while (attempt < 6) {
+      while (attempt < maxAttempts) {
         const { data } = await api.get("/providers/map", { params: qs });
         lastItems = data.items || [];
         lastMatched = data.total_matched || 0;
         setMapProviders(lastItems);
-        // If we have all matched providers with coords, or no geocoding happened this call, stop
         if (lastItems.length >= lastMatched || data.geocoded_this_call === 0) break;
         attempt += 1;
       }
     } finally {
       setMapLoading(false);
     }
+  };
+
+  const handleSearchArea = (bbox) => {
+    fetchMap({}, bbox);
   };
 
   useEffect(() => {
@@ -311,6 +322,7 @@ export default function Search() {
                   highlightedId={highlightedId}
                   onMarkerHover={setHighlightedId}
                   onMarkerClick={handleMarkerClick}
+                  onSearchArea={handleSearchArea}
                 />
               </div>
             </div>
@@ -359,6 +371,7 @@ export default function Search() {
                 highlightedId={highlightedId}
                 onMarkerHover={setHighlightedId}
                 onMarkerClick={handleMarkerClick}
+                onSearchArea={handleSearchArea}
               />
             ) : loading ? (
               <div className="text-center text-slate-500 py-12">{t("common.loading")}</div>

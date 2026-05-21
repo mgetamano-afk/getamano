@@ -848,9 +848,15 @@ async def providers_map(
     owner_identity: Optional[Literal["latino", "american"]] = None,
     country: Optional[str] = DEFAULT_COUNTRY,
     limit: int = 60,
+    min_lat: Optional[float] = None,
+    max_lat: Optional[float] = None,
+    min_lng: Optional[float] = None,
+    max_lng: Optional[float] = None,
 ):
     """Returns active providers with lat/lng for map display. Geocodes missing ones at most 5 per request
-    (rate-limit safety) and persists them. The frontend can call again to fill in the rest progressively."""
+    (rate-limit safety) and persists them. Supports optional bounding-box filtering for the
+    'Buscar en esta zona' feature — when bbox is supplied, only providers with stored coords inside
+    the box are returned (no geocoding triggered). City/state/zip filters still apply."""
     query = {"is_active": True}
     if country:
         query["country"] = country
@@ -876,6 +882,11 @@ async def providers_map(
             {"description": {"$regex": q, "$options": "i"}},
             {"services": {"$regex": q, "$options": "i"}},
         ]
+    bbox_mode = all(v is not None for v in [min_lat, max_lat, min_lng, max_lng])
+    if bbox_mode:
+        query["latitude"] = {"$gte": min_lat, "$lte": max_lat}
+        query["longitude"] = {"$gte": min_lng, "$lte": max_lng}
+
     providers = await db.provider_profiles.find(query, {"_id": 0}).limit(limit).to_list(limit)
 
     items = []
@@ -887,7 +898,8 @@ async def providers_map(
         # Skip if explicitly marked as un-geocodable
         if p.get("geocode_failed") is True:
             continue
-        if (lat is None or lng is None) and geocoded_this_call < MAX_GEOCODE_PER_CALL:
+        # When bbox is supplied, never geocode — items must already have stored coords
+        if not bbox_mode and (lat is None or lng is None) and geocoded_this_call < MAX_GEOCODE_PER_CALL:
             # Only attempt if we have city or zip
             if not (p.get("city") or p.get("zip_code") or p.get("address")):
                 await db.provider_profiles.update_one(

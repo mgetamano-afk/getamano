@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { ShieldCheck, Star, MapPin as MapPinIcon } from "lucide-react";
+import { ShieldCheck, Star, MapPin as MapPinIcon, Search as SearchIcon } from "lucide-react";
 import OwnerIdentityBadge from "./OwnerIdentityBadge";
 
 // Custom teardrop marker in Scooter teal. Inline SVG so no asset fetch needed.
@@ -63,10 +63,59 @@ const PanToHighlighted = ({ points, highlightedId, openPopup }) => {
   return null;
 };
 
-export default function ProvidersMap({ providers, loading, highlightedId, onMarkerHover, onMarkerClick }) {
+// Bridges map events to parent state. Used for the 'Buscar en esta zona' floating button.
+const MapMoveBridge = ({ onMove }) => {
+  const map = useMap();
+  useEffect(() => {
+    const handler = () => onMove(map);
+    map.on("moveend zoomend", handler);
+    return () => map.off("moveend zoomend", handler);
+  }, [map, onMove]);
+  return null;
+};
+
+export default function ProvidersMap({ providers, loading, highlightedId, onMarkerHover, onMarkerClick, onSearchArea }) {
   const markerRefs = useRef({});
+  const lastFetchCenterRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const [showSearchArea, setShowSearchArea] = useState(false);
 
   const items = useMemo(() => (providers || []).filter(p => p.lat != null && p.lng != null), [providers]);
+
+  // Reset "search area" prompt when new providers arrive (parent re-fetched)
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      lastFetchCenterRef.current = mapInstanceRef.current.getCenter();
+    }
+    setShowSearchArea(false);
+  }, [providers]);
+
+  const handleMapMove = (map) => {
+    mapInstanceRef.current = map;
+    if (!lastFetchCenterRef.current) {
+      lastFetchCenterRef.current = map.getCenter();
+      return;
+    }
+    const dist = map.getCenter().distanceTo(lastFetchCenterRef.current);
+    const b = map.getBounds();
+    const diag = b.getNorthEast().distanceTo(b.getSouthWest());
+    const ratio = diag > 0 ? dist / diag : 0;
+    // Show button when user has panned at least 15% of the visible diagonal
+    setShowSearchArea(ratio > 0.15);
+  };
+
+  const triggerSearchArea = () => {
+    if (!mapInstanceRef.current || !onSearchArea) return;
+    const b = mapInstanceRef.current.getBounds();
+    onSearchArea({
+      min_lat: b.getSouth(),
+      max_lat: b.getNorth(),
+      min_lng: b.getWest(),
+      max_lng: b.getEast(),
+    });
+    lastFetchCenterRef.current = mapInstanceRef.current.getCenter();
+    setShowSearchArea(false);
+  };
 
   const center = useMemo(() => {
     if (items.length > 0) return [items[0].lat, items[0].lng];
@@ -173,6 +222,25 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
           <div className="absolute top-3 left-3 z-[400] text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(247,246,242,0.92)", color: "#025F67", border: "1px solid #BCC5CC" }} data-testid="map-count-badge">
             {items.length} {items.length === 1 ? "proveedor" : "proveedores"} en el mapa
           </div>
+        )}
+
+        {/* Floating 'Search this area' button — appears when user pans/zooms */}
+        {showSearchArea && onSearchArea && (
+          <button
+            type="button"
+            onClick={triggerSearchArea}
+            className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold shadow-lg transition hover:scale-105"
+            style={{
+              backgroundColor: "#FFFFFF",
+              color: "#025F67",
+              border: "1.5px solid #2F9D94",
+              boxShadow: "0 8px 24px -8px rgba(2,95,103,0.4)",
+            }}
+            data-testid="map-search-area-btn"
+          >
+            <SearchIcon className="w-4 h-4" />
+            Buscar en esta zona
+          </button>
         )}
       </div>
       <style>{`
