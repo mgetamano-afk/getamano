@@ -11,7 +11,7 @@ const WARM_PHRASES = [
   "Hoy es un buen día para hacer crecer tu negocio",
   "Tu trabajo le cambia la vida a alguien hoy",
   "Pequeños detalles, grandes clientes felices",
-  "Gracias por ser parte de la familia getmano",
+  "Gracias por ser parte de la familia getamano",
   "La comunidad latina te respalda",
   "Sigue brillando, ya empezaste",
   "Un cliente contento, mil recomendaciones",

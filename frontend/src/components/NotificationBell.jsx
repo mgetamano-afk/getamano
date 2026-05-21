@@ -151,7 +151,7 @@ export default function NotificationBell({ compact = false }) {
           </div>
 
           <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50 text-center">
-            <span className="text-[10px] text-slate-400">getmano · tu compañero diario 🧡</span>
+            <span className="text-[10px] text-slate-400">getamano · tu compañero diario 🧡</span>
           </div>
         </div>
       )}

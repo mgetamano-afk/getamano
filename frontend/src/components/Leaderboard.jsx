@@ -7,7 +7,7 @@ import { Crown, Trophy, Medal, MapPin } from "lucide-react";
 const RANK_STYLE = {
   1: { Icon: Crown,  ring: "ring-amber-300", grad: "from-amber-400 to-orange-500", label: "🥇 Líder del mes", color: "#F59E0B" },
   2: { Icon: Trophy, ring: "ring-slate-300", grad: "from-slate-300 to-slate-500", label: "🥈 Segundo lugar",  color: "#94A3B8" },
-  3: { Icon: Medal,  ring: "ring-orange-300", grad: "from-orange-400 to-rose-500", label: "🥉 Tercer lugar",  color: "#FB923C" },
+  3: { Icon: Medal,  ring: "ring-orange-300", grad: "from-orange-400 to-orange-600", label: "🥉 Tercer lugar",  color: "#4EBAAE" },
 };
 
 /**

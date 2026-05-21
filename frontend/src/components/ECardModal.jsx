@@ -25,7 +25,7 @@ export default function ECardModal({ provider, onClose }) {
   };
 
   const shareWA = () => {
-    const text = `Hola, te comparto mi perfil en getmano: ${url} — ${provider.business_name}${provider.category ? `, ${provider.category.name_es}` : ""}${provider.city ? ` en ${provider.city}` : ""}`;
+    const text = `Hola, te comparto mi perfil en getamano: ${url} — ${provider.business_name}${provider.category ? `, ${provider.category.name_es}` : ""}${provider.city ? ` en ${provider.city}` : ""}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 

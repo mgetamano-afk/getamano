@@ -23,7 +23,7 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-JWT_SECRET = os.environ.get('JWT_SECRET', 'getmano-dev-secret-change-me')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'getamano-dev-secret-change-me')
 JWT_ALGO = 'HS256'
 JWT_EXP_DAYS = 7
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
@@ -31,7 +31,7 @@ EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/ses
 # Emergent Object Storage
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
-APP_NAME = "getmano"
+APP_NAME = "getamano"
 _storage_key = None
 
 def init_storage():
@@ -125,7 +125,7 @@ def send_sms(to_phone: str, body: str, event: str = "generic"):
         pass
     return record
 
-app = FastAPI(title="getmano API")
+app = FastAPI(title="getamano API")
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -149,6 +149,15 @@ class User(BaseModel):
 # ============ INTERNATIONALIZATION HELPERS (Sec 11) ============
 DEFAULT_COUNTRY = "US"
 DEFAULT_CURRENCY = "USD"
+
+BUDGET_LABEL = {
+    "<100": "menos de $100",
+    "100-300": "$100–$300",
+    "300-700": "$300–$700",
+    "700-1500": "$700–$1500",
+    ">1500": "más de $1500",
+    "unknown": "sin definir",
+}
 
 def normalize_phone(raw: Optional[str]) -> Optional[str]:
     """Normalize phone numbers to E.164 format. US default."""
@@ -495,20 +504,20 @@ async def seed():
         logger.info(f"Seeded {len(docs)} categories")
 
     # Seed an admin
-    if not await db.users.find_one({"email": "admin@getmano.com"}):
+    if not await db.users.find_one({"email": "admin@getamano.com"}):
         admin_id = f"user_{uuid.uuid4().hex[:12]}"
         await db.users.insert_one({
-            "user_id": admin_id, "email": "admin@getmano.com",
+            "user_id": admin_id, "email": "admin@getamano.com",
             "password_hash": hash_password("admin123"),
-            "name": "getmano Admin", "role": "admin", "picture": None,
+            "name": "getamano Admin", "role": "admin", "picture": None,
             "language": "es", "created_at": datetime.now(timezone.utc).isoformat()
         })
         logger.info("Seeded admin user")
 
     # Seed founding members promo code (idempotent)
-    if not await db.promo_codes.find_one({"code": "GETMANO50"}):
+    if not await db.promo_codes.find_one({"code": "GETAMANO50"}):
         await db.promo_codes.insert_one({
-            "code": "GETMANO50",
+            "code": "GETAMANO50",
             "plan_assigned": "pro",
             "max_uses": 50,
             "current_uses": 0,
@@ -517,10 +526,10 @@ async def seed():
             "active": True,
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
-        logger.info("Seeded GETMANO50 promo code")
+        logger.info("Seeded GETAMANO50 promo code")
 
     # Demo provider — fully idempotent (ensures user + profile + showcase gallery)
-    DEMO_EMAIL = "demo.provider@getmano.com"
+    DEMO_EMAIL = "demo.provider@getamano.com"
     DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
     demo_user = await db.users.find_one({"email": DEMO_EMAIL})
     if not demo_user:
@@ -891,13 +900,13 @@ async def admin_verify(provider_id: str, payload: VerificationActionIn, admin: U
     if provider:
         prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
         if prov_user and prov_user.get("phone"):
-            label = {"approved": "¡Felicidades! Tu perfil fue verificado por getmano.",
+            label = {"approved": "¡Felicidades! Tu perfil fue verificado por getamano.",
                      "rejected": "Tu solicitud de verificación fue rechazada. Revisa los requisitos.",
                      "needs_info": "Necesitamos más información para verificar tu perfil.",
                      "suspended": "Tu perfil fue suspendido. Contacta soporte.",
                      "in_review": "Tu perfil está siendo revisado por nuestro equipo.",
                      "pending": "Tu perfil está pendiente de revisión."}.get(payload.status, f"Estado actualizado: {payload.status}")
-            send_sms(prov_user["phone"], f"[getmano] {label}", event=f"verify_{payload.status}")
+            send_sms(prov_user["phone"], f"[getamano] {label}", event=f"verify_{payload.status}")
 
     return {"ok": True}
 
@@ -968,7 +977,7 @@ async def create_service_request(payload: ServiceRequestIn, user: User = Depends
     # SMS notify provider
     prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
     if prov_user and prov_user.get("phone"):
-        send_sms(prov_user["phone"], f"[getmano] Nueva solicitud de cotización de {user.name}: {payload.message[:120]}", event="new_quote_request")
+        send_sms(prov_user["phone"], f"[getamano] Nueva solicitud de cotización de {user.name}: {payload.message[:120]}", event="new_quote_request")
 
     req.pop("_id", None)
     return req
@@ -992,7 +1001,7 @@ async def update_request_status(request_id: str, payload: ServiceRequestStatusIn
     client_user = await db.users.find_one({"user_id": req["client_id"]}, {"_id": 0})
     if client_user and client_user.get("phone"):
         label = {"accepted": "aceptó", "declined": "rechazó", "completed": "marcó como completada"}.get(payload.status, payload.status)
-        send_sms(client_user["phone"], f"[getmano] {req['business_name']} {label} tu solicitud.", event=f"request_{payload.status}")
+        send_sms(client_user["phone"], f"[getamano] {req['business_name']} {label} tu solicitud.", event=f"request_{payload.status}")
     return {"ok": True}
 
 # ============ ADMIN: REVIEWS MODERATION ============
@@ -1276,7 +1285,7 @@ async def send_message(payload: MessageIn, user: User = Depends(get_current_user
     # SMS notify provider
     prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
     if prov_user and prov_user.get("phone"):
-        send_sms(prov_user["phone"], f"[getmano] Nuevo mensaje de {user.name}: {payload.body[:120]}", event="new_message_to_provider")
+        send_sms(prov_user["phone"], f"[getamano] Nuevo mensaje de {user.name}: {payload.body[:120]}", event="new_message_to_provider")
 
     msg.pop("_id", None)
     return msg
@@ -1314,7 +1323,7 @@ async def reply_message(conversation_id: str, payload: MessageReplyIn, user: Use
     other_user = await db.users.find_one({"user_id": other_user_id}, {"_id": 0})
     if other_user and other_user.get("phone"):
         sender_label = conv["business_name"] if is_provider else user.name
-        send_sms(other_user["phone"], f"[getmano] {sender_label}: {payload.body[:140]}", event="message_reply")
+        send_sms(other_user["phone"], f"[getamano] {sender_label}: {payload.body[:140]}", event="message_reply")
 
     msg.pop("_id", None)
     return msg
@@ -1390,7 +1399,7 @@ async def apply_promo_code(payload: PromoCodeApplyIn, user: User = Depends(get_c
 
 @api_router.get("/promo-codes/founding-status")
 async def founding_status():
-    code_doc = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0})
+    code_doc = await db.promo_codes.find_one({"code": "GETAMANO50"}, {"_id": 0})
     if not code_doc:
         return {"available": False, "used": 0, "max": 50, "recent": []}
     # Last 3 founding members (newest first) — public-safe fields only
@@ -1503,15 +1512,15 @@ MILESTONE_DEFS = [
     {"id": "first_review",     "title": "¡Tu primera reseña! ⭐",          "message": "Un cliente se tomó el tiempo de calificarte. Eso vale oro.",                  "emoji": "⭐", "tier": "silver"},
     {"id": "first_5_star",     "title": "¡Reseña 5 estrellas! 🌟",         "message": "¡5 estrellas, {name}! Qué orgullo verte brillar.",                            "emoji": "🌟", "tier": "gold"},
     {"id": "five_reviews",     "title": "5 reseñas — eres referente 🏆",  "message": "5 clientes hablaron de ti. La confianza se está construyendo sólida.",         "emoji": "🏆", "tier": "gold"},
-    {"id": "verified",         "title": "¡Verificado! ✅",                 "message": "Eres oficialmente un proveedor verificado en getmano. Bienvenid@ a la familia.", "emoji": "✅", "tier": "platinum"},
-    {"id": "founding_member",  "title": "Founding Member 🎖️",              "message": "Eres parte de los primeros 50 que construyen getmano. Gracias por creer.",   "emoji": "🎖️", "tier": "platinum"},
+    {"id": "verified",         "title": "¡Verificado! ✅",                 "message": "Eres oficialmente un proveedor verificado en getamano. Bienvenid@ a la familia.", "emoji": "✅", "tier": "platinum"},
+    {"id": "founding_member",  "title": "Founding Member 🎖️",              "message": "Eres parte de los primeros 50 que construyen getamano. Gracias por creer.",   "emoji": "🎖️", "tier": "platinum"},
     {"id": "first_message",    "title": "Primer mensaje recibido 💬",      "message": "Alguien te escribió. Cada conversación es una posibilidad.",                  "emoji": "💬", "tier": "silver"},
     {"id": "first_request",    "title": "¡Primera solicitud! 📨",          "message": "Tu primera cotización pedida. Respóndele con cariño — ya están considerándote.", "emoji": "📨", "tier": "silver"},
     {"id": "first_like",       "title": "Alguien te recomienda 👍",         "message": "Un cliente te recomendó. Tu reputación está creciendo, {name}.",               "emoji": "👍", "tier": "silver"},
     {"id": "ten_likes",        "title": "10 recomendaciones 💛",           "message": "10 personas recomiendan tu negocio. Eres parte de la red de confianza latina.",  "emoji": "💛", "tier": "gold"},
     {"id": "plan_pro",         "title": "¡Ahora eres Pro! 💼",             "message": "Plan Pro activado. Más visibilidad, más clientes, más comunidad.",            "emoji": "💼", "tier": "gold"},
-    {"id": "plan_premium",     "title": "¡Plan Premium! 👑",              "message": "Eres top of mind en getmano, {name}. Estamos orgullos@s de acompañarte.",     "emoji": "👑", "tier": "platinum"},
-    {"id": "one_month",        "title": "Un mes en getmano 🎂",            "message": "Un mes contigo, {name}. Gracias por confiar en este camino.",                "emoji": "🎂", "tier": "gold"},
+    {"id": "plan_premium",     "title": "¡Plan Premium! 👑",              "message": "Eres top of mind en getamano, {name}. Estamos orgullos@s de acompañarte.",     "emoji": "👑", "tier": "platinum"},
+    {"id": "one_month",        "title": "Un mes en getamano 🎂",            "message": "Un mes contigo, {name}. Gracias por confiar en este camino.",                "emoji": "🎂", "tier": "gold"},
     {"id": "latino_owned",     "title": "Negocio latino-owned 🇲🇽",        "message": "Marcaste tu negocio como latino-owned. Tu identidad es tu fuerza.",            "emoji": "🇲🇽", "tier": "silver"},
 ]
 
@@ -1817,7 +1826,7 @@ async def ceo_metrics(admin: User = Depends(require_admin)):
     activity = activity[:10]
 
     # === Founding cupos ===
-    founding = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0}) or {}
+    founding = await db.promo_codes.find_one({"code": "GETAMANO50"}, {"_id": 0}) or {}
 
     return {
         "generated_at": now.isoformat(),
@@ -1948,7 +1957,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
             leader = {"name": lp.get("business_name"), "city": lp.get("city"), "count": leader_rows[0]["count"]}
 
     # Founding
-    founding = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0}) or {}
+    founding = await db.promo_codes.find_one({"code": "GETAMANO50"}, {"_id": 0}) or {}
     founding_remaining = founding.get("max_uses", 50) - founding.get("current_uses", 0)
 
     # Build compact data for LLM
@@ -1985,7 +1994,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
 
     # === Generate narrative (Brief) ===
     system_msg_brief = (
-        "Eres el compañero de café matutino de Verónica, CEO de getmano (marketplace que conecta a la comunidad latina en USA con proveedores latinos verificados). "
+        "Eres el compañero de café matutino de Verónica, CEO de getamano (marketplace que conecta a la comunidad latina en USA con proveedores latinos verificados). "
         "Entrégale un brief CÁLIDO, BREVE y HUMANO en español, tono de confidente. "
         "Habla en SEGUNDA PERSONA. Máximo 4-5 oraciones. Incluye un dato concreto y una emoción. "
         "Celebra logros con honestidad, sé esperanzador con caídas. TERMINA con una frase de ánimo no cliché. "
@@ -2005,7 +2014,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
 
     # === Generate strategic recommendations (NEW: actionable for traction) ===
     system_msg_recs = (
-        "Eres consultor estratégico de getmano (marketplace latino en USA, fase early-stage). "
+        "Eres consultor estratégico de getamano (marketplace latino en USA, fase early-stage). "
         "Tu prioridad #1 es TRACCIÓN DE CLIENTES y CONVERSIÓN. "
         "Analiza las métricas y propone 3-4 acciones CONCRETAS, PRIORIZADAS y EJECUTABLES esta semana. "
         "Cada acción debe tener:\n"
@@ -2028,7 +2037,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
             system_message=system_msg_recs,
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
         raw = await chat_recs.send_message(UserMessage(text=(
-            f"Métricas operativas de getmano:\n{metrics}\n\n"
+            f"Métricas operativas de getamano:\n{metrics}\n\n"
             f"Proveedores aprobados pero sin actividad reciente (top 5):\n{inactive_top}\n\n"
             f"Pendientes de verificación con más de 3 días (top 5):\n{stale_pending}\n\n"
             "Devuelve SOLO el JSON con recomendaciones de tracción para esta semana."
@@ -2367,7 +2376,7 @@ def _client_notifications(user: dict, ctx: dict) -> list[dict]:
         notes.append({
             "key": "welcome_client",
             "category": "onboarding",
-            "title": f"¡Bienvenid@ a getmano, {first}! 🧡",
+            "title": f"¡Bienvenid@ a getamano, {first}! 🧡",
             "body": "Explora servicios latinos verificados cerca de ti. ¿Qué necesitas resolver hoy?",
             "cta_label": "Explorar servicios",
             "cta_url": "/buscar",
@@ -2436,6 +2445,19 @@ async def _compute_notifications_for_user(user: User) -> list[dict]:
                 "pending_requests": await db.service_requests.count_documents({"provider_id": profile.get("provider_id"), "status": {"$in": ["pending", "new"]}}),
             }
             notes_raw = _provider_notifications(user_doc, profile, ctx)
+            # Weekly Market Pulse (Data Flywheel evolution)
+            cat_id = profile.get("category_id")
+            if cat_id:
+                try:
+                    pulse = await _compute_market_pulse(cat_id, profile.get("city"), profile.get("country") or DEFAULT_COUNTRY)
+                    cat = await db.categories.find_one({"category_id": cat_id}, {"_id": 0, "name_es": 1})
+                    cat_name = (cat or {}).get("name_es") or "tu categoría"
+                    first_name = (user_doc.get("name") or "").split(" ")[0] or "compañer@"
+                    pulse_note = _build_market_pulse_note(profile, pulse, first_name, cat_name)
+                    if pulse_note:
+                        notes_raw.append(pulse_note)
+                except Exception as e:
+                    logger.warning(f"Market pulse compute failed: {e}")
     else:
         # Client (or admin) — load favorites with provider info
         favs = await db.favorites.find({"user_id": user.user_id}, {"_id": 0}).limit(5).to_list(5)
@@ -2751,6 +2773,165 @@ async def respond_to_quote(quote_request_id: str, payload: QuoteResponseIn, user
     doc.pop("_id", None)
     return doc
 
+# === WEEKLY MARKET PULSE (Data Flywheel evolution) ===
+# Provider-facing weekly aggregated market signal: avg rates + WoW delta,
+# quote demand in their category/city, top requested budget tier.
+# Privacy threshold: only return aggregated numbers if total sample >= 3.
+
+async def _compute_market_pulse(category_id: str, city: Optional[str], country: str = DEFAULT_COUNTRY) -> dict:
+    """Compute weekly pulse for a (category, city, country) cohort.
+    Returns dict with weekly_quotes, prev_weekly_quotes, delta_pct,
+    avg_min/max for active rates, top_budget_range, top_service.
+    """
+    now = datetime.now(timezone.utc)
+    week_start = (now - timedelta(days=7)).isoformat()
+    prev_start = (now - timedelta(days=14)).isoformat()
+
+    base_match: dict = {"category_id": category_id, "country": country}
+    if city:
+        base_match["city"] = city
+
+    # Quotes this week vs previous
+    this_week_n = await db.quote_requests.count_documents({**base_match, "created_at": {"$gte": week_start}})
+    prev_week_n = await db.quote_requests.count_documents({**base_match, "created_at": {"$gte": prev_start, "$lt": week_start}})
+
+    # Top budget range this week
+    budget_agg = await db.quote_requests.aggregate([
+        {"$match": {**base_match, "created_at": {"$gte": week_start}, "budget_range": {"$nin": [None, "", "unknown"]}}},
+        {"$group": {"_id": "$budget_range", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 1},
+    ]).to_list(1)
+    top_budget = budget_agg[0]["_id"] if budget_agg else None
+
+    # Top project_size this week
+    size_agg = await db.quote_requests.aggregate([
+        {"$match": {**base_match, "created_at": {"$gte": week_start}, "project_size": {"$nin": [None, ""]}}},
+        {"$group": {"_id": "$project_size", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 1},
+    ]).to_list(1)
+    top_size = size_agg[0]["_id"] if size_agg else None
+
+    # Current vs prior avg rates (provider_rates updated_at)
+    rate_match_cur = {"is_active": True, "category_id": category_id, "country": country, "price_min": {"$ne": None}}
+    if city:
+        rate_match_cur["city"] = city
+    rates_agg = await db.provider_rates.aggregate([
+        {"$match": rate_match_cur},
+        {"$group": {"_id": None, "avg_min": {"$avg": "$price_min"}, "avg_max": {"$avg": "$price_max"}, "n": {"$sum": 1}}},
+    ]).to_list(1)
+    avg_min = round(rates_agg[0]["avg_min"], 0) if rates_agg and rates_agg[0]["avg_min"] is not None else None
+    avg_max = round(rates_agg[0]["avg_max"] or (rates_agg[0]["avg_min"] or 0), 0) if rates_agg else None
+    rate_n = rates_agg[0]["n"] if rates_agg else 0
+
+    # Prior 30d avg (rough WoW signal for prices using created_at on rates)
+    prior_match = {**rate_match_cur, "created_at": {"$lt": (now - timedelta(days=14)).isoformat()}}
+    prior_agg = await db.provider_rates.aggregate([
+        {"$match": prior_match},
+        {"$group": {"_id": None, "avg_min": {"$avg": "$price_min"}, "avg_max": {"$avg": "$price_max"}}},
+    ]).to_list(1)
+    prior_avg_max = round(prior_agg[0]["avg_max"] or prior_agg[0]["avg_min"] or 0, 0) if prior_agg and prior_agg[0]["avg_min"] is not None else None
+
+    delta_quotes_pct = None
+    if prev_week_n > 0:
+        delta_quotes_pct = round(((this_week_n - prev_week_n) / prev_week_n) * 100, 0)
+    elif this_week_n > 0:
+        delta_quotes_pct = 100
+
+    delta_price_pct = None
+    if prior_avg_max and avg_max:
+        delta_price_pct = round(((avg_max - prior_avg_max) / prior_avg_max) * 100, 1)
+
+    return {
+        "category_id": category_id,
+        "city": city,
+        "country": country,
+        "week_start": week_start,
+        "generated_at": now.isoformat(),
+        "weekly_quotes": this_week_n,
+        "prev_weekly_quotes": prev_week_n,
+        "delta_quotes_pct": delta_quotes_pct,
+        "avg_min": avg_min,
+        "avg_max": avg_max,
+        "prior_avg_max": prior_avg_max,
+        "delta_price_pct": delta_price_pct,
+        "rate_sample_size": rate_n,
+        "top_budget_range": top_budget,
+        "top_project_size": top_size,
+        "has_signal": (this_week_n + rate_n) >= 3,
+        "currency": DEFAULT_CURRENCY,
+    }
+
+
+def _humanize_budget_range(rng: Optional[str]) -> str:
+    if not rng:
+        return ""
+    return BUDGET_LABEL.get(rng, rng)
+
+
+def _build_market_pulse_note(profile: dict, pulse: dict, first_name: str, cat_name: str) -> Optional[dict]:
+    """Builds a notification dict for the weekly market pulse. Returns None if no useful signal."""
+    if not pulse.get("has_signal"):
+        return None
+    q = pulse.get("weekly_quotes", 0)
+    delta = pulse.get("delta_quotes_pct")
+    avg_max = pulse.get("avg_max")
+    avg_min = pulse.get("avg_min")
+    delta_price = pulse.get("delta_price_pct")
+    top_budget = _humanize_budget_range(pulse.get("top_budget_range"))
+    city = pulse.get("city") or "tu zona"
+
+    # Build a concise headline
+    parts = []
+    if q > 0:
+        if delta is not None and delta > 0:
+            parts.append(f"{q} cotización{'es' if q != 1 else ''} en {cat_name.lower()} esta semana (+{int(delta)}% vs semana pasada)")
+        elif delta is not None and delta < 0:
+            parts.append(f"{q} cotización{'es' if q != 1 else ''} en {cat_name.lower()} esta semana ({int(delta)}% vs anterior)")
+        else:
+            parts.append(f"{q} cotización{'es' if q != 1 else ''} nuevas en {cat_name.lower()}")
+    if avg_min and avg_max:
+        if delta_price and abs(delta_price) >= 2:
+            arrow = "↑" if delta_price > 0 else "↓"
+            parts.append(f"precio promedio: ${int(avg_min)}–${int(avg_max)} ({arrow}{abs(delta_price)}%)")
+        else:
+            parts.append(f"precio promedio: ${int(avg_min)}–${int(avg_max)}")
+    if top_budget:
+        parts.append(f"budget más pedido: {top_budget}")
+
+    body = " · ".join(parts) if parts else f"Hay movimiento en {cat_name.lower()} en {city}."
+
+    return {
+        "key": "weekly_market_pulse",
+        "category": "market_pulse",
+        "title": f"📊 Pulso semanal de {cat_name} en {city}",
+        "body": f"{first_name}, {body}.",
+        "cta_label": "Ver Market Pulse",
+        "cta_url": "/dashboard/provider?tab=tarifas",
+        "icon": "trending-up",
+        "priority": "medium",
+    }
+
+
+@api_router.get("/providers/me/market-pulse")
+async def get_my_market_pulse(user: User = Depends(get_current_user)):
+    """Returns the Weekly Market Pulse for the authenticated provider."""
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    cat_id = prof.get("category_id")
+    if not cat_id:
+        return {"available": False, "reason": "no_category"}
+    pulse = await _compute_market_pulse(cat_id, prof.get("city"), prof.get("country") or DEFAULT_COUNTRY)
+    cat = await db.categories.find_one({"category_id": cat_id}, {"_id": 0, "name_es": 1, "name_en": 1, "slug": 1})
+    pulse["category_name"] = (cat or {}).get("name_es") or "tu categoría"
+    pulse["category_slug"] = (cat or {}).get("slug")
+    if not pulse.get("has_signal"):
+        return {"available": False, "reason": "not_enough_data", **pulse}
+    pulse["available"] = True
+    return pulse
+
 # === Pricing Intelligence (Admin only) ===
 @api_router.get("/admin/pricing-intelligence")
 async def admin_pricing_intelligence(
@@ -2883,7 +3064,7 @@ async def admin_pricing_intelligence_csv(admin: User = Depends(require_admin)):
     async for rv in db.reviews.find({"paid_amount_range": {"$ne": None}}, {"_id": 0}):
         prof = await db.provider_profiles.find_one({"provider_id": rv.get("provider_id")}, {"_id": 0, "category_id": 1, "state": 1, "city": 1})
         writer.writerow(["review_paid", prof.get("category_id") if prof else "", prof.get("state") if prof else "", prof.get("city") if prof else "", "", "", "", "", rv.get("paid_amount_range"), rv.get("created_at")])
-    return FastResponse(content=out.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=getmano-pricing.csv"})
+    return FastResponse(content=out.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=getamano-pricing.csv"})
 
 # === Market Benchmark (Premium plan only) ===
 @api_router.get("/providers/me/benchmark")

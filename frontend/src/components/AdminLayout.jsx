@@ -45,7 +45,7 @@ export default function AdminLayout({ children, title }) {
           <Link to="/" className="flex items-center gap-2" onClick={() => setOpen(false)} data-testid="admin-logo-link">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white font-bold">g</div>
             <div>
-              <div className="font-display font-bold text-white">getmano</div>
+              <div className="font-display font-bold text-white">getamano</div>
               <div className="text-[10px] uppercase tracking-widest text-slate-400">Admin console</div>
             </div>
           </Link>

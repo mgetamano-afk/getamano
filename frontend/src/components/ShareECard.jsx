@@ -5,7 +5,7 @@ import { toast } from "sonner";
 export default function ShareECard({ businessName, slug, description }) {
   const [open, setOpen] = useState(false);
   const url = `${window.location.origin}/services/${slug}`;
-  const text = `${businessName} — ${description ? description.slice(0, 120) : "Mira este negocio en getmano"} ${url}`;
+  const text = `${businessName} — ${description ? description.slice(0, 120) : "Mira este negocio en getamano"} ${url}`;
 
   const opts = [
     {

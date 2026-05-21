@@ -102,7 +102,7 @@ export default function Community() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
-                <Trophy className="w-3.5 h-3.5" /> Wall of Fame · getmano
+                <Trophy className="w-3.5 h-3.5" /> Wall of Fame · getamano
               </span>
               <h1 className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.05]">
                 La comunidad latina,<br/><span className="text-orange-400">en movimiento.</span>
@@ -140,7 +140,7 @@ export default function Community() {
               </div>
 
               <div className="mt-7 flex flex-wrap gap-2">
-                <Link to="/registro?intent=provider&promo=GETMANO50" className="btn-primary inline-flex items-center gap-1" data-testid="wall-cta-join">
+                <Link to="/registro?intent=provider&promo=GETAMANO50" className="btn-primary inline-flex items-center gap-1" data-testid="wall-cta-join">
                   <Award className="w-4 h-4" /> Abre tu eCard y aparece aquí
                 </Link>
                 <Link to="/buscar" className="px-5 py-2.5 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium text-sm inline-flex items-center gap-1">
@@ -199,7 +199,7 @@ export default function Community() {
           <div className="mt-12 rounded-3xl p-6 md:p-8 text-center" style={{ background: "linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%)" }}>
             <h3 className="font-display text-2xl md:text-3xl font-bold text-slate-900">Tu historia merece estar aquí 🧡</h3>
             <p className="mt-2 text-sm text-slate-600 max-w-xl mx-auto">Si eres latino y tienes un negocio en Estados Unidos, este es tu espacio. Únete a la comunidad y empieza a coleccionar logros.</p>
-            <Link to="/registro?intent=provider&promo=GETMANO50" className="inline-flex items-center gap-2 mt-5 btn-primary" data-testid="wall-bottom-cta">
+            <Link to="/registro?intent=provider&promo=GETAMANO50" className="inline-flex items-center gap-2 mt-5 btn-primary" data-testid="wall-bottom-cta">
               Abrir mi eCard gratis <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

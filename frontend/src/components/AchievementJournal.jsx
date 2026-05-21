@@ -66,7 +66,7 @@ export default function AchievementJournal({ businessNameProp, logoUrl }) {
 
   const shareEntry = async (entry) => {
     const url = `${window.location.origin}/`;
-    const text = `${entry.title} en getmano · ${entry.message} · ${bizName} · ${url}`;
+    const text = `${entry.title} en getamano · ${entry.message} · ${bizName} · ${url}`;
     if (navigator.share) {
       try { await navigator.share({ title: entry.title, text, url }); return; } catch {}
     }
@@ -87,7 +87,7 @@ export default function AchievementJournal({ businessNameProp, logoUrl }) {
               <Trophy className="w-3 h-3" /> Mi diario · {bizName}
             </div>
             <h2 className="font-display text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
-              Tu historia en getmano <span className="inline-block">📖</span>
+              Tu historia en getamano <span className="inline-block">📖</span>
             </h2>
             <p className="mt-2 text-sm text-slate-700 max-w-xl leading-relaxed">
               Cada paso que das construye la confianza de tu comunidad. Aquí guardamos tus logros para que los recuerdes siempre.
@@ -180,7 +180,7 @@ export default function AchievementJournal({ businessNameProp, logoUrl }) {
                     🚪
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-display text-base font-bold text-slate-900 leading-tight">Te uniste a getmano</h3>
+                    <h3 className="font-display text-base font-bold text-slate-900 leading-tight">Te uniste a getamano</h3>
                     <p className="mt-1 text-sm text-slate-600 leading-relaxed">
                       El día que decidiste abrir tu eCard y compartir tu talento con la comunidad latina. <strong>Aquí empezó todo.</strong>
                     </p>
@@ -198,7 +198,7 @@ export default function AchievementJournal({ businessNameProp, logoUrl }) {
             <div className="py-12 text-center">
               <div className="text-5xl mb-3">🏅</div>
               <h3 className="font-display text-xl font-bold text-slate-900">¡Desbloqueaste todos los hitos!</h3>
-              <p className="mt-2 text-sm text-slate-500">Eres parte de los legendarios. Gracias por construir getmano con nosotros.</p>
+              <p className="mt-2 text-sm text-slate-500">Eres parte de los legendarios. Gracias por construir getamano con nosotros.</p>
             </div>
           ) : (
             locked.map((m) => {

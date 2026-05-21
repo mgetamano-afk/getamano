@@ -4,7 +4,7 @@ import { Award, ArrowRight, Flame } from "lucide-react";
 import { api } from "../lib/api";
 
 /**
- * FoundingCounter — Live urgency counter for the GETMANO50 promo.
+ * FoundingCounter — Live urgency counter for the GETAMANO50 promo.
  * Polls /promo-codes/founding-status every 20s, animates remaining spots,
  * and ramps up visual urgency as spots dwindle.
  */
@@ -66,7 +66,7 @@ export default function FoundingCounter({ variant = "hero" }) {
   const recent = Array.isArray(data.recent) ? data.recent.slice(0, 3) : [];
   // Stable color palette by initial
   const avatarBg = (s) => {
-    const colors = ["#FF6B2C", "#2563EB", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444"];
+    const colors = ["#2F9D94", "#025F67", "#063154", "#4EBAAE", "#BCC5CC", "#74CFC5"];
     const idx = (s?.charCodeAt(0) || 0) % colors.length;
     return colors[idx];
   };
@@ -86,7 +86,7 @@ export default function FoundingCounter({ variant = "hero" }) {
 
   return (
     <Link
-      to="/registro?intent=provider&promo=GETMANO50"
+      to="/registro?intent=provider&promo=GETAMANO50"
       className="block group relative overflow-hidden rounded-2xl border border-orange-400/30 bg-gradient-to-br from-orange-500/15 via-amber-600/10 to-orange-900/5 backdrop-blur-sm px-4 py-3.5 hover:border-orange-400/60 transition"
       data-testid="founding-counter-hero"
     >
@@ -120,7 +120,7 @@ export default function FoundingCounter({ variant = "hero" }) {
             </span>
           </div>
           <p className="text-sm text-white font-medium leading-snug">
-            Plan <strong className="text-orange-300">Pro gratis hasta 2027</strong> con código <code className="bg-white/10 text-orange-200 px-1.5 py-0.5 rounded text-xs">GETMANO50</code>
+            Plan <strong className="text-orange-300">Pro gratis hasta 2027</strong> con código <code className="bg-white/10 text-orange-200 px-1.5 py-0.5 rounded text-xs">GETAMANO50</code>
           </p>
           {/* Progress bar */}
           <div className="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">

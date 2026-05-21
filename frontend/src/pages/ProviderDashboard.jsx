@@ -13,6 +13,7 @@ import MilestoneCelebration from "../components/MilestoneCelebration";
 import AchievementJournal from "../components/AchievementJournal";
 import ShareLinkCard from "../components/ShareLinkCard";
 import ProviderRates from "../components/ProviderRates";
+import MarketPulseCard from "../components/MarketPulseCard";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -125,6 +126,7 @@ export default function ProviderDashboard() {
           newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
         />
         <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
+        <MarketPulseCard />
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>

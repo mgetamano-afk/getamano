@@ -15,9 +15,9 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 
-PROVIDER_EMAIL = "demo.provider@getmano.com"
+PROVIDER_EMAIL = "demo.provider@getamano.com"
 PROVIDER_PASSWORD = "provider123"
-ADMIN_EMAIL = "admin@getmano.com"
+ADMIN_EMAIL = "admin@getamano.com"
 ADMIN_PASSWORD = "admin123"
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 

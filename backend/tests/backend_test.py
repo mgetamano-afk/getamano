@@ -1,5 +1,5 @@
 """
-Backend integration tests for getmano API.
+Backend integration tests for getamano API.
 Covers: auth (register/login/me/logout), categories, providers (search/featured/by-slug/me/CRUD),
 reviews, favorites, admin endpoints, plans, and contact-click tracker.
 """
@@ -11,9 +11,9 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@getmano.com"
+ADMIN_EMAIL = "admin@getamano.com"
 ADMIN_PASSWORD = "admin123"
-PROVIDER_EMAIL = "demo.provider@getmano.com"
+PROVIDER_EMAIL = "demo.provider@getamano.com"
 PROVIDER_PASSWORD = "provider123"
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 

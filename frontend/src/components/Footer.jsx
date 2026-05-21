@@ -5,17 +5,17 @@ import { Mail, MapPin } from "lucide-react";
 export default function Footer() {
   const { t } = useI18n();
   return (
-    <footer className="bg-slate-900 text-slate-300 mt-24">
+    <footer className="text-slate-300 mt-24" style={{ backgroundColor: "#063154" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-orange-500 flex items-center justify-center text-white font-bold font-display">g</div>
-            <span className="font-display font-bold text-xl text-white">get<span className="text-orange-400">mano</span></span>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold font-display" style={{ background: "linear-gradient(135deg, #2F9D94, #025F67)" }}>g</div>
+            <span className="font-display font-bold text-xl text-white">get<span style={{ color: "#2F9D94" }}>amano</span></span>
           </div>
           <p className="text-slate-400 text-sm max-w-md leading-relaxed">{t("footer.tagline")}</p>
           <div className="mt-4 flex items-center gap-4 text-sm text-slate-400">
             <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> USA</span>
-            <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getmano.com</span>
+            <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getamano.com</span>
           </div>
         </div>
         <div>

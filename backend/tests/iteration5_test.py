@@ -1,7 +1,7 @@
 """Iteration 5 backend tests — promo codes, likes, latino_owned filter, 4 tier plans + regression.
 
 Covers prompt-maestro v1 features:
-- POST /api/promo-codes/apply with GETMANO50 (valid, invalid, already-used)
+- POST /api/promo-codes/apply with GETAMANO50 (valid, invalid, already-used)
 - POST /api/providers/{id}/like + likes_count increment + toggle off
 - GET /api/providers?latino_owned=true filter
 - Plan tier validation (free/basic/pro/premium) via POST /api/providers/me/plan
@@ -16,8 +16,8 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN = {"email": "admin@getmano.com", "password": "admin123"}
-DEMO_PROVIDER = {"email": "demo.provider@getmano.com", "password": "provider123"}
+ADMIN = {"email": "admin@getamano.com", "password": "admin123"}
+DEMO_PROVIDER = {"email": "demo.provider@getamano.com", "password": "provider123"}
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 
 
@@ -34,7 +34,7 @@ def _hdr(token):
 
 
 def _register(role="client"):
-    em = f"TEST_{uuid.uuid4().hex[:8]}@getmano.com"
+    em = f"TEST_{uuid.uuid4().hex[:8]}@getamano.com"
     r = requests.post(f"{API}/auth/register", json={
         "email": em, "password": "Pass1234!", "name": "TestUser", "role": role
     }, timeout=15)
@@ -167,7 +167,7 @@ class TestLikes:
         assert r.status_code in (401, 403)
 
 
-# ---------- Promo Codes (GETMANO50) ----------
+# ---------- Promo Codes (GETAMANO50) ----------
 class TestPromoCodes:
     def test_founding_status_public(self):
         r = requests.get(f"{API}/promo-codes/founding-status", timeout=15)
@@ -181,7 +181,7 @@ class TestPromoCodes:
         r = requests.post(f"{API}/promo-codes/apply", headers=_hdr(token), json={"code": "NOT_A_REAL_CODE"}, timeout=15)
         assert r.status_code == 404
 
-    def test_apply_valid_GETMANO50_assigns_pro_plan(self):
+    def test_apply_valid_GETAMANO50_assigns_pro_plan(self):
         # Register a fresh provider so plan assignment is visible
         em, token, uid = _register(role="provider")
         # create provider profile so the plan field can be updated
@@ -209,15 +209,15 @@ class TestPromoCodes:
         rp = requests.post(f"{API}/providers", headers=_hdr(token), json=body, timeout=15)
         assert rp.status_code == 200, f"create provider failed: {rp.text}"
 
-        # apply GETMANO50
-        r = requests.post(f"{API}/promo-codes/apply", headers=_hdr(token), json={"code": "GETMANO50"}, timeout=15)
+        # apply GETAMANO50
+        r = requests.post(f"{API}/promo-codes/apply", headers=_hdr(token), json={"code": "GETAMANO50"}, timeout=15)
         # could be 200 (success) or 400 if cupos already filled — accept both but assert content
         if r.status_code == 200:
             d = r.json()
             assert d["plan_assigned"] == "pro"
             assert d["founding_member"] is True
             # second apply must fail (already used)
-            r2 = requests.post(f"{API}/promo-codes/apply", headers=_hdr(token), json={"code": "GETMANO50"}, timeout=15)
+            r2 = requests.post(f"{API}/promo-codes/apply", headers=_hdr(token), json={"code": "GETAMANO50"}, timeout=15)
             assert r2.status_code == 400, f"expected 400 on already-used, got {r2.status_code} {r2.text}"
             # verify provider profile now has plan=pro and founding_member True
             rme = requests.get(f"{API}/providers/me", headers=_hdr(token), timeout=15)
@@ -229,7 +229,7 @@ class TestPromoCodes:
             assert r.status_code in (400,), f"unexpected promo apply status {r.status_code}: {r.text}"
 
     def test_apply_requires_auth(self):
-        r = requests.post(f"{API}/promo-codes/apply", json={"code": "GETMANO50"}, timeout=15)
+        r = requests.post(f"{API}/promo-codes/apply", json={"code": "GETAMANO50"}, timeout=15)
         assert r.status_code in (401, 403)
 
 

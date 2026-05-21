@@ -18,7 +18,7 @@ export default function ShareLinkCard({ slug, businessName }) {
   const fullUrl = `${origin}/services/${slug}`;
   const displayUrl = shortUrl.replace(/^https?:\/\//, "");
 
-  const shareText = `Conoce ${businessName} en getmano · Servicio latino verificado · ${shortUrl}`;
+  const shareText = `Conoce ${businessName} en getamano · Servicio latino verificado · ${shortUrl}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=${encodeURIComponent(shortUrl)}&color=0F172A&bgcolor=FFFFFF`;
 
   const copy = async () => {
@@ -37,7 +37,7 @@ export default function ShareLinkCard({ slug, businessName }) {
   };
 
   const shareEmail = () => {
-    window.location.href = `mailto:?subject=${encodeURIComponent(`Mi negocio en getmano · ${businessName}`)}&body=${encodeURIComponent(shareText)}`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(`Mi negocio en getamano · ${businessName}`)}&body=${encodeURIComponent(shareText)}`;
   };
 
   const nativeShare = async () => {

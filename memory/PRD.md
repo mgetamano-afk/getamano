@@ -1,7 +1,7 @@
-# getmano — PRD
+# getamano — PRD
 
 ## Problem Statement
-Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
+Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
 ## Architecture
 - **Frontend**: React 19 + React Router + Tailwind + Shadcn UI + Poppins + Sonner
@@ -41,27 +41,27 @@ Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedo
 - ✅ Cambio de estado de solicitud
 
 ## Test Credentials (`/app/memory/test_credentials.md`)
-- Admin: `admin@getmano.com` / `admin123`
-- Provider: `demo.provider@getmano.com` / `provider123`
+- Admin: `admin@getamano.com` / `admin123`
+- Provider: `demo.provider@getamano.com` / `provider123`
 - Demo eCard: `/services/maria-cleaning-services-sallisaw-ok`
 
 ## Test Results
 - Iteration 1: 32/32 backend (100%)
 - Iteration 2: 14/14 nuevos (100%)
 - Iteration 3: 76/81 (94%) — fix aplicado a PUT /users/me decorator faltante, phone agregado a RegisterIn, unique index reviews(user_id, provider_id)
-- Iteration 5 (Feb 2026): 31/31 nuevos (100%) — Maestro v1 verificado E2E (promo GETMANO50, likes toggle, latino_owned filter, 4 tiers). 108/112 overall (96%). Frontend smoke 5/5.
+- Iteration 5 (Feb 2026): 31/31 nuevos (100%) — Maestro v1 verificado E2E (promo GETAMANO50, likes toggle, latino_owned filter, 4 tiers). 108/112 overall (96%). Frontend smoke 5/5.
   - Fix aplicado: PUT /providers/me ahora usa model_dump(exclude_unset=True) para evitar wipe silencioso de gallery/photos/services. Verificado vía curl: gallery preservada en updates parciales.
 - Feb 2026 (post iter 5): Compañerismo & social proof
   - `FoundingCounter` con avatares de últimos 3 founders + ciudad + time-ago + polling 20s + tiers de urgencia.
   - `ProviderGreeting` cálido en dashboard: saludo time-of-day, frase del día rotativa, píldoras de actividad empáticas (mensajes, vistas, requests).
   - Nuevo campo `recent` en GET /api/promo-codes/founding-status (top 3 founders, first_name/initial/city, fallback a business_name).
   - **Hitos celebratorios**: 19 milestones (vistas, contactos, reseñas, planes, founding, latino_owned, primer mensaje/request, etc.) con tier silver/gold/platinum. Endpoint `GET /providers/me/milestones` detecta automáticamente, `POST /providers/me/milestones/{id}/dismiss` los cierra. Colección `provider_milestones` persiste vistos. Componente `MilestoneCelebration` con confetti CSS, emoji animado, mensaje personalizado con nombre, cola secuencial. Verificado: María logueada ve "¡Tu primera vista! 👀" → dismiss → "10 personas te han visto 🌱" con confetti.
-  - **Diario de logros** (`/dashboard/provider` → tab "Mi diario"): timeline visual completa de la historia del proveedor en getmano. Componente `AchievementJournal`. Hero con stats pills (vistas/contactos/reseñas/likes/rating) y barra de progreso global X/19. Tabs "Mi línea de tiempo" (entradas ordenadas DESC con fecha, time-ago, emoji, tier color, share button) y "Próximos hitos" (locked en grayscale con candado, barras de progreso current/target, tier badge). Entrada synthetic "Te uniste a getmano 🚪" como ancla de origen. Endpoint nuevo `GET /providers/me/journal` con journey_start, entries, locked, stats. Compartir copia texto formateado al clipboard (o Web Share API si está disponible).
+  - **Diario de logros** (`/dashboard/provider` → tab "Mi diario"): timeline visual completa de la historia del proveedor en getamano. Componente `AchievementJournal`. Hero con stats pills (vistas/contactos/reseñas/likes/rating) y barra de progreso global X/19. Tabs "Mi línea de tiempo" (entradas ordenadas DESC con fecha, time-ago, emoji, tier color, share button) y "Próximos hitos" (locked en grayscale con candado, barras de progreso current/target, tier badge). Entrada synthetic "Te uniste a getamano 🚪" como ancla de origen. Endpoint nuevo `GET /providers/me/journal` con journey_start, entries, locked, stats. Compartir copia texto formateado al clipboard (o Web Share API si está disponible).
   - **Sharing & social** (Feb 2026):
     - **Ruta corta `/p/:slug`** alias amigable para compartir en redes (mantiene `/services/:slug` y `/proveedor/:slug` para SEO).
     - Componente `ShareLinkCard` en dashboard del proveedor con URL corta, copy, WhatsApp, Email, QR generator (api.qrserver.com), Web Share API.
     - **Redes sociales en eCard público**: nuevo componente `SocialLinks` (Instagram, Facebook, TikTok, YouTube, LinkedIn, Website) con normalización auto de username → URL. Sección "SÍGUELO EN REDES" en sidebar. Editor en dashboard Perfil tab (5 inputs con placeholders).
-    - **`AchievementImageGenerator`** (canvas HTML5 puro, sin libs externas): genera PNG 1080×1080 (post) o 1080×1920 (story) con branding getmano, badge tier, emoji XL, título/mensaje, logo del proveedor + business name footer. Botón "Crear imagen" en cada entry del diario. Tip de marketing incluido para incentivar etiquetar @getmano.
+    - **`AchievementImageGenerator`** (canvas HTML5 puro, sin libs externas): genera PNG 1080×1080 (post) o 1080×1920 (story) con branding getamano, badge tier, emoji XL, título/mensaje, logo del proveedor + business name footer. Botón "Crear imagen" en cada entry del diario. Tip de marketing incluido para incentivar etiquetar @getamano.
   - **Wall of Fame público** (`/comunidad` o `/community`): feed live anonimizado de los últimos 60 logros desbloqueados por proveedores. Endpoint `GET /api/community/wall-of-fame?limit=N` devuelve items con first_name, ciudad/estado, slug, emoji, título, tier, unlocked_at + stats globales (total_unlocked, total_providers, by_tier). Página con hero oscuro ("La comunidad latina, en movimiento"), 3 stat cards (Logros / Negocios / En vivo refresca 30s), filtros por tier, grid responsive 1-4 columnas con tiles clickeables al eCard, animación de entrada staggered, polling cada 30s. CTAs "Abre tu eCard y aparece aquí" arriba y abajo. Link "Comunidad 🔴" en Header con dot pulsante en vivo.
   - **Ranking del mes** (`/comunidad` arriba del wall): endpoint `GET /api/community/leaderboard?period=month&limit=5` agrega milestones por user_id en el mes actual y devuelve top N con rank, first_name, business_name, ciudad, slug, logo, latino_owned, milestones_count. Componente `Leaderboard.jsx`: featured card grande naranja-ámbar para el #1 ("🥇 Líder del mes") con logo, business_name, ciudad, count grande, CTA al eCard; rows compactas para 2-5 con rank circle gradient. Filtra perfiles TEST_ e inactivos.
   - **Panel CEO** (`/admin/ceo`, admin-only, ítem destacado en sidebar con gradiente ámbar): endpoint `GET /api/admin/ceo-metrics` devuelve volumen (users/clients/providers/aprobados/pending), acquisition (signups today/yesterday/week/month + delta%), engagement (msgs/requests/reviews/likes/milestones hoy y semana), revenue (MRR/ARR calculado con precios $0/$19/$49/$99, distribución por plan, founding usage), geography (top 10 estados), categorías top, top 5 performers por vistas, activity feed mixto (signups + milestones) ordenado por fecha. Página con hero gradiente púrpura-naranja, 3 big numbers (MRR/Founding/Hitos hoy), 4 KPIs con delta arrows, 3 secciones (Ingresos por plan con bars, Estados top, Categorías top), Top 5 performers clickeables a sus eCards, Actividad en vivo con dot pulsante LIVE. Auto-refresh cada 60s.

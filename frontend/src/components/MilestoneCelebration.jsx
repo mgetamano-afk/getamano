@@ -6,7 +6,7 @@ import { api } from "../lib/api";
  * Confetti pieces with random positions/colors. CSS-driven, no library.
  */
 function Confetti({ count = 60 }) {
-  const colors = ["#FF6B2C", "#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#F472B6"];
+  const colors = ["#2F9D94", "#025F67", "#063154", "#4EBAAE", "#74CFC5", "#A6E1DA", "#BCC5CC"];
   const pieces = Array.from({ length: count }, (_, i) => ({
     id: i,
     left: Math.random() * 100,
@@ -146,7 +146,7 @@ export default function MilestoneCelebration({ pollOnMount = true }) {
 
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
             <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-            <span>Tu compañero getmano lo está celebrando contigo</span>
+            <span>Tu compañero getamano lo está celebrando contigo</span>
           </div>
 
           <button

@@ -100,7 +100,7 @@ export default function Landing() {
 
   const testimonials = [
     { name: "Carmen R.", city: "Tulsa, OK", text: lang === "es" ? "Encontré una catering latina increíble. ¡Toda mi familia quedó feliz!" : "Found an amazing Latino catering. My family was so happy!" },
-    { name: "Roberto M.", city: "Dallas, TX", text: lang === "es" ? "Como proveedor, getmano me trajo más clientes que cualquier red social en un mes." : "As a provider, getmano brought me more clients than any social network." },
+    { name: "Roberto M.", city: "Dallas, TX", text: lang === "es" ? "Como proveedor, getamano me trajo más clientes que cualquier red social en un mes." : "As a provider, getamano brought me more clients than any social network." },
     { name: "Lupita V.", city: "Phoenix, AZ", text: lang === "es" ? "Por fin una plataforma seria, en español, hecha para nosotros." : "Finally, a serious platform in Spanish, made for us." },
   ];
 
@@ -117,7 +117,7 @@ export default function Landing() {
     "Roberto G. encontró un plomero en 5 minutos",
     "3 nuevos proveedores en Dallas esta semana",
     "🟢 Ana R. contrató catering en Chicago",
-    `getmano ya está en ${stats.states} estados`,
+    `getamano ya está en ${stats.states} estados`,
   ];
 
   return (
@@ -126,8 +126,8 @@ export default function Landing() {
 
       {/* FOUNDING MEMBER BANNER */}
       {founding.available && (
-        <Link to="/registro?intent=provider&promo=GETMANO50" className="block bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white py-2.5 text-center text-sm font-medium hover:brightness-110 transition" data-testid="founding-banner">
-          <Award className="w-4 h-4 inline mr-1.5" /> <strong>Founding Members</strong> · Plan Pro gratis hasta 2027 con código <code className="bg-white/20 px-1.5 py-0.5 rounded">GETMANO50</code> · {founding.max - founding.used} cupos restantes <ArrowRight className="w-4 h-4 inline ml-1" />
+        <Link to="/registro?intent=provider&promo=GETAMANO50" className="block bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white py-2.5 text-center text-sm font-medium hover:brightness-110 transition" data-testid="founding-banner">
+          <Award className="w-4 h-4 inline mr-1.5" /> <strong>Founding Members</strong> · Plan Pro gratis hasta 2027 con código <code className="bg-white/20 px-1.5 py-0.5 rounded">GETAMANO50</code> · {founding.max - founding.used} cupos restantes <ArrowRight className="w-4 h-4 inline ml-1" />
         </Link>
       )}
 
@@ -197,7 +197,7 @@ export default function Landing() {
 
             <div className="relative hidden lg:block">
               <div className="absolute -inset-6 bg-gradient-to-br from-blue-500/20 via-transparent to-orange-500/20 rounded-[3rem] blur-3xl" />
-              <img src={HERO_IMG} alt="getmano marketplace" className="relative rounded-[2rem] shadow-2xl object-cover w-full h-[520px]" loading="lazy" />
+              <img src={HERO_IMG} alt="getamano marketplace" className="relative rounded-[2rem] shadow-2xl object-cover w-full h-[520px]" loading="lazy" />
               <div className="absolute -bottom-4 -left-4 rounded-2xl p-4 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.2)", animation: "float 4s ease-in-out infinite" }} data-testid="hero-rating-card">
                 <div className="flex -space-x-2">
                   <div className="w-9 h-9 rounded-full bg-orange-400 border-2 border-white/40" />
@@ -290,7 +290,7 @@ export default function Landing() {
           </ul>
           <Link to="/buscar" className="btn-primary inline-flex mt-8">Explorar servicios</Link>
         </div>
-        <div className="relative text-white p-12 md:p-16 overflow-hidden" style={{ background: "linear-gradient(135deg, #F97316, #EA580C)" }}>
+        <div className="relative text-white p-12 md:p-16 overflow-hidden" style={{ background: "linear-gradient(135deg, #2F9D94, #025F67)" }}>
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "repeating-linear-gradient(45deg, white 0, white 1px, transparent 1px, transparent 20px)" }} />
           <div className="relative">
             <h3 className="font-display text-3xl font-bold">Para proveedores</h3>
@@ -308,7 +308,7 @@ export default function Landing() {
       {featured.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <h2 className="font-display text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">Proveedores destacados</h2>
-          <p className="text-slate-500 mt-2">Profesionales verificados por getmano.</p>
+          <p className="text-slate-500 mt-2">Profesionales verificados por getamano.</p>
           <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featured.map(p => (
               <Link key={p.provider_id} to={`/proveedor/${p.slug}`} className={`card-lift bg-white rounded-2xl border ${p.plan === "premium" ? "border-orange-300 shadow-orange-100 shadow-xl" : "border-slate-200"} overflow-hidden block`} data-testid={`featured-provider-${p.slug}`}>

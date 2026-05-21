@@ -7,7 +7,7 @@ export default function WhatsAppButton({ phone, businessName, testid = "whatsapp
   if (!phone) return null;
   const clean = String(phone).replace(/\D/g, "");
   if (!clean) return null;
-  const msg = businessName ? encodeURIComponent(`Hola, vengo de getmano y me interesa el servicio de ${businessName}.`) : "";
+  const msg = businessName ? encodeURIComponent(`Hola, vengo de getamano y me interesa el servicio de ${businessName}.`) : "";
   const href = `https://wa.me/${clean}${msg ? `?text=${msg}` : ""}`;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="justify-center flex items-center gap-1 text-sm rounded-full px-4 py-3 font-medium text-white transition" style={{ backgroundColor: "#25D366" }} data-testid={testid}>

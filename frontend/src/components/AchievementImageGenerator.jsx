@@ -70,7 +70,7 @@ export default function AchievementImageGenerator({ open, entry, businessName, l
       ctx.fillStyle = "rgba(255,255,255,0.95)";
       ctx.font = "700 38px 'Poppins', system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("getmano", cx, 90);
+      ctx.fillText("getamano", cx, 90);
       ctx.fillStyle = "rgba(255,255,255,0.55)";
       ctx.font = "500 22px 'Poppins', system-ui, sans-serif";
       ctx.fillText("Comunidad latina · USA", cx, 130);
@@ -138,7 +138,7 @@ export default function AchievementImageGenerator({ open, entry, businessName, l
       ctx.fillText(businessName || "Mi negocio", textX, footerY + 40);
       ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.font = "500 24px 'Poppins', sans-serif";
-      ctx.fillText("Lo latino, a la mano. · getmano.com", textX, footerY + 78);
+      ctx.fillText("Lo latino, a la mano. · getamano.com", textX, footerY + 78);
 
       if (cancelled) return;
       const url = cv.toDataURL("image/png");
@@ -154,7 +154,7 @@ export default function AchievementImageGenerator({ open, entry, businessName, l
     if (!dataUrl) return;
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = `getmano-${entry?.milestone_id || "logro"}-${format}.png`;
+    a.download = `getamano-${entry?.milestone_id || "logro"}-${format}.png`;
     document.body.appendChild(a); a.click(); a.remove();
     toast.success("¡Imagen descargada! Compártela en tus redes 🧡");
   };
@@ -205,7 +205,7 @@ export default function AchievementImageGenerator({ open, entry, businessName, l
               <Download className="w-4 h-4" /> Descargar PNG
             </button>
             <p className="text-xs text-slate-500 leading-relaxed">
-              📸 <strong>Tip:</strong> publícala en Instagram, etiquétanos <strong>@getmano</strong> y duplica tu alcance. Tu historia inspira a más latinos a abrir su eCard.
+              📸 <strong>Tip:</strong> publícala en Instagram, etiquétanos <strong>@getamano</strong> y duplica tu alcance. Tu historia inspira a más latinos a abrir su eCard.
             </p>
           </div>
         </div>

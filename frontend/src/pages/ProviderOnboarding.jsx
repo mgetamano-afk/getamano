@@ -234,7 +234,7 @@ export default function ProviderOnboarding() {
               <Row label="Ubicación" value={form.is_home_based ? "Desde casa / móvil" : `${form.address}, ${form.city}, ${form.state}`} />
               <Row label="Servicios" value={form.services.join(", ") || "—"} />
               <Row label="Idiomas" value={form.languages.join(", ").toUpperCase()} />
-              <p className="text-xs text-slate-500 pt-4 border-t border-slate-100">Tu perfil pasará a estado "Pendiente" hasta que getmano lo verifique. Mientras tanto, puedes editar todo desde tu panel.</p>
+              <p className="text-xs text-slate-500 pt-4 border-t border-slate-100">Tu perfil pasará a estado "Pendiente" hasta que getamano lo verifique. Mientras tanto, puedes editar todo desde tu panel.</p>
             </div>
           )}
 

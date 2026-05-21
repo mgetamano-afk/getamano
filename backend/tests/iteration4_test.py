@@ -18,9 +18,9 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "admin@getmano.com"
+ADMIN_EMAIL = "admin@getamano.com"
 ADMIN_PASSWORD = "admin123"
-PROVIDER_EMAIL = "demo.provider@getmano.com"
+PROVIDER_EMAIL = "demo.provider@getamano.com"
 PROVIDER_PASSWORD = "provider123"
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 
@@ -326,7 +326,7 @@ def _ensure_demo_user_phone():
     import asyncio
     async def go():
         db = _mongo_db()
-        await db.users.update_one({"email": "demo.provider@getmano.com"},
+        await db.users.update_one({"email": "demo.provider@getamano.com"},
                                   {"$set": {"phone": "+15559990000"}})
     asyncio.run(go())
 

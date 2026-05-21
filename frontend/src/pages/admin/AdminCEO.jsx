@@ -71,7 +71,7 @@ export default function AdminCEO() {
         <div className="relative flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-amber-300 text-[10px] font-semibold tracking-widest uppercase mb-2">
-              <Crown className="w-3 h-3" /> CEO Dashboard · getmano
+              <Crown className="w-3 h-3" /> CEO Dashboard · getamano
             </div>
             <h2 className="font-display text-2xl md:text-3xl font-bold text-white">Toda tu app, en un solo lugar 👑</h2>
             <p className="text-sm text-white/70 mt-1">Métricas actualizadas cada 60 segundos. <span className="text-amber-300">Última: {timeAgo(data.generated_at)} atrás</span>.</p>

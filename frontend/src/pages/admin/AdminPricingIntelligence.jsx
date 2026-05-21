@@ -35,7 +35,7 @@ export default function AdminPricingIntelligence() {
       const url = `${process.env.REACT_APP_BACKEND_URL}/api/admin/pricing-intelligence/export.csv`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const blob = await res.blob();
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "getmano-pricing.csv";
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "getamano-pricing.csv";
       document.body.appendChild(a); a.click(); a.remove();
     } catch {}
   };
@@ -50,7 +50,7 @@ export default function AdminPricingIntelligence() {
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-[10px] font-semibold tracking-widest uppercase mb-2">
               <TrendingUp className="w-3 h-3" /> Pricing Intelligence · admin only
             </div>
-            <h2 className="font-display text-2xl font-bold text-white">El data flywheel de getmano</h2>
+            <h2 className="font-display text-2xl font-bold text-white">El data flywheel de getamano</h2>
             <p className="text-sm text-white/65 mt-1">Precios reales, demanda por ciudad, eficiencia operativa. <strong className="text-fuchsia-300">Nunca mostramos datos individuales — solo agregados.</strong></p>
           </div>
           <div className="flex items-center gap-2">
