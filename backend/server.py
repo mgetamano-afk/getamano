@@ -323,6 +323,13 @@ class PlanChangeIn(BaseModel):
 class GalleryItemIn(BaseModel):
     url: str
     caption: Optional[str] = ""
+    category: Optional[Literal["trabajo_terminado", "antes_despues", "equipo", "herramientas", "negocio", "otro"]] = None
+
+class GalleryReorderIn(BaseModel):
+    order: List[str]  # ordered list of gallery item ids
+
+class GalleryCategoryIn(BaseModel):
+    category: Optional[Literal["trabajo_terminado", "antes_despues", "equipo", "herramientas", "negocio", "otro"]] = None
 
 class ServiceRequestIn(BaseModel):
     provider_id: str
@@ -1513,20 +1520,20 @@ async def list_plans():
     return [
         {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0,
          "badge": None, "highlight": False,
-         "features_es": ["eCard básica con enlace único", "1 categoría de servicio", "Hasta 3 fotos", "Analytics básicos", "Formulario de contacto"],
-         "features_en": ["Basic eCard with unique link", "1 service category", "Up to 3 photos", "Basic analytics", "Contact form"]},
+         "features_es": ["eCard básica con enlace único", "1 categoría de servicio", "Hasta 20 fotos en tu galería", "Analytics básicos", "Formulario de contacto"],
+         "features_en": ["Basic eCard with unique link", "1 service category", "Up to 20 photos in your gallery", "Basic analytics", "Contact form"]},
         {"id": "basic", "name": "Básico", "name_en": "Basic", "price_monthly": 10,
          "badge": "Básico", "badge_color": "#94a3b8", "highlight": False,
-         "features_es": ["Todo lo de Gratis +", "Hasta 3 categorías", "Hasta 10 fotos", "Analytics mejorados", "Responder reseñas", "1 boost mensual de visibilidad"],
-         "features_en": ["Everything in Free +", "Up to 3 categories", "Up to 10 photos", "Enhanced analytics", "Respond to reviews", "1 visibility boost/month"]},
+         "features_es": ["Todo lo de Gratis +", "Hasta 3 categorías", "Fotos ilimitadas en tu galería", "Analytics mejorados", "Responder reseñas", "1 boost mensual de visibilidad"],
+         "features_en": ["Everything in Free +", "Up to 3 categories", "Unlimited gallery photos", "Enhanced analytics", "Respond to reviews", "1 visibility boost/month"]},
         {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 15,
          "badge": "Pro", "badge_color": "#F97316", "highlight": True, "label": "Más popular",
-         "features_es": ["Todo lo de Básico +", "Hasta 5 categorías", "Hasta 15 fotos + 1 video", "Mejor posición en búsquedas", "Notificaciones en tiempo real", "Botón WhatsApp directo", "3 boosts mensuales", "Soporte prioritario"],
-         "features_en": ["Everything in Basic +", "Up to 5 categories", "Up to 15 photos + 1 video", "Better search ranking", "Real-time notifications", "Direct WhatsApp button", "3 visibility boosts/month", "Priority support"]},
+         "features_es": ["Todo lo de Básico +", "Hasta 5 categorías", "Fotos ilimitadas + 1 video de presentación", "Mejor posición en búsquedas", "Notificaciones en tiempo real", "Botón WhatsApp directo", "3 boosts mensuales", "Soporte prioritario"],
+         "features_en": ["Everything in Basic +", "Up to 5 categories", "Unlimited photos + 1 presentation video", "Better search ranking", "Real-time notifications", "Direct WhatsApp button", "3 visibility boosts/month", "Priority support"]},
         {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 25,
          "badge": "Premium", "badge_color": "#D97706", "highlight": False, "label": "Mejor valor",
-         "features_es": ["Todo lo de Pro +", "Categorías ilimitadas", "Fotos ilimitadas", "Posición TOP en búsquedas", "Aparece en homepage", "Campañas mensuales", "QR personalizado descargable", "eCard premium con branding", "Reportes avanzados", "5 boosts mensuales"],
-         "features_en": ["Everything in Pro +", "Unlimited categories", "Unlimited photos", "TOP search position", "Featured on homepage", "Monthly campaigns", "Downloadable custom QR", "Premium eCard", "Advanced reports", "5 visibility boosts/month"]},
+         "features_es": ["Todo lo de Pro +", "Categorías ilimitadas", "Fotos ilimitadas + 1 video de presentación", "Posición TOP en búsquedas", "Aparece en homepage", "Campañas mensuales", "QR personalizado descargable", "eCard premium con branding", "Reportes avanzados", "5 boosts mensuales"],
+         "features_en": ["Everything in Pro +", "Unlimited categories", "Unlimited photos + 1 presentation video", "TOP search position", "Featured on homepage", "Monthly campaigns", "Downloadable custom QR", "Premium eCard", "Advanced reports", "5 visibility boosts/month"]},
     ]
 
 # ============ SERVICE REQUESTS ============
@@ -1744,20 +1751,73 @@ async def update_user(payload: UserUpdateIn, user: User = Depends(get_current_us
     return User(**doc).model_dump(mode="json")
 
 # ============ UPLOAD ============
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
-MAX_UPLOAD_SIZE = 8 * 1024 * 1024  # 8 MB
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"}
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+GALLERY_COMPRESS_MAX_WIDTH = 1200
+GALLERY_COMPRESS_QUALITY = 85
+
+# Plan-based photo limits. None = unlimited.
+PLAN_PHOTO_LIMITS = {"free": 20, "basic": None, "pro": None, "premium": None}
+
+PHOTO_CATEGORY_LABELS = {
+    "trabajo_terminado": "Trabajo terminado",
+    "antes_despues": "Antes y después",
+    "equipo": "Mi equipo",
+    "herramientas": "Mis herramientas",
+    "negocio": "Mi negocio / local",
+    "otro": "Otro",
+}
+
+
+def _compress_image_bytes(data: bytes, content_type: str) -> tuple[bytes, str]:
+    """Resize to GALLERY_COMPRESS_MAX_WIDTH (keep aspect) and re-encode JPEG q=85.
+    Returns (new_bytes, new_content_type). GIFs and transparent PNGs are passed through unchanged.
+    """
+    try:
+        from PIL import Image, ImageOps
+        try:
+            from pillow_heif import register_heif_opener  # noqa: WPS433
+            register_heif_opener()
+        except Exception:
+            pass
+        import io as _io
+        # GIFs may be animated; do not re-encode
+        if content_type == "image/gif":
+            return data, content_type
+        img = Image.open(_io.BytesIO(data))
+        img = ImageOps.exif_transpose(img)
+        # Preserve transparency for PNG/WebP if alpha present
+        has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+        if img.width > GALLERY_COMPRESS_MAX_WIDTH:
+            ratio = GALLERY_COMPRESS_MAX_WIDTH / float(img.width)
+            new_h = int(img.height * ratio)
+            img = img.resize((GALLERY_COMPRESS_MAX_WIDTH, new_h), Image.LANCZOS)
+        out = _io.BytesIO()
+        if has_alpha:
+            img.save(out, format="PNG", optimize=True)
+            return out.getvalue(), "image/png"
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        img.save(out, format="JPEG", quality=GALLERY_COMPRESS_QUALITY, optimize=True, progressive=True)
+        return out.getvalue(), "image/jpeg"
+    except Exception as e:
+        logger.warning(f"Image compression failed, keeping original: {e}")
+        return data, content_type
 
 @api_router.post("/upload")
 async def upload(file: UploadFile = File(...), user: User = Depends(get_current_user)):
     content_type = file.content_type or "application/octet-stream"
     if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Only image files allowed (jpg/png/webp/gif)")
+        raise HTTPException(status_code=400, detail="Solo imágenes (jpg/png/webp/gif/heic)")
     data = await file.read()
     if len(data) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=400, detail="File too large (max 8MB)")
-    ext = (file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin").lower()
-    if ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
-        ext = content_type.split("/")[-1]
+        raise HTTPException(status_code=400, detail="El archivo supera 10 MB")
+    # Auto-compress images to reduce storage + speed up page load
+    data, content_type = _compress_image_bytes(data, content_type)
+    # File extension follows the (possibly transcoded) content type
+    ext = content_type.split("/")[-1]
+    if ext == "jpeg":
+        ext = "jpg"
     file_id = str(uuid.uuid4())
     path = f"{APP_NAME}/uploads/{user.user_id}/{file_id}.{ext}"
     try:
@@ -1789,19 +1849,83 @@ async def download(path: str):
     return Response(content=data, media_type=record.get("content_type") or ct)
 
 # ============ GALLERY ============
+@api_router.get("/providers/me/gallery/limit")
+async def my_gallery_limit(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "gallery": 1, "plan": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    plan = prof.get("plan") or "free"
+    max_photos = PLAN_PHOTO_LIMITS.get(plan, PLAN_PHOTO_LIMITS["free"])
+    used = len(prof.get("gallery") or [])
+    return {
+        "plan": plan,
+        "used": used,
+        "max": max_photos,  # None = unlimited
+        "can_upload": (max_photos is None) or (used < max_photos),
+        "remaining": (None if max_photos is None else max(0, max_photos - used)),
+    }
+
 @api_router.post("/providers/me/gallery")
 async def add_gallery_item(payload: GalleryItemIn, user: User = Depends(get_current_user)):
     prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
     if not prof:
         raise HTTPException(status_code=404, detail="No provider profile")
+    plan = prof.get("plan") or "free"
+    max_photos = PLAN_PHOTO_LIMITS.get(plan, PLAN_PHOTO_LIMITS["free"])
+    current = prof.get("gallery") or []
+    if max_photos is not None and len(current) >= max_photos:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Has llegado al límite de {max_photos} fotos del plan {plan.capitalize()}. Actualiza tu plan para subir fotos ilimitadas.",
+        )
+    next_sort = (max((g.get("sort_order", 0) for g in current), default=-1)) + 1
     item = {
         "id": f"g_{uuid.uuid4().hex[:10]}",
         "url": payload.url,
         "caption": payload.caption or "",
+        "category": payload.category,
+        "sort_order": next_sort,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.provider_profiles.update_one({"user_id": user.user_id}, {"$push": {"gallery": item}})
     return item
+
+@api_router.put("/providers/me/gallery/reorder")
+async def reorder_gallery(payload: GalleryReorderIn, user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "gallery": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    current = prof.get("gallery") or []
+    by_id = {g["id"]: g for g in current}
+    # Reorder: items in payload.order first (deduped, only valid ids), then any leftovers preserving original order
+    seen = set()
+    ordered = []
+    for idx, gid in enumerate(payload.order):
+        if gid in by_id and gid not in seen:
+            g = dict(by_id[gid])
+            g["sort_order"] = idx
+            ordered.append(g)
+            seen.add(gid)
+    for g in current:
+        if g["id"] not in seen:
+            g2 = dict(g)
+            g2["sort_order"] = len(ordered)
+            ordered.append(g2)
+    await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"gallery": ordered}},
+    )
+    return {"ok": True, "count": len(ordered)}
+
+@api_router.put("/providers/me/gallery/{item_id}/category")
+async def set_gallery_category(item_id: str, payload: GalleryCategoryIn, user: User = Depends(get_current_user)):
+    res = await db.provider_profiles.update_one(
+        {"user_id": user.user_id, "gallery.id": item_id},
+        {"$set": {"gallery.$.category": payload.category}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Foto no encontrada")
+    return {"ok": True, "category": payload.category}
 
 @api_router.delete("/providers/me/gallery/{item_id}")
 async def remove_gallery_item(item_id: str, user: User = Depends(get_current_user)):

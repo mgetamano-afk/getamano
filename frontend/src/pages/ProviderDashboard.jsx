@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import AddressAutocomplete from "../components/AddressAutocomplete";
-import ImageUpload, { GalleryUpload, buildFileUrl } from "../components/ImageUpload";
+import ImageUpload, { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign } from "lucide-react";
@@ -14,6 +14,7 @@ import AchievementJournal from "../components/AchievementJournal";
 import ShareLinkCard from "../components/ShareLinkCard";
 import ProviderRates from "../components/ProviderRates";
 import MarketPulseCard from "../components/MarketPulseCard";
+import DashboardGallery from "../components/DashboardGallery";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -303,32 +304,7 @@ export default function ProviderDashboard() {
             )}
 
             {tab === "galeria" && (
-              <div data-testid="dashboard-gallery">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h3 className="font-display font-semibold text-lg text-slate-900">Galería de trabajos</h3>
-                    <p className="text-sm text-slate-500">Muestra a tus clientes lo que sabes hacer.</p>
-                  </div>
-                  <GalleryUpload onUploaded={onGalleryUploaded} testid="gallery-upload-button" />
-                </div>
-                {profile.gallery?.length ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {profile.gallery.map(g => (
-                      <div key={g.id} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 group" data-testid={`gallery-item-${g.id}`}>
-                        <img src={buildFileUrl(g.url)} alt={g.caption || ""} className="w-full h-full object-cover" />
-                        <button onClick={() => removeGalleryItem(g.id)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 hover:text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition" data-testid={`gallery-remove-${g.id}`}>
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center text-slate-500">
-                    <ImageIcon className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                    <p>Aún no tienes fotos en tu galería.</p>
-                  </div>
-                )}
-              </div>
+              <DashboardGallery profile={profile} setProfile={setProfile} />
             )}
 
             {tab === "solicitudes" && (

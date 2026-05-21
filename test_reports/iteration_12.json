@@ -1,0 +1,41 @@
+{
+  "summary": "Sprint A — Plan-based photo policy + Gallery UX. BACKEND pytest 11/11 PASS (iteration12_sprint_a_gallery_test.py): /api/plans wording (free=20 fotos, basic/pro/premium=ilimitadas + pro/premium video), /providers/me/gallery/limit (pro→max=null,remaining=null; free→max=20), POST /gallery sort_order auto-increment + category persistence, free plan returns 403 at #21 with mensaje '...límite de 20...', PUT /reorder persists + dedupes + tolerates invalid ids + keeps leftovers at end, PUT /{id}/category 404 on missing + 200 on valid, POST /upload compresses 2000x1500 JPEG → 1200x900 (verified via PIL on downloaded /api/files/{path}), rejects 11MB with 400, rejects non-image content-type with 400. FRONTEND Playwright PASS: Login as demo.provider OK; Galería tab header 'Plan Pro · 3 fotos · ilimitadas' OK; first photo (g_seed1) has data-testid 'gallery-main-badge-g_seed1' OK; reorder via API moves g_seed2 to first position, page reload shows g_seed2 as first with the main badge attached OK (drag&drop UI hooks call the same endpoint); switched to free plan + filled to 20 photos → gallery-limit-banner visible, gallery-limit-cta href='/plans', upload trigger disabled=true OK; multi-upload of 3 JPEGs via input[multiple] → data-testid='gallery-upload-progress' container appears with 3 rows (gallery-upload-progress-0..2), all 3 items added to grid without page reload OK; /plans page contains '20 fotos' AND 'ilimitadas' AND 'video de presentación' OK; eCard /services/maria-cleaning-services-sallisaw-ok shows ecard-gallery-grid; with 11 photos shows 9 visible thumbs + 'Ver 2 fotos más' overflow OK; click thumb opens ecard-gallery-grid-lightbox, ArrowRight advances image, ArrowLeft returns, Esc closes OK.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration12_sprint_a_gallery_test.py",
+    "/app/test_reports/pytest/iteration12_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 3857 lines — single-file monolith, still not modularized (carried over).",
+    "PLAN_PHOTO_LIMITS lookup uses fallback to free (20) when plan is unknown — silently caps unknown plans; consider explicit unknown-plan handling or a default Literal validation on the plan field in provider_profiles.",
+    "POST /providers/me/gallery accepts arbitrary url (Pydantic field is bare str, not HttpUrl/AnyUrl). Combined with no ownership check on the URL, a provider can inject any string (including non-URLs) into their gallery. Recommend HttpUrl validation + maybe a sanity check that the URL begins with /api/files/ or APP_NAME's storage prefix.",
+    "GalleryItemIn lacks length validation on caption (no max_length) — a malicious payload could store arbitrary-length captions.",
+    "PUT /providers/me/gallery/reorder rewrites the whole gallery array with $set — under high concurrency two simultaneous reorders by the same user could lose photos added between fetch and update. Consider optimistic concurrency or array-update operators.",
+    "_compress_image_bytes swallows all exceptions and falls back to original bytes — large undetected failures would silently bypass the 1200px cap. Consider logging at error level + emitting a metric.",
+    "ImageUpload GalleryUpload performs uploads sequentially in a loop (per-file await api.post), which is correct for progress but slow for many files; consider parallelization with bounded concurrency for >5 files.",
+    "Dashboard gallery uses HTML5 native drag&drop which has no touch/mobile support — mobile providers cannot reorder photos. Recommend evaluating react-dnd or @dnd-kit with touch sensors.",
+    "Reorder is fire-and-forget on the client (persistOrder catches but does not roll back optimistic UI on failure). A network failure would leave UI and DB out of sync until next reload."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration12_sprint_a_gallery_test.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 pytest)",
+    "frontend": "100% (all Sprint A flows green)"
+  },
+  "test_credentials": "demo.provider@getamano.com / provider123 ; admin@getamano.com / admin123",
+  "seed_data_creation": "Tests are self-cleaning: restore_plan_and_cleanup fixture restores plan='pro' and deletes all non-seed gallery items after every test. Frontend Playwright script also restored pro plan and removed the 8 dummy items used to exercise the overflow tile. Seed g_seed1/g_seed2/g_seed3 left untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Sprint A green. KEY TESTIDS: dashboard tab = 'dashboard-tab-galeria'; gallery root = 'dashboard-gallery'; limit header = 'gallery-limit-text'; banner = 'gallery-limit-banner'; CTA = 'gallery-limit-cta'; per-item = 'gallery-item-{id}'; main badge = 'gallery-main-badge-{id}'; upload root = 'gallery-upload-button'; multi-file input = 'gallery-upload-button-input' (uses input[type=file][multiple]); upload trigger = 'gallery-upload-button-trigger'; progress container = 'gallery-upload-progress'; progress rows = 'gallery-upload-progress-{idx}'. Public eCard grid = 'ecard-gallery-grid' (testid prop passed to GalleryGrid); thumbs = 'ecard-gallery-grid-thumb-{i}'; overflow = 'ecard-gallery-grid-overflow'; lightbox = 'ecard-gallery-grid-lightbox' with -prev/-next/-close children. /api/providers/me returns gallery; there is no /api/providers/by-user/{uid}. HTML5 drag&drop is hard to simulate in Playwright reliably — exercise PUT /providers/me/gallery/reorder directly to validate persistence and then reload UI.",
+  "rca_of_the_issue": "N/A — no production defects in Sprint A. All listed acceptance criteria for plan-based photo limits + multi-upload + drag-reorder + Free-plan banner + public gallery lightbox verified end-to-end against the production preview URL."
+}

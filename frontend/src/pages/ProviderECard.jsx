@@ -15,6 +15,7 @@ import ECardModal from "../components/ECardModal";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
+import GalleryGrid from "../components/GalleryGrid";
 import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
 
@@ -31,7 +32,7 @@ export default function ProviderECard() {
   const [mode, setMode] = useState("message"); // "message" | "quote"
   const [msgBody, setMsgBody] = useState("");
   const [msgSubject, setMsgSubject] = useState("");
-  const [lightbox, setLightbox] = useState(null);
+  // (gallery now uses GalleryGrid with its own built-in lightbox + arrow navigation)
   const [showECardModal, setShowECardModal] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -184,14 +185,11 @@ export default function ProviderECard() {
             {/* Gallery */}
             {p.gallery?.length > 0 && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-gallery">
-                <h3 className="font-display font-semibold text-slate-900 mb-3">Galería de trabajos</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {p.gallery.map(g => (
-                    <button key={g.id} onClick={() => setLightbox(g)} className="aspect-square rounded-xl overflow-hidden bg-slate-100 hover:opacity-90 transition" data-testid={`ecard-gallery-${g.id}`}>
-                      <img src={buildFileUrl(g.url)} alt={g.caption || ""} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-display font-semibold text-slate-900">Galería de trabajos</h3>
+                  <span className="text-xs text-slate-500">{p.gallery.length} foto{p.gallery.length > 1 ? "s" : ""}</span>
                 </div>
+                <GalleryGrid items={p.gallery} testid="ecard-gallery-grid" />
               </div>
             )}
             {p.services?.length > 0 && (
@@ -332,12 +330,6 @@ export default function ProviderECard() {
                 {!user && <p className="text-xs text-slate-500 text-center">Necesitas iniciar sesión.</p>}
               </form>
             </div>
-          </div>
-        )}
-
-        {lightbox && (
-          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setLightbox(null)} data-testid="gallery-lightbox">
-            <img src={buildFileUrl(lightbox.url)} alt={lightbox.caption || ""} className="max-w-full max-h-full rounded-2xl" />
           </div>
         )}
 
