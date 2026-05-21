@@ -48,7 +48,9 @@ Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedo
 ## Test Results
 - Iteration 1: 32/32 backend (100%)
 - Iteration 2: 14/14 nuevos (100%)
-- Iteration 3 (esta): 76/81 (94%) — fix aplicado a PUT /users/me decorator faltante, phone agregado a RegisterIn, unique index reviews(user_id, provider_id)
+- Iteration 3: 76/81 (94%) — fix aplicado a PUT /users/me decorator faltante, phone agregado a RegisterIn, unique index reviews(user_id, provider_id)
+- Iteration 5 (Feb 2026): 31/31 nuevos (100%) — Maestro v1 verificado E2E (promo GETMANO50, likes toggle, latino_owned filter, 4 tiers). 108/112 overall (96%). Frontend smoke 5/5.
+  - Fix aplicado: PUT /providers/me ahora usa model_dump(exclude_unset=True) para evitar wipe silencioso de gallery/photos/services. Verificado vía curl: gallery preservada en updates parciales.
 
 ## Prioritized Backlog
 

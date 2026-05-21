@@ -700,7 +700,7 @@ async def update_my_provider(payload: ProviderProfileIn, user: User = Depends(ge
     existing = await db.provider_profiles.find_one({"user_id": user.user_id})
     if not existing:
         raise HTTPException(status_code=404, detail="No provider profile")
-    update = payload.model_dump()
+    update = payload.model_dump(exclude_unset=True)
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": update})
     doc = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
