@@ -43,6 +43,9 @@ import SeoCityDetail from "./pages/seo/SeoCityDetail";
 import SeoCategoryDetail from "./pages/seo/SeoCategoryDetail";
 import SeoPage from "./pages/seo/SeoPage";
 
+// Admin: bidirectional reports
+import AdminReportsBidirectional from "./pages/admin/AdminReportsBidirectional";
+
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function AppRouter() {
   const location = useLocation();
@@ -85,6 +88,7 @@ function AppRouter() {
       <Route path="/admin/queue" element={<AdminQueue />} />
       <Route path="/admin/providers" element={<AdminProviders />} />
       <Route path="/admin/reviews" element={<AdminReviews />} />
+      <Route path="/admin/reportes" element={<AdminReportsBidirectional />} />
       <Route path="/admin/catalog" element={<AdminCatalog />} />
       <Route path="/admin/audit" element={<AdminAudit />} />
       <Route path="/dashboard/admin" element={<AdminOverview />} />

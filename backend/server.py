@@ -376,6 +376,39 @@ class LatinoOwnedIn(BaseModel):
 class OwnerIdentityIn(BaseModel):
     owner_identity: Optional[Literal["latino", "american"]] = None
 
+# ============ REPORTS (Sprint 2) ============
+REPORT_REASONS_CLIENT_TO_PROVIDER = {
+    "no_servicio": "No prestó el servicio acordado",
+    "calidad_pobre": "Calidad del trabajo muy por debajo de lo esperado",
+    "fraude_pago": "Cobros no acordados / fraude",
+    "comportamiento_inapropiado": "Comportamiento inapropiado o irrespetuoso",
+    "info_falsa": "Información falsa en el perfil (precio, ubicación, identidad)",
+    "abandono": "Abandonó el trabajo sin terminar",
+    "otro": "Otro motivo (describe)",
+}
+REPORT_REASONS_PROVIDER_TO_CLIENT = {
+    "no_pago": "Cliente no pagó el servicio prestado",
+    "trato_irrespetuoso": "Trato irrespetuoso o agresivo",
+    "info_falsa_cliente": "Información falsa (dirección, alcance del trabajo)",
+    "cambios_excesivos": "Cambios excesivos no acordados",
+    "fake_review": "Reseña fake o injusta",
+    "intento_fraude": "Intento de fraude o estafa",
+    "otro": "Otro motivo (describe)",
+}
+
+class ReportIn(BaseModel):
+    target_id: str  # user_id of the reported user
+    target_role: Literal["client", "provider"]
+    reason: str  # key from one of the dicts above
+    description: str
+    evidence_urls: List[str] = []  # up to 3 image/file URLs uploaded via /api/upload
+    related_quote_request_id: Optional[str] = None
+    related_provider_slug: Optional[str] = None
+
+class ReportActionIn(BaseModel):
+    action: Literal["dismiss", "warn", "suspend", "delete"]
+    admin_notes: Optional[str] = ""
+
 # ============ HELPERS ============
 def hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
@@ -978,6 +1011,176 @@ Disallow: /register
 
 Sitemap: https://getamano.us/sitemap.xml
 """
+
+
+# ============ SEO CONTENT AI (cached per cat × city) ============
+@api_router.get("/seo/content/{category_slug}/{city_slug}")
+async def get_seo_content(category_slug: str, city_slug: str):
+    """Returns AI-generated unique 100-word paragraph for a (cat, city) page.
+    Cached in `seo_content_cache` collection; generates lazily on first request."""
+    cached = await db.seo_content_cache.find_one({"cat_slug": category_slug, "city_slug": city_slug}, {"_id": 0})
+    if cached and cached.get("content"):
+        return {"content": cached["content"], "generated_at": cached.get("generated_at"), "cached": True}
+
+    cat = await db.categories.find_one({"slug": category_slug}, {"_id": 0})
+    city = next((c for c in SEO_CITIES if c["slug"] == city_slug), None)
+    if not cat or not city:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    prompt = (
+        f"Eres un copywriter latino para getamano, marketplace que conecta a latinos en USA con proveedores latinos verificados. "
+        f"Escribe UN ÚNICO PÁRRAFO de 90-110 palabras en español neutro sobre buscar servicios de '{cat['name_es']}' en {city['name']}, {city['state']}. "
+        f"Tono cálido, profesional, útil. Menciona que getamano conecta con proveedores latinos verificados. "
+        f"NO listas, NO emojis, NO títulos. NO inventes datos numéricos (precios, cantidades). "
+        f"Termina con un llamado sutil a explorar la lista o pedir cotización. NO menciones competidores."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            session_id=f"seo_{category_slug}_{city_slug}",
+            system_message="Eres un copywriter SEO bilingüe para la comunidad latina en USA."
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        content = (await chat.send_message(UserMessage(text=prompt))).strip()
+        if not content:
+            raise ValueError("Empty response")
+        doc = {
+            "cat_slug": category_slug,
+            "city_slug": city_slug,
+            "content": content,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.seo_content_cache.update_one(
+            {"cat_slug": category_slug, "city_slug": city_slug},
+            {"$set": doc},
+            upsert=True,
+        )
+        return {"content": content, "generated_at": doc["generated_at"], "cached": False}
+    except Exception as e:
+        logger.warning(f"SEO AI content gen failed for {category_slug}/{city_slug}: {e}")
+        fallback = (
+            f"En getamano encontrarás proveedores latinos verificados de {cat['name_es'].lower()} "
+            f"en {city['name']}, {city['state']}. Compara reseñas reales, solicita cotización gratis en español, "
+            f"y contrata con confianza. Apoya a la comunidad mientras resuelves lo que necesitas."
+        )
+        return {"content": fallback, "generated_at": datetime.now(timezone.utc).isoformat(), "cached": False, "fallback": True}
+
+
+# ============ REPORTS (Sprint 2 — bidirectional safety) ============
+@api_router.get("/reports/reasons")
+async def report_reasons():
+    return {
+        "client_to_provider": [{"key": k, "label": v} for k, v in REPORT_REASONS_CLIENT_TO_PROVIDER.items()],
+        "provider_to_client": [{"key": k, "label": v} for k, v in REPORT_REASONS_PROVIDER_TO_CLIENT.items()],
+    }
+
+
+@api_router.post("/reports")
+async def create_report(payload: ReportIn, user: User = Depends(get_current_user)):
+    if user.user_id == payload.target_id:
+        raise HTTPException(status_code=400, detail="Cannot report yourself")
+    target = await db.users.find_one({"user_id": payload.target_id}, {"_id": 0, "user_id": 1, "role": 1, "name": 1, "email": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    if user.role == "client":
+        valid_reasons = REPORT_REASONS_CLIENT_TO_PROVIDER
+    elif user.role == "provider":
+        valid_reasons = REPORT_REASONS_PROVIDER_TO_CLIENT
+    else:
+        raise HTTPException(status_code=403, detail="Only clients and providers can report")
+    if payload.reason not in valid_reasons:
+        raise HTTPException(status_code=400, detail="Invalid reason for your role")
+    evidence = (payload.evidence_urls or [])[:3]
+    doc = {
+        "report_id": f"rep_{uuid.uuid4().hex[:12]}",
+        "reporter_id": user.user_id,
+        "reporter_role": user.role,
+        "reporter_name": user.name,
+        "reporter_email": user.email,
+        "target_id": payload.target_id,
+        "target_role": payload.target_role,
+        "target_name": target.get("name"),
+        "target_email": target.get("email"),
+        "reason": payload.reason,
+        "reason_label": valid_reasons[payload.reason],
+        "description": payload.description.strip()[:2000],
+        "evidence_urls": evidence,
+        "related_quote_request_id": payload.related_quote_request_id,
+        "related_provider_slug": payload.related_provider_slug,
+        "status": "pending",
+        "admin_notes": "",
+        "action_taken": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.reports.insert_one(doc)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+    recent_count = await db.reports.count_documents({"target_id": payload.target_id, "created_at": {"$gte": cutoff}})
+    if recent_count >= 3:
+        await db.users.update_one(
+            {"user_id": payload.target_id},
+            {"$set": {"flagged_by_reports": True, "flagged_count": recent_count, "flagged_at": datetime.now(timezone.utc).isoformat()}},
+        )
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/reports/mine")
+async def list_my_reports(user: User = Depends(get_current_user)):
+    items = await db.reports.find({"reporter_id": user.user_id}, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    return {"items": items, "total": len(items)}
+
+
+@api_router.get("/admin/reports")
+async def admin_list_reports(
+    status: Optional[Literal["pending", "resolved", "dismissed"]] = None,
+    reporter_role: Optional[Literal["client", "provider"]] = None,
+    target_role: Optional[Literal["client", "provider"]] = None,
+    user: User = Depends(require_admin),
+):
+    query: dict = {}
+    if status:
+        query["status"] = status
+    if reporter_role:
+        query["reporter_role"] = reporter_role
+    if target_role:
+        query["target_role"] = target_role
+    items = await db.reports.find(query, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+    pending = await db.reports.count_documents({"status": "pending"})
+    total_90d = await db.reports.count_documents({"created_at": {"$gte": cutoff}})
+    flagged_users = await db.users.count_documents({"flagged_by_reports": True})
+    return {"items": items, "total": len(items), "pending": pending, "total_90d": total_90d, "flagged_users": flagged_users}
+
+
+@api_router.put("/admin/reports/{report_id}")
+async def admin_action_on_report(report_id: str, payload: ReportActionIn, user: User = Depends(require_admin)):
+    rep = await db.reports.find_one({"report_id": report_id}, {"_id": 0})
+    if not rep:
+        raise HTTPException(status_code=404, detail="Report not found")
+    update = {
+        "status": "dismissed" if payload.action == "dismiss" else "resolved",
+        "action_taken": payload.action,
+        "admin_notes": (payload.admin_notes or "").strip()[:1000],
+        "resolved_by_admin_id": user.user_id,
+        "resolved_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.reports.update_one({"report_id": report_id}, {"$set": update})
+    target_id = rep.get("target_id")
+    target_role = rep.get("target_role")
+    if payload.action == "warn":
+        await db.users.update_one({"user_id": target_id}, {"$inc": {"warnings_count": 1}, "$set": {"last_warning_at": datetime.now(timezone.utc).isoformat()}})
+    elif payload.action == "suspend":
+        await db.users.update_one({"user_id": target_id}, {"$set": {"is_suspended": True, "suspended_at": datetime.now(timezone.utc).isoformat()}})
+        if target_role == "provider":
+            await db.provider_profiles.update_one({"user_id": target_id}, {"$set": {"is_active": False}})
+    elif payload.action == "delete":
+        await db.users.update_one({"user_id": target_id}, {"$set": {"is_deleted": True, "deleted_at": datetime.now(timezone.utc).isoformat(), "is_suspended": True}})
+        if target_role == "provider":
+            await db.provider_profiles.update_one({"user_id": target_id}, {"$set": {"is_active": False}})
+    return {"ok": True, "action": payload.action, "report_id": report_id}
+
 
 
 # === GEOCODING (Nominatim OpenStreetMap — free, no API key) ===

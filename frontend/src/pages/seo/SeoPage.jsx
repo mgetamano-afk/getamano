@@ -11,6 +11,7 @@ export default function SeoPage() {
   const { categorySlug, citySlug } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [aiContent, setAiContent] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -18,6 +19,10 @@ export default function SeoPage() {
       .then(r => setData(r.data))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
+    // Fetch unique AI-generated SEO paragraph (cached server-side)
+    api.get(`/seo/content/${categorySlug}/${citySlug}`)
+      .then(r => setAiContent(r.data.content))
+      .catch(() => setAiContent(null));
   }, [categorySlug, citySlug]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
@@ -124,6 +129,12 @@ export default function SeoPage() {
               <p className="text-sm text-red-800">
                 <strong>Categoría regulada:</strong> {category.name_es.toLowerCase()} requiere licencia profesional en {city.state}. Verifica siempre que tu proveedor tenga las credenciales correspondientes.
               </p>
+            </div>
+          )}
+
+          {aiContent && (
+            <div className="mt-6 max-w-3xl rounded-xl p-5" style={{ backgroundColor: "#FFFFFF", border: "1px solid #BCC5CC" }} data-testid="seo-ai-content">
+              <p className="text-base leading-relaxed" style={{ color: "#063154" }}>{aiContent}</p>
             </div>
           )}
         </header>

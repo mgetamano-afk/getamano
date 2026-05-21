@@ -8,12 +8,13 @@ import SocialLinks from "../components/SocialLinks";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard } from "lucide-react";
+import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard, Flag } from "lucide-react";
 import WhatsAppButton from "../components/WhatsAppButton";
 import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
+import ReportModal from "../components/ReportModal";
 import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ export default function ProviderECard() {
   const [lightbox, setLightbox] = useState(null);
   const [showECardModal, setShowECardModal] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [rates, setRates] = useState([]);
 
   useEffect(() => {
@@ -168,6 +170,11 @@ export default function ProviderECard() {
             <button onClick={addFavorite} className="mt-2 text-sm text-slate-500 hover:text-orange-500 flex items-center gap-1" data-testid="ecard-favorite-button">
               <Heart className="w-4 h-4" /> Guardar en favoritos
             </button>
+            {user && user.user_id !== p.user_id && (
+              <button onClick={() => setShowReport(true)} className="ml-3 mt-2 text-xs text-slate-400 hover:text-red-600 inline-flex items-center gap-1" data-testid="ecard-report-button">
+                <Flag className="w-3 h-3" /> Reportar este proveedor
+              </button>
+            )}
           </div>
         </div>
 
@@ -336,6 +343,14 @@ export default function ProviderECard() {
 
         {showECardModal && <ECardModal provider={p} onClose={() => setShowECardModal(false)} />}
         <QuoteRequestModal open={showQuote} provider={p} onClose={() => setShowQuote(false)} />
+        <ReportModal
+          open={showReport}
+          onClose={() => setShowReport(false)}
+          targetId={p.user_id}
+          targetRole="provider"
+          targetName={p.business_name}
+          context={{ provider_slug: p.slug }}
+        />
       </main>
       <Footer />
     </div>
