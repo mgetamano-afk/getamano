@@ -1237,6 +1237,7 @@ async def providers_map(
     language: Optional[str] = None,
     owner_identity: Optional[Literal["latino", "american"]] = None,
     country: Optional[str] = DEFAULT_COUNTRY,
+    has_video: Optional[bool] = None,
     limit: int = 60,
     min_lat: Optional[float] = None,
     max_lat: Optional[float] = None,
@@ -1266,6 +1267,8 @@ async def providers_map(
         query["languages"] = language
     if owner_identity:
         query["owner_identity"] = owner_identity
+    if has_video:
+        query["video_url"] = {"$exists": True, "$ne": ""}
     if q:
         query["$or"] = [
             {"business_name": {"$regex": q, "$options": "i"}},
@@ -1327,6 +1330,7 @@ async def providers_map(
             "rating_count": p.get("rating_count", 0),
             "logo_url": p.get("logo_url"),
             "cover_url": p.get("cover_url"),
+            "video_url": p.get("video_url"),
             "lat": lat,
             "lng": lng,
         })
