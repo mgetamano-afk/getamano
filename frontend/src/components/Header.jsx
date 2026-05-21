@@ -35,6 +35,9 @@ export default function Header() {
 
           <nav className="hidden md:flex items-center gap-2">
             <Link to="/search" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-explore">{t("nav.explore")}</Link>
+            <Link to="/comunidad" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium inline-flex items-center gap-1" data-testid="nav-community">
+              Comunidad <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="En vivo" />
+            </Link>
             <Link to="/plans" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-plans">{t("nav.plans")}</Link>
             <button
               onClick={() => changeLang(lang === "es" ? "en" : "es")}
@@ -72,6 +75,7 @@ export default function Header() {
         {open && (
           <div className="md:hidden border-t border-slate-200 py-4 space-y-2">
             <Link to="/search" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium" data-testid="mobile-nav-explore">{t("nav.explore")}</Link>
+            <Link to="/comunidad" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium" data-testid="mobile-nav-community">Comunidad 🔴</Link>
             <Link to="/plans" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium">{t("nav.plans")}</Link>
             <button onClick={() => { changeLang(lang === "es" ? "en" : "es"); setOpen(false); }} className="w-full text-left px-4 py-2 text-slate-700 font-medium" data-testid="mobile-lang-toggle">
               <Globe className="w-4 h-4 inline mr-2" />{lang === "es" ? "English" : "Español"}

@@ -1610,6 +1610,56 @@ async def my_journal(user: User = Depends(get_current_user)):
     }
 
 # ============ STATS for landing (public) ============
+@api_router.get("/community/wall-of-fame")
+async def wall_of_fame(limit: int = 50):
+    """Public anonymized feed of recent milestone unlocks across providers."""
+    limit = max(1, min(limit, 100))
+    defs_by_id = {d["id"]: d for d in MILESTONE_DEFS}
+    cursor = db.provider_milestones.find({}, {"_id": 0}).sort("unlocked_at", -1).limit(limit)
+    items = []
+    user_cache = {}
+    prof_cache = {}
+    async for rec in cursor:
+        mid = rec.get("milestone_id")
+        d = defs_by_id.get(mid)
+        if not d:
+            continue
+        uid = rec.get("user_id")
+        if uid not in user_cache:
+            user_cache[uid] = await db.users.find_one({"user_id": uid}, {"_id": 0, "name": 1}) or {}
+        if uid not in prof_cache:
+            prof_cache[uid] = await db.provider_profiles.find_one({"user_id": uid}, {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "state": 1, "logo_url": 1, "latino_owned": 1}) or {}
+        u = user_cache[uid]
+        prof = prof_cache[uid]
+        biz = prof.get("business_name") or ""
+        name = (u.get("name") or "").strip()
+        first = name.split(" ")[0] if name else (biz.split(" ")[0] if biz else "Alguien")
+        # Skip seeded test profiles from public feed
+        if biz.startswith("TEST_"):
+            continue
+        items.append({
+            "first_name": first,
+            "city": prof.get("city"),
+            "state": prof.get("state"),
+            "business_name": biz or None,
+            "slug": prof.get("slug"),
+            "logo_url": prof.get("logo_url"),
+            "latino_owned": prof.get("latino_owned") == "yes",
+            "milestone_id": mid,
+            "title": d["title"],
+            "emoji": d["emoji"],
+            "tier": d["tier"],
+            "unlocked_at": rec.get("unlocked_at"),
+        })
+    # Aggregate stats for hero
+    total_unlocked = await db.provider_milestones.count_documents({})
+    total_providers = await db.provider_profiles.count_documents({"is_active": True})
+    by_tier = {"silver": 0, "gold": 0, "platinum": 0}
+    for it in items:
+        if it["tier"] in by_tier:
+            by_tier[it["tier"]] += 1
+    return {"items": items, "stats": {"total_unlocked": total_unlocked, "total_providers": total_providers, "by_tier": by_tier}}
+
 @api_router.get("/public/stats")
 async def public_stats():
     total = await db.provider_profiles.count_documents({"verification_status": "approved", "is_active": True})

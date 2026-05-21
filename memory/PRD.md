@@ -62,6 +62,7 @@ Marketplace digital "getmano" que conecta a comunidad latina en USA con proveedo
     - Componente `ShareLinkCard` en dashboard del proveedor con URL corta, copy, WhatsApp, Email, QR generator (api.qrserver.com), Web Share API.
     - **Redes sociales en eCard público**: nuevo componente `SocialLinks` (Instagram, Facebook, TikTok, YouTube, LinkedIn, Website) con normalización auto de username → URL. Sección "SÍGUELO EN REDES" en sidebar. Editor en dashboard Perfil tab (5 inputs con placeholders).
     - **`AchievementImageGenerator`** (canvas HTML5 puro, sin libs externas): genera PNG 1080×1080 (post) o 1080×1920 (story) con branding getmano, badge tier, emoji XL, título/mensaje, logo del proveedor + business name footer. Botón "Crear imagen" en cada entry del diario. Tip de marketing incluido para incentivar etiquetar @getmano.
+  - **Wall of Fame público** (`/comunidad` o `/community`): feed live anonimizado de los últimos 60 logros desbloqueados por proveedores. Endpoint `GET /api/community/wall-of-fame?limit=N` devuelve items con first_name, ciudad/estado, slug, emoji, título, tier, unlocked_at + stats globales (total_unlocked, total_providers, by_tier). Página con hero oscuro ("La comunidad latina, en movimiento"), 3 stat cards (Logros / Negocios / En vivo refresca 30s), filtros por tier, grid responsive 1-4 columnas con tiles clickeables al eCard, animación de entrada staggered, polling cada 30s. CTAs "Abre tu eCard y aparece aquí" arriba y abajo. Link "Comunidad 🔴" en Header con dot pulsante en vivo.
 
 ## Prioritized Backlog
 

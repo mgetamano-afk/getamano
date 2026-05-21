@@ -14,6 +14,7 @@ import ProviderDashboard from "./pages/ProviderDashboard";
 import ProviderOnboarding from "./pages/ProviderOnboarding";
 import ClientDashboard from "./pages/ClientDashboard";
 import Plans from "./pages/Plans";
+import Community from "./pages/Community";
 import DashboardRouter from "./pages/DashboardRouter";
 import Messages from "./pages/Messages";
 import UserProfile from "./pages/UserProfile";
@@ -49,6 +50,8 @@ function AppRouter() {
       <Route path="/services/:slug" element={<ProviderECard />} />
       <Route path="/proveedor/:slug" element={<ProviderECard />} />
       <Route path="/p/:slug" element={<ProviderECard />} />
+      <Route path="/comunidad" element={<Community />} />
+      <Route path="/community" element={<Community />} />
 
       {/* Zone 3: Provider + Client Dashboards */}
       <Route path="/dashboard" element={<DashboardRouter />} />
