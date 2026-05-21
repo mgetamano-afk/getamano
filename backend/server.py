@@ -1752,12 +1752,16 @@ async def update_user(payload: UserUpdateIn, user: User = Depends(get_current_us
 
 # ============ UPLOAD ============
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"}
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"}
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB images
+MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB videos
 GALLERY_COMPRESS_MAX_WIDTH = 1200
 GALLERY_COMPRESS_QUALITY = 85
 
 # Plan-based photo limits. None = unlimited.
 PLAN_PHOTO_LIMITS = {"free": 20, "basic": None, "pro": None, "premium": None}
+# Plans that may upload a presentation video
+VIDEO_ALLOWED_PLANS = {"pro", "premium"}
 
 PHOTO_CATEGORY_LABELS = {
     "trabajo_terminado": "Trabajo terminado",
@@ -1932,6 +1936,62 @@ async def remove_gallery_item(item_id: str, user: User = Depends(get_current_use
     await db.provider_profiles.update_one(
         {"user_id": user.user_id}, {"$pull": {"gallery": {"id": item_id}}}
     )
+    return {"ok": True}
+
+@api_router.get("/gallery/photo-categories")
+async def list_photo_categories():
+    """Public list of photo categories used to tag/filter gallery photos."""
+    return [{"key": k, "label": v} for k, v in PHOTO_CATEGORY_LABELS.items()]
+
+# ============ PROVIDER VIDEO (Pro / Premium only) ============
+@api_router.post("/providers/me/video")
+async def upload_provider_video(file: UploadFile = File(...), user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "plan": 1, "video_url": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    plan = (prof.get("plan") or "free").lower()
+    if plan not in VIDEO_ALLOWED_PLANS:
+        raise HTTPException(status_code=403, detail="El video de presentación está disponible en los planes Pro y Premium.")
+    content_type = file.content_type or "application/octet-stream"
+    if content_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(status_code=400, detail="Formato no soportado. Usa MP4, MOV o AVI.")
+    data = await file.read()
+    if len(data) > MAX_VIDEO_SIZE:
+        raise HTTPException(status_code=400, detail="El video supera 200 MB.")
+    ext_map = {"video/mp4": "mp4", "video/quicktime": "mov", "video/x-msvideo": "avi", "video/avi": "avi"}
+    ext = ext_map.get(content_type, "mp4")
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/videos/{user.user_id}/{file_id}.{ext}"
+    try:
+        result = put_object(path, data, content_type)
+    except Exception as e:
+        logger.exception("Video upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    await db.files.insert_one({
+        "file_id": file_id, "user_id": user.user_id, "storage_path": result["path"],
+        "original_filename": file.filename or "", "content_type": content_type,
+        "size": result.get("size", len(data)), "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    video_url = f"/api/files/{result['path']}"
+    await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {
+            "video_url": video_url,
+            "video_content_type": content_type,
+            "video_uploaded_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    return {"ok": True, "video_url": video_url, "content_type": content_type, "size": len(data)}
+
+@api_router.delete("/providers/me/video")
+async def delete_provider_video(user: User = Depends(get_current_user)):
+    res = await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$unset": {"video_url": "", "video_content_type": "", "video_uploaded_at": ""}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
     return {"ok": True}
 
 # ============ PLAN CHANGE (mock - no Stripe) ============

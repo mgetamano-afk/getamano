@@ -182,6 +182,22 @@ export default function ProviderECard() {
         {/* Details grid */}
         <div className="grid md:grid-cols-3 gap-5 mt-6 px-4 md:px-8">
           <div className="md:col-span-2 space-y-5">
+            {/* Presentation video (Pro/Premium) */}
+            {p.video_url && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-video">
+                <h3 className="font-display font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  🎬 Video de presentación
+                </h3>
+                <video
+                  src={buildFileUrl(p.video_url)}
+                  controls
+                  preload="metadata"
+                  className="w-full rounded-xl bg-black max-h-[480px]"
+                  data-testid="ecard-video-player"
+                />
+              </div>
+            )}
+
             {/* Gallery */}
             {p.gallery?.length > 0 && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-gallery">

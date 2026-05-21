@@ -1,27 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { GalleryUpload, buildFileUrl } from "./ImageUpload";
-import { Pin, GripVertical, Trash2, Image as ImageIcon, Sparkles } from "lucide-react";
+import { Pin, GripVertical, Trash2, Image as ImageIcon, Sparkles, Tag } from "lucide-react";
 import { toast } from "sonner";
+import ProviderVideoUpload from "./ProviderVideoUpload";
 
 const PLAN_LABEL = { free: "Gratis", basic: "Básico", pro: "Pro", premium: "Premium" };
 
 /**
  * Provider dashboard gallery tab.
- * - Shows plan-aware limit info + "limit reached" upgrade banner for Free
- * - Multi-file upload with progress (via GalleryUpload)
- * - Drag & drop reorder (HTML5 native, persists via PUT /providers/me/gallery/reorder)
- * - First photo highlighted with "📌 Foto principal" badge
+ * - Plan-aware limit info + "limit reached" upgrade banner for Free
+ * - Multi-file upload with progress
+ * - Drag & drop reorder; first photo highlighted with "📌 Foto principal"
+ * - Per-photo category dropdown (saves via PUT /providers/me/gallery/{id}/category)
+ * - Video upload card (Pro/Premium) — locked for Free/Basic with upgrade CTA
  */
 export default function DashboardGallery({ profile, setProfile }) {
   const [limit, setLimit] = useState(null);
+  const [photoCategories, setPhotoCategories] = useState([]);
   const [dragId, setDragId] = useState(null);
 
-  const sorted = useMemo(
-    () => [...(profile.gallery || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
-    [profile.gallery]
-  );
+  const sorted = [...(profile.gallery || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  useEffect(() => {
+    api.get("/gallery/photo-categories").then(r => setPhotoCategories(r.data)).catch(() => {});
+  }, []);
 
   const loadLimit = async () => {
     try {
@@ -44,19 +48,24 @@ export default function DashboardGallery({ profile, setProfile }) {
     } catch { toast.error("Error al eliminar"); }
   };
 
-  const persistOrder = async (newOrder) => {
+  const updateCategory = async (id, category) => {
+    const value = category || null;
     try {
-      await api.put("/providers/me/gallery/reorder", { order: newOrder.map(g => g.id) });
-    } catch { toast.error("No se pudo guardar el orden"); }
+      await api.put(`/providers/me/gallery/${id}/category`, { category: value });
+      setProfile(p => ({
+        ...p,
+        gallery: (p.gallery || []).map(g => g.id === id ? { ...g, category: value } : g),
+      }));
+    } catch { toast.error("No se pudo guardar la categoría"); }
   };
 
-  const onDragStart = (e, id) => {
-    setDragId(id);
-    e.dataTransfer.effectAllowed = "move";
+  const persistOrder = async (newOrder) => {
+    try { await api.put("/providers/me/gallery/reorder", { order: newOrder.map(g => g.id) }); }
+    catch { toast.error("No se pudo guardar el orden"); }
   };
 
+  const onDragStart = (e, id) => { setDragId(id); e.dataTransfer.effectAllowed = "move"; };
   const onDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
-
   const onDrop = (e, targetId) => {
     e.preventDefault();
     if (!dragId || dragId === targetId) { setDragId(null); return; }
@@ -71,7 +80,6 @@ export default function DashboardGallery({ profile, setProfile }) {
     persistOrder(withOrder);
     setDragId(null);
   };
-
   const onDragEnd = () => setDragId(null);
 
   const planLabel = PLAN_LABEL[limit?.plan] || "Gratis";
@@ -98,6 +106,11 @@ export default function DashboardGallery({ profile, setProfile }) {
           remaining={limit?.remaining}
           testid="gallery-upload-button"
         />
+      </div>
+
+      {/* Video uploader (Pro/Premium gated) */}
+      <div className="mb-6">
+        <ProviderVideoUpload profile={profile} setProfile={setProfile} />
       </div>
 
       {isFreeLimitReached && (
@@ -136,10 +149,12 @@ export default function DashboardGallery({ profile, setProfile }) {
               onDragOver={onDragOver}
               onDrop={(e) => onDrop(e, g.id)}
               onDragEnd={onDragEnd}
-              className={`relative aspect-square rounded-2xl overflow-hidden bg-slate-100 group cursor-move transition ${dragId === g.id ? "opacity-40 scale-95" : ""}`}
+              className={`relative rounded-2xl overflow-hidden bg-slate-100 group cursor-move transition ${dragId === g.id ? "opacity-40 scale-95" : ""}`}
               data-testid={`gallery-item-${g.id}`}
             >
-              <img src={buildFileUrl(g.url)} alt={g.caption || ""} className="w-full h-full object-cover pointer-events-none" />
+              <div className="aspect-square overflow-hidden">
+                <img src={buildFileUrl(g.url)} alt={g.caption || ""} className="w-full h-full object-cover pointer-events-none" />
+              </div>
 
               {idx === 0 && (
                 <span
@@ -157,12 +172,29 @@ export default function DashboardGallery({ profile, setProfile }) {
 
               <button
                 onClick={() => remove(g.id)}
-                className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 hover:text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                className="absolute bottom-12 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 hover:text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                 data-testid={`gallery-remove-${g.id}`}
                 aria-label="Eliminar foto"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
+
+              {/* Category selector (always visible at bottom) */}
+              <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-white/95 border-t border-slate-200 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <select
+                  value={g.category || ""}
+                  onChange={(e) => updateCategory(g.id, e.target.value)}
+                  className="text-xs flex-1 bg-transparent outline-none truncate text-slate-700"
+                  data-testid={`gallery-category-select-${g.id}`}
+                  aria-label="Categoría de la foto"
+                >
+                  <option value="">Sin categoría</option>
+                  {photoCategories.map(c => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           ))}
         </div>
