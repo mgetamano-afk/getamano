@@ -3,6 +3,7 @@ import { X, Phone, Mail, MapPin, Globe, Star, ShieldCheck, Award, Copy, Download
 import WhatsAppButton from "./WhatsAppButton";
 import { buildFileUrl } from "./ImageUpload";
 import { toast } from "sonner";
+import OwnerIdentityBadge from "./OwnerIdentityBadge";
 
 /**
  * Premium eCard modal - shareable business card view
@@ -59,7 +60,7 @@ export default function ECardModal({ provider, onClose }) {
             <h2 className="font-display text-2xl font-bold text-slate-900">{provider.business_name}</h2>
             {verified && <span className="badge-verified"><ShieldCheck className="w-3 h-3" /> Verificado</span>}
             {provider.founding_member && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-yellow-50 border border-yellow-200 text-yellow-700"><Award className="w-3 h-3" /> Founding</span>}
-            {provider.latino_owned === "yes" && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">Latino-owned 🇲🇽</span>}
+            <OwnerIdentityBadge identity={provider.owner_identity} size="sm" />
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-500">
             {provider.category && <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${provider.category.color}15`, color: provider.category.color }}>{provider.category.name_es}</span>}

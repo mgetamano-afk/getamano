@@ -42,7 +42,7 @@ function Tile({ item }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
             <span className="font-display font-semibold text-sm text-slate-900 truncate">{item.first_name}</span>
-            {item.latino_owned && <span className="text-[10px]" title="Latino-owned">🇲🇽</span>}
+            {item.latino_owned && <span className="text-[10px]" title="Dueño Latino" style={{ color: "#025F67" }}>🤝</span>}
             {item.city && (
               <span className="text-xs text-slate-500 inline-flex items-center gap-0.5">
                 <MapPin className="w-2.5 h-2.5" /> {item.city}{item.state ? `, ${item.state}` : ""}

@@ -13,6 +13,7 @@ import WhatsAppButton from "../components/WhatsAppButton";
 import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
 import QuoteRequestModal from "../components/QuoteRequestModal";
+import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
 
@@ -129,7 +130,7 @@ export default function ProviderECard() {
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                   {p.category && <span className="px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>{lang === "es" ? p.category.name_es : p.category.name_en}</span>}
-                  {p.latino_owned === "yes" && <span className="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200">Latino-owned 🇲🇽</span>}
+                  <OwnerIdentityBadge identity={p.owner_identity} />
                   {p.founding_member && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200"><Award className="w-3 h-3" /> Founding</span>}
                   {p.city && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {p.city}, {p.state}</span>}
                   {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800 font-medium"><Star className="w-3.5 h-3.5 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)} ({p.rating_count})</span>}

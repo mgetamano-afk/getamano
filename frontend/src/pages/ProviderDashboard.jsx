@@ -70,6 +70,7 @@ export default function ProviderDashboard() {
     logo_url: p.logo_url || "", cover_url: p.cover_url || "",
     photos: p.photos || [], gallery: p.gallery || [],
     social: p.social || {}, price_range: p.price_range || "quote",
+    owner_identity: p.owner_identity ?? null,
   });
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -193,6 +194,34 @@ export default function ProviderDashboard() {
                   <Field label="Email" value={form.email} onChange={v => update("email", v)} testid="form-email" />
                   <Field label="Sitio web" value={form.website} onChange={v => update("website", v)} testid="form-website" />
                   <Field label="Descripción" value={form.description} onChange={v => update("description", v)} textarea testid="form-description" full />
+                </Section>
+
+                <Section title="Identidad del negocio (opcional)">
+                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#025F67", border: "#A6E1DA" },
+                      { id: "american", label: "Dueño Americano", emoji: "🤝", bg: "#E6F1FB", color: "#185FA5", border: "#BFD9F2" },
+                      { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F7F6F2", color: "#475569", border: "#BCC5CC" },
+                    ].map(opt => {
+                      const active = form.owner_identity === opt.id;
+                      return (
+                        <button
+                          key={String(opt.id)}
+                          type="button"
+                          onClick={() => update("owner_identity", opt.id)}
+                          className={`p-3 rounded-2xl border-2 text-left transition ${active ? "shadow-sm" : "hover:border-slate-300"}`}
+                          style={{ borderColor: active ? opt.color : opt.border, backgroundColor: active ? opt.bg : "white" }}
+                          data-testid={`form-owner-identity-${opt.id || "none"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {opt.emoji && <span className="text-lg">{opt.emoji}</span>}
+                            <span className="font-medium text-sm" style={{ color: active ? opt.color : "#0F172A" }}>{opt.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="md:col-span-2 text-xs text-slate-500">getamano sirve a toda la comunidad latina. Esta selección es opcional, sin banderas ni etiquetas por país.</p>
                 </Section>
 
                 <Section title="Tipo de operación y ubicación">

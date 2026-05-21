@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award } from "lucide-react";
 import FoundingCounter from "../components/FoundingCounter";
+import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -315,7 +316,7 @@ export default function Landing() {
                 <div className="h-40 bg-slate-100 relative">
                   {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" loading="lazy" />}
                   <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> Verificado</div>
-                  {p.latino_owned === "yes" && <span className="absolute top-3 right-3 text-xs px-2 py-1 rounded-full bg-orange-500 text-white">Latino 🇲🇽</span>}
+                  {p.owner_identity && <span className="absolute top-3 right-3"><OwnerIdentityBadge identity={p.owner_identity} size="sm" /></span>}
                 </div>
                 <div className="p-5">
                   <h3 className="font-display font-semibold text-lg text-slate-900">{p.business_name}</h3>

@@ -1,0 +1,51 @@
+{
+  "summary": "Iteration 7 E2E testing of (A) 4 legal pages with draft banner + email hola@getamano.us; (B) Inclusive owner_identity field replacing 🇲🇽 flags. Backend: 17/17 iteration7 tests PASS (100%) — PUT /api/providers/me/owner-identity accepts latino/american/null with 200 + ok:true, rejects invalid values (422), returns 401 without auth; GET /api/providers/me persists owner_identity; GET /api/providers?owner_identity=latino|american filters correctly; legacy latino_owned=true regression OK; categories, providers/featured, public/stats, promo-codes/founding-status, admin/ceo-metrics, providers/me/market-pulse, notifications all 200. Frontend: All 4 legal routes (/terminos /privacidad /politica-resenas /cookies) return 200, render Header+Footer, show data-testid='legal-draft-banner' with 'Borrador' + hola@getamano.us, data-testid='legal-title' in rgb(2,95,103) Blue Lagoon, proper main testids (legal-terms/privacy/reviews/cookies), and 8–14 h2 sections each in rgb(47,157,148) Scooter teal. Footer on Landing contains all 4 footer-link-* with correct hrefs and email 'hola@getamano.us' (not .com). Landing has ZERO 🇲🇽 emoji; demo provider's featured card shows data-testid='owner-identity-latino' badge with 🤝 icon. ProviderECard /proveedor/maria-cleaning-services-sallisaw-ok: 0 🇲🇽 occurrences, 0 'Latino-owned' text, badge with bg rgb(225,245,238) and color rgb(2,95,103) matches spec. /comunidad: 0 🇲🇽, 16 🤝 cosmetic replacements. Provider Dashboard /dashboard/provider Perfil tab shows 'Identidad del negocio' with all 3 form-owner-identity-{latino,american,none} testids present and clickable.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Provider Dashboard → Perfil → owner_identity persistence via global 'Guardar cambios' button",
+        "issue": "Clicked form-owner-identity-american then 'Guardar cambios' — backend GET /api/providers/me still returned owner_identity='latino' after save (no change persisted via UI). Either (a) the profile POST/PUT payload from this form doesn't include owner_identity, (b) the milestone-celebration modal (which reappeared during the workflow despite localStorage preload) intercepted the save, or (c) the section requires its own dedicated save button calling PUT /api/providers/me/owner-identity. Direct backend PUT /api/providers/me/owner-identity works perfectly (17/17 backend tests). Needs manual verification by main agent.",
+        "affected_selectors": ["[data-testid='form-owner-identity-american']", "button:has-text('Guardar cambios')"]
+      },
+      {
+        "flow": "Provider Dashboard milestone modals",
+        "issue": "Milestone celebration modals ('Primer mensaje recibido', 'Primera solicitud') still surface on /dashboard/provider even after preloading localStorage keys milestone_celebrated_first_msg / first_quote / all. Same carryover from iter-5/iter-6. Non-blocking.",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration7_test.py",
+    "/app/test_reports/pytest/iteration7_results.xml"
+  ],
+  "action_items": [
+    "Verify owner_identity persistence flow from Provider Dashboard Perfil tab — clicking form-owner-identity-american + 'Guardar cambios' should update the provider's owner_identity to 'american' but currently does not (backend still shows 'latino'). Confirm whether ProviderDashboard sends owner_identity in the profile-save payload or wires the click directly to PUT /api/providers/me/owner-identity. Backend endpoints are fully functional.",
+    "[OPTIONAL] Unify milestone-suppress keys so testers/QA can disable all celebration modals via a single localStorage flag (e.g. milestone_celebrated_all=1)."
+  ],
+  "critical_code_review_comments": [
+    "server.py now ~3170 lines — modularization still pending (split into auth, providers, messaging, admin, promo, ads, market-pulse, owner-identity).",
+    "Migration block (server.py L502–518) is idempotent and runs at startup — good. However the second update sets owner_identity=None for ALL profiles without it, including potential american providers; consider mapping by another signal if/when american identity data becomes available pre-migration.",
+    "OwnerIdentityIn model uses Literal['latino','american'] but the endpoint allows None via payload.owner_identity. Document explicit null-allowed semantics in OpenAPI schema for clarity (Optional[Literal[...]] is fine but ensure Pydantic generates correct schema).",
+    "LegalLayout.jsx uses a single SHOW_LEGAL_DRAFT_BANNER constant — good DX for legal sign-off. Consider promoting to env var or admin toggle so it can flip without a redeploy.",
+    "OwnerIdentityBadge.jsx hard-codes colors (#E1F5EE / #E6F1FB / #025F67 / #185FA5). Consider extracting to a palette constants file for future theming/i18n."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration7_test.py (new — 17 tests covering owner_identity endpoint, /providers/me, search filter, legacy regression, and broader endpoint regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (17/17 iteration7 tests)",
+    "frontend": "92% (legal pages 4/4, footer links 4/4, ECard 6/6, Landing 7/7, Community 8/8, Dashboard identity section visible 9/9 BUT UI-driven persistence via 'Guardar cambios' not verified successful)"
+  },
+  "test_credentials": "admin@getamano.com/admin123 ✓, demo.provider@getamano.com/provider123 ✓",
+  "seed_data_creation": "No new seed data. Tests toggled demo provider's owner_identity through latino→american→null states and restored to 'latino' at the end (verified via final fetch).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iteration 7 backend objectives green. UI badges working everywhere (Landing featured card, ProviderECard public page, Community Wall+Leaderboard). 4 legal pages render with correct banner/title/h2 colors. Footer links and email .us correct. Open question: whether the Provider Dashboard Perfil tab's 'Guardar cambios' button actually wires the selected form-owner-identity-* into a backend call. Direct PUT /api/providers/me/owner-identity is confirmed working. Demo provider owner_identity restored to 'latino' at end of test run. Two transient 401 errors on console during anonymous loads (pre-existing — /api/auth/me, /api/favorites called before session check, same as iter-5/6).",
+  "rca_of_the_issue": "Likely RCA for owner_identity not persisting via 'Guardar cambios': the global profile save POST/PUT /api/providers/me probably wires only a subset of fields and may not yet include owner_identity in its serialized payload — OR the click handler on form-owner-identity-* updates a local UI state that is overwritten on save submit. Recommended fix: ensure ProviderDashboard's onClick for each form-owner-identity-* button either (a) immediately PUTs to /api/providers/me/owner-identity (write-through), or (b) sets a local state that is included in the profile save payload AND the save button is the one used. A quick verification: tail backend logs while clicking 'Guardar cambios' to see which endpoint is hit."
+}

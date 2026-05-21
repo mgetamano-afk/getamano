@@ -17,23 +17,24 @@ export default function Footer() {
           <p className="text-slate-400 text-sm max-w-md leading-relaxed">{t("footer.tagline")}</p>
           <div className="mt-4 flex items-center gap-4 text-sm text-slate-400">
             <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> USA</span>
-            <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getamano.com</span>
+            <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getamano.us</span>
           </div>
         </div>
         <div>
           <h4 className="font-display font-semibold text-white mb-3">Plataforma</h4>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/search" className="hover:text-orange-400">{t("nav.explore")}</Link></li>
-            <li><Link to="/plans" className="hover:text-orange-400">{t("nav.plans")}</Link></li>
-            <li><Link to="/register?intent=provider" className="hover:text-orange-400">{t("nav.providers")}</Link></li>
+            <li><Link to="/search" className="hover:text-white transition" data-testid="footer-explore">{t("nav.explore")}</Link></li>
+            <li><Link to="/plans" className="hover:text-white transition" data-testid="footer-plans">{t("nav.plans")}</Link></li>
+            <li><Link to="/register?intent=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>
           </ul>
         </div>
         <div>
           <h4 className="font-display font-semibold text-white mb-3">Legal</h4>
           <ul className="space-y-2 text-sm">
-            <li><a href="#" className="hover:text-orange-400">Términos</a></li>
-            <li><a href="#" className="hover:text-orange-400">Privacidad</a></li>
-            <li><a href="#" className="hover:text-orange-400">Reseñas</a></li>
+            <li><Link to="/terminos" className="hover:text-white transition" data-testid="footer-link-terms">Términos y Condiciones</Link></li>
+            <li><Link to="/privacidad" className="hover:text-white transition" data-testid="footer-link-privacy">Política de Privacidad</Link></li>
+            <li><Link to="/politica-resenas" className="hover:text-white transition" data-testid="footer-link-reviews">Política de Reseñas</Link></li>
+            <li><Link to="/cookies" className="hover:text-white transition" data-testid="footer-link-cookies">Política de Cookies</Link></li>
           </ul>
         </div>
       </div>

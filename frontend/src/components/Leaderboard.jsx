@@ -92,7 +92,7 @@ function FeaturedCard({ item }) {
             <h3 className="font-display text-2xl md:text-3xl font-bold leading-tight truncate">{item.business_name || item.first_name}</h3>
             <div className="flex items-center gap-2 text-sm text-white/90 mt-1 flex-wrap">
               <span>por <strong>{item.first_name}</strong></span>
-              {item.latino_owned && <span title="Latino-owned">🇲🇽</span>}
+              {item.latino_owned && <span title="Dueño Latino" className="opacity-90">🤝</span>}
               {item.city && <span className="inline-flex items-center gap-0.5"><MapPin className="w-3 h-3" />{item.city}{item.state ? `, ${item.state}` : ""}</span>}
             </div>
           </div>
@@ -125,7 +125,7 @@ function RankRow({ item }) {
         <div className="flex-1 min-w-0">
           <div className="font-display font-semibold text-slate-900 truncate flex items-center gap-1">
             {item.business_name || item.first_name}
-            {item.latino_owned && <span className="text-xs">🇲🇽</span>}
+            {item.latino_owned && <span className="text-xs" title="Dueño Latino" style={{ color: "#025F67" }}>🤝</span>}
           </div>
           <div className="text-xs text-slate-500 truncate">
             {item.first_name}{item.city ? ` · ${item.city}${item.state ? `, ${item.state}` : ""}` : ""}

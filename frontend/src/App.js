@@ -30,6 +30,12 @@ import AdminReviews from "./pages/admin/AdminReviews";
 import AdminCatalog from "./pages/admin/AdminCatalog";
 import AdminAudit from "./pages/admin/AdminAudit";
 
+// Legal pages
+import Terms from "./pages/legal/Terms";
+import Privacy from "./pages/legal/Privacy";
+import ReviewsPolicy from "./pages/legal/ReviewsPolicy";
+import Cookies from "./pages/legal/Cookies";
+
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function AppRouter() {
   const location = useLocation();
@@ -75,6 +81,12 @@ function AppRouter() {
       <Route path="/admin/catalog" element={<AdminCatalog />} />
       <Route path="/admin/audit" element={<AdminAudit />} />
       <Route path="/dashboard/admin" element={<AdminOverview />} />
+
+      {/* Legal */}
+      <Route path="/terminos" element={<Terms />} />
+      <Route path="/privacidad" element={<Privacy />} />
+      <Route path="/politica-resenas" element={<ReviewsPolicy />} />
+      <Route path="/cookies" element={<Cookies />} />
     </Routes>
   );
 }

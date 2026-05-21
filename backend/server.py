@@ -371,6 +371,9 @@ class AdIn(BaseModel):
 class LatinoOwnedIn(BaseModel):
     latino_owned: Literal["yes", "serves", "prefer_not_say"]
 
+class OwnerIdentityIn(BaseModel):
+    owner_identity: Optional[Literal["latino", "american"]] = None
+
 # ============ HELPERS ============
 def hash_password(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
@@ -495,6 +498,20 @@ async def seed():
         logger.info("Sec 11 migrations: country/currency/phone-normalize applied")
     except Exception as e:
         logger.warning(f"Sec 11 migration warn: {e}")
+
+    # Migration: owner_identity (inclusive identity badge). Map legacy latino_owned="yes" → owner_identity="latino"
+    try:
+        await db.provider_profiles.update_many(
+            {"owner_identity": {"$exists": False}, "latino_owned": "yes"},
+            {"$set": {"owner_identity": "latino"}}
+        )
+        await db.provider_profiles.update_many(
+            {"owner_identity": {"$exists": False}},
+            {"$set": {"owner_identity": None}}
+        )
+        logger.info("owner_identity migration applied")
+    except Exception as e:
+        logger.warning(f"owner_identity migration warn: {e}")
 
     if await db.categories.count_documents({}) == 0:
         docs = []
@@ -701,6 +718,7 @@ async def search_providers(
     verified: Optional[bool] = None,
     language: Optional[str] = None,
     latino_owned: Optional[bool] = None,
+    owner_identity: Optional[Literal["latino", "american"]] = None,
     country: Optional[str] = DEFAULT_COUNTRY,
     limit: int = 24,
 ):
@@ -723,6 +741,8 @@ async def search_providers(
         query["languages"] = language
     if latino_owned:
         query["latino_owned"] = "yes"
+    if owner_identity:
+        query["owner_identity"] = owner_identity
     if q:
         query["$or"] = [
             {"business_name": {"$regex": q, "$options": "i"}},
@@ -1439,6 +1459,18 @@ async def set_latino_owned(payload: LatinoOwnedIn, user: User = Depends(get_curr
         raise HTTPException(status_code=404, detail="No provider profile")
     return {"ok": True}
 
+# ============ OWNER IDENTITY (inclusive, no country flags) ============
+@api_router.put("/providers/me/owner-identity")
+async def set_owner_identity(payload: OwnerIdentityIn, user: User = Depends(get_current_user)):
+    """Set provider's owner identity ('latino' | 'american' | null=prefer not to say)."""
+    result = await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"owner_identity": payload.owner_identity}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True, "owner_identity": payload.owner_identity}
+
 # ============ ADS ============
 @api_router.get("/ads")
 async def list_active_ads(category: Optional[str] = None, city: Optional[str] = None):
@@ -1521,7 +1553,7 @@ MILESTONE_DEFS = [
     {"id": "plan_pro",         "title": "¡Ahora eres Pro! 💼",             "message": "Plan Pro activado. Más visibilidad, más clientes, más comunidad.",            "emoji": "💼", "tier": "gold"},
     {"id": "plan_premium",     "title": "¡Plan Premium! 👑",              "message": "Eres top of mind en getamano, {name}. Estamos orgullos@s de acompañarte.",     "emoji": "👑", "tier": "platinum"},
     {"id": "one_month",        "title": "Un mes en getamano 🎂",            "message": "Un mes contigo, {name}. Gracias por confiar en este camino.",                "emoji": "🎂", "tier": "gold"},
-    {"id": "latino_owned",     "title": "Negocio latino-owned 🇲🇽",        "message": "Marcaste tu negocio como latino-owned. Tu identidad es tu fuerza.",            "emoji": "🇲🇽", "tier": "silver"},
+    {"id": "latino_owned",     "title": "Negocio latino-owned 🤝",        "message": "Marcaste tu negocio como dueño latino. Tu identidad es tu fuerza.",            "emoji": "🤝", "tier": "silver"},
 ]
 
 def _milestone_unlocked(mid: str, prof: dict, user_doc: dict, extras: dict) -> bool:

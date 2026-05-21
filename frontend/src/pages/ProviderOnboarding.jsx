@@ -34,6 +34,7 @@ export default function ProviderOnboarding() {
     hours: { mon: "9:00-18:00", tue: "9:00-18:00", wed: "9:00-18:00", thu: "9:00-18:00", fri: "9:00-18:00", sat: "Cerrado", sun: "Cerrado" },
     logo_url: "", cover_url: "", photos: [], gallery: [],
     social: {}, price_range: "$$",
+    owner_identity: null,
   });
 
   useEffect(() => {
@@ -214,6 +215,35 @@ export default function ProviderOnboarding() {
                     );
                   })}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">¿Cómo describes tu negocio? <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#025F67", border: "#A6E1DA" },
+                    { id: "american", label: "Dueño Americano", emoji: "🤝", bg: "#E6F1FB", color: "#185FA5", border: "#BFD9F2" },
+                    { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F7F6F2", color: "#475569", border: "#BCC5CC" },
+                  ].map(opt => {
+                    const active = form.owner_identity === opt.id;
+                    return (
+                      <button
+                        key={String(opt.id)}
+                        type="button"
+                        onClick={() => update("owner_identity", opt.id)}
+                        className={`p-3 rounded-2xl border-2 text-left transition ${active ? "shadow-md scale-[1.02]" : "hover:border-slate-300"}`}
+                        style={{ borderColor: active ? opt.color : opt.border, backgroundColor: active ? opt.bg : "white" }}
+                        data-testid={`onboarding-owner-identity-${opt.id || "none"}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {opt.emoji && <span className="text-lg">{opt.emoji}</span>}
+                          <span className="font-medium text-sm" style={{ color: active ? opt.color : "#0F172A" }}>{opt.label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Es opcional y puedes cambiarlo después desde tu panel.</p>
               </div>
             </div>
           )}
