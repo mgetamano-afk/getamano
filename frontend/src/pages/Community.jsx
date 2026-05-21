@@ -97,7 +97,7 @@ export default function Community() {
       <main className="pb-16" data-testid="community-page">
         {/* HERO */}
         <section className="relative overflow-hidden">
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #0B0F2E 0%, #1A0A3C 55%, #050914 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #063154 0%, #0A4D5E 55%, #025F67 100%)" }} />
           <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "28px 28px" }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
             <div className="max-w-3xl">

@@ -139,7 +139,7 @@ export default function Landing() {
       {/* HERO with animated background */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0" style={{
-          background: "linear-gradient(120deg, #0B0F2E 0%, #1A0A3C 35%, #050914 70%, #0B0F2E 100%)",
+          background: "linear-gradient(135deg, #063154 0%, #0A4D5E 50%, #025F67 100%)",
           backgroundSize: "300% 300%",
           animation: "auroraShift 60s ease infinite",
         }} />
@@ -263,10 +263,10 @@ export default function Landing() {
       </section>
 
       {/* CÓMO FUNCIONA (dark) */}
-      <section className="relative bg-slate-950 text-white py-16 md:py-24 overflow-hidden">
-        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 50% 0%, rgba(249,115,22,0.15), transparent 50%)" }} />
+      <section className="relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#063154" }}>
+        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 50% 0%, rgba(255,140,68,0.18), transparent 50%)" }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight">Cómo funciona</h2>
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-white">Cómo funciona</h2>
           <div className="mt-12 grid md:grid-cols-3 gap-6 relative">
             {[
               { icon: Search, title: "Busca", desc: "Filtra por ciudad, categoría, idioma o reputación.", color: "from-blue-500/20 to-blue-500/0", border: "border-blue-400/30" },
@@ -274,10 +274,10 @@ export default function Landing() {
               { icon: ShieldCheck, title: "Confía", desc: "Todos los destacados están verificados.", color: "from-green-500/20 to-green-500/0", border: "border-green-400/30" },
             ].map((s, i) => (
               <div key={i} className={`relative p-8 rounded-3xl border ${s.border} backdrop-blur bg-gradient-to-br ${s.color}`} data-testid={`how-step-${i + 1}`}>
-                <div className="absolute -top-4 -left-4 w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center font-display font-bold text-2xl">{i + 1}</div>
-                <s.icon className="w-12 h-12 mx-auto mb-4 text-white/90" />
-                <h3 className="font-display font-bold text-2xl">{s.title}</h3>
-                <p className="text-white/70 mt-3 leading-relaxed">{s.desc}</p>
+                <div className="absolute -top-4 -left-4 w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center font-display font-bold text-2xl text-white">{i + 1}</div>
+                <s.icon className="w-12 h-12 mx-auto mb-4 text-white" />
+                <h3 className="font-display font-bold text-2xl text-white">{s.title}</h3>
+                <p className="text-white/80 mt-3 leading-relaxed">{s.desc}</p>
               </div>
             ))}
           </div>
@@ -286,11 +286,11 @@ export default function Landing() {
 
       {/* DUAL AUDIENCE split */}
       <section className="grid md:grid-cols-2">
-        <div className="bg-slate-950 text-white p-12 md:p-16">
-          <h3 className="font-display text-3xl font-bold">Para clientes</h3>
-          <ul className="mt-6 space-y-3 text-white/80">
+        <div className="text-white p-12 md:p-16" style={{ backgroundColor: "#063154" }}>
+          <h3 className="font-display text-3xl font-bold text-white">Para clientes</h3>
+          <ul className="mt-6 space-y-3 text-white/90">
             {["Servicios reales y verificados", "Profesionales que hablan tu idioma", "Reseñas auténticas de la comunidad"].map((b, i) => (
-              <li key={i} className="flex items-start gap-3"><CheckCircle2 className="w-5 h-5 text-blue-400 mt-0.5" /> {b}</li>
+              <li key={i} className="flex items-start gap-3"><CheckCircle2 className="w-5 h-5 text-orange-300 mt-0.5" /> {b}</li>
             ))}
           </ul>
           <Link to="/buscar" className="btn-primary inline-flex mt-8">Explorar servicios</Link>
@@ -298,8 +298,8 @@ export default function Landing() {
         <div className="relative text-white p-12 md:p-16 overflow-hidden" style={{ background: "linear-gradient(135deg, #2F9D94, #025F67)" }}>
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "repeating-linear-gradient(45deg, white 0, white 1px, transparent 1px, transparent 20px)" }} />
           <div className="relative">
-            <h3 className="font-display text-3xl font-bold">Para proveedores</h3>
-            <ul className="mt-6 space-y-3">
+            <h3 className="font-display text-3xl font-bold text-white">Para proveedores</h3>
+            <ul className="mt-6 space-y-3 text-white/95">
               {["Tu eCard digital profesional", "Más clientes en tu zona", "Analytics y solicitudes en un lugar"].map((b, i) => (
                 <li key={i} className="flex items-start gap-3"><TrendingUp className="w-5 h-5 text-white mt-0.5" /> {b}</li>
               ))}
@@ -452,10 +452,10 @@ export default function Landing() {
       )}
 
       {/* TESTIMONIALS dark */}
-      <section className="relative bg-slate-950 text-white py-16 md:py-24 overflow-hidden">
-        <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(circle at 50% 100%, rgba(249,115,22,0.2), transparent 60%)" }} />
+      <section className="relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#063154" }}>
+        <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(circle at 50% 100%, rgba(255,140,68,0.22), transparent 60%)" }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-center">Lo que dice la comunidad</h2>
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-center text-white">Lo que dice la comunidad</h2>
           <div className="mt-12 grid md:grid-cols-3 gap-6">
             {testimonials.map((tt, i) => (
               <div key={i} className="relative p-6 rounded-3xl border border-white/10 backdrop-blur" style={{ background: "rgba(255,255,255,0.04)" }} data-testid={`testimonial-${i}`}>

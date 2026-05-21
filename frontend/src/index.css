@@ -13,7 +13,10 @@ body {
     color: #063154;
 }
 
-h1, h2, h3, h4, h5, h6, .font-display {
+/* Use :where() so any Tailwind text-color utility (text-white, text-slate-900, etc.)
+   wins over this default. Without :where() these selectors carry specificity (0,0,1)
+   and Tailwind's .text-white (also 0,1,0 but same layer) can be silently overridden. */
+:where(h1, h2, h3, h4, h5, h6, .font-display) {
     font-family: 'Poppins', system-ui, sans-serif;
     letter-spacing: -0.02em;
     color: #025F67;

@@ -134,7 +134,8 @@ export default function FoundingCounter({ variant = "hero" }) {
                   {recent.map((m, i) => (
                     <div
                       key={i}
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-[#0B0F2E] shadow"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 shadow"
+                      style={{ borderColor: "#063154" }}
                       style={{ backgroundColor: avatarBg(m.initial) }}
                       title={`${m.first_name}${m.city ? ` · ${m.city}` : ""}`}
                     >

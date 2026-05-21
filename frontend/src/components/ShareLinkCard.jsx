@@ -61,7 +61,7 @@ export default function ShareLinkCard({ slug, businessName }) {
   return (
     <div className="relative overflow-hidden rounded-3xl p-5 md:p-6 mb-6"
       style={{
-        background: "linear-gradient(135deg, #0B0F2E 0%, #1A1F4A 60%, #2D1B69 100%)",
+        background: "linear-gradient(135deg, #063154 0%, #0A4D5E 60%, #025F67 100%)",
         boxShadow: "0 12px 40px -16px rgba(11,15,46,0.6)",
       }}
       data-testid="share-link-card"
