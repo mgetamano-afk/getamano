@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 8 retest of owner_identity persistence bug fix. BACKEND: 6/6 pytest tests PASS (100%) confirming PUT /api/providers/me with {business_name, category_id, owner_identity:'american'} now persists — subsequent GET /api/providers/me returns owner_identity='american'. Toggle latino↔american works both ways. Filter regression /api/providers?owner_identity=latino|american still returns the expected providers. /api/providers/featured 200. FRONTEND E2E: Logged in as demo.provider@getamano.com, navigated to /dashboard/provider, opened Perfil tab, clicked data-testid='form-owner-identity-american' (button reflected active styling — border rgb(24,95,165) + boxShadow set), clicked 'Guardar cambios'. Live API probe from the browser context returned {status:200, owner_identity:'american'} confirming persistence from the UI save button. After hard reload + reopen Perfil tab, the american button still shows the active styling (border rgb(24,95,165), boxShadow present) while latino shows inactive (no shadow, border rgb(166,225,218)). Restored demo provider to owner_identity='latino' at end. Regression: all 4 legal routes (/terminos /privacidad /politica-resenas /cookies) return 200.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration8_owner_identity_persist_test.py",
+    "/app/test_reports/pytest/iteration8_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~3172 lines; modularization still recommended (split into auth, providers, messaging, admin, promo, ads, market-pulse modules).",
+    "ProviderProfileIn now correctly includes owner_identity: Optional[Literal['latino','american']]. The dedicated helper endpoint PUT /api/providers/me/owner-identity is now redundant for the latino/american toggle and could be deprecated, or kept solely for the 'clear to None' case (since ProviderProfileIn default of None means a PUT without owner_identity will NOT clear it — confirm intended behavior).",
+    "Migration step that backfills owner_identity=None for old profiles is idempotent — good. Seed for demo provider now sets owner_identity='latino', preventing the migration from nulling it. Consider documenting in a migration log."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration8_owner_identity_persist_test.py (new — 6 tests covering the PUT /providers/me owner_identity persistence fix + regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 iteration8 tests)",
+    "frontend": "100% (E2E save → reload styling → API verification all green)"
+  },
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123",
+  "seed_data_creation": "None. Demo provider owner_identity toggled latino→american→latino during testing; final state restored to 'latino'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix from iteration 7 is fully resolved. The previously failing flow (ProviderDashboard Perfil 'Guardar cambios' button → PUT /api/providers/me payload missing owner_identity) is now persisted correctly because the field was added to the ProviderProfileIn Pydantic model. Backend tests in /app/backend/tests/iteration8_owner_identity_persist_test.py can be re-run as regression. Two transient 401s on console for /api/auth/me before session check remain (pre-existing).",
+  "rca_of_the_issue": "Root cause confirmed: ProviderProfileIn (line 239 of server.py) was missing the owner_identity field. The PUT /api/providers/me endpoint deserializes its body through ProviderProfileIn, so Pydantic silently dropped owner_identity even though the frontend was including it in the save payload. Fix: add `owner_identity: Optional[Literal['latino','american']] = None` to ProviderProfileIn. Verified end-to-end via backend tests + browser E2E save + API probe + reload."
+}

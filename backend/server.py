@@ -236,6 +236,7 @@ class ProviderProfileIn(BaseModel):
     gallery: List[dict] = []
     social: dict = {}
     price_range: Optional[str] = "quote"
+    owner_identity: Optional[Literal["latino", "american"]] = None
 
 class ProviderProfile(ProviderProfileIn):
     provider_id: str
@@ -595,6 +596,7 @@ async def seed():
         "rating_avg": 0.0, "rating_count": 0,
         "likes_count": 3,
         "latino_owned": "yes",
+        "owner_identity": "latino",
         "user_id": prov_user_id,
         "slug": DEMO_SLUG,
         "updated_at": now_iso,
