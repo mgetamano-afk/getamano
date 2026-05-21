@@ -4,6 +4,7 @@ import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
+import CategoryIcon from "../../components/CategoryIcon";
 
 export default function SeoCategoryDetail() {
   const { categorySlug } = useParams();
@@ -38,7 +39,12 @@ export default function SeoCategoryDetail() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12" data-testid="seo-category-detail">
         <Breadcrumbs items={breadcrumbs} />
-        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#025F67" }} data-testid="seo-h1">{category.name_es} — Proveedores latinos</h1>
+        <div className="flex items-center gap-3 mb-3">
+          <span className="category-icon-wrap brand" aria-hidden="true">
+            <CategoryIcon slug={category.slug} size={36} color="#FFFFFF" stroke={1.6} />
+          </span>
+          <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#025F67" }} data-testid="seo-h1">{category.name_es} — Proveedores latinos</h1>
+        </div>
         <p className="text-slate-600 mb-10 text-base md:text-lg">
           {totalProviders > 0
             ? `${totalProviders} proveedores latinos verificados de ${category.name_es.toLowerCase()} activos en ${total_cities} ciudades de USA.`

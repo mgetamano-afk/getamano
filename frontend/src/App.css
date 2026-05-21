@@ -66,3 +66,25 @@
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid rgba(188, 197, 204, 0.5);
 }
+
+/* ─── Category icon system (Tabler) ─── */
+.category-icon-wrap {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: #E1F5EE;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.category-icon-wrap.sm { width: 36px; height: 36px; border-radius: 10px; }
+.category-icon-wrap.lg { width: 72px; height: 72px; border-radius: 20px; }
+.category-icon-wrap.brand { background: #2F9D94; }
+
+.provider-category-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px;
+  background: #F0FAF9;
+  border: 1px solid #9FE1CB;
+  border-radius: 20px;
+  font-size: 13px; font-weight: 500; color: #025F67;
+}
+

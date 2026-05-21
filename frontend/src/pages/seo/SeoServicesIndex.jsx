@@ -4,6 +4,7 @@ import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
+import CategoryIcon from "../../components/CategoryIcon";
 
 export default function SeoServicesIndex() {
   const [sectors, setSectors] = useState([]);
@@ -46,12 +47,13 @@ export default function SeoServicesIndex() {
                     <Link
                       key={cat.category_id}
                       to={`/servicios/${cat.slug}`}
-                      className="px-3 py-2 rounded-lg border bg-white hover:shadow-sm transition text-sm"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white hover:shadow-sm transition text-sm min-w-0"
                       style={{ borderColor: "#BCC5CC", color: "#025F67" }}
                       data-testid={`cat-link-${cat.slug}`}
                     >
-                      {cat.name_es}
-                      {cat.providers_count > 0 && <span className="text-slate-400 text-xs ml-1">({cat.providers_count})</span>}
+                      <CategoryIcon slug={cat.slug} size={18} color={sec.color} stroke={1.8} className="flex-shrink-0" />
+                      <span className="truncate">{cat.name_es}</span>
+                      {cat.providers_count > 0 && <span className="text-slate-400 text-xs ml-auto flex-shrink-0">({cat.providers_count})</span>}
                     </Link>
                   ))}
                 </div>

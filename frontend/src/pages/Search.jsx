@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
 import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video } from "lucide-react";
+import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
 
@@ -440,7 +441,8 @@ export default function Search() {
                         )}
                       </div>
                       {p.category && (
-                        <span className="inline-block mt-2 mr-2 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>
+                        <span className="inline-flex items-center gap-1 mt-2 mr-2 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>
+                          <CategoryIcon slug={p.category.slug} size={14} color={p.category.color} stroke={2} />
                           {lang === "es" ? p.category.name_es : p.category.name_en}
                         </span>
                       )}

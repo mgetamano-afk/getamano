@@ -6,6 +6,7 @@ import Footer from "../../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
 import OwnerIdentityBadge from "../../components/OwnerIdentityBadge";
 import { ShieldCheck, Star, MapPin, Phone, MessageCircle, Award } from "lucide-react";
+import CategoryIcon from "../../components/CategoryIcon";
 
 export default function SeoPage() {
   const { categorySlug, citySlug } = useParams();
@@ -115,9 +116,14 @@ export default function SeoPage() {
           <div className="flex items-center gap-2 mb-2 text-sm text-slate-500">
             <MapPin className="w-4 h-4" /> {city.name}, {city.state}
           </div>
-          <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#025F67" }} data-testid="seo-h1">
-            {category.name_es} en {city.name}, {city.state}
-          </h1>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="category-icon-wrap brand" aria-hidden="true">
+              <CategoryIcon slug={category.slug} size={36} color="#FFFFFF" stroke={1.6} />
+            </span>
+            <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#025F67" }} data-testid="seo-h1">
+              {category.name_es} en {city.name}, {city.state}
+            </h1>
+          </div>
           <p className="text-slate-600 text-base md:text-lg max-w-3xl" data-testid="seo-intro">
             {providers.length > 0
               ? `Encuentra ${providers.length} proveedores latinos verificados de ${category.name_es.toLowerCase()} en ${city.name}. Compara reseñas, solicita cotización gratis y contrata con confianza.`
