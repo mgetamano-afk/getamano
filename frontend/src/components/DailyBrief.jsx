@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { Coffee, Sparkles, RefreshCw, Mail, MessageCircle, Users, Trophy, ShieldAlert, Crown, DollarSign, Copy, Check } from "lucide-react";
+import { Coffee, Sparkles, RefreshCw, Mail, MessageCircle, Users, Trophy, ShieldAlert, Crown, DollarSign, Copy, Check, Target, TrendingUp, LifeBuoy, Megaphone, Heart, AlertTriangle, Zap, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 const ICON_MAP = {
@@ -9,6 +9,18 @@ const ICON_MAP = {
   shield: ShieldAlert,
   crown: Crown,
   dollar: DollarSign,
+  target: Target,
+  growth: TrendingUp,
+  support: LifeBuoy,
+  marketing: Megaphone,
+  retention: Heart,
+  urgent: AlertTriangle,
+};
+
+const PRIO_STYLE = {
+  high:   { ring: "ring-red-400/50",    badge: "bg-red-500/20 text-red-200 border-red-400/40",       label: "Prioridad alta" },
+  medium: { ring: "ring-amber-400/40",  badge: "bg-amber-500/15 text-amber-200 border-amber-400/30", label: "Prioridad media" },
+  low:    { ring: "ring-slate-400/30",  badge: "bg-slate-500/15 text-slate-200 border-slate-400/30", label: "Cuando puedas" },
 };
 
 const HOUR_GREETING = () => {
@@ -115,6 +127,56 @@ export default function DailyBrief() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Recommendations — Growth & Traction */}
+      {brief?.recommendations?.length > 0 && (
+        <div className="relative mt-6" data-testid="daily-brief-recommendations">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="w-4 h-4 text-amber-300" />
+            <h3 className="font-display font-bold text-white text-base">Acciones para esta semana</h3>
+            <span className="text-[10px] uppercase tracking-widest text-amber-300 ml-1 font-semibold">Recomendaciones IA</span>
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {brief.recommendations.map((r, i) => {
+              const Icon = ICON_MAP[r.icon] || Target;
+              const prio = PRIO_STYLE[r.priority] || PRIO_STYLE.medium;
+              return (
+                <div
+                  key={i}
+                  className={`relative rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-4 ring-1 ${prio.ring} transition hover:bg-white/10`}
+                  data-testid={`daily-brief-rec-${i}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${r.priority === "high" ? "bg-red-500/20" : r.priority === "medium" ? "bg-amber-500/15" : "bg-slate-500/15"}`}>
+                      <Icon className={`w-5 h-5 ${r.priority === "high" ? "text-red-300" : r.priority === "medium" ? "text-amber-300" : "text-slate-300"}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase border ${prio.badge}`}>{prio.label}</span>
+                        {r.impact_estimate && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-semibold">
+                            <ArrowRight className="w-2.5 h-2.5" /> {r.impact_estimate}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-display text-sm md:text-base font-bold text-white leading-tight">{r.title}</h4>
+                      <p className="mt-1.5 text-xs text-white/70 leading-relaxed" data-testid={`daily-brief-rec-why-${i}`}>
+                        <span className="text-amber-300 font-semibold">Por qué:</span> {r.why}
+                      </p>
+                      <p className="mt-1 text-xs text-white/85 leading-relaxed" data-testid={`daily-brief-rec-action-${i}`}>
+                        <span className="text-orange-300 font-semibold">Acción:</span> {r.action}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 text-[10px] text-white/40 text-center">
+            💡 Recomendaciones generadas analizando tus métricas reales · Regenera si quieres una nueva perspectiva
+          </div>
         </div>
       )}
 

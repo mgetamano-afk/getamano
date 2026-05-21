@@ -1770,6 +1770,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
     yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     week_start = (now - timedelta(days=7)).isoformat()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    three_days_ago = (now - timedelta(days=3)).isoformat()
 
     signups_today = await db.users.count_documents({"created_at": {"$gte": today_start}})
     signups_yesterday = await db.users.count_documents({"created_at": {"$gte": yesterday_start, "$lt": today_start}})
@@ -1777,9 +1778,30 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
     providers_today = await db.provider_profiles.count_documents({"created_at": {"$gte": today_start}})
     total_providers = await db.provider_profiles.count_documents({"is_active": True})
     pending = await db.provider_profiles.count_documents({"verification_status": "pending"})
+    pending_stale = await db.provider_profiles.count_documents({"verification_status": "pending", "created_at": {"$lt": three_days_ago}})
     milestones_today = await db.provider_milestones.count_documents({"unlocked_at": {"$gte": today_start}})
     milestones_yesterday = await db.provider_milestones.count_documents({"unlocked_at": {"$gte": yesterday_start, "$lt": today_start}})
     requests_today = await db.service_requests.count_documents({"created_at": {"$gte": today_start}})
+
+    # === Conversion funnel data (CRITICAL for traction) ===
+    # Total client-to-provider ratio
+    total_clients = await db.users.count_documents({"role": "client"})
+    # Providers with zero views
+    zero_view_providers = await db.provider_profiles.count_documents({"is_active": True, "verification_status": "approved", "$or": [{"views": 0}, {"views": {"$exists": False}}]})
+    # Providers with views but no contacts
+    no_contact_providers = await db.provider_profiles.count_documents({"is_active": True, "verification_status": "approved", "views": {"$gt": 5}, "$or": [{"contact_clicks": 0}, {"contact_clicks": {"$exists": False}}]})
+    # Providers with no eCard photos (gallery empty)
+    incomplete_providers = await db.provider_profiles.count_documents({"is_active": True, "$or": [{"gallery": {"$exists": False}}, {"gallery": {"$size": 0}}]})
+    # State imbalance: providers vs clients per state
+    state_providers = {}
+    async for row in db.provider_profiles.aggregate([
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+    ]):
+        state_providers[row["_id"]] = row["count"]
+    # Top state with imbalance (lots of providers, few clients — hypothetical)
+    top_state = max(state_providers, key=state_providers.get) if state_providers else None
+    top_state_providers = state_providers.get(top_state, 0) if top_state else 0
 
     # Revenue
     PLAN_PRICES = {"free": 0, "basic": 19, "pro": 49, "premium": 99}
@@ -1788,7 +1810,25 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
         {"$group": {"_id": "$plan", "count": {"$sum": 1}}},
     ]).to_list(20)
     plans = {r["_id"] or "free": r["count"] for r in plan_rows}
+    free_count = plans.get("free", 0)
     mrr = sum(PLAN_PRICES.get(p, 0) * c for p, c in plans.items())
+
+    # Top stale pending (oldest pending approval, top 5)
+    stale_pending = []
+    async for p in db.provider_profiles.find(
+        {"verification_status": "pending", "created_at": {"$lt": three_days_ago}},
+        {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "state": 1, "created_at": 1, "category_id": 1}
+    ).sort("created_at", 1).limit(5):
+        stale_pending.append(p)
+
+    # Inactive providers (no views in 14 days) — proxy: zero views & old
+    fourteen_ago = (now - timedelta(days=14)).isoformat()
+    inactive_top = []
+    async for p in db.provider_profiles.find(
+        {"is_active": True, "verification_status": "approved", "$or": [{"views": 0}, {"views": {"$exists": False}}], "created_at": {"$lt": fourteen_ago}},
+        {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "state": 1, "category_id": 1}
+    ).limit(5):
+        inactive_top.append(p)
 
     # Leader of the month
     leader_rows = await db.provider_milestones.aggregate([
@@ -1805,6 +1845,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
 
     # Founding
     founding = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0}) or {}
+    founding_remaining = founding.get("max_uses", 50) - founding.get("current_uses", 0)
 
     # Build compact data for LLM
     signup_delta = "—"
@@ -1816,50 +1857,116 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
     metrics = {
         "fecha": now.strftime("%d de %B de %Y"),
         "signups_hoy": signups_today,
-        "signups_ayer": signups_yesterday,
         "signup_delta": signup_delta,
         "signups_semana": signups_week,
         "proveedores_nuevos_hoy": providers_today,
         "proveedores_activos": total_providers,
+        "clientes_totales": total_clients,
+        "ratio_provider_to_client": round(total_providers / max(total_clients, 1), 2),
         "pendientes_aprobacion": pending,
+        "pendientes_atrasados_3dias_o_mas": pending_stale,
+        "proveedores_zero_views": zero_view_providers,
+        "proveedores_views_pero_sin_contactos": no_contact_providers,
+        "proveedores_sin_galeria": incomplete_providers,
+        "estado_con_mas_proveedores": top_state,
+        "proveedores_en_estado_top": top_state_providers,
         "hitos_desbloqueados_hoy": milestones_today,
         "hitos_ayer": milestones_yesterday,
         "solicitudes_hoy": requests_today,
         "mrr_usd": mrr,
-        "arr_usd": mrr * 12,
-        "founding_usados": founding.get("current_uses", 0),
-        "founding_max": founding.get("max_uses", 50),
+        "free_count": free_count,
+        "founding_restantes": founding_remaining,
         "lider_del_mes": leader,
-        "planes_distribucion": plans,
     }
 
-    # Call LLM
-    system_msg = (
-        "Eres el compañero de café matutino de Verónica, la CEO de getmano (un marketplace que conecta a la comunidad latina en USA con proveedores de servicios latinos verificados). "
-        "Tu trabajo es entregarle cada mañana un brief ejecutivo CÁLIDO, BREVE y HUMANO en español, en TONO DE CONFIDENTE, no de reporte corporativo. "
-        "Habla en SEGUNDA PERSONA ('hoy tienes...', 'tu negocio creció...'). "
-        "Usa máximo 4-5 oraciones. Incluye un dato concreto (cifra) y una emoción/ánimo. "
-        "Si hay logros, celébralos. Si hay caídas, sé honesto pero esperanzador. "
-        "Si hay líder del mes, menciónalo con cariño. Si hay pendientes de aprobación, recuérdalo gentilmente. "
-        "TERMINA con una frase corta de ánimo (no cliché). NO uses listas, solo prosa fluida. NO uses markdown."
+    # === Generate narrative (Brief) ===
+    system_msg_brief = (
+        "Eres el compañero de café matutino de Verónica, CEO de getmano (marketplace que conecta a la comunidad latina en USA con proveedores latinos verificados). "
+        "Entrégale un brief CÁLIDO, BREVE y HUMANO en español, tono de confidente. "
+        "Habla en SEGUNDA PERSONA. Máximo 4-5 oraciones. Incluye un dato concreto y una emoción. "
+        "Celebra logros con honestidad, sé esperanzador con caídas. TERMINA con una frase de ánimo no cliché. "
+        "NO uses listas ni markdown."
     )
-    user_prompt = f"Aquí están las métricas de getmano para hoy. Genera el brief de la mañana para Verónica:\n\n{metrics}"
-
+    narrative = ""
     try:
         chat = LlmChat(
             api_key=os.environ.get("EMERGENT_LLM_KEY"),
-            session_id=cache_id,
-            system_message=system_msg,
+            session_id=f"{cache_id}_brief",
+            system_message=system_msg_brief,
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        narrative = await chat.send_message(UserMessage(text=user_prompt))
-        narrative = (narrative or "").strip()
+        narrative = (await chat.send_message(UserMessage(text=f"Métricas de hoy: {metrics}"))).strip()
     except Exception:
-        logger.exception("Daily brief LLM failed")
-        narrative = (
-            f"Buen día, Verónica. Hoy tenemos {signups_today} nuevos usuarios y {milestones_today} hitos celebrados. "
-            f"MRR proyectado en ${mrr}/mes y aún quedan {founding.get('max_uses', 50) - founding.get('current_uses', 0)} cupos founding. "
-            "Sigamos construyendo. 🧡"
-        )
+        logger.exception("Daily brief narrative failed")
+        narrative = f"Buen día, Verónica. Hoy tenemos {signups_today} nuevos usuarios y {milestones_today} hitos celebrados. MRR ${mrr}/mes. Sigamos construyendo. 🧡"
+
+    # === Generate strategic recommendations (NEW: actionable for traction) ===
+    system_msg_recs = (
+        "Eres consultor estratégico de getmano (marketplace latino en USA, fase early-stage). "
+        "Tu prioridad #1 es TRACCIÓN DE CLIENTES y CONVERSIÓN. "
+        "Analiza las métricas y propone 3-4 acciones CONCRETAS, PRIORIZADAS y EJECUTABLES esta semana. "
+        "Cada acción debe tener:\n"
+        "  - title (corto, en español, accionable, empezando con verbo)\n"
+        "  - why (1 oración con el dato/evidencia de las métricas)\n"
+        "  - action (1-2 oraciones con el paso CONCRETO a hacer hoy/esta semana)\n"
+        "  - priority (high/medium/low) — solo 1 high máximo\n"
+        "  - icon (uno de: 'users','target','dollar','growth','support','marketing','retention','urgent')\n"
+        "  - impact_estimate (corto, ej: '+15% conversión', '+$500 MRR', '5 ventas/semana')\n"
+        "Enfócate en: captación de clientes, activación de proveedores dormidos, upgrade de free→pro, retención, geographic expansion, viralización. "
+        "Sé específico: nombra ciudades, números, nombres de proveedores reales si los tienes. "
+        "Responde SOLO con JSON válido en este formato: "
+        '{"recommendations": [{"title":"...", "why":"...", "action":"...", "priority":"high|medium|low", "icon":"...", "impact_estimate":"..."}]}'
+    )
+    recommendations = []
+    try:
+        chat_recs = LlmChat(
+            api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            session_id=f"{cache_id}_recs",
+            system_message=system_msg_recs,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        raw = await chat_recs.send_message(UserMessage(text=(
+            f"Métricas operativas de getmano:\n{metrics}\n\n"
+            f"Proveedores aprobados pero sin actividad reciente (top 5):\n{inactive_top}\n\n"
+            f"Pendientes de verificación con más de 3 días (top 5):\n{stale_pending}\n\n"
+            "Devuelve SOLO el JSON con recomendaciones de tracción para esta semana."
+        )))
+        # Extract JSON
+        import json as _json
+        clean = (raw or "").strip()
+        if clean.startswith("```"):
+            clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", clean, flags=re.MULTILINE).strip()
+        parsed = _json.loads(clean)
+        recommendations = parsed.get("recommendations", [])[:5]
+    except Exception:
+        logger.exception("Daily brief recommendations failed")
+        # Heuristic fallback
+        recommendations = []
+        if pending_stale > 0:
+            recommendations.append({
+                "title": f"Aprobar {pending_stale} proveedores atrasados",
+                "why": f"{pending_stale} proveedores llevan más de 3 días esperando verificación. Cada día perdido es un cliente que no llegó.",
+                "action": "Entra a 'Cola de verificación' y procesa los pendientes más antiguos hoy mismo.",
+                "priority": "high",
+                "icon": "urgent",
+                "impact_estimate": f"+{pending_stale * 5} clientes potenciales/mes",
+            })
+        if zero_view_providers > 0:
+            recommendations.append({
+                "title": f"Activar {zero_view_providers} proveedores con 0 vistas",
+                "why": f"{zero_view_providers} negocios aprobados nunca recibieron una visita. Sin tráfico no hay conversión.",
+                "action": "Envía un email/WhatsApp masivo invitándolos a compartir su eCard. Dales el QR descargable y el copy listo.",
+                "priority": "high",
+                "icon": "growth",
+                "impact_estimate": "+30% activación",
+            })
+        if free_count > 5:
+            recommendations.append({
+                "title": f"Upgrade campaign: {free_count} en Free",
+                "why": f"Tienes {free_count} proveedores en Free. Con conversión 10% al plan Pro ganarías ~${free_count * 0.1 * 49:.0f}/mes.",
+                "action": "Lanza una campaña con beneficios Pro vs Free + descuento founding mientras queden cupos.",
+                "priority": "medium",
+                "icon": "dollar",
+                "impact_estimate": f"+${int(free_count * 0.1 * 49)}/mes",
+            })
 
     # Build structured highlights
     highlights = []
@@ -1868,7 +1975,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
     if milestones_today > 0:
         highlights.append({"icon": "trophy", "label": f"{milestones_today} hitos desbloqueados", "delta": f"{milestones_today - milestones_yesterday:+d} vs ayer" if milestones_yesterday > 0 else None})
     if pending > 0:
-        highlights.append({"icon": "shield", "label": f"{pending} proveedores esperando aprobación", "urgent": True})
+        highlights.append({"icon": "shield", "label": f"{pending} proveedores esperando aprobación", "urgent": pending_stale > 0, "sub": f"{pending_stale} atrasados >3 días" if pending_stale > 0 else None})
     if leader:
         highlights.append({"icon": "crown", "label": f"Líder del mes: {leader['name']}", "sub": f"{leader['count']} logros · {leader.get('city') or ''}"})
     highlights.append({"icon": "dollar", "label": f"MRR ${mrr}/mes · ARR ${mrr*12}", "sub": f"{founding.get('current_uses', 0)}/{founding.get('max_uses', 50)} founding"})
@@ -1880,6 +1987,7 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
         "generated_at": now.isoformat(),
         "narrative": narrative,
         "highlights": highlights,
+        "recommendations": recommendations,
         "raw_metrics": metrics,
     }
     # Cache for the day
