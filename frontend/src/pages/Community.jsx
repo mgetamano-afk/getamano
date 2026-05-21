@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { buildFileUrl } from "../components/ImageUpload";
 import { Trophy, Sparkles, Users, Flame, Award, ArrowRight, MapPin } from "lucide-react";
+import Leaderboard from "../components/Leaderboard";
 
 const TIER_COLOR = {
   silver:   { ring: "ring-slate-200", glow: "rgba(148,163,184,0.4)",  badge: "bg-slate-100 text-slate-600" },
@@ -152,6 +153,8 @@ export default function Community() {
 
         {/* WALL */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <Leaderboard period="month" limit={5} />
+
           {/* Tier filter */}
           <div className="flex items-center gap-2 mb-6 flex-wrap" data-testid="wall-filters">
             {[

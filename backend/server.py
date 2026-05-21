@@ -1610,6 +1610,56 @@ async def my_journal(user: User = Depends(get_current_user)):
     }
 
 # ============ STATS for landing (public) ============
+@api_router.get("/community/leaderboard")
+async def leaderboard(period: str = "month", limit: int = 5):
+    """Top providers by milestones unlocked in a period (month/all)."""
+    limit = max(1, min(limit, 20))
+    now = datetime.now(timezone.utc)
+    match: dict = {}
+    period_label = "all"
+    if period == "month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+        match["unlocked_at"] = {"$gte": start}
+        period_label = "month"
+    elif period == "week":
+        start = (now - timedelta(days=7)).isoformat()
+        match["unlocked_at"] = {"$gte": start}
+        period_label = "week"
+    pipeline = [
+        {"$match": match} if match else {"$match": {}},
+        {"$group": {"_id": "$user_id", "count": {"$sum": 1}, "last_at": {"$max": "$unlocked_at"}}},
+        {"$sort": {"count": -1, "last_at": -1}},
+        {"$limit": limit * 4},  # over-fetch for filter out TEST/inactive
+    ]
+    rows = await db.provider_milestones.aggregate(pipeline).to_list(limit * 4)
+    items = []
+    rank = 0
+    for row in rows:
+        uid = row["_id"]
+        user = await db.users.find_one({"user_id": uid}, {"_id": 0, "name": 1}) or {}
+        prof = await db.provider_profiles.find_one({"user_id": uid}, {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "state": 1, "logo_url": 1, "latino_owned": 1, "is_active": 1, "verification_status": 1}) or {}
+        biz = prof.get("business_name") or ""
+        if biz.startswith("TEST_") or not prof.get("is_active", True):
+            continue
+        name = (user.get("name") or "").strip()
+        first = name.split(" ")[0] if name else (biz.split(" ")[0] if biz else "Negocio")
+        rank += 1
+        items.append({
+            "rank": rank,
+            "first_name": first,
+            "business_name": biz or None,
+            "city": prof.get("city"),
+            "state": prof.get("state"),
+            "slug": prof.get("slug"),
+            "logo_url": prof.get("logo_url"),
+            "latino_owned": prof.get("latino_owned") == "yes",
+            "milestones_count": row["count"],
+            "last_at": row.get("last_at"),
+        })
+        if rank >= limit:
+            break
+    return {"period": period_label, "items": items}
+
 @api_router.get("/community/wall-of-fame")
 async def wall_of_fame(limit: int = 50):
     """Public anonymized feed of recent milestone unlocks across providers."""
