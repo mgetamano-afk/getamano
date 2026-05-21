@@ -42,13 +42,13 @@ export default function Leaderboard({ period = "month", limit = 5 }) {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-4" data-testid="leaderboard-grid">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4" data-testid="leaderboard-grid">
         {/* Featured #1 */}
         {first && (
-          <FeaturedCard item={first} />
+          <div className="min-w-0"><FeaturedCard item={first} /></div>
         )}
         {/* Rest stacked */}
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           {rest.map(it => <RankRow key={it.slug || it.rank} item={it} />)}
           {rest.length === 0 && (
             <div className="rounded-2xl bg-white border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">

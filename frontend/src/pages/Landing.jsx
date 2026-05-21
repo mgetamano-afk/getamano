@@ -154,28 +154,28 @@ export default function Landing() {
         `}</style>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-20 md:pt-20 md:pb-32">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="min-w-0">
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
                 <Sparkles className="w-3.5 h-3.5" /> Comunidad Latina · USA
               </span>
-              <h1 className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.05]">
-                <Typewriter text="Lo latino, a la mano." className="inline-block" />
+              <h1 className="font-display mt-5 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1] break-words">
+                <Typewriter text="Lo latino, a la mano." className="inline" />
               </h1>
-              <p className="mt-5 text-lg text-slate-300 max-w-xl leading-relaxed animate-in fade-in-50 duration-700 delay-700">
+              <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-xl leading-relaxed animate-in fade-in-50 duration-700 delay-700">
                 El marketplace para encontrar profesionales latinos verificados en todo Estados Unidos. Negocios reales, calificados por tu comunidad.
               </p>
 
               <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 transition-shadow" style={{ boxShadow: "0 0 40px rgba(255, 107, 44, 0.25)" }} data-testid="hero-search-form">
-                <div className="flex items-center gap-2 px-3 flex-1">
-                  <Search className="w-5 h-5 text-slate-400" />
-                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="¿Qué servicio buscas?" className="w-full py-3 outline-none text-slate-900" data-testid="hero-search-input" />
+                <div className="flex items-center gap-2 px-3 flex-1 min-w-0">
+                  <Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="¿Qué servicio buscas?" className="w-full min-w-0 py-3 outline-none text-slate-900" data-testid="hero-search-input" />
                 </div>
-                <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px]">
-                  <MapPin className="w-5 h-5 text-slate-400" />
-                  <input value={loc} onChange={e => setLoc(e.target.value)} placeholder="Ciudad o ZIP" className="w-full py-3 outline-none text-slate-900" data-testid="hero-location-input" />
+                <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px] min-w-0">
+                  <MapPin className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                  <input value={loc} onChange={e => setLoc(e.target.value)} placeholder="Ciudad o ZIP" className="w-full min-w-0 py-3 outline-none text-slate-900" data-testid="hero-location-input" />
                 </div>
-                <button type="submit" className="relative overflow-hidden btn-secondary flex items-center justify-center gap-1" data-testid="hero-search-submit">
+                <button type="submit" className="relative overflow-hidden btn-secondary flex items-center justify-center gap-1 w-full md:w-auto" data-testid="hero-search-submit">
                   <span className="relative z-10">Buscar</span>
                   <ArrowRight className="w-4 h-4 relative z-10" />
                   <span className="absolute inset-0 -translate-x-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)", animation: "shimmer 3s infinite" }} />

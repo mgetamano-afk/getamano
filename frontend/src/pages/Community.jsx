@@ -92,7 +92,7 @@ export default function Community() {
   const top = data.stats || {};
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 overflow-x-hidden">
       <Header />
       <main className="pb-16" data-testid="community-page">
         {/* HERO */}
