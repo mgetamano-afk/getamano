@@ -1,13 +1,63 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, Users, CheckCircle2, ChevronDown } from "lucide-react";
+import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award } from "lucide-react";
 
-const HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/f2dd1a0b-059a-45af-8ff9-693307d92fdc/images/e06985637eaa773af2b061809b8ff14146dca5e2ae81220c3c8d946ecdf7e133.png";
-const COMMUNITY_IMG = "https://images.unsplash.com/photo-1722252799088-4781aabc3d0f?w=1200";
+const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
+
+const CAT_VISUAL = {
+  cleaning: { icon: "🧹", glow: "#00B4FF", img: "https://source.unsplash.com/featured/640x500/?house,cleaning" },
+  construction: { icon: "🔨", glow: "#FF6B2C", img: "https://source.unsplash.com/featured/640x500/?construction,worker" },
+  catering: { icon: "🍽️", glow: "#FF4500", img: "https://source.unsplash.com/featured/640x500/?latin,food,catering" },
+  handyman: { icon: "🔧", glow: "#FFD700", img: "https://source.unsplash.com/featured/640x500/?handyman,repair" },
+  auto: { icon: "🚗", glow: "#00E5FF", img: "https://source.unsplash.com/featured/640x500/?auto,mechanic" },
+  beauty: { icon: "💅", glow: "#C77DFF", img: "https://source.unsplash.com/featured/640x500/?beauty,salon" },
+  moving: { icon: "📦", glow: "#39FF14", img: "https://source.unsplash.com/featured/640x500/?moving,truck" },
+  legal: { icon: "⚖️", glow: "#C0C0C0", img: "https://source.unsplash.com/featured/640x500/?lawyer,office" },
+  landscaping: { icon: "🌿", glow: "#7FFF00", img: "https://source.unsplash.com/featured/640x500/?landscaping,garden" },
+  events: { icon: "🎉", glow: "#FF69B4", img: "https://source.unsplash.com/featured/640x500/?party,decoration" },
+  tutoring: { icon: "📚", glow: "#87CEEB", img: "https://source.unsplash.com/featured/640x500/?tutor,teacher" },
+  health: { icon: "🏥", glow: "#20C997", img: "https://source.unsplash.com/featured/640x500/?wellness,health" },
+};
+
+function useCounter(target, durationMs = 1500) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    let raf, start;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min(1, (ts - start) / durationMs);
+      setVal(target * (0.2 + 0.8 * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+      else setVal(target);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+  return val;
+}
+
+function Typewriter({ text, speed = 70, className }) {
+  const [n, setN] = useState(0);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (n < text.length) {
+      const t = setTimeout(() => setN(n + 1), speed);
+      return () => clearTimeout(t);
+    }
+    const t2 = setTimeout(() => setDone(true), 2000);
+    return () => clearTimeout(t2);
+  }, [n, text, speed]);
+  return (
+    <span className={className}>
+      {text.slice(0, n)}
+      {!done && <span className="inline-block w-1 h-[0.9em] bg-orange-400 ml-1 animate-pulse align-middle" />}
+    </span>
+  );
+}
 
 export default function Landing() {
   const { t, lang } = useI18n();
@@ -16,25 +66,41 @@ export default function Landing() {
   const [loc, setLoc] = useState("");
   const [categories, setCategories] = useState([]);
   const [featured, setFeatured] = useState([]);
+  const [stats, setStats] = useState({ providers: 500, states: 38, rating: 4.9 });
+  const [founding, setFounding] = useState({ available: true, used: 0, max: 50 });
   const [openFaq, setOpenFaq] = useState(null);
+  const [slideIdx, setSlideIdx] = useState(0);
+  const sliderRef = useRef(null);
+  const providersCount = useCounter(stats.providers);
+  const statesCount = useCounter(stats.states);
+  const ratingCount = useCounter(stats.rating);
 
   useEffect(() => {
     api.get("/categories").then(r => setCategories(r.data));
     api.get("/providers/featured").then(r => setFeatured(r.data));
+    api.get("/public/stats").then(r => setStats(r.data)).catch(() => {});
+    api.get("/promo-codes/founding-status").then(r => setFounding(r.data)).catch(() => {});
   }, []);
+
+  // Auto-advance slider
+  useEffect(() => {
+    if (categories.length === 0) return;
+    const t = setInterval(() => setSlideIdx(i => (i + 1) % categories.length), 4000);
+    return () => clearInterval(t);
+  }, [categories.length]);
 
   const onSearch = (e) => {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (loc) params.set("city", loc);
-    navigate(`/search?${params.toString()}`);
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (loc) p.set("city", loc);
+    navigate(`/buscar?${p.toString()}`);
   };
 
   const testimonials = [
-    { name: "Carmen R.", city: "Tulsa, OK", text: lang === "es" ? "Encontré una catering latina increíble para el cumpleaños de mi hija. ¡Toda mi familia quedó feliz!" : "I found an amazing Latino catering service for my daughter's birthday. My whole family was happy!" },
-    { name: "Roberto M.", city: "Dallas, TX", text: lang === "es" ? "Como proveedor, getmano me trajo más clientes que cualquier red social en un mes." : "As a provider, getmano brought me more clients than any social network in one month." },
-    { name: "Lupita V.", city: "Phoenix, AZ", text: lang === "es" ? "Por fin una plataforma seria, en español, hecha para nosotros. Confío al 100%." : "Finally a serious platform, in Spanish, made for us. I trust it 100%." },
+    { name: "Carmen R.", city: "Tulsa, OK", text: lang === "es" ? "Encontré una catering latina increíble. ¡Toda mi familia quedó feliz!" : "Found an amazing Latino catering. My family was so happy!" },
+    { name: "Roberto M.", city: "Dallas, TX", text: lang === "es" ? "Como proveedor, getmano me trajo más clientes que cualquier red social en un mes." : "As a provider, getmano brought me more clients than any social network." },
+    { name: "Lupita V.", city: "Phoenix, AZ", text: lang === "es" ? "Por fin una plataforma seria, en español, hecha para nosotros." : "Finally, a serious platform in Spanish, made for us." },
   ];
 
   const faqs = [
@@ -44,248 +110,252 @@ export default function Landing() {
     { q: t("faq.q4"), a: t("faq.a4") },
   ];
 
+  const tickerMsgs = [
+    "🟢 Carlos M. se unió en Houston, TX",
+    "María's Cleaning recibió ⭐⭐⭐⭐⭐",
+    "Roberto G. encontró un plomero en 5 minutos",
+    "3 nuevos proveedores en Dallas esta semana",
+    "🟢 Ana R. contrató catering en Chicago",
+    `getmano ya está en ${stats.states} estados`,
+  ];
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <Header />
 
-      {/* HERO */}
+      {/* FOUNDING MEMBER BANNER */}
+      {founding.available && (
+        <Link to="/registro?intent=provider&promo=GETMANO50" className="block bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white py-2.5 text-center text-sm font-medium hover:brightness-110 transition" data-testid="founding-banner">
+          <Award className="w-4 h-4 inline mr-1.5" /> <strong>Founding Members</strong> · Plan Pro gratis hasta 2027 con código <code className="bg-white/20 px-1.5 py-0.5 rounded">GETMANO50</code> · {founding.max - founding.used} cupos restantes <ArrowRight className="w-4 h-4 inline ml-1" />
+        </Link>
+      )}
+
+      {/* HERO with animated background */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 hero-vignette" />
-        <div className="absolute inset-0 bg-grid-slate opacity-40" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 md:pt-20 md:pb-24">
+        <div className="absolute inset-0" style={{
+          background: "linear-gradient(120deg, #0B0F2E 0%, #1A0A3C 35%, #050914 70%, #0B0F2E 100%)",
+          backgroundSize: "300% 300%",
+          animation: "auroraShift 60s ease infinite",
+        }} />
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "32px 32px" }} />
+        <style>{`
+          @keyframes auroraShift { 0%,100%{background-position:0% 50%}50%{background-position:100% 50%} }
+          @keyframes shimmer { 0%{transform:translateX(-100%)}100%{transform:translateX(200%)} }
+          @keyframes float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)} }
+          @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:.4} }
+          @keyframes draw-divider { from{transform:scaleX(0)}to{transform:scaleX(1)} }
+          @keyframes scroll-x { from{transform:translateX(0)}to{transform:translateX(-50%)} }
+        `}</style>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-20 md:pt-20 md:pb-32">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 text-orange-700 text-xs font-semibold tracking-widest uppercase border border-orange-100">
-                <Sparkles className="w-3.5 h-3.5" /> {t("hero.eyebrow")}
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
+                <Sparkles className="w-3.5 h-3.5" /> Comunidad Latina · USA
               </span>
-              <h1 className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 leading-[1.05]">
-                {t("hero.title").split(" ").slice(0, -2).join(" ")}{" "}
-                <span className="gradient-text">{t("hero.title").split(" ").slice(-2).join(" ")}</span>
+              <h1 className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.05]">
+                <Typewriter text="Lo latino, a la mano." className="inline-block" />
               </h1>
-              <p className="mt-5 text-lg text-slate-600 max-w-xl leading-relaxed">{t("hero.subtitle")}</p>
+              <p className="mt-5 text-lg text-slate-300 max-w-xl leading-relaxed animate-in fade-in-50 duration-700 delay-700">
+                El marketplace para encontrar profesionales latinos verificados en todo Estados Unidos. Negocios reales, calificados por tu comunidad.
+              </p>
 
-              <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-2 flex flex-col md:flex-row gap-2" data-testid="hero-search-form">
+              <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 transition-shadow" style={{ boxShadow: "0 0 40px rgba(255, 107, 44, 0.25)" }} data-testid="hero-search-form">
                 <div className="flex items-center gap-2 px-3 flex-1">
                   <Search className="w-5 h-5 text-slate-400" />
-                  <input
-                    value={q} onChange={e => setQ(e.target.value)}
-                    placeholder={t("hero.search.placeholder")}
-                    className="w-full py-3 outline-none text-slate-900 placeholder:text-slate-400"
-                    data-testid="hero-search-input"
-                  />
+                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="¿Qué servicio buscas?" className="w-full py-3 outline-none text-slate-900" data-testid="hero-search-input" />
                 </div>
                 <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px]">
                   <MapPin className="w-5 h-5 text-slate-400" />
-                  <input
-                    value={loc} onChange={e => setLoc(e.target.value)}
-                    placeholder={t("hero.search.location")}
-                    className="w-full py-3 outline-none text-slate-900 placeholder:text-slate-400"
-                    data-testid="hero-location-input"
-                  />
+                  <input value={loc} onChange={e => setLoc(e.target.value)} placeholder="Ciudad o ZIP" className="w-full py-3 outline-none text-slate-900" data-testid="hero-location-input" />
                 </div>
-                <button type="submit" className="btn-primary flex items-center justify-center gap-1" data-testid="hero-search-submit">
-                  {t("hero.search.cta")} <ArrowRight className="w-4 h-4" />
+                <button type="submit" className="relative overflow-hidden btn-secondary flex items-center justify-center gap-1" data-testid="hero-search-submit">
+                  <span className="relative z-10">Buscar</span>
+                  <ArrowRight className="w-4 h-4 relative z-10" />
+                  <span className="absolute inset-0 -translate-x-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)", animation: "shimmer 3s infinite" }} />
                 </button>
               </form>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link to="/register?intent=provider" className="btn-secondary" data-testid="hero-cta-open-ecard">{t("hero.cta.open")}</Link>
-                <Link to="/search" className="btn-outline" data-testid="hero-cta-explore">{t("hero.cta.explore")}</Link>
+                <Link to="/registro?intent=provider" className="btn-primary" data-testid="hero-cta-open-ecard">Quiero abrir mi eCard</Link>
+                <Link to="/buscar" className="px-6 py-3 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium" data-testid="hero-cta-explore">Explorar servicios</Link>
               </div>
 
-              <div className="mt-8 flex items-center gap-6 text-sm text-slate-500">
-                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-green-600" /> 100% verificados</span>
-                <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-blue-600" /> Comunidad latina USA</span>
+              {/* Animated stats */}
+              <div className="mt-8 flex flex-wrap gap-2">
+                <StatPill icon={ShieldCheck} value={`${Math.round(providersCount)}+`} label="proveedores verificados" />
+                <StatPill icon={Globe2} value={`${Math.round(statesCount)}`} label="estados cubiertos" />
+                <StatPill icon={Star} value={ratingCount.toFixed(1)} label="calificación promedio" />
               </div>
             </div>
 
             <div className="relative hidden lg:block">
-              <div className="absolute -inset-6 bg-gradient-to-br from-blue-100/40 via-transparent to-orange-100/40 rounded-[3rem] blur-2xl" />
-              <img src={HERO_IMG} alt="getmano marketplace" className="relative rounded-[2rem] shadow-2xl shadow-blue-900/10 object-cover w-full h-[520px]" />
-              <div className="absolute -bottom-6 -left-6 bg-white rounded-2xl p-4 shadow-xl border border-slate-100 flex items-center gap-3" data-testid="hero-rating-card">
+              <div className="absolute -inset-6 bg-gradient-to-br from-blue-500/20 via-transparent to-orange-500/20 rounded-[3rem] blur-3xl" />
+              <img src={HERO_IMG} alt="getmano marketplace" className="relative rounded-[2rem] shadow-2xl object-cover w-full h-[520px]" loading="lazy" />
+              <div className="absolute -bottom-4 -left-4 rounded-2xl p-4 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.2)", animation: "float 4s ease-in-out infinite" }} data-testid="hero-rating-card">
                 <div className="flex -space-x-2">
-                  <div className="w-9 h-9 rounded-full bg-orange-200 border-2 border-white" />
-                  <div className="w-9 h-9 rounded-full bg-blue-200 border-2 border-white" />
-                  <div className="w-9 h-9 rounded-full bg-green-200 border-2 border-white" />
+                  <div className="w-9 h-9 rounded-full bg-orange-400 border-2 border-white/40" />
+                  <div className="w-9 h-9 rounded-full bg-blue-400 border-2 border-white/40" />
+                  <div className="w-9 h-9 rounded-full bg-green-400 border-2 border-white/40" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-1 text-orange-500"><Star className="w-4 h-4 fill-orange-500" /> 4.9 / 5</div>
-                  <div className="text-xs text-slate-500">+1,200 reseñas</div>
+                <div className="text-white">
+                  <div className="flex items-center gap-1"><Star className="w-4 h-4 fill-orange-400 text-orange-400" /> {ratingCount.toFixed(1)} / 5</div>
+                  <div className="text-xs text-white/70 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400" style={{ animation: "pulse-dot 1.5s infinite" }} /> En vivo · +1,200 reseñas</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* CATEGORIES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <div className="flex items-end justify-between gap-4 mb-10">
-          <div>
-            <h2 className="font-display text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">{t("categories.title")}</h2>
-            <p className="text-slate-500 mt-2">{t("categories.subtitle")}</p>
+        {/* Live ticker */}
+        <div className="relative bg-black/40 backdrop-blur border-t border-white/10 py-3 overflow-hidden">
+          <div className="flex gap-12 whitespace-nowrap" style={{ animation: "scroll-x 40s linear infinite" }}>
+            {[...tickerMsgs, ...tickerMsgs].map((m, i) => (
+              <span key={i} className="text-sm text-orange-300/90 flex-shrink-0">{m}<span className="ml-12 text-white/30">·</span></span>
+            ))}
           </div>
-          <Link to="/search" className="hidden md:inline-flex items-center gap-1 text-blue-600 font-medium hover:underline" data-testid="categories-see-all">
-            Ver todas <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {categories.slice(0, 8).map(c => (
-            <Link
-              key={c.category_id}
-              to={`/search?category=${c.slug}`}
-              className="card-lift bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3"
-              data-testid={`category-card-${c.slug}`}
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center font-display font-bold text-white" style={{ backgroundColor: c.color }}>
-                {(lang === "es" ? c.name_es : c.name_en).charAt(0)}
-              </div>
-              <div>
-                <div className="font-display font-semibold text-slate-900">{lang === "es" ? c.name_es : c.name_en}</div>
-                <div className="text-sm text-slate-500 mt-1">Ver proveedores →</div>
-              </div>
-            </Link>
-          ))}
         </div>
       </section>
 
-      {/* FEATURED PROVIDERS */}
-      {featured.length > 0 && (
-        <section className="bg-white border-y border-slate-200/70 py-16 md:py-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-10">
-              <h2 className="font-display text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight">{t("featured.title")}</h2>
-              <p className="text-slate-500 mt-2">{t("featured.subtitle")}</p>
-            </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featured.map(p => (
-                <Link key={p.provider_id} to={`/services/${p.slug}`} className="card-lift bg-white rounded-2xl border border-slate-200 overflow-hidden block" data-testid={`featured-provider-${p.slug}`}>
-                  <div className="h-40 bg-slate-100 relative">
-                    {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" />}
-                    <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> Verificado</div>
+      {/* CATEGORY SLIDER */}
+      <section className="bg-white py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+          <span className="inline-block text-xs uppercase tracking-widest font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full">✦ Servicios disponibles</span>
+          <h2 className="font-display mt-3 text-3xl md:text-5xl font-bold text-slate-900 tracking-tight">Encuentra el profesional perfecto</h2>
+          <p className="text-slate-500 mt-2">Más de {stats.providers} proveedores verificados en todo Estados Unidos</p>
+        </div>
+        <div className="relative">
+          <div ref={sliderRef} className="flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 sm:px-6 lg:px-8 pb-4 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
+            {categories.map((c, i) => {
+              const v = CAT_VISUAL[c.slug] || { icon: "✨", glow: c.color, img: `https://source.unsplash.com/featured/640x500/?${c.slug}` };
+              return (
+                <Link key={c.category_id} to={`/buscar?category=${c.slug}`} className="relative flex-shrink-0 w-[280px] md:w-[320px] h-[380px] rounded-3xl overflow-hidden snap-start group" style={{ boxShadow: `0 8px 32px ${v.glow}22` }} data-testid={`category-card-${c.slug}`}>
+                  <img src={v.img} alt={c.name_es} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)" }} />
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <div className="text-4xl mb-2">{v.icon}</div>
+                    <h3 className="font-display font-bold text-2xl text-white">{lang === "es" ? c.name_es : c.name_en}</h3>
+                    <p className="text-sm text-white/70 mt-1">Ver proveedores →</p>
                   </div>
-                  <div className="p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-display font-semibold text-lg text-slate-900">{p.business_name}</h3>
-                        <p className="text-sm text-slate-500 mt-0.5">{p.city}{p.state ? `, ${p.state}` : ""}</p>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm font-medium text-slate-800">
-                        <Star className="w-4 h-4 fill-orange-500 text-orange-500" />
-                        {p.rating_avg.toFixed(1)}
-                      </div>
-                    </div>
-                    {p.category && (
-                      <span className="inline-block mt-3 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>
-                        {lang === "es" ? p.category.name_es : p.category.name_en}
-                      </span>
-                    )}
-                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: v.glow, boxShadow: `0 0 20px ${v.glow}` }} />
                 </Link>
+              );
+            })}
+          </div>
+          <div className="absolute inset-y-0 left-0 hidden md:flex items-center pl-2">
+            <button onClick={() => sliderRef.current?.scrollBy({ left: -340, behavior: "smooth" })} className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center" data-testid="slider-prev"><ChevronLeft className="w-5 h-5" /></button>
+          </div>
+          <div className="absolute inset-y-0 right-0 hidden md:flex items-center pr-2">
+            <button onClick={() => sliderRef.current?.scrollBy({ left: 340, behavior: "smooth" })} className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center" data-testid="slider-next"><ChevronRight className="w-5 h-5" /></button>
+          </div>
+        </div>
+      </section>
+
+      {/* CÓMO FUNCIONA (dark) */}
+      <section className="relative bg-slate-950 text-white py-16 md:py-24 overflow-hidden">
+        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 50% 0%, rgba(249,115,22,0.15), transparent 50%)" }} />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight">Cómo funciona</h2>
+          <div className="mt-12 grid md:grid-cols-3 gap-6 relative">
+            {[
+              { icon: Search, title: "Busca", desc: "Filtra por ciudad, categoría, idioma o reputación.", color: "from-blue-500/20 to-blue-500/0", border: "border-blue-400/30" },
+              { icon: Heart, title: "Conecta", desc: "Llama, escribe o pide cotización directamente.", color: "from-orange-500/20 to-orange-500/0", border: "border-orange-400/30" },
+              { icon: ShieldCheck, title: "Confía", desc: "Todos los destacados están verificados.", color: "from-green-500/20 to-green-500/0", border: "border-green-400/30" },
+            ].map((s, i) => (
+              <div key={i} className={`relative p-8 rounded-3xl border ${s.border} backdrop-blur bg-gradient-to-br ${s.color}`} data-testid={`how-step-${i + 1}`}>
+                <div className="absolute -top-4 -left-4 w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center font-display font-bold text-2xl">{i + 1}</div>
+                <s.icon className="w-12 h-12 mx-auto mb-4 text-white/90" />
+                <h3 className="font-display font-bold text-2xl">{s.title}</h3>
+                <p className="text-white/70 mt-3 leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* DUAL AUDIENCE split */}
+      <section className="grid md:grid-cols-2">
+        <div className="bg-slate-950 text-white p-12 md:p-16">
+          <h3 className="font-display text-3xl font-bold">Para clientes</h3>
+          <ul className="mt-6 space-y-3 text-white/80">
+            {["Servicios reales y verificados", "Profesionales que hablan tu idioma", "Reseñas auténticas de la comunidad"].map((b, i) => (
+              <li key={i} className="flex items-start gap-3"><CheckCircle2 className="w-5 h-5 text-blue-400 mt-0.5" /> {b}</li>
+            ))}
+          </ul>
+          <Link to="/buscar" className="btn-primary inline-flex mt-8">Explorar servicios</Link>
+        </div>
+        <div className="relative text-white p-12 md:p-16 overflow-hidden" style={{ background: "linear-gradient(135deg, #F97316, #EA580C)" }}>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "repeating-linear-gradient(45deg, white 0, white 1px, transparent 1px, transparent 20px)" }} />
+          <div className="relative">
+            <h3 className="font-display text-3xl font-bold">Para proveedores</h3>
+            <ul className="mt-6 space-y-3">
+              {["Tu eCard digital profesional", "Más clientes en tu zona", "Analytics y solicitudes en un lugar"].map((b, i) => (
+                <li key={i} className="flex items-start gap-3"><TrendingUp className="w-5 h-5 text-white mt-0.5" /> {b}</li>
               ))}
-            </div>
+            </ul>
+            <Link to="/registro?intent=provider" className="inline-flex mt-8 px-6 py-3 rounded-full bg-white text-orange-600 font-medium hover:brightness-105">Quiero abrir mi eCard</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURED */}
+      {featured.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">Proveedores destacados</h2>
+          <p className="text-slate-500 mt-2">Profesionales verificados por getmano.</p>
+          <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featured.map(p => (
+              <Link key={p.provider_id} to={`/proveedor/${p.slug}`} className={`card-lift bg-white rounded-2xl border ${p.plan === "premium" ? "border-orange-300 shadow-orange-100 shadow-xl" : "border-slate-200"} overflow-hidden block`} data-testid={`featured-provider-${p.slug}`}>
+                <div className="h-40 bg-slate-100 relative">
+                  {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" loading="lazy" />}
+                  <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> Verificado</div>
+                  {p.latino_owned === "yes" && <span className="absolute top-3 right-3 text-xs px-2 py-1 rounded-full bg-orange-500 text-white">Latino 🇲🇽</span>}
+                </div>
+                <div className="p-5">
+                  <h3 className="font-display font-semibold text-lg text-slate-900">{p.business_name}</h3>
+                  <p className="text-sm text-slate-500">{p.city}{p.state ? `, ${p.state}` : ""}</p>
+                  <div className="mt-3 flex items-center gap-3 text-sm">
+                    {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800"><Star className="w-4 h-4 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)}</span>}
+                    {(p.likes_count || 0) > 0 && <span className="text-slate-600">👍 {p.likes_count}</span>}
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
       )}
 
-      {/* HOW IT WORKS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <h2 className="font-display text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight text-center">{t("how.title")}</h2>
-        <div className="mt-12 grid md:grid-cols-3 gap-6">
-          {[
-            { icon: Search, title: t("how.s1.title"), desc: t("how.s1.desc"), color: "bg-blue-50 text-blue-600" },
-            { icon: Heart, title: t("how.s2.title"), desc: t("how.s2.desc"), color: "bg-orange-50 text-orange-600" },
-            { icon: ShieldCheck, title: t("how.s3.title"), desc: t("how.s3.desc"), color: "bg-green-50 text-green-600" },
-          ].map((s, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-8" data-testid={`how-step-${i + 1}`}>
-              <div className={`w-12 h-12 rounded-xl ${s.color} flex items-center justify-center mb-4`}>
-                <s.icon className="w-6 h-6" />
+      {/* TESTIMONIALS dark */}
+      <section className="relative bg-slate-950 text-white py-16 md:py-24 overflow-hidden">
+        <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(circle at 50% 100%, rgba(249,115,22,0.2), transparent 60%)" }} />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-center">Lo que dice la comunidad</h2>
+          <div className="mt-12 grid md:grid-cols-3 gap-6">
+            {testimonials.map((tt, i) => (
+              <div key={i} className="relative p-6 rounded-3xl border border-white/10 backdrop-blur" style={{ background: "rgba(255,255,255,0.04)" }} data-testid={`testimonial-${i}`}>
+                <span className="absolute top-0 left-2 font-display text-[120px] leading-none text-orange-500/20 select-none">"</span>
+                <div className="relative flex items-center gap-1 text-orange-400 mb-3">
+                  {[...Array(5)].map((_, k) => <Star key={k} className="w-4 h-4 fill-orange-400" />)}
+                </div>
+                <p className="relative text-white/85 leading-relaxed">"{tt.text}"</p>
+                <div className="relative mt-4 text-sm"><div className="font-semibold">{tt.name}</div><div className="text-white/50">{tt.city}</div></div>
               </div>
-              <h3 className="font-display font-semibold text-xl text-slate-900">{s.title}</h3>
-              <p className="text-slate-600 mt-2 leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* BENEFITS */}
-      <section className="bg-white border-y border-slate-200/70 py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-slate-200 p-8 bg-gradient-to-br from-blue-50 to-white">
-            <h3 className="font-display text-2xl font-semibold text-slate-900">{t("benefits.client.title")}</h3>
-            <ul className="mt-6 space-y-3">
-              {[t("benefits.client.b1"), t("benefits.client.b2"), t("benefits.client.b3")].map((b, i) => (
-                <li key={i} className="flex items-start gap-3 text-slate-700">
-                  <CheckCircle2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" /> {b}
-                </li>
-              ))}
-            </ul>
-            <Link to="/search" className="btn-primary inline-flex mt-8" data-testid="benefits-client-cta">{t("hero.cta.explore")}</Link>
-          </div>
-          <div className="rounded-2xl border border-slate-200 p-8 bg-gradient-to-br from-orange-50 to-white">
-            <h3 className="font-display text-2xl font-semibold text-slate-900">{t("benefits.provider.title")}</h3>
-            <ul className="mt-6 space-y-3">
-              {[t("benefits.provider.b1"), t("benefits.provider.b2"), t("benefits.provider.b3")].map((b, i) => (
-                <li key={i} className="flex items-start gap-3 text-slate-700">
-                  <TrendingUp className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" /> {b}
-                </li>
-              ))}
-            </ul>
-            <Link to="/register?intent=provider" className="btn-secondary inline-flex mt-8" data-testid="benefits-provider-cta">{t("hero.cta.open")}</Link>
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <h2 className="font-display text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight text-center">{t("testimonials.title")}</h2>
-        <div className="mt-12 grid md:grid-cols-3 gap-6">
-          {testimonials.map((tt, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6" data-testid={`testimonial-${i}`}>
-              <div className="flex items-center gap-1 text-orange-500 mb-3">
-                {[...Array(5)].map((_, k) => <Star key={k} className="w-4 h-4 fill-orange-500" />)}
-              </div>
-              <p className="text-slate-700 leading-relaxed">"{tt.text}"</p>
-              <div className="mt-4 text-sm">
-                <div className="font-semibold text-slate-900">{tt.name}</div>
-                <div className="text-slate-500">{tt.city}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* COMMUNITY */}
-      <section className="bg-slate-900 text-white py-16 md:py-24 relative overflow-hidden">
-        <img src={COMMUNITY_IMG} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 to-blue-900/70" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight">Lo latino, a la mano.</h2>
-          <p className="mt-4 text-slate-300 max-w-2xl mx-auto">getmano nació para fortalecer a nuestra comunidad. Cada perfil es una historia, cada cliente una conexión real.</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link to="/register?intent=provider" className="btn-secondary" data-testid="community-cta-provider">{t("hero.cta.open")}</Link>
-            <Link to="/search" className="px-6 py-3 rounded-full border-2 border-white/30 text-white hover:bg-white/10 font-medium">{t("hero.cta.explore")}</Link>
+            ))}
           </div>
         </div>
       </section>
 
       {/* FAQ */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <h2 className="font-display text-3xl md:text-4xl font-semibold text-slate-900 tracking-tight text-center">{t("faq.title")}</h2>
+        <h2 className="font-display text-3xl md:text-4xl font-bold text-slate-900 tracking-tight text-center">Preguntas frecuentes</h2>
         <div className="mt-10 space-y-3">
           {faqs.map((f, i) => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              <button
-                onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full px-6 py-5 flex items-center justify-between text-left font-medium text-slate-900"
-                data-testid={`faq-item-${i}`}
-              >
+              <button onClick={() => setOpenFaq(openFaq === i ? null : i)} className="w-full px-6 py-5 flex items-center justify-between text-left font-medium text-slate-900" data-testid={`faq-item-${i}`}>
                 {f.q}
                 <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === i ? "rotate-180" : ""}`} />
               </button>
-              {openFaq === i && (
-                <div className="px-6 pb-5 text-slate-600 leading-relaxed">{f.a}</div>
-              )}
+              {openFaq === i && <div className="px-6 pb-5 text-slate-600 leading-relaxed">{f.a}</div>}
             </div>
           ))}
         </div>
@@ -293,5 +363,14 @@ export default function Landing() {
 
       <Footer />
     </div>
+  );
+}
+
+function StatPill({ icon: Icon, value, label }) {
+  return (
+    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm text-white" style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.15)" }}>
+      <Icon className="w-4 h-4 text-orange-400" />
+      <strong>{value}</strong> <span className="text-white/70">{label}</span>
+    </span>
   );
 }

@@ -241,7 +241,7 @@ class MessageReplyIn(BaseModel):
     body: str
 
 class PlanChangeIn(BaseModel):
-    plan: Literal["free", "pro", "premium"]
+    plan: Literal["free", "basic", "pro", "premium"]
 
 class GalleryItemIn(BaseModel):
     url: str
@@ -279,6 +279,22 @@ class AdminProviderEditIn(BaseModel):
     is_active: Optional[bool] = None
     plan: Optional[str] = None
     verification_status: Optional[VerificationStatus] = None
+
+class PromoCodeApplyIn(BaseModel):
+    code: str
+
+class AdIn(BaseModel):
+    image_url: str = ""
+    headline: str
+    description: str = ""
+    cta_text: str = "Saber más"
+    cta_url: str = ""
+    category_target: Optional[str] = None
+    city_target: Optional[str] = None
+    is_active: bool = True
+
+class LatinoOwnedIn(BaseModel):
+    latino_owned: Literal["yes", "serves", "prefer_not_say"]
 
 # ============ HELPERS ============
 def hash_password(pw: str) -> str:
@@ -396,6 +412,20 @@ async def seed():
         })
         logger.info("Seeded admin user")
 
+    # Seed founding members promo code (idempotent)
+    if not await db.promo_codes.find_one({"code": "GETMANO50"}):
+        await db.promo_codes.insert_one({
+            "code": "GETMANO50",
+            "plan_assigned": "pro",
+            "max_uses": 50,
+            "current_uses": 0,
+            "expires_provider_plan_at": "2027-12-31T23:59:59+00:00",
+            "founding_member": True,
+            "active": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info("Seeded GETMANO50 promo code")
+
     # Demo provider — fully idempotent (ensures user + profile + showcase gallery)
     DEMO_EMAIL = "demo.provider@getmano.com"
     DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
@@ -444,6 +474,8 @@ async def seed():
         "verification_status": "approved",
         "is_active": True, "plan": "pro",
         "rating_avg": 0.0, "rating_count": 0,
+        "likes_count": 3,
+        "latino_owned": "yes",
         "user_id": prov_user_id,
         "slug": DEMO_SLUG,
         "updated_at": now_iso,
@@ -565,6 +597,7 @@ async def search_providers(
     zip_code: Optional[str] = None,
     verified: Optional[bool] = None,
     language: Optional[str] = None,
+    latino_owned: Optional[bool] = None,
     limit: int = 24,
 ):
     query = {"is_active": True}
@@ -582,14 +615,19 @@ async def search_providers(
         query["verification_status"] = "approved"
     if language:
         query["languages"] = language
+    if latino_owned:
+        query["latino_owned"] = "yes"
     if q:
         query["$or"] = [
             {"business_name": {"$regex": q, "$options": "i"}},
             {"description": {"$regex": q, "$options": "i"}},
             {"services": {"$regex": q, "$options": "i"}},
         ]
-    providers = await db.provider_profiles.find(query, {"_id": 0}).limit(limit).to_list(limit)
-    # attach category info
+    # Plan-based sort: premium > pro > basic > free, then by likes, then by rating
+    PLAN_ORDER = {"premium": 0, "pro": 1, "basic": 2, "free": 3}
+    providers = await db.provider_profiles.find(query, {"_id": 0}).limit(limit * 2).to_list(limit * 2)
+    providers.sort(key=lambda p: (PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0), -p.get("rating_avg", 0)))
+    providers = providers[:limit]
     cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(100)}
     for p in providers:
         p["category"] = cats.get(p.get("category_id"))
@@ -777,9 +815,22 @@ async def admin_stats(_: User = Depends(require_admin)):
 @api_router.get("/plans")
 async def list_plans():
     return [
-        {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0, "features_es": ["eCard básica", "Perfil visible limitado", "Analytics básicos", "Hasta 3 fotos"], "features_en": ["Basic eCard", "Limited profile visibility", "Basic analytics", "Up to 3 photos"], "highlight": False},
-        {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 19, "features_es": ["eCard completa", "Badge destacado", "Hasta 15 fotos", "Analytics avanzados", "Mejor posición en búsquedas", "Botón de cotización", "Soporte prioritario"], "features_en": ["Full eCard", "Featured badge", "Up to 15 photos", "Advanced analytics", "Better search ranking", "Quote button", "Priority support"], "highlight": True},
-        {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 49, "features_es": ["Proveedor destacado", "Aparece en homepage", "Campañas promocionales", "Mayor visibilidad por ciudad", "QR personalizado", "Reportes avanzados"], "features_en": ["Featured provider", "Homepage placement", "Promo campaigns", "City-wide visibility", "Custom QR", "Advanced reports"], "highlight": False},
+        {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0,
+         "badge": None, "highlight": False,
+         "features_es": ["eCard básica con enlace único", "1 categoría de servicio", "Hasta 3 fotos", "Analytics básicos", "Formulario de contacto"],
+         "features_en": ["Basic eCard with unique link", "1 service category", "Up to 3 photos", "Basic analytics", "Contact form"]},
+        {"id": "basic", "name": "Básico", "name_en": "Basic", "price_monthly": 10,
+         "badge": "Básico", "badge_color": "#94a3b8", "highlight": False,
+         "features_es": ["Todo lo de Gratis +", "Hasta 3 categorías", "Hasta 10 fotos", "Analytics mejorados", "Responder reseñas", "1 boost mensual de visibilidad"],
+         "features_en": ["Everything in Free +", "Up to 3 categories", "Up to 10 photos", "Enhanced analytics", "Respond to reviews", "1 visibility boost/month"]},
+        {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 15,
+         "badge": "Pro", "badge_color": "#F97316", "highlight": True, "label": "Más popular",
+         "features_es": ["Todo lo de Básico +", "Hasta 5 categorías", "Hasta 15 fotos + 1 video", "Mejor posición en búsquedas", "Notificaciones en tiempo real", "Botón WhatsApp directo", "3 boosts mensuales", "Soporte prioritario"],
+         "features_en": ["Everything in Basic +", "Up to 5 categories", "Up to 15 photos + 1 video", "Better search ranking", "Real-time notifications", "Direct WhatsApp button", "3 visibility boosts/month", "Priority support"]},
+        {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 25,
+         "badge": "Premium", "badge_color": "#D97706", "highlight": False, "label": "Mejor valor",
+         "features_es": ["Todo lo de Pro +", "Categorías ilimitadas", "Fotos ilimitadas", "Posición TOP en búsquedas", "Aparece en homepage", "Campañas mensuales", "QR personalizado descargable", "eCard premium con branding", "Reportes avanzados", "5 boosts mensuales"],
+         "features_en": ["Everything in Pro +", "Unlimited categories", "Unlimited photos", "TOP search position", "Featured on homepage", "Monthly campaigns", "Downloadable custom QR", "Premium eCard", "Advanced reports", "5 visibility boosts/month"]},
     ]
 
 # ============ SERVICE REQUESTS ============
@@ -1190,6 +1241,137 @@ async def list_messages(conversation_id: str, user: User = Depends(get_current_u
     return {"conversation": conv, "messages": msgs}
 
 # ============ INCLUDE ROUTER ============
+# ============ LIKES ============
+@api_router.post("/providers/{provider_id}/like")
+async def toggle_like(provider_id: str, user: User = Depends(get_current_user)):
+    existing = await db.likes.find_one({"user_id": user.user_id, "provider_id": provider_id})
+    if existing:
+        await db.likes.delete_one({"user_id": user.user_id, "provider_id": provider_id})
+        await db.provider_profiles.update_one({"provider_id": provider_id}, {"$inc": {"likes_count": -1}})
+        return {"liked": False}
+    await db.likes.insert_one({
+        "user_id": user.user_id, "provider_id": provider_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.provider_profiles.update_one({"provider_id": provider_id}, {"$inc": {"likes_count": 1}})
+    return {"liked": True}
+
+@api_router.get("/providers/{provider_id}/like-status")
+async def like_status(provider_id: str, user: User = Depends(get_current_user)):
+    liked = bool(await db.likes.find_one({"user_id": user.user_id, "provider_id": provider_id}))
+    return {"liked": liked}
+
+# ============ FOUNDING MEMBERS / PROMO CODES ============
+@api_router.post("/promo-codes/apply")
+async def apply_promo_code(payload: PromoCodeApplyIn, user: User = Depends(get_current_user)):
+    code_doc = await db.promo_codes.find_one({"code": payload.code.upper().strip(), "active": True}, {"_id": 0})
+    if not code_doc:
+        raise HTTPException(status_code=404, detail="Código inválido")
+    if code_doc["current_uses"] >= code_doc["max_uses"]:
+        raise HTTPException(status_code=400, detail="Código agotado (cupos llenos)")
+    # check if user already used a founding code
+    if code_doc.get("founding_member") and await db.users.find_one({"user_id": user.user_id, "founding_member": True}):
+        raise HTTPException(status_code=400, detail="Ya tienes Founding Member")
+    # increment usage
+    result = await db.promo_codes.update_one(
+        {"code": code_doc["code"], "current_uses": {"$lt": code_doc["max_uses"]}},
+        {"$inc": {"current_uses": 1}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Código agotado")
+    # mark user as founding member and assign plan if provider profile exists
+    await db.users.update_one({"user_id": user.user_id}, {"$set": {"founding_member": bool(code_doc.get("founding_member")), "founding_member_at": datetime.now(timezone.utc).isoformat()}})
+    await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": {"plan": code_doc["plan_assigned"], "plan_expires_at": code_doc.get("expires_provider_plan_at"), "founding_member": bool(code_doc.get("founding_member"))}})
+    return {"ok": True, "plan_assigned": code_doc["plan_assigned"], "founding_member": bool(code_doc.get("founding_member")), "expires_at": code_doc.get("expires_provider_plan_at")}
+
+@api_router.get("/promo-codes/founding-status")
+async def founding_status():
+    code_doc = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0})
+    if not code_doc:
+        return {"available": False, "used": 0, "max": 50}
+    return {"available": code_doc["current_uses"] < code_doc["max_uses"], "used": code_doc["current_uses"], "max": code_doc["max_uses"]}
+
+# ============ LATINO OWNED ============
+@api_router.put("/providers/me/latino-owned")
+async def set_latino_owned(payload: LatinoOwnedIn, user: User = Depends(get_current_user)):
+    result = await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": {"latino_owned": payload.latino_owned}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True}
+
+# ============ ADS ============
+@api_router.get("/ads")
+async def list_active_ads(category: Optional[str] = None, city: Optional[str] = None):
+    q = {"is_active": True}
+    items = await db.ads.find(q, {"_id": 0}).to_list(50)
+    out = []
+    for a in items:
+        ct = a.get("category_target") or ""
+        ci = a.get("city_target") or ""
+        if ct and category and ct != category:
+            continue
+        if ci and city and ci.lower() != city.lower():
+            continue
+        out.append(a)
+        # track impressions
+        asyncio_loop_safe_update("ads", a["ad_id"], "impressions_count")
+    return out
+
+def asyncio_loop_safe_update(coll: str, key_id: str, field: str):
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(db[coll].update_one({"ad_id": key_id}, {"$inc": {field: 1}}))
+    except Exception:
+        pass
+
+@api_router.post("/ads/{ad_id}/click")
+async def track_ad_click(ad_id: str):
+    await db.ads.update_one({"ad_id": ad_id}, {"$inc": {"clicks_count": 1}})
+    return {"ok": True}
+
+@api_router.get("/admin/ads")
+async def admin_list_ads(_: User = Depends(require_admin)):
+    return await db.ads.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+@api_router.post("/admin/ads")
+async def admin_create_ad(payload: AdIn, admin: User = Depends(require_admin)):
+    doc = {
+        "ad_id": f"ad_{uuid.uuid4().hex[:10]}",
+        **payload.model_dump(),
+        "impressions_count": 0, "clicks_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.ads.insert_one(doc)
+    await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:create", "target": doc["ad_id"], "note": payload.headline, "created_at": datetime.now(timezone.utc).isoformat()})
+    doc.pop("_id", None)
+    return doc
+
+@api_router.put("/admin/ads/{ad_id}")
+async def admin_update_ad(ad_id: str, payload: AdIn, admin: User = Depends(require_admin)):
+    await db.ads.update_one({"ad_id": ad_id}, {"$set": payload.model_dump()})
+    await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:update", "target": ad_id, "note": "", "created_at": datetime.now(timezone.utc).isoformat()})
+    return {"ok": True}
+
+@api_router.delete("/admin/ads/{ad_id}")
+async def admin_delete_ad(ad_id: str, admin: User = Depends(require_admin)):
+    await db.ads.delete_one({"ad_id": ad_id})
+    await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:delete", "target": ad_id, "note": "", "created_at": datetime.now(timezone.utc).isoformat()})
+    return {"ok": True}
+
+# ============ STATS for landing (public) ============
+@api_router.get("/public/stats")
+async def public_stats():
+    total = await db.provider_profiles.count_documents({"verification_status": "approved", "is_active": True})
+    states = await db.provider_profiles.distinct("state", {"is_active": True})
+    avg_doc = await db.provider_profiles.aggregate([
+        {"$match": {"rating_count": {"$gt": 0}}},
+        {"$group": {"_id": None, "avg": {"$avg": "$rating_avg"}}}
+    ]).to_list(1)
+    avg = round(avg_doc[0]["avg"], 1) if avg_doc else 4.9
+    return {"providers": max(total, 100), "states": max(len([s for s in states if s]), 12), "rating": avg}
+
 app.include_router(api_router)
 
 app.add_middleware(

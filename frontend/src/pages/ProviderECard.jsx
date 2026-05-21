@@ -7,7 +7,10 @@ import ShareECard from "../components/ShareECard";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X } from "lucide-react";
+import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard } from "lucide-react";
+import WhatsAppButton from "../components/WhatsAppButton";
+import LikeButton from "../components/LikeButton";
+import ECardModal from "../components/ECardModal";
 import { toast } from "sonner";
 
 export default function ProviderECard() {
@@ -24,6 +27,7 @@ export default function ProviderECard() {
   const [msgBody, setMsgBody] = useState("");
   const [msgSubject, setMsgSubject] = useState("");
   const [lightbox, setLightbox] = useState(null);
+  const [showECardModal, setShowECardModal] = useState(false);
 
   useEffect(() => {
     api.get(`/providers/by-slug/${slug}`).then(r => setP(r.data)).finally(() => setLoading(false));
@@ -114,22 +118,28 @@ export default function ProviderECard() {
                   <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900" data-testid="ecard-business-name">{p.business_name}</h1>
                   {verified && <span className="badge-verified" data-testid="ecard-verified-badge"><ShieldCheck className="w-3.5 h-3.5" /> {t("provider.verified")}</span>}
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                   {p.category && <span className="px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>{lang === "es" ? p.category.name_es : p.category.name_en}</span>}
+                  {p.latino_owned === "yes" && <span className="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200">Latino-owned 🇲🇽</span>}
+                  {p.founding_member && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200"><Award className="w-3 h-3" /> Founding</span>}
                   {p.city && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {p.city}, {p.state}</span>}
                   {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800 font-medium"><Star className="w-3.5 h-3.5 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)} ({p.rating_count})</span>}
                 </div>
                 {p.description && <p className="mt-4 text-slate-700 leading-relaxed">{p.description}</p>}
+                <div className="mt-4">
+                  <LikeButton providerId={p.provider_id} initialCount={p.likes_count || 0} size="lg" />
+                </div>
               </div>
             </div>
 
             {/* Action buttons */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-6 gap-2">
               {p.phone && (
                 <a href={`tel:${p.phone}`} onClick={trackClick} className="btn-primary justify-center flex items-center gap-1 text-sm" data-testid="ecard-call-button">
                   <Phone className="w-4 h-4" /> {t("provider.call")}
                 </a>
               )}
+              {p.phone && <WhatsAppButton phone={p.phone} businessName={p.business_name} testid="ecard-whatsapp-button" />}
               <button onClick={() => { setShowMessage(true); setMode("message"); }} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
                 <MessageSquare className="w-4 h-4" /> {t("provider.message")}
               </button>
@@ -141,7 +151,9 @@ export default function ProviderECard() {
                   <MapPin className="w-4 h-4" /> {t("provider.map")}
                 </a>
               )}
-              <ShareECard businessName={p.business_name} slug={p.slug} description={p.description} />
+              <button onClick={() => setShowECardModal(true)} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-view-button">
+                <CreditCard className="w-4 h-4" /> Ver mi eCard
+              </button>
             </div>
             <button onClick={addFavorite} className="mt-2 text-sm text-slate-500 hover:text-orange-500 flex items-center gap-1" data-testid="ecard-favorite-button">
               <Heart className="w-4 h-4" /> Guardar en favoritos
@@ -268,6 +280,8 @@ export default function ProviderECard() {
             <img src={buildFileUrl(lightbox.url)} alt={lightbox.caption || ""} className="max-w-full max-h-full rounded-2xl" />
           </div>
         )}
+
+        {showECardModal && <ECardModal provider={p} onClose={() => setShowECardModal(false)} />}
       </main>
       <Footer />
     </div>
