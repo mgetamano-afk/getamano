@@ -8,6 +8,7 @@ import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
 import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox } from "lucide-react";
 import { toast } from "sonner";
+import ProviderGreeting from "../components/ProviderGreeting";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -110,10 +111,16 @@ export default function ProviderDashboard() {
     <div className="min-h-screen bg-neutral-50">
       <Header />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8" data-testid="provider-dashboard">
+        <ProviderGreeting
+          user={user}
+          profile={profile}
+          unreadMessages={unread}
+          newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
+        />
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="font-display text-3xl font-bold text-slate-900">Panel de proveedor</h1>
-            <p className="text-slate-500 mt-1">Hola, {user?.name}.</p>
+            <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
+            <p className="text-slate-500 text-sm mt-0.5">Gestiona tu negocio, tus clientes y tu eCard.</p>
           </div>
           <Link to={`/services/${profile.slug}`} target="_blank" className="btn-outline flex items-center gap-1 text-sm" data-testid="view-public-ecard">
             Ver mi eCard <ExternalLink className="w-3.5 h-3.5" />

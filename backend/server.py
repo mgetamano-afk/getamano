@@ -1288,8 +1288,35 @@ async def apply_promo_code(payload: PromoCodeApplyIn, user: User = Depends(get_c
 async def founding_status():
     code_doc = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0})
     if not code_doc:
-        return {"available": False, "used": 0, "max": 50}
-    return {"available": code_doc["current_uses"] < code_doc["max_uses"], "used": code_doc["current_uses"], "max": code_doc["max_uses"]}
+        return {"available": False, "used": 0, "max": 50, "recent": []}
+    # Last 3 founding members (newest first) — public-safe fields only
+    recent_cursor = db.users.find(
+        {"founding_member": True, "founding_member_at": {"$ne": None}},
+        {"_id": 0, "full_name": 1, "founding_member_at": 1, "user_id": 1}
+    ).sort("founding_member_at", -1).limit(3)
+    recent = []
+    async for u in recent_cursor:
+        name = (u.get("full_name") or "").strip()
+        # Get provider city if profile exists
+        prof = await db.provider_profiles.find_one({"user_id": u.get("user_id")}, {"_id": 0, "city": 1, "state": 1, "business_name": 1})
+        biz = (prof.get("business_name") if prof else "") or ""
+        # Prefer first name; fall back to first word of business name
+        display = name.split(" ")[0] if name else (biz.split(" ")[0] if biz else "Nuev@")
+        initial = (display[:1] or "?").upper()
+        recent.append({
+            "first_name": display,
+            "initial": initial,
+            "city": prof.get("city") if prof else None,
+            "state": prof.get("state") if prof else None,
+            "business_name": biz or None,
+            "at": u.get("founding_member_at"),
+        })
+    return {
+        "available": code_doc["current_uses"] < code_doc["max_uses"],
+        "used": code_doc["current_uses"],
+        "max": code_doc["max_uses"],
+        "recent": recent,
+    }
 
 # ============ LATINO OWNED ============
 @api_router.put("/providers/me/latino-owned")
