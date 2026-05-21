@@ -11,8 +11,10 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL, ADMIN_PW = "admin@getamano.com", "admin123"
-PROV_EMAIL, PROV_PW = "demo.provider@getamano.com", "provider123"
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "admin@getamano.com")
+ADMIN_PW = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
+PROV_EMAIL = os.environ.get("TEST_PROVIDER_EMAIL", "demo.provider@getamano.com")
+PROV_PW = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 
 
 # ============ fixtures ============
@@ -163,7 +165,7 @@ class TestAdminReports:
         rid = r.json()["report_id"]
         r2 = admin_session.put(f"{API}/admin/reports/{rid}", json={"action": "dismiss", "admin_notes": "test"}, timeout=10)
         assert r2.status_code == 200, r2.text
-        assert r2.json().get("ok") is True
+        assert r2.json().get("ok") == True  # noqa: E712
         # verify status is now dismissed
         listing = admin_session.get(f"{API}/admin/reports", timeout=10).json()
         match = next((x for x in listing["items"] if x["report_id"] == rid), None)
@@ -174,11 +176,10 @@ class TestAdminReports:
               "description": "Trato muy irrespetuoso del cliente al proveedor durante el trabajo."}
         rid = provider_session.post(f"{API}/reports", json=pl, timeout=10).json()["report_id"]
         before = admin_session.get(f"{API}/admin/users", timeout=10)
-        before_count = 0
         if before.status_code == 200:
             u = next((x for x in before.json().get("items", before.json() if isinstance(before.json(), list) else []) if x.get("user_id") == admin_user_id), None)
             if u:
-                before_count = u.get("warnings_count", 0) or 0
+                _ = u.get("warnings_count", 0) or 0  # captured for potential future delta-check
         r = admin_session.put(f"{API}/admin/reports/{rid}", json={"action": "warn", "admin_notes": "warn"}, timeout=10)
         assert r.status_code == 200
         # Verify increment via /admin/users if available — otherwise just assert ok
@@ -209,7 +210,7 @@ class TestSeoContent:
         body2 = r2.json()
         # if first call returned fallback (LLM failed), it won't have been cached; only require cached=True if first was real
         if not body1.get("fallback"):
-            assert body2.get("cached") is True
+            assert body2.get("cached") == True  # noqa: E712
             assert body2["content"] == body1["content"]
 
 

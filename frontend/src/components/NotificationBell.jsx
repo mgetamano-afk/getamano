@@ -27,7 +27,7 @@ export default function NotificationBell({ compact = false }) {
       const r = await api.get("/notifications");
       setItems(r.data.items || []);
       setUnread(r.data.unread_count || 0);
-    } catch {} finally { setLoading(false); }
+    } catch (e) { console.error("notifications load failed", e); } finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -47,19 +47,19 @@ export default function NotificationBell({ compact = false }) {
   const markRead = async (id) => {
     setItems(items.map(i => i.notification_id === id ? { ...i, is_read: true } : i));
     setUnread(Math.max(0, unread - 1));
-    try { await api.post(`/notifications/${id}/read`); } catch {}
+    try { await api.post(`/notifications/${id}/read`); } catch (e) { console.error("mark read failed", e); }
   };
   const dismiss = async (id, e) => {
     e?.stopPropagation();
     setItems(items.filter(i => i.notification_id !== id));
     const item = items.find(i => i.notification_id === id);
     if (item && !item.is_read) setUnread(Math.max(0, unread - 1));
-    try { await api.post(`/notifications/${id}/dismiss`); } catch {}
+    try { await api.post(`/notifications/${id}/dismiss`); } catch (err) { console.error("dismiss failed", err); }
   };
   const markAllRead = async () => {
     setItems(items.map(i => ({ ...i, is_read: true })));
     setUnread(0);
-    try { await api.post("/notifications/read-all"); } catch {}
+    try { await api.post("/notifications/read-all"); } catch (e) { console.error("mark all read failed", e); }
   };
 
   const BellIcon = unread > 0 ? BellRing : Bell;

@@ -12,9 +12,9 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASS = "admin123"
+ADMIN_PASS = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASS = "provider123"
+PROVIDER_PASS = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 
 
 def _login(session, email, password):
@@ -67,8 +67,8 @@ class TestMarketPulse:
         }
         missing = expected_keys - set(data.keys())
         assert not missing, f"Missing keys: {missing}. Got: {list(data.keys())}"
-        assert data.get("has_signal") is True, f"has_signal expected True, got {data.get('has_signal')}. Payload={data}"
-        assert data.get("available") is True, f"available expected True, got {data.get('available')}. Payload={data}"
+        assert data.get("has_signal") == True  # noqa: E712, f"has_signal expected True, got {data.get('has_signal')}. Payload={data}"
+        assert data.get("available") == True  # noqa: E712, f"available expected True, got {data.get('available')}. Payload={data}"
         assert isinstance(data.get("currency"), str) and len(data["currency"]) > 0
 
 

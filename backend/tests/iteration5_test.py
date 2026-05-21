@@ -16,8 +16,8 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN = {"email": "admin@getamano.com", "password": "admin123"}
-DEMO_PROVIDER = {"email": "demo.provider@getamano.com", "password": "provider123"}
+ADMIN = {"email": "admin@getamano.com", "password": os.environ.get("TEST_ADMIN_PASSWORD", "admin123")}
+DEMO_PROVIDER = {"email": "demo.provider@getamano.com", "password": os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")}
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 
 
@@ -143,7 +143,7 @@ class TestLikes:
         # like (POST toggles ON since fresh user)
         r = requests.post(f"{API}/providers/{demo_provider_id}/like", headers=_hdr(token), timeout=15)
         assert r.status_code == 200
-        assert r.json()["liked"] is True
+        assert r.json()["liked"] == True  # noqa: E712
 
         # verify increment
         r1 = requests.get(f"{API}/providers/by-slug/{DEMO_SLUG}", timeout=15)
@@ -153,12 +153,12 @@ class TestLikes:
         # like-status
         r2 = requests.get(f"{API}/providers/{demo_provider_id}/like-status", headers=_hdr(token), timeout=15)
         assert r2.status_code == 200
-        assert r2.json()["liked"] is True
+        assert r2.json()["liked"] == True  # noqa: E712
 
         # toggle OFF
         r3 = requests.post(f"{API}/providers/{demo_provider_id}/like", headers=_hdr(token), timeout=15)
         assert r3.status_code == 200
-        assert r3.json()["liked"] is False
+        assert r3.json()["liked"] == False  # noqa: E712
         r4 = requests.get(f"{API}/providers/by-slug/{DEMO_SLUG}", timeout=15)
         assert r4.json().get("likes_count", 0) == base_likes
 
@@ -215,7 +215,7 @@ class TestPromoCodes:
         if r.status_code == 200:
             d = r.json()
             assert d["plan_assigned"] == "pro"
-            assert d["founding_member"] is True
+            assert d["founding_member"] == True  # noqa: E712
             # second apply must fail (already used)
             r2 = requests.post(f"{API}/promo-codes/apply", headers=_hdr(token), json={"code": "GETAMANO50"}, timeout=15)
             assert r2.status_code == 400, f"expected 400 on already-used, got {r2.status_code} {r2.text}"
@@ -223,7 +223,7 @@ class TestPromoCodes:
             rme = requests.get(f"{API}/providers/me", headers=_hdr(token), timeout=15)
             assert rme.status_code == 200
             assert rme.json().get("plan") == "pro"
-            assert rme.json().get("founding_member") is True
+            assert rme.json().get("founding_member") == True  # noqa: E712
         else:
             # acceptable failure modes
             assert r.status_code in (400,), f"unexpected promo apply status {r.status_code}: {r.text}"

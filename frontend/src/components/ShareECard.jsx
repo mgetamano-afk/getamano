@@ -45,7 +45,8 @@ export default function ShareECard({ businessName, slug, description }) {
 
   const nativeShare = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: businessName, text: description, url }); return true; } catch {}
+      try { await navigator.share({ title: businessName, text: description, url }); return true; }
+      catch (e) { if (e?.name !== "AbortError") console.error("native share failed", e); }
     }
     return false;
   };

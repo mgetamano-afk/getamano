@@ -16,9 +16,9 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASS = "admin123"
+ADMIN_PASS = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASS = "provider123"
+PROVIDER_PASS = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 
 
 def _login(session, email, password):
@@ -64,7 +64,7 @@ class TestOwnerIdentityEndpoint:
         r = provider_session.put(f"{API}/providers/me/owner-identity", json={"owner_identity": "latino"})
         assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text[:200]}"
         data = r.json()
-        assert data.get("ok") is True
+        assert data.get("ok") == True  # noqa: E712
         assert data.get("owner_identity") == "latino"
 
         # Verify persistence
@@ -84,7 +84,7 @@ class TestOwnerIdentityEndpoint:
         r = provider_session.put(f"{API}/providers/me/owner-identity", json={"owner_identity": None})
         assert r.status_code == 200
         body = r.json()
-        assert body.get("ok") is True
+        assert body.get("ok") == True  # noqa: E712
         assert body.get("owner_identity") is None
 
         me = provider_session.get(f"{API}/providers/me")

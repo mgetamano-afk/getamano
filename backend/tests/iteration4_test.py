@@ -19,9 +19,9 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstr
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 
 
@@ -260,7 +260,7 @@ class TestAdminCities:
         assert r.status_code == 200
         items = r.json()
         # all returned must be featured
-        assert all(c.get("featured") is True for c in items)
+        assert all(c.get("featured") == True for c in items)  # noqa: E712
         # our created featured city is included
         assert any(c["city_id"] == temp_city["city_id"] for c in items)
 
@@ -398,7 +398,7 @@ class TestTwilioLogOnly:
         assert after > before
 
     def test_sms_log_on_verify(self, admin_token, provider_info):
-        before_pending = _count_sms("verify_pending")
+        _ = _count_sms("verify_pending")  # noqa: F841 — baseline reserved for future delta assertion
         before_approved = _count_sms("verify_approved")
         r = requests.post(f"{API}/admin/providers/{provider_info['provider_id']}/verify",
                           headers=H(admin_token), json={"status": "approved", "note": "ok"}, timeout=15)

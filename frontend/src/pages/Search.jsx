@@ -48,10 +48,14 @@ export default function Search() {
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
+    // Mount-only: sentinelRef.current is set by React before this fires
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     api.get("/categories").then(r => setCategories(r.data));
+    // Mount-only: load categories once. `api` is a module singleton.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doSearch = async (e, overrides = {}) => {

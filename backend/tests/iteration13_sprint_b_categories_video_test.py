@@ -19,7 +19,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
 
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 PROVIDER_SLUG = "maria-cleaning-services-sallisaw-ok"
 
 # Minimal valid-looking MP4 (header ftypisom) — backend only checks content_type, not bytes.
@@ -171,7 +171,7 @@ class TestProviderVideo:
         r = s.post(f"{API}/providers/me/video", files=files, timeout=30)
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["ok"] is True
+        assert body["ok"] == True  # noqa: E712
         assert body["video_url"].startswith("/api/files/")
         assert body["content_type"] == "video/mp4"
         assert body["size"] == len(MINIMAL_MP4)

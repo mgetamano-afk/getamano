@@ -169,14 +169,14 @@ def test_promo_founding_status(http):
 
 
 def test_auth_login_admin(http):
-    r = http.post(f"{API}/auth/login", json={"email": "admin@getamano.com", "password": "admin123"}, timeout=30)
+    r = http.post(f"{API}/auth/login", json={"email": "admin@getamano.com", "password": os.environ.get("TEST_ADMIN_PASSWORD", "admin123")}, timeout=30)
     assert r.status_code == 200, r.text
     assert "user" in r.json() or "access_token" in r.json()
 
 
 def test_auth_login_provider(http):
     s = requests.Session()
-    r = s.post(f"{API}/auth/login", json={"email": "demo.provider@getamano.com", "password": "provider123"}, timeout=30)
+    r = s.post(f"{API}/auth/login", json={"email": "demo.provider@getamano.com", "password": os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")}, timeout=30)
     assert r.status_code == 200, r.text
     # then try market-pulse on same session
     mp = s.get(f"{API}/providers/me/market-pulse", timeout=30)

@@ -42,7 +42,11 @@ export default function ShareLinkCard({ slug, businessName }) {
 
   const nativeShare = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: businessName, text: shareText, url: shortUrl }); return; } catch {}
+      try { await navigator.share({ title: businessName, text: shareText, url: shortUrl }); return; }
+      catch (e) {
+        // User cancelled share (AbortError) is expected — only log unexpected errors
+        if (e?.name !== "AbortError") console.error("native share failed", e);
+      }
     }
     copy();
   };

@@ -18,7 +18,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
 
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 
 
 # --- Fixtures ---
@@ -86,7 +86,7 @@ def test_gallery_limit_pro_unlimited(provider_session):
     data = r.json()
     assert data["plan"] == "pro"
     assert data["max"] is None
-    assert data["can_upload"] is True
+    assert data["can_upload"] == True  # noqa: E712
     assert data["remaining"] is None
     assert isinstance(data["used"], int)
 

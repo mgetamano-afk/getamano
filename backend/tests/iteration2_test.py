@@ -18,9 +18,9 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 
 
@@ -182,7 +182,7 @@ class TestMessaging:
         pmine = [c for c in pl if c["conversation_id"] == conv_id]
         assert pmine, "provider should see the conversation"
         assert pmine[0]["my_role"] == "provider"
-        assert pmine[0]["unread"] is True
+        assert pmine[0]["unread"] == True  # noqa: E712
 
         # provider fetches messages — should mark read & show 1 msg
         msgs = requests.get(f"{API}/conversations/{conv_id}/messages",
@@ -191,7 +191,7 @@ class TestMessaging:
 
         pl2 = requests.get(f"{API}/conversations", headers=H(provider_token), timeout=15).json()
         pmine2 = [c for c in pl2 if c["conversation_id"] == conv_id][0]
-        assert pmine2["unread"] is False
+        assert pmine2["unread"] == False  # noqa: E712
 
         # provider replies
         r2 = requests.post(f"{API}/messages/{conv_id}/reply", headers=H(provider_token),
@@ -202,7 +202,7 @@ class TestMessaging:
         # client should now have unread=True
         cl2 = requests.get(f"{API}/conversations", headers=H(ctoken), timeout=15).json()
         cmine2 = [c for c in cl2 if c["conversation_id"] == conv_id][0]
-        assert cmine2["unread"] is True
+        assert cmine2["unread"] == True  # noqa: E712
 
         # third party (admin) cannot fetch this conversation
         admin_login = requests.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, timeout=15)

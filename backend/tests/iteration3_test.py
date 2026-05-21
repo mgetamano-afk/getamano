@@ -16,9 +16,9 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstr
 API = f"{BASE_URL}/api"
 
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
 
 
@@ -76,7 +76,7 @@ class TestCreateProviderPersistsNewFields:
     def test_create_persists_all_new_fields(self, new_provider):
         body = new_provider["profile"]
         # Assert all 5 new fields present in create response
-        assert body.get("is_home_based") is True, f"is_home_based not persisted: {body}"
+        assert body.get("is_home_based") == True  # noqa: E712, f"is_home_based not persisted: {body}"
         assert body.get("latitude") == 30.2672
         assert body.get("longitude") == -97.7431
         assert body.get("additional_categories") == new_provider["payload"]["additional_categories"]
@@ -89,7 +89,7 @@ class TestCreateProviderPersistsNewFields:
         r = requests.get(f"{API}/providers/me", headers=H(new_provider["token"]), timeout=15)
         assert r.status_code == 200
         data = r.json()
-        assert data["is_home_based"] is True
+        assert data["is_home_based"] == True  # noqa: E712
         assert data["latitude"] == 30.2672
         assert data["longitude"] == -97.7431
         assert len(data["additional_categories"]) == 1
@@ -123,7 +123,7 @@ class TestUpdateProviderPersistsNewFields:
         r = requests.put(f"{API}/providers/me", headers=H(token), json=update_payload, timeout=20)
         assert r.status_code == 200, r.text
         data = r.json()
-        assert data["is_home_based"] is False
+        assert data["is_home_based"] == False  # noqa: E712
         assert data["latitude"] == 35.4612
         assert data["longitude"] == -94.7872
         assert data["additional_categories"] == [categories[2]["category_id"]]
@@ -132,7 +132,7 @@ class TestUpdateProviderPersistsNewFields:
 
         # Re-GET to confirm DB persistence
         r2 = requests.get(f"{API}/providers/me", headers=H(token), timeout=15).json()
-        assert r2["is_home_based"] is False
+        assert r2["is_home_based"] == False  # noqa: E712
         assert r2["latitude"] == 35.4612
         assert r2["gallery"][0]["id"] == "g_updated"
 

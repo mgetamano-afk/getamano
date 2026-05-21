@@ -3,19 +3,11 @@ Backend integration tests for getamano API.
 Covers: auth (register/login/me/logout), categories, providers (search/featured/by-slug/me/CRUD),
 reviews, favorites, admin endpoints, plans, and contact-click tracker.
 """
-import os
 import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
-API = f"{BASE_URL}/api"
-
-ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
-PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
-DEMO_SLUG = "maria-cleaning-services-sallisaw-ok"
+from test_config import API, ADMIN_EMAIL, ADMIN_PASSWORD, PROVIDER_EMAIL, PROVIDER_PASSWORD, DEMO_SLUG  # noqa: F401
 
 
 # ---------- Session-scoped helpers ----------
@@ -98,7 +90,7 @@ class TestAuth:
         # logout (cookie-based; with bearer it still returns ok=True)
         r2 = requests.post(f"{API}/auth/logout", headers=H(client_user["token"]), timeout=15)
         assert r2.status_code == 200
-        assert r2.json().get("ok") is True
+        assert r2.json().get("ok") == True  # noqa: E712
 
     def test_register_duplicate_email(self):
         email = f"TEST_dup_{uuid.uuid4().hex[:6]}@example.com"

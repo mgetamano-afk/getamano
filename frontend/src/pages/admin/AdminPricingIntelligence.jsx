@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { api } from "../../lib/api";
 import { TrendingUp, MapPin, Activity, Download, DollarSign, Users } from "lucide-react";
+import { toast } from "sonner";
 
 const BUDGET_LABEL = {
   "<100": "<$100", "100-300": "$100-300", "300-700": "$300-700", "700-1500": "$700-1.5K", ">1500": ">$1.5K",
@@ -18,26 +19,35 @@ export default function AdminPricingIntelligence() {
     const q = new URLSearchParams();
     if (filters.state) q.set("state", filters.state);
     q.set("days", filters.days);
-    api.get(`/admin/pricing-intelligence?${q.toString()}`).then(r => setData(r.data)).catch(() => {});
+    api.get(`/admin/pricing-intelligence?${q.toString()}`)
+      .then(r => setData(r.data))
+      .catch(e => { console.error("pricing fetch failed", e); toast.error("No se pudo cargar el reporte"); });
   };
+  // Reload when filters change; `load` is recreated each render but only `filters` is the meaningful dep.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [filters]);
   useEffect(() => {
-    api.get("/categories").then(r => setCats(r.data?.items || r.data || [])).catch(() => {});
+    api.get("/categories")
+      .then(r => setCats(r.data?.items || r.data || []))
+      .catch(e => console.error("categories load failed", e));
     api.get("/cities").then(r => {
       const items = r.data?.items || r.data || [];
       setStates([...new Set(items.map(c => c.state).filter(Boolean))].sort());
-    }).catch(() => {});
+    }).catch(e => console.error("cities load failed", e));
   }, []);
 
   const downloadCsv = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const url = `${process.env.REACT_APP_BACKEND_URL}/api/admin/pricing-intelligence/export.csv`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const blob = await res.blob();
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "getamano-pricing.csv";
+      const res = await api.get("/admin/pricing-intelligence/export.csv", { responseType: "blob" });
+      const blob = res.data;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "getamano-pricing.csv";
       document.body.appendChild(a); a.click(); a.remove();
-    } catch {}
+    } catch (e) {
+      console.error("Pricing CSV export failed:", e);
+      toast.error("No se pudo descargar el CSV");
+    }
   };
 
   return (

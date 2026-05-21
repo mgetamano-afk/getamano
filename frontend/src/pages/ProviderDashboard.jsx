@@ -384,7 +384,7 @@ export default function ProviderDashboard() {
                       <div className="font-display font-bold text-xl text-slate-900">{p.name}</div>
                       <div className="text-2xl font-display font-bold mt-1">${p.price_monthly}<span className="text-sm text-slate-500 font-normal">/mes</span></div>
                       <ul className="mt-3 space-y-1 min-h-[120px]">
-                        {p.features_es.slice(0, 4).map((f, i) => <li key={i} className="text-xs text-slate-600 flex items-start gap-1"><Check className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />{f}</li>)}
+                        {p.features_es.slice(0, 4).map((f) => <li key={f} className="text-xs text-slate-600 flex items-start gap-1"><Check className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />{f}</li>)}
                       </ul>
                       <button
                         onClick={() => changePlan(p.id)}

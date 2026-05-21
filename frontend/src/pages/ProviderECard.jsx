@@ -218,7 +218,7 @@ export default function ProviderECard() {
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-display font-semibold text-slate-900 mb-3">{t("provider.services")}</h3>
                 <div className="flex flex-wrap gap-2">
-                  {p.services.map((s, i) => <span key={i} className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm">{s}</span>)}
+                  {p.services.map((s, i) => <span key={`svc-${s}-${i}`} className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm">{s}</span>)}
                 </div>
               </div>
             )}
@@ -251,7 +251,7 @@ export default function ProviderECard() {
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-display font-semibold text-slate-900 mb-3">{t("provider.areas")}</h3>
                 <div className="flex flex-wrap gap-2">
-                  {p.service_areas.map((a, i) => <span key={i} className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm">{a}</span>)}
+                  {p.service_areas.map((a, i) => <span key={`area-${a}-${i}`} className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm">{a}</span>)}
                 </div>
               </div>
             )}

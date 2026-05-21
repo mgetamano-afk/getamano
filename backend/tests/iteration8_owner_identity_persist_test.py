@@ -16,7 +16,7 @@ if not BASE_URL:
         pass
 
 PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 
 
 @pytest.fixture(scope="module")
