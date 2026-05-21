@@ -4,9 +4,10 @@ import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award } from "lucide-react";
+import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award, Video, Play } from "lucide-react";
 import FoundingCounter from "../components/FoundingCounter";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
+import { buildFileUrl } from "../components/ImageUpload";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -68,6 +69,8 @@ export default function Landing() {
   const [loc, setLoc] = useState("");
   const [categories, setCategories] = useState([]);
   const [featured, setFeatured] = useState([]);
+  const [withVideo, setWithVideo] = useState([]);
+  const [playingVideo, setPlayingVideo] = useState(null); // provider_id or null
   const [stats, setStats] = useState({ providers: 500, states: 38, rating: 4.9 });
   const [founding, setFounding] = useState({ available: true, used: 0, max: 50 });
   const [openFaq, setOpenFaq] = useState(null);
@@ -80,6 +83,7 @@ export default function Landing() {
   useEffect(() => {
     api.get("/categories").then(r => setCategories(r.data));
     api.get("/providers/featured").then(r => setFeatured(r.data));
+    api.get("/providers", { params: { has_video: "true", limit: 6 } }).then(r => setWithVideo(r.data || [])).catch(() => {});
     api.get("/public/stats").then(r => setStats(r.data)).catch(() => {});
     api.get("/promo-codes/founding-status").then(r => setFounding(r.data)).catch(() => {});
   }, []);
@@ -328,6 +332,121 @@ export default function Landing() {
                 </div>
               </Link>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* DESTACADOS CON VIDEO — palanca de conversión Free → Pro */}
+      {withVideo.length > 0 && (
+        <section
+          className="py-16 md:py-24"
+          style={{ background: "linear-gradient(180deg, #F7F6F2 0%, #EBF8F7 100%)" }}
+          data-testid="landing-featured-video-section"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-3" style={{ backgroundColor: "#025F67", color: "#FFFFFF" }}>
+                  <Video className="w-3.5 h-3.5" /> NUEVO
+                </div>
+                <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight" style={{ color: "#025F67" }}>
+                  Conoce a tu próximo proveedor en video
+                </h2>
+                <p className="text-slate-600 mt-2 max-w-xl">
+                  Mira cómo trabajan, escucha su historia y elige con confianza. Estos proveedores Pro grabaron un video corto para ti.
+                </p>
+              </div>
+              <Link
+                to="/buscar?has_video=true"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
+                style={{ color: "#025F67" }}
+                data-testid="landing-video-see-all"
+              >
+                Ver todos con video <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {withVideo.slice(0, 3).map(p => {
+                const isPlaying = playingVideo === p.provider_id;
+                return (
+                  <div
+                    key={p.provider_id}
+                    className="card-lift bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col"
+                    data-testid={`landing-video-card-${p.slug}`}
+                  >
+                    <div className="relative aspect-video bg-slate-900 overflow-hidden">
+                      {isPlaying ? (
+                        <video
+                          src={buildFileUrl(p.video_url)}
+                          controls
+                          autoPlay
+                          preload="metadata"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          data-testid={`landing-video-player-${p.slug}`}
+                        />
+                      ) : (
+                        <>
+                          {p.cover_url ? (
+                            <img src={p.cover_url} alt={p.business_name} className="absolute inset-0 w-full h-full object-cover opacity-80" loading="lazy" />
+                          ) : (
+                            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #2F9D94 0%, #025F67 100%)" }} />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setPlayingVideo(p.provider_id)}
+                            className="absolute inset-0 flex items-center justify-center group bg-black/20 hover:bg-black/30 transition"
+                            data-testid={`landing-video-play-${p.slug}`}
+                            aria-label={`Reproducir video de ${p.business_name}`}
+                          >
+                            <span className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                              <Play className="w-7 h-7 ml-1" style={{ color: "#025F67" }} fill="currentColor" />
+                            </span>
+                          </button>
+                          <span
+                            className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white"
+                            style={{ backgroundColor: "rgba(2, 95, 103, 0.92)" }}
+                          >
+                            <Video className="w-3 h-3" /> Video
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="p-4 flex-1 flex flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-display font-semibold text-base truncate" style={{ color: "#025F67" }}>
+                          {p.business_name}
+                        </h3>
+                        {p.rating_count > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#063154" }}>
+                            <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#F59E0B" }} /> {Number(p.rating_avg).toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {p.city}{p.state ? `, ${p.state}` : ""}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {p.verification_status === "approved" && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#025F67", border: "1px solid #A6E1DA" }}>
+                            <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                          </span>
+                        )}
+                        <OwnerIdentityBadge identity={p.owner_identity} size="sm" />
+                      </div>
+                      <Link
+                        to={`/proveedor/${p.slug}`}
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+                        style={{ color: "#025F67" }}
+                        data-testid={`landing-video-card-link-${p.slug}`}
+                      >
+                        Ver perfil completo <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
       )}
