@@ -6,10 +6,11 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { GalleryUpload, buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import MilestoneCelebration from "../components/MilestoneCelebration";
+import AchievementJournal from "../components/AchievementJournal";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -17,6 +18,7 @@ const TABS = [
   { id: "galeria", label: "Galería", Icon: ImageIcon },
   { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
   { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
+  { id: "diario", label: "Mi diario", Icon: Trophy },
   { id: "suscripcion", label: "Suscripción", Icon: CreditCard },
 ];
 
@@ -337,6 +339,10 @@ export default function ProviderDashboard() {
                   </div>
                 )}
               </div>
+            )}
+
+            {tab === "diario" && (
+              <AchievementJournal businessNameProp={profile?.business_name} />
             )}
 
             {tab === "suscripcion" && (

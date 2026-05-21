@@ -1514,6 +1514,101 @@ async def dismiss_milestone(milestone_id: str, user: User = Depends(get_current_
         raise HTTPException(status_code=404, detail="Milestone not found")
     return {"ok": True}
 
+# Progress hint for locked milestones (current/target)
+def _milestone_progress(mid: str, prof: dict, extras: dict) -> dict:
+    v = prof.get("views", 0) or 0
+    c = prof.get("contact_clicks", 0) or 0
+    rcount = prof.get("rating_count", 0) or 0
+    likes = prof.get("likes_count", 0) or 0
+    msg = extras.get("msg_count", 0) or 0
+    req = extras.get("req_count", 0) or 0
+    targets = {
+        "first_view": (v, 1), "ten_views": (v, 10), "fifty_views": (v, 50), "hundred_views": (v, 100),
+        "first_contact": (c, 1), "ten_contacts": (c, 10),
+        "first_review": (rcount, 1), "five_reviews": (rcount, 5),
+        "first_like": (likes, 1), "ten_likes": (likes, 10),
+        "first_message": (msg, 1), "first_request": (req, 1),
+    }
+    if mid in targets:
+        cur, tgt = targets[mid]
+        return {"current": min(cur, tgt), "target": tgt, "pct": min(100, round((cur / tgt) * 100)) if tgt else 0}
+    return {"current": 0, "target": 1, "pct": 0}
+
+@api_router.get("/providers/me/journal")
+async def my_journal(user: User = Depends(get_current_user)):
+    """Achievement journal — full timeline of milestones unlocked + locked milestones with progress."""
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        return {"journey_start": None, "entries": [], "locked": [], "stats": {}}
+    user_doc = await db.users.find_one({"user_id": user.user_id}, {"_id": 0})
+    name = (user.name or "compañer@").split(" ")[0]
+    # Ensure milestones are computed/saved
+    has_5_star = await db.reviews.find_one({"provider_id": prof["provider_id"], "rating": 5}) is not None
+    msg_count = await db.conversations.count_documents({"provider_id": prof["provider_id"]})
+    req_count = await db.service_requests.count_documents({"provider_id": prof["provider_id"]})
+    extras = {"has_5_star": has_5_star, "msg_count": msg_count, "req_count": req_count}
+    existing = {r["milestone_id"]: r async for r in db.provider_milestones.find({"user_id": user.user_id}, {"_id": 0})}
+    for d in MILESTONE_DEFS:
+        if _milestone_unlocked(d["id"], prof, user_doc or {}, extras) and d["id"] not in existing:
+            rec = {
+                "record_id": f"ms_{uuid.uuid4().hex[:10]}",
+                "user_id": user.user_id,
+                "provider_id": prof["provider_id"],
+                "milestone_id": d["id"],
+                "unlocked_at": datetime.now(timezone.utc).isoformat(),
+                "seen_at": None,
+                "dismissed_at": None,
+            }
+            await db.provider_milestones.insert_one(rec)
+            rec.pop("_id", None)
+            existing[d["id"]] = rec
+    defs_by_id = {d["id"]: d for d in MILESTONE_DEFS}
+    entries = []
+    for mid, rec in existing.items():
+        if mid not in defs_by_id:
+            continue
+        d = defs_by_id[mid]
+        entries.append({
+            "milestone_id": mid,
+            "title": d["title"],
+            "message": d["message"].format(name=name),
+            "emoji": d["emoji"],
+            "tier": d["tier"],
+            "unlocked_at": rec["unlocked_at"],
+        })
+    entries.sort(key=lambda x: x["unlocked_at"], reverse=True)
+    # Locked = not unlocked yet, with progress hint
+    locked = []
+    for d in MILESTONE_DEFS:
+        if d["id"] in existing:
+            continue
+        prog = _milestone_progress(d["id"], prof, extras)
+        locked.append({
+            "milestone_id": d["id"],
+            "title": d["title"],
+            "message": d["message"].format(name=name),
+            "emoji": d["emoji"],
+            "tier": d["tier"],
+            "progress": prog,
+        })
+    # Sort locked by closest to unlock first
+    locked.sort(key=lambda x: -x["progress"]["pct"])
+    return {
+        "journey_start": prof.get("created_at"),
+        "business_name": prof.get("business_name"),
+        "entries": entries,
+        "locked": locked,
+        "stats": {
+            "total_unlocked": len(entries),
+            "total_possible": len(MILESTONE_DEFS),
+            "views": prof.get("views", 0),
+            "contacts": prof.get("contact_clicks", 0),
+            "reviews": prof.get("rating_count", 0),
+            "rating": prof.get("rating_avg", 0),
+            "likes": prof.get("likes_count", 0),
+        },
+    }
+
 # ============ STATS for landing (public) ============
 @api_router.get("/public/stats")
 async def public_stats():
