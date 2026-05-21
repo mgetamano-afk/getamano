@@ -1,10 +1,11 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const NAV = [
   { path: "/admin", label: "Resumen", Icon: LayoutDashboard, exact: true },
+  { path: "/admin/ceo", label: "Panel CEO", Icon: Crown, highlight: true },
   { path: "/admin/queue", label: "Cola de verificación", Icon: ShieldCheck },
   { path: "/admin/providers", label: "Proveedores", Icon: Users },
   { path: "/admin/reviews", label: "Reseñas", Icon: MessageSquare },
@@ -52,7 +53,13 @@ export default function AdminLayout({ children, title }) {
           {NAV.map(item => (
             <Link
               key={item.path} to={item.path} onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive(item) ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
+                isActive(item)
+                  ? "bg-blue-600 text-white"
+                  : item.highlight
+                    ? "bg-gradient-to-r from-amber-500/15 to-orange-500/10 text-amber-300 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/20"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
               data-testid={`admin-nav-${item.path.split("/").pop() || "home"}`}
             >
               <item.Icon className="w-4 h-4 flex-shrink-0" />

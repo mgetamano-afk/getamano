@@ -1609,7 +1609,149 @@ async def my_journal(user: User = Depends(get_current_user)):
         },
     }
 
-# ============ STATS for landing (public) ============
+@api_router.get("/admin/ceo-metrics")
+async def ceo_metrics(admin: User = Depends(require_admin)):
+    """Executive dashboard: live activity, growth, revenue projections, top performers."""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    week_start = (now - timedelta(days=7)).isoformat()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+    # === Volume ===
+    total_users = await db.users.count_documents({})
+    total_providers = await db.provider_profiles.count_documents({"is_active": True})
+    approved = await db.provider_profiles.count_documents({"verification_status": "approved", "is_active": True})
+    pending = await db.provider_profiles.count_documents({"verification_status": "pending"})
+    total_clients = total_users - await db.provider_profiles.count_documents({})
+    if total_clients < 0:
+        total_clients = 0
+
+    # === Acquisition (signups by period) ===
+    signups_today = await db.users.count_documents({"created_at": {"$gte": today_start}})
+    signups_yesterday = await db.users.count_documents({"created_at": {"$gte": yesterday_start, "$lt": today_start}})
+    signups_week = await db.users.count_documents({"created_at": {"$gte": week_start}})
+    signups_month = await db.users.count_documents({"created_at": {"$gte": month_start}})
+    providers_today = await db.provider_profiles.count_documents({"created_at": {"$gte": today_start}})
+    providers_week = await db.provider_profiles.count_documents({"created_at": {"$gte": week_start}})
+    providers_month = await db.provider_profiles.count_documents({"created_at": {"$gte": month_start}})
+
+    # === Engagement ===
+    msgs_today = await db.messages.count_documents({"created_at": {"$gte": today_start}}) if "messages" in await db.list_collection_names() else 0
+    requests_today = await db.service_requests.count_documents({"created_at": {"$gte": today_start}})
+    reviews_today = await db.reviews.count_documents({"created_at": {"$gte": today_start}})
+    milestones_today = await db.provider_milestones.count_documents({"unlocked_at": {"$gte": today_start}})
+    milestones_week = await db.provider_milestones.count_documents({"unlocked_at": {"$gte": week_start}})
+    total_milestones = await db.provider_milestones.count_documents({})
+    likes_today = await db.likes.count_documents({"created_at": {"$gte": today_start}}) if "likes" in await db.list_collection_names() else 0
+
+    # === Plan distribution ===
+    plan_pipeline = [
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$plan", "count": {"$sum": 1}}},
+    ]
+    plan_rows = await db.provider_profiles.aggregate(plan_pipeline).to_list(20)
+    plans_dist = {r["_id"] or "free": r["count"] for r in plan_rows}
+
+    # === Revenue projection (MRR + ARR) ===
+    PLAN_PRICES = {"free": 0, "basic": 19, "pro": 49, "premium": 99}
+    mrr = sum(PLAN_PRICES.get(plan, 0) * count for plan, count in plans_dist.items())
+    arr = mrr * 12
+    # Founding members get pro free until 2027, so we don't count their MRR (but show count)
+    founding_count = await db.users.count_documents({"founding_member": True})
+
+    # === Geographic distribution ===
+    state_pipeline = [
+        {"$match": {"is_active": True, "state": {"$nin": [None, ""]}}},
+        {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10},
+    ]
+    state_rows = await db.provider_profiles.aggregate(state_pipeline).to_list(10)
+    top_states = [{"state": r["_id"], "count": r["count"]} for r in state_rows]
+
+    # === Categories distribution ===
+    cat_pipeline = [
+        {"$match": {"is_active": True, "category_id": {"$ne": None}}},
+        {"$group": {"_id": "$category_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 8},
+    ]
+    cat_rows = await db.provider_profiles.aggregate(cat_pipeline).to_list(8)
+    cats_meta = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(100)}
+    top_categories = [{
+        "category_id": r["_id"],
+        "name": cats_meta.get(r["_id"], {}).get("name_es", r["_id"]),
+        "count": r["count"]
+    } for r in cat_rows]
+
+    # === Top performers (by views) ===
+    top_pipeline = [
+        {"$match": {"is_active": True, "verification_status": "approved"}},
+        {"$sort": {"views": -1}},
+        {"$limit": 5},
+        {"$project": {"_id": 0, "slug": 1, "business_name": 1, "views": 1, "contact_clicks": 1, "rating_avg": 1, "rating_count": 1, "city": 1, "state": 1, "logo_url": 1, "likes_count": 1, "plan": 1}},
+    ]
+    top_performers = await db.provider_profiles.aggregate(top_pipeline).to_list(5)
+
+    # === Recent activity feed (mixed) ===
+    activity = []
+    # Recent users
+    async for u in db.users.find({}, {"_id": 0, "name": 1, "created_at": 1, "role": 1}).sort("created_at", -1).limit(5):
+        activity.append({"type": "signup", "at": u.get("created_at"), "title": f"{(u.get('name') or 'Nuevo usuario').split(' ')[0]} se registró", "role": u.get("role")})
+    # Recent milestones
+    async for m in db.provider_milestones.find({}, {"_id": 0}).sort("unlocked_at", -1).limit(5):
+        defs_by_id = {d["id"]: d for d in MILESTONE_DEFS}
+        d = defs_by_id.get(m["milestone_id"])
+        if not d:
+            continue
+        prof = await db.provider_profiles.find_one({"user_id": m["user_id"]}, {"_id": 0, "business_name": 1})
+        if not prof or (prof.get("business_name") or "").startswith("TEST_"):
+            continue
+        activity.append({"type": "milestone", "at": m["unlocked_at"], "title": f"{prof.get('business_name', 'Alguien')} desbloqueó {d['title']}", "tier": d["tier"]})
+    activity.sort(key=lambda x: x.get("at") or "", reverse=True)
+    activity = activity[:10]
+
+    # === Founding cupos ===
+    founding = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0}) or {}
+
+    return {
+        "generated_at": now.isoformat(),
+        "volume": {
+            "total_users": total_users,
+            "total_clients": total_clients,
+            "total_providers": total_providers,
+            "approved_providers": approved,
+            "pending_providers": pending,
+        },
+        "acquisition": {
+            "signups": {"today": signups_today, "yesterday": signups_yesterday, "week": signups_week, "month": signups_month},
+            "new_providers": {"today": providers_today, "week": providers_week, "month": providers_month},
+        },
+        "engagement": {
+            "messages_today": msgs_today,
+            "requests_today": requests_today,
+            "reviews_today": reviews_today,
+            "likes_today": likes_today,
+            "milestones_today": milestones_today,
+            "milestones_week": milestones_week,
+            "total_milestones_unlocked": total_milestones,
+        },
+        "revenue": {
+            "mrr_usd": mrr,
+            "arr_usd": arr,
+            "by_plan": plans_dist,
+            "founding_members_count": founding_count,
+            "founding_used": founding.get("current_uses", 0),
+            "founding_max": founding.get("max_uses", 50),
+            "plan_prices": PLAN_PRICES,
+        },
+        "geography": {"top_states": top_states},
+        "categories": {"top": top_categories},
+        "top_performers": top_performers,
+        "activity": activity,
+    }
+
 @api_router.get("/community/leaderboard")
 async def leaderboard(period: str = "month", limit: int = 5):
     """Top providers by milestones unlocked in a period (month/all)."""
