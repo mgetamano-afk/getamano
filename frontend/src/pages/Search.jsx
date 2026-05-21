@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft } from "lucide-react";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
 
@@ -28,10 +28,15 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
   const [stuck, setStuck] = useState(false);
-  const [view, setView] = useState(params.get("view") === "map" ? "map" : "list");
+  const [view, setView] = useState(() => {
+    const v = params.get("view");
+    return v === "map" || v === "split" ? v : "list";
+  });
   const [mapProviders, setMapProviders] = useState([]);
   const [mapLoading, setMapLoading] = useState(false);
+  const [highlightedId, setHighlightedId] = useState(null);
   const sentinelRef = useRef(null);
+  const listCardRefs = useRef({});
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -59,7 +64,7 @@ export default function Search() {
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     const urlQs = { ...qs };
-    if (view === "map") urlQs.view = "map";
+    if (view !== "list") urlQs.view = view;
     setParams(urlQs);
     // counts query: same filters minus owner_identity
     const countsQs = { ...qs };
@@ -106,18 +111,27 @@ export default function Search() {
   };
 
   useEffect(() => {
-    if (view === "map") {
+    if (view === "map" || view === "split") {
       fetchMap();
     }
     // eslint-disable-next-line
   }, [view]);
+
+  // When marker is clicked from map, scroll the matching list card into view (split mode)
+  const handleMarkerClick = (providerId) => {
+    setHighlightedId(providerId);
+    if (view === "split") {
+      const el = listCardRefs.current[providerId];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   useEffect(() => { doSearch(); /* eslint-disable-next-line */ }, []);
 
   const selectIdentity = (id) => {
     setOwnerIdentity(id);
     doSearch(null, { ownerIdentity: id });
-    if (view === "map") fetchMap({ ownerIdentity: id });
+    if (view === "map" || view === "split") fetchMap({ ownerIdentity: id });
   };
 
   return (
@@ -188,7 +202,7 @@ export default function Search() {
             );
           })}
 
-          {/* View toggle: Lista | Mapa */}
+          {/* View toggle: Lista | Split | Mapa */}
           <div className="ml-auto inline-flex items-center rounded-full border overflow-hidden" style={{ borderColor: "#BCC5CC", backgroundColor: "#FFFFFF" }} data-testid="view-toggle">
             <button
               type="button"
@@ -199,6 +213,16 @@ export default function Search() {
               aria-pressed={view === "list"}
             >
               <List className="w-4 h-4" /> Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("split")}
+              className="hidden md:inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition border-l border-r"
+              style={{ backgroundColor: view === "split" ? "#025F67" : "transparent", color: view === "split" ? "#FFFFFF" : "#025F67", borderColor: "#BCC5CC" }}
+              data-testid="view-toggle-split"
+              aria-pressed={view === "split"}
+            >
+              <LayoutPanelLeft className="w-4 h-4" /> Split
             </button>
             <button
               type="button"
@@ -216,7 +240,84 @@ export default function Search() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-12">
-        <div className="grid lg:grid-cols-[260px_1fr] gap-6">
+        {view === "split" ? (
+          /* SPLIT VIEW: list on left, sticky map on right (desktop only) */
+          <div data-testid="split-view">
+            <h2 className="font-display text-2xl font-semibold mb-4" style={{ color: "#025F67" }}>
+              {t("search.results")} <span className="text-slate-400 text-base font-normal">({mapProviders.length})</span>
+            </h2>
+            <div className="grid lg:grid-cols-2 gap-5">
+              {/* List column */}
+              <div className="space-y-4 max-h-[78vh] overflow-y-auto pr-1 lg:pr-3" data-testid="split-list-column">
+                {mapLoading && mapProviders.length === 0 && (
+                  <div className="text-center text-slate-500 py-12">{t("common.loading")}</div>
+                )}
+                {!mapLoading && mapProviders.length === 0 && (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">{t("search.no_results")}</div>
+                )}
+                {mapProviders.map(p => {
+                  const isHighlighted = highlightedId === p.provider_id;
+                  return (
+                    <div
+                      key={p.provider_id}
+                      ref={el => { if (el) listCardRefs.current[p.provider_id] = el; }}
+                      onMouseEnter={() => setHighlightedId(p.provider_id)}
+                      onMouseLeave={() => setHighlightedId(null)}
+                      onClick={() => handleMarkerClick(p.provider_id)}
+                      className="card-lift bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all"
+                      style={{
+                        borderColor: isHighlighted ? "#2F9D94" : "#E2E8F0",
+                        boxShadow: isHighlighted ? "0 8px 24px -8px rgba(47,157,148,0.35)" : undefined,
+                        transform: isHighlighted ? "translateY(-2px)" : undefined,
+                      }}
+                      data-testid={`split-card-${p.slug}`}
+                      data-highlighted={isHighlighted}
+                    >
+                      <div className="flex">
+                        <div className="w-28 h-28 bg-slate-100 flex-shrink-0 relative">
+                          {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="flex-1 p-4 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <Link to={`/services/${p.slug}`} onClick={e => e.stopPropagation()} className="font-display font-semibold text-base truncate hover:underline" style={{ color: "#025F67" }}>{p.business_name}</Link>
+                            {p.rating_count > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#063154" }}>
+                                <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#F59E0B" }} /> {Number(p.rating_avg).toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {p.city}{p.state ? `, ${p.state}` : ""}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {p.verified && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#025F67", border: "1px solid #A6E1DA" }}>
+                                <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                              </span>
+                            )}
+                            <OwnerIdentityBadge identity={p.owner_identity} size="sm" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Map column (sticky) */}
+              <div className="lg:sticky lg:top-[160px] h-fit" data-testid="split-map-column">
+                <ProvidersMap
+                  providers={mapProviders}
+                  loading={mapLoading}
+                  highlightedId={highlightedId}
+                  onMarkerHover={setHighlightedId}
+                  onMarkerClick={handleMarkerClick}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* LIST or MAP-only view */
+          <div className="grid lg:grid-cols-[260px_1fr] gap-6">
           {/* Filters */}
           <aside className="bg-white rounded-2xl border border-slate-200 p-5 h-fit" data-testid="search-filters">
             <div className="flex items-center gap-2 mb-4">
@@ -252,7 +353,13 @@ export default function Search() {
               {t("search.results")} <span className="text-slate-400 text-base font-normal">({providers.length})</span>
             </h2>
             {view === "map" ? (
-              <ProvidersMap providers={mapProviders} loading={mapLoading} />
+              <ProvidersMap
+                providers={mapProviders}
+                loading={mapLoading}
+                highlightedId={highlightedId}
+                onMarkerHover={setHighlightedId}
+                onMarkerClick={handleMarkerClick}
+              />
             ) : loading ? (
               <div className="text-center text-slate-500 py-12">{t("common.loading")}</div>
             ) : providers.length === 0 ? (
@@ -293,6 +400,7 @@ export default function Search() {
             )}
           </div>
         </div>
+        )}
       </main>
       <Footer />
     </div>
