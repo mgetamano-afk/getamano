@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
@@ -26,6 +26,18 @@ export default function Search() {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
+  const [stuck, setStuck] = useState(false);
+  const sentinelRef = useRef(null);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { threshold: 0, rootMargin: "-1px 0px 0px 0px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     api.get("/categories").then(r => setCategories(r.data));
@@ -66,23 +78,39 @@ export default function Search() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <form onSubmit={doSearch} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 flex flex-col md:flex-row gap-2 mb-6" data-testid="search-form">
-          <div className="flex items-center gap-2 px-3 flex-1">
-            <SearchIcon className="w-5 h-5 text-slate-400" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder={t("hero.search.placeholder")} className="w-full py-3 outline-none" data-testid="search-q-input" />
-          </div>
-          <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px]">
-            <MapPin className="w-5 h-5 text-slate-400" />
-            <input value={city} onChange={e => setCity(e.target.value)} placeholder={t("hero.search.location")} className="w-full py-3 outline-none" data-testid="search-city-input" />
-          </div>
-          <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
-        </form>
+      {/* Sentinel to detect when the sticky filter bar becomes stuck */}
+      <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
 
-        {/* Identity chips (inclusive filter, no flags) */}
-        <div className="flex flex-wrap items-center gap-2 mb-6" data-testid="identity-filter-chips">
+      {/* Sticky filter bar: search form + identity chips */}
+      <div
+        className="sticky top-16 md:top-20 z-30 transition-all duration-200"
+        style={{
+          backgroundColor: stuck ? "rgba(247, 246, 242, 0.92)" : "transparent",
+          backdropFilter: stuck ? "blur(14px)" : "none",
+          WebkitBackdropFilter: stuck ? "blur(14px)" : "none",
+          boxShadow: stuck ? "0 4px 16px -8px rgba(6, 49, 84, 0.12)" : "none",
+          borderBottom: stuck ? "1px solid rgba(188, 197, 204, 0.4)" : "1px solid transparent",
+        }}
+        data-testid="search-sticky-bar"
+        data-stuck={stuck}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
+          <form onSubmit={doSearch} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 flex flex-col md:flex-row gap-2 mb-4" data-testid="search-form">
+            <div className="flex items-center gap-2 px-3 flex-1">
+              <SearchIcon className="w-5 h-5 text-slate-400" />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder={t("hero.search.placeholder")} className="w-full py-3 outline-none bg-transparent" data-testid="search-q-input" />
+            </div>
+            <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px]">
+              <MapPin className="w-5 h-5 text-slate-400" />
+              <input value={city} onChange={e => setCity(e.target.value)} placeholder={t("hero.search.location")} className="w-full py-3 outline-none bg-transparent" data-testid="search-city-input" />
+            </div>
+            <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
+          </form>
+
+          {/* Identity chips (inclusive filter, no flags) */}
+          <div className="flex flex-wrap items-center gap-2" data-testid="identity-filter-chips">
           {IDENTITY_CHIPS.map(chip => {
             const active = ownerIdentity === chip.id;
             const countKey = chip.id || "all";
@@ -116,8 +144,11 @@ export default function Search() {
               </button>
             );
           })}
+          </div>
         </div>
+      </div>
 
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-12">
         <div className="grid lg:grid-cols-[260px_1fr] gap-6">
           {/* Filters */}
           <aside className="bg-white rounded-2xl border border-slate-200 p-5 h-fit" data-testid="search-filters">
