@@ -1,0 +1,37 @@
+{
+  "summary": "Sprint 2 end-to-end re-verification (Bidirectional Reports + AI SEO content). BACKEND pytest: 23/23 PASS (iteration10_sprint2_reports_seo_test.py re-run with REACT_APP_BACKEND_URL exported). Spot-checked /api/seo/content/cleaning/houston (returns 816+ chars Spanish paragraph mentioning Houston + limpieza) and /api/seo/page/cleaning/houston (keys: category, city, providers=6, related_cities=3, related_categories=4). Admin reports API confirmed: 3 pending, 8 total in 90d, 1 flagged user; items carry rep_* ids, status, target_role, reason_label as expected. FRONTEND E2E (Playwright on prod URL): Test 1 (SEO) PASS — /servicios/cleaning/houston shows data-testid='seo-ai-content' with 816 chars. Test 2 (Admin dismiss) PASS — admin login → /admin/reportes → filter-status-pending → 3 rows with testid 'report-rep_*' → click action-dismiss-<id> → action-modal opens → action-confirm-btn → list refreshes to 2 rows (dismissed row removed from pending). Test 3 (Client report submit) PASS — registered fresh client clienttest{ts}@example.com via POST /api/auth/register (name field, not full_name) → login → /services/maria-cleaning-services-sallisaw-ok → ecard-report-button → ReportModal opens → 7 reason cards visible → first selected → description filled with 100+ chars → report-submit-btn clicked → report-success card 'Reporte enviado. Lo revisaremos en 24-48 horas.' displayed plus green toast.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration10_sprint2_reports_seo_test.py",
+    "/app/test_reports/pytest/iteration11_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ReportIn.description still has no Field(min_length=20, max_length=2000) at backend (server.py ~399). Frontend enforces the 20-char minimum but a direct API caller can bypass. Carried over from iteration_10 — still unaddressed.",
+    "POST /api/reports does not cross-check payload target_role against target['role'] from DB. A malicious payload can poison admin filters. Carried over from iteration_10.",
+    "users.flagged_by_reports never resets after admin dismisses reports, so flagged state monotonically accumulates. Carried over from iteration_10.",
+    "SEO content lazy generation = up to 184 categories × 23 cities = ~4232 LLM calls on first crawl. No background pre-warm or queue. Carried over from iteration_10.",
+    "server.py is 3733 lines (single file) — still not modularized. Carried over from iteration_10.",
+    "Admin reports panel renders rows with testid `report-{report_id}` but action buttons use `action-{action}-{report_id}`. Naming is consistent but worth documenting for future regression tests; row testid could be normalized to `report-row-{id}` for clarity.",
+    "AdminReportsBidirectional confirm button testid is `action-confirm-btn` (not `action-confirm`) — minor inconsistency with other testids that use no `-btn` suffix (e.g. `filter-status-pending`)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (23/23 pytest)",
+    "frontend": "100% (Tests 1, 2, 3 all green)"
+  },
+  "test_credentials": "admin@getamano.com/admin123 ; demo.provider@getamano.com/provider123 ; ephemeral clienttest{ts}@example.com / ClientPass123! created in-test via POST /api/auth/register {email,password,name,role:'client'} (note: field is `name`, NOT `full_name`).",
+  "seed_data_creation": "Test run dismissed 1 pending report (rep_e7f0a0488538) — pending count went from 3 to 2 during this iteration. Created 1 new fresh client account and 1 new pending report (client→provider, no_servicio reason) against demo.provider via the eCard report flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Sprint 2 holds end-to-end. KEY TESTID GOTCHAS for AdminReportsBidirectional: rows use data-testid='report-{report_id}' where report_id has format 'rep_XXXXXXXX' (underscore in id — make sure any regex/selector permits underscore); action buttons are `action-dismiss-{id}`, `action-warn-{id}`, `action-suspend-{id}`, `action-delete-{id}`; modal confirm is `action-confirm-btn` (with -btn suffix). For ReportModal use `report-description-input` and `report-submit-btn`. For POST /api/auth/register the field is `name`, not `full_name`. demo.provider is OWNER of maria-cleaning-services-sallisaw-ok so the report button is correctly hidden when logged in as them; register a fresh client to exercise the flow. The backend tests file needs REACT_APP_BACKEND_URL exported in the shell when running pytest directly — pytest does NOT auto-load frontend/.env.",
+  "rca_of_the_issue": "N/A — no production defects encountered in this iteration. All Sprint 2 functionality (POST /api/reports, GET /api/reports/reasons, GET /api/reports/mine, GET /api/admin/reports with filters & stats, PUT /api/admin/reports/{id} actions dismiss/warn/suspend/delete, GET /api/seo/content/{cat}/{city}, GET /api/seo/page/{cat}/{city}, ReportModal UI, AdminReportsBidirectional UI, SeoPage AI card) verified working as designed."
+}
