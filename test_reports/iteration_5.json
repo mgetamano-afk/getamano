@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 5 E2E testing of prompt-maestro v1 (promo codes, likes, latino_owned filter, 4 tiers) + frontend smoke + regression. Backend: 31/31 iteration5 tests PASS (100%). Full suite: 108/112 pass (96%). All NEW endpoints fully working: POST /api/promo-codes/apply (GETMANO50 assigns pro plan, founding_member=True, blocks duplicate use with 400, invalid code 404), POST /api/providers/{id}/like toggles likes_count up/down with auth required, GET /api/providers?latino_owned=true correctly filters to yes-only providers, POST /api/providers/me/plan accepts all 4 tiers (free/basic/pro/premium) and rejects invalid via Literal validation. Regression OK: auth, search, featured, by-slug (gallery=3 items after backend restart heal), reviews, service-requests, messages (uses body field), upload, admin endpoints, favorites all green. Frontend smoke: Landing renders Founding banner (48 cupos restantes shown), 'Lo latino, a la mano' hero, live ticker, categories. Search /buscar loads. eCard public renders 'Latino-owned' badge, WhatsApp button, gallery (3 items), reviews, 'Recomendar 3' (LikeButton). /provider/onboarding correctly redirects anonymous to /login. Admin & Provider login both navigate to dashboards without white-screen.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/providers/me", "issue": "Wipes provider gallery (and any field not sent) because handler does payload.model_dump() + $set, and ProviderProfileIn.gallery defaults to []. Any partial UI update that omits gallery clears all images. backend_test::test_update_my_provider_profile reproduces this and the demo provider gallery silently goes to 0. Backend restart heals via seed $set but UI-driven updates leak it again. Fix: switch to model_dump(exclude_unset=True) so omitted fields aren't $set."},
+      {"endpoint": "POST /api/reviews", "issue": "test_create_review_and_duplicate_rejected — duplicate-per-user check still missing (carryover from iter-4). 2nd review from same client_user still inserted."},
+      {"endpoint": "GET /api/plans", "issue": "backend_test::TestPlans::test_plans_returns_three asserts 3 tiers but now there are 4 — pre-existing stale assertion in legacy test (not a real bug; just outdated test)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "LikeButton on ProviderECard", "issue": "Component renders as 'Recomendar 3' button but lacks data-testid='like-button' attribute, making automated testing harder. Functional in browser (no clicks tested as anonymous user, but element present).", "selector": "[data-testid=\"like-button\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Anonymous browsing", "issue": "Multiple 401 console errors on Landing/Search/eCard from background calls to auth-gated endpoints (likely /api/auth/me, /api/conversations, /api/favorites). Pages still render correctly but it pollutes console. Gate these calls behind user-is-authenticated check in frontend.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration5_test.py",
+    "/app/test_reports/pytest/iteration5_results.xml"
+  ],
+  "action_items": [
+    "[MEDIUM] PUT /api/providers/me uses model_dump() with defaults — switch to model_dump(exclude_unset=True) to prevent silent wipes of gallery/photos/languages when UI sends partial payloads.",
+    "[LOW] Update legacy backend_test::TestPlans::test_plans_returns_three to expect 4 tiers (free/basic/pro/premium), since plan model evolved.",
+    "[LOW] Add data-testid='like-button' to LikeButton component for automation; also data-testid='whatsapp-button', 'ecard-modal', 'chip-input' for the new components.",
+    "[LOW] Add per-(user_id, provider_id) uniqueness on POST /api/reviews to block duplicate ratings from the same user (carryover).",
+    "[LOW] Gate frontend calls to /api/auth/me, /api/favorites, /api/conversations behind authenticated flag to silence 401 console errors on public pages.",
+    "[INFO] WhatsAppButton link target & ChipInput component verified present in code; rendered correctly on eCard."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1388 lines — should be split (auth, providers, messaging, admin, promo, ads).",
+    "PUT /providers/me has the silent-wipe bug noted above; ProviderProfileIn.gallery defaults to [] so any consumer that does not explicitly set it loses data.",
+    "promo_codes.update_one is racey for high concurrency — currently mitigated by the `current_uses: {$lt: max_uses}` filter which is correct; nice.",
+    "apply_promo_code marks user.founding_member but does NOT check if user already has a non-free plan — could downgrade a paying user to GETMANO50's pro tier (unlikely flow but worth a guard).",
+    "ProviderProfileIn.latino_owned not in payload model — only set via separate PUT /providers/me/latino-owned endpoint; ensure onboarding UI calls that endpoint after profile create.",
+    "No rate limiting on POST /api/providers/{id}/like — a single user is dedup'd by likes collection unique-ish lookup, but multiple users via registration can artificially inflate counts."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration5_test.py (new — 31 tests; promo codes, likes toggle, latino_owned filter, 4-tier plan validation, full regression)"
+  ],
+  "success_rate": {"backend": "100% on iteration5 (31/31); 96% overall (108/112)", "frontend": "100% smoke (5/5 pages load — Landing, Search, eCard, Onboarding redirect, Admin & Provider login dashboards)"},
+  "test_credentials": "admin@getmano.com/admin123, demo.provider@getmano.com/provider123 — both working",
+  "seed_data_creation": "Tests create TEST_-prefixed clients (no teardown), one TEST_Promo_Biz provider profile per promo test run, applies GETMANO50 (consumes 1/50 founding cupos per test run — currently 48 remaining as shown in Landing banner). Cleanup of demo provider plan back to 'pro' is performed at end of TestPlanTiers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All prompt-maestro v1 features verified end-to-end on backend AND smoke-verified on frontend. Demo provider gallery is healed on every backend restart via seed $set block (server.py:483-494). The PUT /providers/me wipe-on-omit bug is reproducible by editing any field via the provider dashboard — main agent should fix using exclude_unset=True. GETMANO50 promo currently has 2 uses consumed (48/50 remaining shown in Landing banner) — promo apply test will continue working until the 50-cupo cap. Frontend new components (LikeButton, WhatsAppButton, ChipInput, ECardModal) all present in code and rendering, just missing data-testid attrs for richer automation. Twilio still in log-only mode (expected). No critical bugs found.",
+  "rca_of_the_issue": "PUT /providers/me silent gallery wipe: ProviderProfileIn.gallery has default `[]` in pydantic. When frontend submits a partial profile update without the `gallery` key, pydantic populates it with `[]`, and the handler does `payload.model_dump()` (which includes ALL fields with defaults) followed by `$set`. This unsets gallery on every profile edit. Reproduced by backend_test.py::test_update_my_provider_profile which omits gallery and silently wipes the demo provider's 3 gallery items. Mitigation: replace `update = payload.model_dump()` with `update = payload.model_dump(exclude_unset=True)` at server.py:703, OR add explicit exclusions for collections. This also affects photos, languages, services, additional_categories, hours, social — any list/dict field with a default."
+}
