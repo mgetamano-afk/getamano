@@ -1752,6 +1752,141 @@ async def ceo_metrics(admin: User = Depends(require_admin)):
         "activity": activity,
     }
 
+@api_router.get("/admin/daily-brief")
+async def daily_brief(admin: User = Depends(require_admin), language: str = "es", regenerate: bool = False):
+    """AI-generated executive daily brief — warm CEO morning summary in natural language."""
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+    today_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cache_id = f"brief_{today_key}_{language}"
+    if not regenerate:
+        cached = await db.daily_briefs.find_one({"brief_id": cache_id}, {"_id": 0})
+        if cached:
+            return cached
+
+    # Gather metrics by reusing logic from ceo_metrics (compact)
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    week_start = (now - timedelta(days=7)).isoformat()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+    signups_today = await db.users.count_documents({"created_at": {"$gte": today_start}})
+    signups_yesterday = await db.users.count_documents({"created_at": {"$gte": yesterday_start, "$lt": today_start}})
+    signups_week = await db.users.count_documents({"created_at": {"$gte": week_start}})
+    providers_today = await db.provider_profiles.count_documents({"created_at": {"$gte": today_start}})
+    total_providers = await db.provider_profiles.count_documents({"is_active": True})
+    pending = await db.provider_profiles.count_documents({"verification_status": "pending"})
+    milestones_today = await db.provider_milestones.count_documents({"unlocked_at": {"$gte": today_start}})
+    milestones_yesterday = await db.provider_milestones.count_documents({"unlocked_at": {"$gte": yesterday_start, "$lt": today_start}})
+    requests_today = await db.service_requests.count_documents({"created_at": {"$gte": today_start}})
+
+    # Revenue
+    PLAN_PRICES = {"free": 0, "basic": 19, "pro": 49, "premium": 99}
+    plan_rows = await db.provider_profiles.aggregate([
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$plan", "count": {"$sum": 1}}},
+    ]).to_list(20)
+    plans = {r["_id"] or "free": r["count"] for r in plan_rows}
+    mrr = sum(PLAN_PRICES.get(p, 0) * c for p, c in plans.items())
+
+    # Leader of the month
+    leader_rows = await db.provider_milestones.aggregate([
+        {"$match": {"unlocked_at": {"$gte": month_start}}},
+        {"$group": {"_id": "$user_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 3},
+    ]).to_list(3)
+    leader = None
+    if leader_rows:
+        lp = await db.provider_profiles.find_one({"user_id": leader_rows[0]["_id"]}, {"_id": 0, "business_name": 1, "city": 1, "state": 1})
+        if lp and not (lp.get("business_name") or "").startswith("TEST_"):
+            leader = {"name": lp.get("business_name"), "city": lp.get("city"), "count": leader_rows[0]["count"]}
+
+    # Founding
+    founding = await db.promo_codes.find_one({"code": "GETMANO50"}, {"_id": 0}) or {}
+
+    # Build compact data for LLM
+    signup_delta = "—"
+    if signups_yesterday > 0:
+        d = signups_today - signups_yesterday
+        pct = int(abs(d) / max(signups_yesterday, 1) * 100)
+        signup_delta = f"{'+' if d >= 0 else '-'}{pct}% vs ayer"
+
+    metrics = {
+        "fecha": now.strftime("%d de %B de %Y"),
+        "signups_hoy": signups_today,
+        "signups_ayer": signups_yesterday,
+        "signup_delta": signup_delta,
+        "signups_semana": signups_week,
+        "proveedores_nuevos_hoy": providers_today,
+        "proveedores_activos": total_providers,
+        "pendientes_aprobacion": pending,
+        "hitos_desbloqueados_hoy": milestones_today,
+        "hitos_ayer": milestones_yesterday,
+        "solicitudes_hoy": requests_today,
+        "mrr_usd": mrr,
+        "arr_usd": mrr * 12,
+        "founding_usados": founding.get("current_uses", 0),
+        "founding_max": founding.get("max_uses", 50),
+        "lider_del_mes": leader,
+        "planes_distribucion": plans,
+    }
+
+    # Call LLM
+    system_msg = (
+        "Eres el compañero de café matutino de Verónica, la CEO de getmano (un marketplace que conecta a la comunidad latina en USA con proveedores de servicios latinos verificados). "
+        "Tu trabajo es entregarle cada mañana un brief ejecutivo CÁLIDO, BREVE y HUMANO en español, en TONO DE CONFIDENTE, no de reporte corporativo. "
+        "Habla en SEGUNDA PERSONA ('hoy tienes...', 'tu negocio creció...'). "
+        "Usa máximo 4-5 oraciones. Incluye un dato concreto (cifra) y una emoción/ánimo. "
+        "Si hay logros, celébralos. Si hay caídas, sé honesto pero esperanzador. "
+        "Si hay líder del mes, menciónalo con cariño. Si hay pendientes de aprobación, recuérdalo gentilmente. "
+        "TERMINA con una frase corta de ánimo (no cliché). NO uses listas, solo prosa fluida. NO uses markdown."
+    )
+    user_prompt = f"Aquí están las métricas de getmano para hoy. Genera el brief de la mañana para Verónica:\n\n{metrics}"
+
+    try:
+        chat = LlmChat(
+            api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            session_id=cache_id,
+            system_message=system_msg,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        narrative = await chat.send_message(UserMessage(text=user_prompt))
+        narrative = (narrative or "").strip()
+    except Exception:
+        logger.exception("Daily brief LLM failed")
+        narrative = (
+            f"Buen día, Verónica. Hoy tenemos {signups_today} nuevos usuarios y {milestones_today} hitos celebrados. "
+            f"MRR proyectado en ${mrr}/mes y aún quedan {founding.get('max_uses', 50) - founding.get('current_uses', 0)} cupos founding. "
+            "Sigamos construyendo. 🧡"
+        )
+
+    # Build structured highlights
+    highlights = []
+    if signups_today > 0:
+        highlights.append({"icon": "users", "label": f"{signups_today} nuevos usuarios", "delta": signup_delta if signups_yesterday > 0 else None})
+    if milestones_today > 0:
+        highlights.append({"icon": "trophy", "label": f"{milestones_today} hitos desbloqueados", "delta": f"{milestones_today - milestones_yesterday:+d} vs ayer" if milestones_yesterday > 0 else None})
+    if pending > 0:
+        highlights.append({"icon": "shield", "label": f"{pending} proveedores esperando aprobación", "urgent": True})
+    if leader:
+        highlights.append({"icon": "crown", "label": f"Líder del mes: {leader['name']}", "sub": f"{leader['count']} logros · {leader.get('city') or ''}"})
+    highlights.append({"icon": "dollar", "label": f"MRR ${mrr}/mes · ARR ${mrr*12}", "sub": f"{founding.get('current_uses', 0)}/{founding.get('max_uses', 50)} founding"})
+
+    result = {
+        "brief_id": cache_id,
+        "date": now.strftime("%A, %d de %B de %Y").lower(),
+        "date_iso": today_key,
+        "generated_at": now.isoformat(),
+        "narrative": narrative,
+        "highlights": highlights,
+        "raw_metrics": metrics,
+    }
+    # Cache for the day
+    await db.daily_briefs.update_one({"brief_id": cache_id}, {"$set": result}, upsert=True)
+    result.pop("_id", None)
+    return result
+
 @api_router.get("/community/leaderboard")
 async def leaderboard(period: str = "month", limit: int = 5):
     """Top providers by milestones unlocked in a period (month/all)."""

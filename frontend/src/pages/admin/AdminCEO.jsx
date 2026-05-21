@@ -7,6 +7,7 @@ import {
   Crown, DollarSign, TrendingUp, Users, Briefcase, Sparkles, MapPin, Flame,
   Eye, Phone, Star, MessageSquare, Award, Activity, RefreshCw, ArrowUpRight, ArrowDownRight
 } from "lucide-react";
+import DailyBrief from "../../components/DailyBrief";
 
 function fmt$(n) {
   if (!n) return "$0";
@@ -59,6 +60,8 @@ export default function AdminCEO() {
 
   return (
     <AdminLayout title="Panel CEO">
+      <DailyBrief />
+
       {/* HERO HEADER */}
       <div className="relative overflow-hidden rounded-3xl p-6 md:p-8 mb-6"
         style={{ background: "linear-gradient(135deg, #1A0A3C 0%, #2D1B69 50%, #7C2D12 120%)" }}
