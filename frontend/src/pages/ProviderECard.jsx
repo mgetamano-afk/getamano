@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -8,7 +8,7 @@ import SocialLinks from "../components/SocialLinks";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard, Flag, Calendar } from "lucide-react";
+import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard, Flag, Calendar, Sparkles } from "lucide-react";
 import WhatsAppButton from "../components/WhatsAppButton";
 import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
@@ -18,6 +18,8 @@ import ReportModal from "../components/ReportModal";
 import GalleryGrid from "../components/GalleryGrid";
 import CategoryIcon from "../components/CategoryIcon";
 import BookingModal from "../components/BookingModal";
+import RecommendModal from "../components/RecommendModal";
+import RecommendationsSection from "../components/RecommendationsSection";
 import { LicenseBadge } from "../components/LicenseSection";
 import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
@@ -40,6 +42,9 @@ export default function ProviderECard() {
   const [showQuote, setShowQuote] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
+  const [showRecommend, setShowRecommend] = useState(false);
+  const [recommendsRefreshKey, setRecommendsRefreshKey] = useState(0);
+  const [refBy, setRefBy] = useState(null);  // resolved from ?via=token
   const [rates, setRates] = useState([]);
 
   useEffect(() => {
@@ -48,6 +53,16 @@ export default function ProviderECard() {
       api.get(`/providers/${r.data.provider_id}/rates`).then(rr => setRates(rr.data?.rates || [])).catch(() => {});
     }).finally(() => setLoading(false));
   }, [slug]);
+
+  // Resolve ?via=share_token → "Recommended by [name]" hero banner
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const token = searchParams.get("via");
+    if (!token) { setRefBy(null); return; }
+    api.get(`/recommendations/by-token/${token}`)
+      .then(r => setRefBy(r.data.recommendation))
+      .catch(() => setRefBy(null));
+  }, [searchParams]);
 
   const trackClick = () => {
     if (p) api.post(`/providers/${p.provider_id}/contact-click`).catch(() => {});
@@ -117,6 +132,29 @@ export default function ProviderECard() {
           <ChevronLeft className="w-4 h-4" /> {t("common.back")}
         </Link>
 
+        {/* "Recomendado por X" hero banner — appears when arriving via ?via=share_token */}
+        {refBy && (
+          <div className="mb-4 rounded-2xl p-4 sm:p-5 flex items-start gap-3 shadow-sm" style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", borderLeft: "4px solid #DC2626" }} data-testid="ecard-referred-by-banner">
+            <div className="w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center text-white font-display font-bold shadow-sm" style={{ background: "linear-gradient(135deg, #F87171 0%, #DC2626 100%)" }}>
+              <Heart className="w-5 h-5 fill-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-red-700">
+                {lang === "en" ? "Recommended by a friend" : "Recomendado por una persona"}
+              </p>
+              <p className="font-display font-semibold text-slate-900 mt-0.5 text-sm sm:text-base">
+                <span className="text-red-700">{refBy.client_name}</span>
+                {refBy.client_city && <span className="text-slate-500 text-xs font-normal"> · {refBy.client_city}</span>}
+                {" "}
+                {lang === "en" ? "vouches for this pro" : "lo/la recomienda"}
+              </p>
+              {refBy.message && (
+                <p className="mt-1 text-sm text-slate-700 italic leading-relaxed">"{refBy.message}"</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Cover */}
         <div className="relative h-48 md:h-64 rounded-2xl overflow-hidden bg-slate-200">
           {p.cover_url && <img src={p.cover_url} alt="cover" className="w-full h-full object-cover" />}
@@ -148,6 +186,11 @@ export default function ProviderECard() {
                   {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800 font-medium"><Star className="w-3.5 h-3.5 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)} ({p.rating_count})</span>}
                 </div>
                 {p.description && <p className="mt-4 text-slate-700 leading-relaxed">{p.description}</p>}
+                {p.recommendations_count > 0 && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-semibold" data-testid="ecard-recommendations-badge">
+                    <Heart className="w-3 h-3 fill-red-500" /> {p.recommendations_count} {lang === "en" ? "recommend" + (p.recommendations_count === 1 ? "s" : "") + " this pro" : `recomendaci${p.recommendations_count === 1 ? "ón" : "ones"}`}
+                  </div>
+                )}
                 <div className="mt-4">
                   <LikeButton providerId={p.provider_id} initialCount={p.likes_count || 0} size="lg" />
                 </div>
@@ -173,6 +216,15 @@ export default function ProviderECard() {
                   <Calendar className="w-4 h-4" /> {lang === "en" ? "Book appointment" : "Reservar cita"}
                 </button>
               )}
+              <button
+                onClick={() => setShowRecommend(true)}
+                className="btn-secondary justify-center flex items-center gap-1 text-sm border-red-200 hover:bg-red-50"
+                style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", color: "#B91C1C" }}
+                data-testid="ecard-recommend-button"
+              >
+                <Heart className="w-4 h-4 fill-red-500" />
+                {lang === "en" ? "I recommend" : "Lo/la recomiendo"}
+              </button>
               {!p.is_home_based && p.city && (
                 <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-map-button">
                   <MapPin className="w-4 h-4" /> {t("provider.map")}
@@ -266,6 +318,15 @@ export default function ProviderECard() {
                 </div>
               </div>
             )}
+
+            {/* Community recommendations — public named endorsements */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <RecommendationsSection
+                providerId={p.provider_id}
+                refreshKey={recommendsRefreshKey}
+                onRecommendClick={() => setShowRecommend(true)}
+              />
+            </div>
 
             {/* Reviews */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -369,6 +430,12 @@ export default function ProviderECard() {
         {showECardModal && <ECardModal provider={p} onClose={() => setShowECardModal(false)} />}
         <QuoteRequestModal open={showQuote} provider={p} onClose={() => setShowQuote(false)} />
         <BookingModal open={showBooking} provider={p} onClose={() => setShowBooking(false)} onBooked={() => trackClick()} />
+        <RecommendModal
+          open={showRecommend}
+          provider={p}
+          onClose={() => setShowRecommend(false)}
+          onSubmitted={() => setRecommendsRefreshKey(k => k + 1)}
+        />
         <ReportModal
           open={showReport}
           onClose={() => setShowReport(false)}

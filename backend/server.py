@@ -579,6 +579,15 @@ async def seed():
         # Email captures for the recovery flow
         await db.lead_recoveries.create_index("email", unique=True)
         await db.lead_recoveries.create_index([("status", 1), ("created_at", -1)])
+        # Public recommendations (named endorsements with optional message + share token)
+        await db.recommendations.create_index([("provider_id", 1), ("created_at", -1)])
+        await db.recommendations.create_index(
+            [("provider_id", 1), ("client_email", 1)],
+            unique=True,
+            partialFilterExpression={"client_email": {"$type": "string"}},
+        )
+        await db.recommendations.create_index("share_token", unique=True, sparse=True)
+        await db.recommendations.create_index([("created_at", -1)])
     except Exception as e:
         logger.warning(f"Index creation: {e}")
 
@@ -5265,6 +5274,134 @@ async def admin_list_leads(status: Optional[str] = None, _user: User = Depends(r
         q["status"] = status
     leads = await db.lead_recoveries.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
     return {"items": leads, "total": len(leads)}
+
+
+# ════════════════════════════════════════════════════════════════════
+# RECOMMENDATIONS — Public client-driven endorsements (viral growth loop)
+# ════════════════════════════════════════════════════════════════════
+# A client says "I recommend this provider" → optional message → gets a
+# unique share_token → WhatsApp/copy-link to friends. Other visitors land
+# on the eCard with a "Recommended by [name]" hero that adds social proof.
+
+class RecommendationIn(BaseModel):
+    client_name: str = Field(min_length=2, max_length=80)
+    client_email: Optional[str] = Field(default=None, max_length=200)
+    client_city: Optional[str] = Field(default=None, max_length=80)
+    message: Optional[str] = Field(default=None, max_length=240)
+    source: Optional[Literal["ecard_button", "post_booking", "post_message", "share_link"]] = "ecard_button"
+
+
+def _make_share_token() -> str:
+    return f"r_{uuid.uuid4().hex[:14]}"
+
+
+@api_router.post("/providers/{provider_id}/recommend")
+async def recommend_provider(provider_id: str, payload: RecommendationIn, request: Request,
+                              user: Optional[User] = Depends(get_optional_user)):
+    """Public endpoint — anonymous-OK. Creates (or updates) a recommendation
+    for this provider. If the same email already recommended this provider,
+    we UPDATE the existing record instead of creating a duplicate."""
+    prof = await db.provider_profiles.find_one({"provider_id": provider_id, "is_active": True}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    email = (payload.client_email or "").strip().lower() or None
+    name = payload.client_name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Nombre requerido")
+
+    now = datetime.now(timezone.utc).isoformat()
+    rec = {
+        "recommendation_id": f"rec_{uuid.uuid4().hex[:12]}",
+        "provider_id": provider_id,
+        "provider_slug": prof.get("slug"),
+        "provider_business_name": prof.get("business_name"),
+        "client_name": name,
+        "client_email": email,
+        "client_city": (payload.client_city or "").strip() or None,
+        "client_user_id": user.user_id if user else None,
+        "message": (payload.message or "").strip() or None,
+        "source": payload.source or "ecard_button",
+        "share_token": _make_share_token(),
+        "is_public": True,
+        "created_at": now,
+        "updated_at": now,
+        "ip": request.client.host if request.client else None,
+    }
+    # Upsert by (provider_id, client_email) when email is provided.
+    if email:
+        existing = await db.recommendations.find_one(
+            {"provider_id": provider_id, "client_email": email}, {"_id": 0}
+        )
+        if existing:
+            await db.recommendations.update_one(
+                {"recommendation_id": existing["recommendation_id"]},
+                {"$set": {
+                    "client_name": name,
+                    "client_city": rec["client_city"],
+                    "message": rec["message"],
+                    "updated_at": now,
+                }},
+            )
+            return {
+                "ok": True, "deduped": True,
+                "recommendation_id": existing["recommendation_id"],
+                "share_token": existing["share_token"],
+                "share_url": f"/services/{prof.get('slug')}?via={existing['share_token']}",
+            }
+    await db.recommendations.insert_one(rec)
+    # Denormalize the count for fast eCard rendering
+    await db.provider_profiles.update_one(
+        {"provider_id": provider_id},
+        {"$inc": {"recommendations_count": 1}},
+    )
+    return {
+        "ok": True, "deduped": False,
+        "recommendation_id": rec["recommendation_id"],
+        "share_token": rec["share_token"],
+        "share_url": f"/services/{prof.get('slug')}?via={rec['share_token']}",
+    }
+
+
+@api_router.get("/providers/{provider_id}/recommendations")
+async def list_recommendations(provider_id: str, limit: int = 50):
+    """Public list of named recommendations for this provider."""
+    items = await db.recommendations.find(
+        {"provider_id": provider_id, "is_public": True},
+        {"_id": 0, "ip": 0, "client_email": 0, "client_user_id": 0}
+    ).sort("created_at", -1).limit(min(limit, 100)).to_list(min(limit, 100))
+    total = await db.recommendations.count_documents(
+        {"provider_id": provider_id, "is_public": True}
+    )
+    return {"items": items, "total": total}
+
+
+@api_router.get("/recommendations/by-token/{share_token}")
+async def recommendation_by_token(share_token: str):
+    """Resolve a share_token → recommendation + provider basic info.
+    Used when a referred visitor opens /services/{slug}?via={token} so the
+    eCard can show the 'Recommended by [name]' hero banner."""
+    rec = await db.recommendations.find_one(
+        {"share_token": share_token, "is_public": True},
+        {"_id": 0, "ip": 0, "client_email": 0, "client_user_id": 0}
+    )
+    if not rec:
+        raise HTTPException(status_code=404, detail="Token not found")
+    return {"recommendation": rec}
+
+
+@api_router.get("/providers/top-recommended")
+async def top_recommended(limit: int = 8):
+    """Most-recommended active providers — used on Landing/Community for social
+    proof. Excludes TEST data via PUBLIC_GUARD."""
+    providers = await db.provider_profiles.find(
+        {"is_active": True, "recommendations_count": {"$gt": 0}, **PUBLIC_GUARD},
+        {"_id": 0}
+    ).sort("recommendations_count", -1).limit(min(limit, 24)).to_list(min(limit, 24))
+    cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(200)}
+    for p in providers:
+        p["category"] = cats.get(p.get("category_id"))
+    return providers
 
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.
