@@ -10,23 +10,9 @@ import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import { buildFileUrl } from "../components/ImageUpload";
 import { openInstallModal } from "../components/InstallAppModal";
 import useIsPwaInstalled from "../lib/useIsPwaInstalled";
+import CategoryCard from "../components/CategoryCard";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
-
-const CAT_VISUAL = {
-  cleaning: { icon: "🧹", glow: "#00B4FF", img: "https://source.unsplash.com/featured/640x500/?house,cleaning" },
-  construction: { icon: "🔨", glow: "#FF6B2C", img: "https://source.unsplash.com/featured/640x500/?construction,worker" },
-  catering: { icon: "🍽️", glow: "#FF4500", img: "https://source.unsplash.com/featured/640x500/?latin,food,catering" },
-  handyman: { icon: "🔧", glow: "#FFD700", img: "https://source.unsplash.com/featured/640x500/?handyman,repair" },
-  auto: { icon: "🚗", glow: "#00E5FF", img: "https://source.unsplash.com/featured/640x500/?auto,mechanic" },
-  beauty: { icon: "💅", glow: "#C77DFF", img: "https://source.unsplash.com/featured/640x500/?beauty,salon" },
-  moving: { icon: "📦", glow: "#39FF14", img: "https://source.unsplash.com/featured/640x500/?moving,truck" },
-  legal: { icon: "⚖️", glow: "#C0C0C0", img: "https://source.unsplash.com/featured/640x500/?lawyer,office" },
-  landscaping: { icon: "🌿", glow: "#7FFF00", img: "https://source.unsplash.com/featured/640x500/?landscaping,garden" },
-  events: { icon: "🎉", glow: "#FF69B4", img: "https://source.unsplash.com/featured/640x500/?party,decoration" },
-  tutoring: { icon: "📚", glow: "#87CEEB", img: "https://source.unsplash.com/featured/640x500/?tutor,teacher" },
-  health: { icon: "🏥", glow: "#20C997", img: "https://source.unsplash.com/featured/640x500/?wellness,health" },
-};
 
 function useCounter(target, durationMs = 1500) {
   const [val, setVal] = useState(0);
@@ -290,22 +276,16 @@ export default function Landing() {
           <p className="text-slate-500 mt-2">Más de {stats.providers} proveedores verificados en todo Estados Unidos</p>
         </div>
         <div className="relative">
-          <div ref={sliderRef} className="flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 sm:px-6 lg:px-8 pb-4 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
-            {categories.map((c, i) => {
-              const v = CAT_VISUAL[c.slug] || { icon: "✨", glow: c.color, img: `https://source.unsplash.com/featured/640x500/?${c.slug}` };
-              return (
-                <Link key={c.category_id} to={`/buscar?category=${c.slug}`} className="relative flex-shrink-0 w-[280px] md:w-[320px] h-[380px] rounded-3xl overflow-hidden snap-start group" style={{ boxShadow: `0 8px 32px ${v.glow}22` }} data-testid={`category-card-${c.slug}`}>
-                  <img src={v.img} alt={c.name_es} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)" }} />
-                  <div className="absolute bottom-0 left-0 right-0 p-5">
-                    <div className="text-4xl mb-2">{v.icon}</div>
-                    <h3 className="font-display font-bold text-2xl text-white">{lang === "es" ? c.name_es : c.name_en}</h3>
-                    <p className="text-sm text-white/70 mt-1">Ver proveedores →</p>
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: v.glow, boxShadow: `0 0 20px ${v.glow}` }} />
-                </Link>
-              );
-            })}
+          <div ref={sliderRef} className="flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 sm:px-6 lg:px-8 pb-4 scroll-smooth scrollbar-none" style={{ scrollbarWidth: "thin" }} data-testid="category-slider">
+            {categories.map((c) => (
+              <CategoryCard
+                key={c.category_id}
+                category={c}
+                name={lang === "es" ? c.name_es : c.name_en}
+                providerCount={c.provider_count || 0}
+                lang={lang}
+              />
+            ))}
           </div>
           <div className="absolute inset-y-0 left-0 hidden md:flex items-center pl-2">
             <button onClick={() => sliderRef.current?.scrollBy({ left: -340, behavior: "smooth" })} className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center" data-testid="slider-prev"><ChevronLeft className="w-5 h-5" /></button>

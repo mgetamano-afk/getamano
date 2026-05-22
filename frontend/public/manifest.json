@@ -48,5 +48,28 @@
       "url": "/dashboard?tab=mensajes&utm_source=pwa_shortcut",
       "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/mobile-home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "getamano — Latino marketplace home"
+    },
+    {
+      "src": "/screenshots/mobile-search.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Search verified Latino providers near you"
+    },
+    {
+      "src": "/screenshots/desktop-home.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "getamano — Marketplace home"
+    }
   ]
 }
