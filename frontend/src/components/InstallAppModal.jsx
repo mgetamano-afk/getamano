@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { X, Share, Plus, Download, Smartphone, Copy, Check, Compass, Sparkles, MoreVertical } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
+import SafariInstallTutorial from "./SafariInstallTutorial";
 
 /**
  * InstallAppModal — One CTA, fully automatic experience.
@@ -261,31 +262,34 @@ export default function InstallAppModal() {
         )}
 
         {view === "ios-safari" && (
-          <ol className="space-y-3" data-testid="install-view-ios-safari">
-            <Step
-              n={1}
-              text={
-                <>
-                  {T.safariStep1}{" "}
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 font-semibold text-slate-800">
-                    <Share className="w-3.5 h-3.5" /> {lang === "en" ? "Share" : "Compartir"}
-                  </span>
-                </>
-              }
-            />
-            <Step
-              n={2}
-              text={
-                <>
-                  {T.safariStep2}{" "}
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 font-semibold text-slate-800">
-                    <Plus className="w-3.5 h-3.5" /> {T.safariStep2b}
-                  </span>
-                </>
-              }
-            />
-            <Step n={3} text={T.safariStep3} />
-          </ol>
+          <div data-testid="install-view-ios-safari">
+            <SafariInstallTutorial className="mb-4" />
+            <ol className="space-y-3">
+              <Step
+                n={1}
+                text={
+                  <>
+                    {T.safariStep1}{" "}
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 font-semibold text-slate-800">
+                      <Share className="w-3.5 h-3.5" /> {lang === "en" ? "Share" : "Compartir"}
+                    </span>
+                  </>
+                }
+              />
+              <Step
+                n={2}
+                text={
+                  <>
+                    {T.safariStep2}{" "}
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 font-semibold text-slate-800">
+                      <Plus className="w-3.5 h-3.5" /> {T.safariStep2b}
+                    </span>
+                  </>
+                }
+              />
+              <Step n={3} text={T.safariStep3} />
+            </ol>
+          </div>
         )}
 
         {view === "ios-non-safari" && (
