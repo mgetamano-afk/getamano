@@ -70,3 +70,24 @@ body {
 
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
+
+/* Section 18B — Google Places autocomplete dropdown branded for getamano */
+.pac-container {
+    border-radius: 12px;
+    border: 1.5px solid #BCC5CC;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    font-family: inherit;
+    margin-top: 4px;
+    z-index: 10000;
+    overflow: hidden;
+}
+.pac-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #1a1a2e;
+    cursor: pointer;
+}
+.pac-item:hover { background: #F7F6F2; }
+.pac-item-selected { background: #E6F7F5; }
+.pac-matched { color: #2F9D94; font-weight: 600; }
+.pac-icon { display: none; }

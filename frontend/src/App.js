@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { I18nProvider } from "./contexts/I18nContext";
 import { Toaster } from "sonner";
+import AnalyticsTracker from "./components/AnalyticsTracker";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -116,6 +117,7 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <Toaster position="top-right" richColors />
+            <AnalyticsTracker />
             <AppRouter />
           </BrowserRouter>
         </AuthProvider>

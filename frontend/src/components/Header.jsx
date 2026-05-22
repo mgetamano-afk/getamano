@@ -5,6 +5,7 @@ import { Globe, LogOut, User as UserIcon, Menu, X, MessageCircle } from "lucide-
 import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import NotificationBell from "./NotificationBell";
+import { trackLanguageSwitch } from "../lib/analytics";
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -41,7 +42,7 @@ export default function Header() {
             </Link>
             <Link to="/plans" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-plans">{t("nav.plans")}</Link>
             <button
-              onClick={() => changeLang(lang === "es" ? "en" : "es")}
+              onClick={() => { const to = lang === "es" ? "en" : "es"; changeLang(to); trackLanguageSwitch(to); }}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 rounded-full hover:bg-slate-100"
               data-testid="lang-toggle"
               title={lang === "es" ? "Switch to English" : "Cambiar a Español"}

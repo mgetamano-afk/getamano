@@ -4,10 +4,13 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, Loader2 } from "lucide-react";
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
+import CityAutocomplete from "../components/CityAutocomplete";
+import useGeolocation from "../hooks/useGeolocation";
+import { trackSearch } from "../lib/analytics";
 
 const IDENTITY_CHIPS = [
   { id: "", label: "Todos" },
@@ -28,6 +31,7 @@ export default function Search() {
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { position, loading: geoLoading, requestLocation, clear: clearGeo } = useGeolocation();
   const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
   const [stuck, setStuck] = useState(false);
   const [view, setView] = useState(() => {
@@ -70,6 +74,12 @@ export default function Search() {
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     if (cur.hasVideo) qs.has_video = "true";
+    // Section 18F — proximity ("Near me") search
+    if (position && !cur.city) {
+      qs.lat = position.lat;
+      qs.lng = position.lng;
+      qs.radius_km = 50;
+    }
     const urlQs = { ...qs };
     if (view !== "list") urlQs.view = view;
     setParams(urlQs);
@@ -83,6 +93,7 @@ export default function Search() {
       ]);
       setProviders(data);
       if (countsRes?.data) setIdentityCounts(countsRes.data);
+      trackSearch(cur.q, cur.city, cur.category, (data || []).length);
     } finally {
       setLoading(false);
     }
@@ -147,6 +158,12 @@ export default function Search() {
 
   useEffect(() => { doSearch(); /* eslint-disable-next-line */ }, []);
 
+  // Section 18F — auto-research when user enables "Near me"
+  useEffect(() => {
+    if (position) doSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position?.lat, position?.lng]);
+
   const selectIdentity = (id) => {
     setOwnerIdentity(id);
     doSearch(null, { ownerIdentity: id });
@@ -178,9 +195,25 @@ export default function Search() {
               <SearchIcon className="w-5 h-5 text-slate-400" />
               <input value={q} onChange={e => setQ(e.target.value)} placeholder={t("hero.search.placeholder")} className="w-full py-3 outline-none bg-transparent" data-testid="search-q-input" />
             </div>
-            <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px]">
-              <MapPin className="w-5 h-5 text-slate-400" />
-              <input value={city} onChange={e => setCity(e.target.value)} placeholder={t("hero.search.location")} className="w-full py-3 outline-none bg-transparent" data-testid="search-city-input" />
+            <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[260px] flex-1 md:flex-initial">
+              <div className="flex-1 min-w-0">
+                <CityAutocomplete
+                  value={city}
+                  onSelect={({ displayName }) => { setCity(displayName); clearGeo(); }}
+                  placeholder={t("hero.search.location")}
+                  testid="search-city-input"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => { setCity(""); requestLocation(); }}
+                className={`flex-shrink-0 p-2.5 rounded-xl border transition ${position ? "bg-teal-600 text-white border-teal-600" : "bg-white text-teal-700 border-slate-200 hover:border-teal-500"}`}
+                title={position ? "Ubicación activa" : (lang === "en" ? "Near me" : "Cerca de mí")}
+                data-testid="search-near-me"
+                disabled={geoLoading}
+              >
+                {geoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+              </button>
             </div>
             <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
           </form>
@@ -330,6 +363,11 @@ export default function Search() {
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> {p.city}{p.state ? `, ${p.state}` : ""}
+                            {typeof p.distance_km === "number" && p.distance_km < 9999 && (
+                              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-${p.slug}`}>
+                                <Navigation className="w-2.5 h-2.5" /> {p.distance_km.toFixed(1)} km
+                              </span>
+                            )}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {p.verified && (

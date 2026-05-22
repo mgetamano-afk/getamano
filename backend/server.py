@@ -562,8 +562,30 @@ async def seed():
         await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
         await db.provider_rates.create_index([("category_id", 1), ("city", 1), ("country", 1)])
         await db.provider_rates.create_index([("provider_id", 1), ("is_active", 1)])
+        # SECTION 18 — Geocoding cache
+        await db.city_coordinates.create_index([("city", 1), ("state", 1)], unique=True)
     except Exception as e:
         logger.warning(f"Index creation: {e}")
+
+    # SECTION 18 — Seed city_coordinates with 24 base cities (idempotent)
+    try:
+        seeded = 0
+        for city, state, lat, lng in US_CITY_SEED:
+            res = await db.city_coordinates.update_one(
+                {"city": city, "state": state},
+                {"$setOnInsert": {
+                    "city": city, "state": state, "lat": lat, "lng": lng,
+                    "display_name": f"{city.replace('-', ' ').title()}, {state}",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+            if res.upserted_id is not None:
+                seeded += 1
+        if seeded > 0:
+            logger.info(f"Sec 18: seeded {seeded} city_coordinates")
+    except Exception as e:
+        logger.warning(f"Sec 18 city seed warn: {e}")
 
     # Migrations (idempotent): backfill country/currency on legacy docs
     try:
@@ -835,6 +857,9 @@ async def search_providers(
     owner_identity: Optional[Literal["latino", "american"]] = None,
     country: Optional[str] = DEFAULT_COUNTRY,
     has_video: Optional[bool] = None,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    radius_km: float = 50.0,
     limit: int = 24,
 ):
     query = {"is_active": True}
@@ -866,10 +891,33 @@ async def search_providers(
             {"description": {"$regex": q, "$options": "i"}},
             {"services": {"$regex": q, "$options": "i"}},
         ]
+    # Section 18F — Proximity search ("Near me"): if lat/lng provided, fetch
+    # candidates with coordinates, compute haversine distance, filter by radius.
+    use_proximity = lat is not None and lng is not None
+    if use_proximity:
+        query["latitude"] = {"$ne": None}
+        query["longitude"] = {"$ne": None}
     # Plan-based sort: premium > pro > basic > free, then by likes, then by rating
     PLAN_ORDER = {"premium": 0, "pro": 1, "basic": 2, "free": 3}
-    providers = await db.provider_profiles.find(query, {"_id": 0}).limit(limit * 2).to_list(limit * 2)
-    providers.sort(key=lambda p: (PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0), -p.get("rating_avg", 0)))
+    fetch_n = limit * 4 if use_proximity else limit * 2
+    providers = await db.provider_profiles.find(query, {"_id": 0}).limit(fetch_n).to_list(fetch_n)
+    if use_proximity:
+        from math import radians, sin, cos, asin, sqrt
+        def _hav_km(lat1, lng1, lat2, lng2):
+            R = 6371.0
+            la1, lo1, la2, lo2 = map(radians, (lat1, lng1, lat2, lng2))
+            dlat = la2 - la1; dlng = lo2 - lo1
+            a = sin(dlat/2)**2 + cos(la1)*cos(la2)*sin(dlng/2)**2
+            return 2 * R * asin(sqrt(a))
+        for p in providers:
+            try:
+                p["distance_km"] = round(_hav_km(lat, lng, float(p["latitude"]), float(p["longitude"])), 2)
+            except Exception:
+                p["distance_km"] = 9999.0
+        providers = [p for p in providers if p["distance_km"] <= radius_km]
+        providers.sort(key=lambda p: (p["distance_km"], PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0)))
+    else:
+        providers.sort(key=lambda p: (PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0), -p.get("rating_avg", 0)))
     providers = providers[:limit]
     cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(100)}
     for p in providers:
@@ -4676,7 +4724,9 @@ async def translate_text(payload: TranslateRequestIn):
     if cached:
         return {"translated_text": cached["translated_text"], "cached": True, "source": "cache"}
     # 2) Call Google Translate if API key configured
-    api_key = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "").strip()
+    # Section 18: unified GOOGLE_API_KEY (Translation + Vision + Places + Maps + Geocoding)
+    # Backwards-compatible: also accepts the legacy GOOGLE_TRANSLATE_API_KEY name.
+    api_key = (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_TRANSLATE_API_KEY", "")).strip()
     if not api_key:
         # Graceful fallback: return original. UI shows a small note "Traducción no disponible aún".
         return {"translated_text": payload.text, "cached": False, "source": "no_api_key",
@@ -4708,5 +4758,103 @@ async def translate_text(payload: TranslateRequestIn):
     return {"translated_text": translated, "cached": False, "source": "google"}
 
 
-# Mount api_router AFTER all route definitions so Sections 13–16 are included.
+# ════════════════════════════════════════════════════════════════════
+# SECTION 18 — Google Cloud APIs (Geocoding + Translation unified key)
+# ════════════════════════════════════════════════════════════════════
+# Translation endpoint is defined above (Section 17D). Geocoding here.
+# A single GOOGLE_API_KEY environment variable powers all Google services.
+
+US_CITY_SEED = [
+    ("dallas", "TX", 32.7767, -96.7970), ("houston", "TX", 29.7604, -95.3698),
+    ("san-antonio", "TX", 29.4241, -98.4936), ("austin", "TX", 30.2672, -97.7431),
+    ("el-paso", "TX", 31.7619, -106.4850), ("fort-worth", "TX", 32.7555, -97.3308),
+    ("los-angeles", "CA", 34.0522, -118.2437), ("san-diego", "CA", 32.7157, -117.1611),
+    ("fresno", "CA", 36.7378, -119.7871), ("san-jose", "CA", 37.3382, -121.8863),
+    ("miami", "FL", 25.7617, -80.1918), ("orlando", "FL", 28.5383, -81.3792),
+    ("tampa", "FL", 27.9506, -82.4572), ("chicago", "IL", 41.8781, -87.6298),
+    ("new-york", "NY", 40.7128, -74.0060), ("phoenix", "AZ", 33.4484, -112.0740),
+    ("las-vegas", "NV", 36.1699, -115.1398), ("denver", "CO", 39.7392, -104.9903),
+    ("charlotte", "NC", 35.2271, -80.8431), ("atlanta", "GA", 33.7490, -84.3880),
+    ("tucson", "AZ", 32.2226, -110.9747), ("albuquerque", "NM", 35.0853, -106.6056),
+    ("san-bernardino", "CA", 34.1083, -117.2898), ("sallisaw", "OK", 35.4612, -94.7872),
+]
+
+
+class GeocodeRequestIn(BaseModel):
+    city: str = Field(min_length=2, max_length=120)
+    state: str = Field(min_length=2, max_length=80)
+
+
+async def _geocode_lookup(city: str, state: str) -> Optional[dict]:
+    """Return {lat, lng, display_name, source} or None. Cache-first via MongoDB."""
+    key = (city.strip().lower(), state.strip().upper())
+    cached = await db.city_coordinates.find_one(
+        {"city": key[0], "state": key[1]}, {"_id": 0}
+    )
+    if cached:
+        return {"lat": cached["lat"], "lng": cached["lng"],
+                "display_name": cached.get("display_name", f"{city}, {state}"),
+                "source": "cache"}
+    api_key = (os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not api_key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as cli:
+            r = await cli.get(
+                "https://maps.googleapis.com/maps/api/geocode/json",
+                params={"address": f"{city}, {state}, USA", "key": api_key},
+            )
+            r.raise_for_status()
+            data = r.json()
+        if data.get("status") != "OK" or not data.get("results"):
+            return None
+        loc = data["results"][0]["geometry"]["location"]
+        lat, lng = float(loc["lat"]), float(loc["lng"])
+    except Exception as e:
+        logger.warning(f"geocode failed for {city},{state}: {e}")
+        return None
+    await db.city_coordinates.update_one(
+        {"city": key[0], "state": key[1]},
+        {"$set": {
+            "city": key[0], "state": key[1],
+            "lat": lat, "lng": lng,
+            "display_name": f"{city}, {state}",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"lat": lat, "lng": lng, "display_name": f"{city}, {state}", "source": "google"}
+
+
+@api_router.post("/geocode")
+async def geocode_city(payload: GeocodeRequestIn):
+    """Public endpoint. Returns {lat, lng, display_name, source} or 404 if not found
+    AND no Google API key configured. With key+billing enabled, falls back to Google Geocoding API."""
+    res = await _geocode_lookup(payload.city, payload.state)
+    if not res:
+        raise HTTPException(status_code=404, detail="No coordinates available for this city.")
+    return res
+
+
+@api_router.post("/admin/geocode/seed")
+async def admin_geocode_seed(_user: User = Depends(require_admin)):
+    """Pre-seed the city_coordinates collection with the 24 active getamano cities.
+    Idempotent — safe to call multiple times."""
+    n = 0
+    for city, state, lat, lng in US_CITY_SEED:
+        res = await db.city_coordinates.update_one(
+            {"city": city, "state": state},
+            {"$setOnInsert": {
+                "city": city, "state": state, "lat": lat, "lng": lng,
+                "display_name": f"{city.replace('-', ' ').title()}, {state}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+        if res.upserted_id is not None:
+            n += 1
+    return {"ok": True, "inserted": n, "total_seed": len(US_CITY_SEED)}
+
+
+# Mount api_router AFTER all route definitions so Sections 13–18 are included.
 app.include_router(api_router)

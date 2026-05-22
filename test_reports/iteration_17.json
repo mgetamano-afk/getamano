@@ -1,0 +1,48 @@
+{
+  "summary": "Section 18 (Geocoding + Proximity + Translate fallback) backend + frontend smoke tested. 15/15 backend pytest pass: /api/geocode cache hits for Dallas/Miami/Sallisaw (source='cache'), uncached city falls through to Google with source='google' (Boston: lat=42.355, lng=-71.057 ✅), invalid input returns 422, /api/admin/geocode/seed requires admin and is idempotent (total_seed=24, second call inserted=0), GET /api/providers?lat=35.5&lng=-94.8&radius_km=50 returns María at distance_km<5 with closest-first sort and distance_km field present, GET /api/providers WITHOUT lat/lng has NO distance_km (regression OK), POST /api/translate gracefully returns source='api_error' (Cloud Translation blocked on GCP project — as documented), noop case returns source='noop', provider availability (Phase E) regression OK. Frontend smoke: /search loads, all key testids present (search-city-input, search-near-me, search-q-input, search-submit, identity-filter-chips), CityAutocomplete accepts plain text even though Maps JS Places shows referrer-restriction alert (graceful), Near Me with mocked geolocation DOES fire /api/providers?lat=35.5&lng=-94.8&radius_km=50, NO gtag/GA4 console errors (no-op as expected with empty REACT_APP_GA4_MEASUREMENT_ID), Landing/Plans/Provider eCard all load without runtime errors. ONE FRONTEND BUG FOUND: distance badges DO NOT render in the UI. The code at Search.jsx:366-368 only renders distance-badge inside split-card-* (Split view), and Split view's rendered list comes from mapProviders (which calls /providers/map and does NOT carry distance_km). The default List view's result-card-${slug} block has NO distance badge code at all. Net effect: backend correctly returns distance_km but UI never displays it to users.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Search.jsx (List view)", "issue": "distance-badge element is only defined inside split-card branch (lines 366-368). The List view result-card has no distance badge rendering. When user clicks 'Near me' in default List view, backend returns distance_km on every result but UI never shows it.", "selector": "[data-testid^='distance-badge-']", "priority": "MEDIUM"},
+      {"component": "Search.jsx (Split view)", "issue": "Split view renders from mapProviders (which is /providers/map, sans distance_km), so even the split-card distance-badge code at line 367 never fires when Near Me is active. The proximity fetch into `providers` state is not the source for split-card rendering.", "selector": "[data-testid='distance-badge-maria-cleaning-services-sallisaw-ok']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/search", "issues": ["Google Maps modal 'This page can't load Google Maps correctly' alert appears in top-right due to referrer restriction on GOOGLE_API_KEY. Expected per task scope — user must add referrer restrictions in GCP console. Graceful degradation works: input keeps functioning as plain text.", "Legacy Places API error in console (2x): 'You're calling a legacy API, which is not enabled for your project. Switch to Places API (New).' — expected per task; UI not broken."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration17_section18_geocode_test.py",
+    "/app/test_reports/pytest/iteration17_results.xml"
+  ],
+  "action_items": [
+    "Move the distance-badge rendering block (Search.jsx lines 366-368) into the List view result-card (around line 457) so the badge actually shows when Near Me is active. The current placement only fires for Split view AND Split view reads from mapProviders which lacks distance_km — double miss.",
+    "If Split view should also show distance badges, either (a) augment /providers/map response with distance_km when lat/lng are passed, or (b) merge distance_km from the parallel /providers call into mapProviders by provider_id.",
+    "(Optional / out-of-scope) Enable Places API (New) on GCP project + add referrer restrictions so the Maps overlay alert disappears for end users.",
+    "(Optional) Cloud Translation API is BLOCKED on user's project — /api/translate correctly returns source='api_error'. Already documented in task as integration_pending."
+  ],
+  "critical_code_review_comments": [
+    "server.py now 4861 lines (still growing — split into routers strongly recommended before next section). Section 18 cleanly adds geocode + seed without polluting global state.",
+    "_geocode_lookup() catches all exceptions and returns None; that hides root cause from caller. Consider logging the Google API response status/body when status != 'OK' for easier debugging of REQUEST_DENIED / OVER_QUERY_LIMIT.",
+    "city_coordinates collection has no unique index on (city,state) — relies on upsert filter. Add db.city_coordinates.create_index([('city',1),('state',1)], unique=True) on startup to prevent dupes if seed race-condition ever happens.",
+    "Frontend useGeolocation hook + Search.jsx proximity logic is gated by `!cur.city` (line 78). If user has typed a city then clicks Near Me, the lat/lng is silently dropped. Recommend either clearing the city field on Near Me click OR documenting the precedence with a UI hint.",
+    "AnalyticsTracker / analytics.js no-op behavior verified: with empty REACT_APP_GA4_MEASUREMENT_ID, zero gtag errors fire across full app navigation. Safe.",
+    "Sec 18 seed log: did not explicitly verify 'Sec 18: seeded N city_coordinates' log line (would need supervisor backend log access during a fresh DB), but admin seed endpoint returns inserted=0 on subsequent calls — confirms idempotency."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration17_section18_geocode_test.py (new — 15 pytest cases)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15)",
+    "frontend": "85% (smoke + testids verified; Near Me API integration works; only distance-badge UI rendering is the gap)"
+  },
+  "test_credentials": "admin@getamano.com/admin123 and demo.provider@getamano.com/provider123 (from /app/memory/test_credentials.md). GOOGLE_API_KEY active for Geocoding but Cloud Translation blocked.",
+  "seed_data_creation": "Test added 1 NEW city to city_coordinates: boston-test-xyz, MA via real Google Geocoding (during uncached-fallthrough test). Also Boston, MA cached via earlier curl. Otherwise no test data created. 24 seed cities already present from backend startup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 18 backend is fully working including real Google Geocoding fallthrough. Translation API correctly degrades to api_error (blocked on user's GCP project — not a bug, integration_pending). One UX gap remains: distance badges never visually render because (a) badge JSX is inside Split view only, and (b) Split view reads from /providers/map which doesn't include distance_km. Main agent should move the badge into the List-view result-card OR add distance_km to /providers/map. The proximity API call itself is verified working end-to-end (network tab confirms /api/providers?lat=35.5&lng=-94.8&radius_km=50 fires on Near Me click). Pre-existing minor issues from iter16 (GET /api/conversations 500 KeyError) were NOT re-tested this iteration.",
+  "rca of the issue": "Distance badge missing in UI: Search.jsx line 367 placed the [data-testid='distance-badge-${p.slug}'] span inside the split-card-${p.slug} block (lines 348-388), which is in the Split view branch. In Split view, however, the list column iterates over `mapProviders` (filled by fetchMap() → /providers/map → no distance_km field). The default List view branch (around line 457, result-card-${p.slug}) renders from `providers` (which DOES have distance_km when proximity is active) but contains no distance-badge JSX at all. Reproduce: open /search, clear city, mock geolocation 35.5,-94.8, click Near Me — observe network call /api/providers?lat=35.5&lng=-94.8 returns providers with distance_km, but DOM has zero [data-testid^='distance-badge-'] elements. Mitigation: add the same distance badge JSX block (with Navigation icon + p.distance_km.toFixed(1)) into the result-card map around line 462-467 of Search.jsx."
+}
