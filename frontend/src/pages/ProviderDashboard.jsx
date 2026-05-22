@@ -20,6 +20,7 @@ import ReferralsTab from "../components/ReferralsTab";
 import LicenseSection from "../components/LicenseSection";
 import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
+import SubscriptionManager from "../components/SubscriptionManager";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -381,12 +382,16 @@ export default function ProviderDashboard() {
             )}
 
             {tab === "suscripcion" && (
-              <div data-testid="dashboard-subscription">
-                <div className="mb-6 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
+              <div data-testid="dashboard-subscription" className="space-y-6">
+                {/* Subscription Manager — current plan + cancel/reactivate */}
+                <SubscriptionManager />
+
+                {/* Plan picker grid (legacy beta mode — change plan without payment) */}
+                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
                   <CreditCard className="w-5 h-5 text-blue-600" />
                   <div className="flex-1">
-                    <div className="font-medium text-slate-900">Plan actual: <span className="capitalize text-blue-700">{profile.plan}</span></div>
-                    <div className="text-xs text-slate-500">El cobro real con Stripe estará disponible próximamente. Cambios libres durante la beta.</div>
+                    <div className="font-medium text-slate-900">Cambios libres durante la beta</div>
+                    <div className="text-xs text-slate-500">El cobro real con Stripe estará disponible próximamente. Mientras tanto, puedes cambiar de plan sin costo.</div>
                   </div>
                 </div>
                 <div className="grid md:grid-cols-3 gap-4">

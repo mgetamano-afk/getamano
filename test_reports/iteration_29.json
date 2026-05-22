@@ -1,0 +1,35 @@
+{
+  "summary": "Section 26 (annual plans + FTC-compliant cancellation) end-to-end tested: 11/11 backend pytest cases pass and all frontend Playwright flows pass — Plans /api/plans annual pricing exposed, auth gating on /api/me/subscription*, subscribe pro annual → cancel (with reason 'too_expensive') → reactivate lifecycle works, 400 returned when cancelling free plan, and email confirmation falls back to backend.err.log with 'Tu suscripción a getamano ha sido cancelada' subject. Frontend: BillingToggle persists via localStorage, toggles monthly↔annual pricing/savings/per-month subtitle, CTAs carry &cycle=, SubscriptionManager renders three states (Free/Active/Cancelled) with correct CTAs, CancelSubscriptionModal advances through FTC 3-step flow, Escape and X close the modal, body scroll lock applied while modal open. Mobile @393px has no horizontal overflow on /plans. Demo provider left in Pro annual active state per request.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Provider Dashboard · Suscripción tab", "issues": ["After CancelSubscriptionModal closes, document.body.style.overflow is left as 'hidden auto' rather than being cleared back to '' (or the original value). Functionally the page still scrolls because 'auto' wins, but the lingering inline 'hidden' token is sloppy. Recommend restoring the prior value (or removing the inline style entirely) in the modal's effect cleanup."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter29_subscriptions.py",
+    "/app/test_reports/pytest/iter29_results.xml"
+  ],
+  "action_items": [
+    "Optional: clear body inline overflow style on CancelSubscriptionModal unmount (currently leaves 'hidden auto')."
+  ],
+  "critical_code_review_comments": [
+    "server.py /api/me/subscription/cancel correctly preserves next_renewal_date (FTC: access until period end) and only flips status — verified via test.",
+    "_PLAN_PRICES is duplicated in spirit with the inline /api/plans price list. Consider deriving one from the other (single source of truth) so a Pro price bump doesn't have to be edited in two places.",
+    "Reactivate endpoint guards against expired periods (datetime compare) — good. Empty-string reason is normalized to None (nice).",
+    "BillingToggle persistence uses localStorage with try/catch — safe for SSR/private-mode browsers.",
+    "Plans.jsx computes annualPerMonth client-side; backend doesn't expose it — fine, but if pricing ever depends on currency/region this should move server-side."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter29_subscriptions.py (new)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all 7 frontend assertions covered)"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (from /app/memory/test_credentials.md); left in Pro annual active state after test run.",
+  "seed_data_creation": "Subscription doc upserted in MongoDB `subscriptions` collection for demo provider user_id (Pro annual, status=active).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 26 subscription module is shipped and clean. The reusable backend pytest suite is at /app/backend/tests/test_iter29_subscriptions.py — its module-scope teardown leaves demo provider in Pro annual active state. Email confirmation lands in /var/log/supervisor/backend.err.log as [EMAIL DEV-FALLBACK] until RESEND_API_KEY is configured (per /app/memory/test_credentials.md). Only nit found: CancelSubscriptionModal leaves body style.overflow='hidden auto' after unmount (cosmetic, page still scrolls).",
+  "rca_of_the_issue": "n/a — feature verification, no bug."
+}

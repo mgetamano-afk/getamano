@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
 import { Check, Sparkles } from "lucide-react";
 import PlanRecommender from "../components/PlanRecommender";
+import BillingToggle from "../components/BillingToggle";
 
 /** Per-experiment deterministic A/B assignment from session_id.
  *  Matches the same algorithm in PlanRecommender so a session sees consistent
@@ -34,6 +35,10 @@ const PLAN_ORDER_B = ["pro", "premium", "basic", "free"];
 export default function Plans() {
   const { t, lang } = useI18n();
   const [plans, setPlans] = useState([]);
+  const [billingCycle, setBillingCycle] = useState(() => {
+    try { return localStorage.getItem("plans_billing_cycle") || "monthly"; }
+    catch (_e) { return "monthly"; }
+  });
 
   useEffect(() => {
     api.get("/plans").then(r => setPlans(r.data));
@@ -73,6 +78,15 @@ export default function Plans() {
     }).catch(() => {});
   };
 
+  const onChangeCycle = (next) => {
+    setBillingCycle(next);
+    try { localStorage.setItem("plans_billing_cycle", next); } catch (_e) { /* ignore */ }
+    api.post("/quiz/track", {
+      session_id: sessionId, event: "billing_cycle_changed",
+      experiment: "billing_cycle_v1", variant: next === "annual" ? "B" : "A", lang,
+    }).catch(() => {});
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <Header />
@@ -88,26 +102,67 @@ export default function Plans() {
         {/* Smart Recommender — quiz "What plan do I need?" */}
         <PlanRecommender />
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-12" data-variant={orderVariant}>
+        {/* Billing cycle toggle */}
+        <div className="mt-12 flex justify-center" data-testid="plans-billing-toggle-row">
+          <BillingToggle cycle={billingCycle} onChange={onChangeCycle} lang={lang} savingsLabel="17%" />
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10" data-variant={orderVariant}>
           {orderedPlans.map(p => {
             const features = lang === "es" ? p.features_es : p.features_en;
             const name = lang === "es" ? p.name : p.name_en;
+            const priceMonthly = p.price_monthly || 0;
+            const priceAnnual = p.price_annual || priceMonthly * 12;
+            const annualSavings = p.annual_savings || 0;
+            const showAnnual = billingCycle === "annual";
+            // Cost per month when paying annually — shown so users see the daily-cost framing.
+            const annualPerMonth = priceAnnual ? (priceAnnual / 12) : 0;
             return (
-              <div key={p.id} className={`rounded-2xl border-2 p-6 md:p-7 bg-white ${p.highlight ? "border-orange-500 shadow-xl shadow-orange-100 relative" : "border-slate-200"}`} data-testid={`plan-card-${p.id}`}>
+              <div key={p.id} className={`rounded-2xl border-2 p-6 md:p-7 bg-white relative ${p.highlight ? "border-orange-500 shadow-xl shadow-orange-100" : "border-slate-200"}`} data-testid={`plan-card-${p.id}`}>
                 {p.highlight && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">{lang === "en" ? "Most popular" : "Más popular"}</span>}
                 <h3 className="font-display text-xl font-bold text-slate-900">{name}</h3>
-                <div className="mt-3 flex items-end gap-1">
-                  <span className="font-display text-4xl font-bold text-slate-900">${p.price_monthly}</span>
-                  <span className="text-slate-500 mb-1">{t("plans.monthly")}</span>
+
+                {/* Price block — animates by swapping the visible value */}
+                <div className="mt-3 min-h-[78px]" data-testid={`plan-price-${p.id}`}>
+                  {priceMonthly === 0 ? (
+                    <div className="flex items-end gap-1">
+                      <span className="font-display text-4xl font-bold text-slate-900">$0</span>
+                      <span className="text-slate-500 mb-1">{lang === "en" ? "/forever" : "/siempre"}</span>
+                    </div>
+                  ) : showAnnual ? (
+                    <>
+                      <div className="flex items-end gap-1">
+                        <span className="font-display text-4xl font-bold text-slate-900" data-testid={`plan-price-${p.id}-annual`}>${priceAnnual}</span>
+                        <span className="text-slate-500 mb-1">{lang === "en" ? "/year" : "/año"}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        ≈ <span className="font-semibold text-slate-700">${annualPerMonth.toFixed(annualPerMonth % 1 === 0 ? 0 : 2)}</span> {lang === "en" ? "per month" : "por mes"}
+                      </p>
+                      {annualSavings > 0 && (
+                        <p className="text-xs font-bold mt-1" style={{ color: "#16A34A" }} data-testid={`plan-price-${p.id}-savings`}>
+                          {lang === "en" ? `You save $${annualSavings}/yr` : `Ahorras $${annualSavings}/año`}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-end gap-1">
+                        <span className="font-display text-4xl font-bold text-slate-900" data-testid={`plan-price-${p.id}-monthly`}>${priceMonthly}</span>
+                        <span className="text-slate-500 mb-1">{t("plans.monthly")}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 invisible">placeholder</p>
+                    </>
+                  )}
                 </div>
-                <ul className="mt-5 space-y-2.5 min-h-[220px]">
+
+                <ul className="mt-3 space-y-2.5 min-h-[220px]">
                   {features.map((f, i) => (
                     <li key={`${p.id}-${i}`} className="flex items-start gap-2 text-[13px] text-slate-700">
                       <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /> {f}
                     </li>
                   ))}
                 </ul>
-                <Link to={`/register?intent=provider&plan=${p.id}`} onClick={() => trackPlanClick(p.id)} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
+                <Link to={`/register?intent=provider&plan=${p.id}&cycle=${billingCycle}`} onClick={() => trackPlanClick(p.id)} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
                   {p.id === "free" ? (lang === "en" ? "Start free" : "Empezar gratis") : t("plans.choose")}
                 </Link>
               </div>

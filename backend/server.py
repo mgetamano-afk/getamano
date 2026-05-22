@@ -580,6 +580,9 @@ async def seed():
         # Audit log — fast lookup by actor_id + action
         await db.audit_log.create_index([("actor_id", 1), ("created_at", -1)])
         await db.audit_log.create_index([("action", 1), ("created_at", -1)])
+        # SECTION 26 — subscriptions (one per user)
+        await db.subscriptions.create_index("user_id", unique=True)
+        await db.subscriptions.create_index("status")
         # SECTION 18 — Geocoding cache
         await db.city_coordinates.create_index([("city", 1), ("state", 1)], unique=True)
         # Quiz funnel (PlanRecommender abandonment tracking)
@@ -1725,24 +1728,180 @@ async def admin_stats(_: User = Depends(require_admin)):
 # ============ PLANS (UI only) ============
 @api_router.get("/plans")
 async def list_plans():
+    # SECTION 26 — Annual pricing: pay for 10 months, get 12 months access (2 free).
+    # Frontend toggles between monthly/annual using price_monthly and price_annual.
     return [
-        {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0,
+        {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0, "price_annual": 0, "annual_savings": 0,
          "badge": None, "highlight": False,
          "features_es": ["eCard básica con enlace único", "1 categoría de servicio", "Hasta 20 fotos en tu galería", "Analytics básicos", "Formulario de contacto"],
          "features_en": ["Basic eCard with unique link", "1 service category", "Up to 20 photos in your gallery", "Basic analytics", "Contact form"]},
-        {"id": "basic", "name": "Básico", "name_en": "Basic", "price_monthly": 10,
+        {"id": "basic", "name": "Básico", "name_en": "Basic", "price_monthly": 10, "price_annual": 100, "annual_savings": 20,
          "badge": "Básico", "badge_color": "#94a3b8", "highlight": False,
          "features_es": ["Todo lo de Gratis +", "Hasta 3 categorías", "Fotos ilimitadas en tu galería", "Analytics mejorados", "Responder reseñas", "1 boost mensual de visibilidad"],
          "features_en": ["Everything in Free +", "Up to 3 categories", "Unlimited gallery photos", "Enhanced analytics", "Respond to reviews", "1 visibility boost/month"]},
-        {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 15,
+        {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 15, "price_annual": 150, "annual_savings": 30,
          "badge": "Pro", "badge_color": "#F97316", "highlight": True, "label": "Más popular",
          "features_es": ["Todo lo de Básico +", "Hasta 5 categorías", "Fotos ilimitadas + 1 video de presentación", "Mejor posición en búsquedas", "Notificaciones en tiempo real", "Botón WhatsApp directo", "3 boosts mensuales", "Soporte prioritario"],
          "features_en": ["Everything in Basic +", "Up to 5 categories", "Unlimited photos + 1 presentation video", "Better search ranking", "Real-time notifications", "Direct WhatsApp button", "3 visibility boosts/month", "Priority support"]},
-        {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 25,
+        {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 25, "price_annual": 250, "annual_savings": 50,
          "badge": "Premium", "badge_color": "#D97706", "highlight": False, "label": "Mejor valor",
          "features_es": ["Todo lo de Pro +", "Categorías ilimitadas", "Fotos ilimitadas + 1 video de presentación", "Posición TOP en búsquedas", "Aparece en homepage", "Campañas mensuales", "QR personalizado descargable", "eCard premium con branding", "Reportes avanzados", "5 boosts mensuales"],
          "features_en": ["Everything in Pro +", "Unlimited categories", "Unlimited photos + 1 presentation video", "TOP search position", "Featured on homepage", "Monthly campaigns", "Downloadable custom QR", "Premium eCard", "Advanced reports", "5 visibility boosts/month"]},
     ]
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 26 — Subscription management (annual plans + FTC cancellation)
+# ════════════════════════════════════════════════════════════════════
+# We're pre-Stripe — these endpoints record the user's intent and lifecycle
+# so that when Stripe Connect goes live we can swap the in-memory record for
+# real billing without changing the frontend. The cancellation flow is FTC
+# "Click-to-Cancel Rule" compliant: one click from the dashboard, immediate
+# email confirmation, access preserved until the paid period ends.
+
+_PLAN_PRICES = {
+    "free":    {"monthly": 0,  "annual": 0,   "savings": 0},
+    "basic":   {"monthly": 10, "annual": 100, "savings": 20},
+    "pro":     {"monthly": 15, "annual": 150, "savings": 30},
+    "premium": {"monthly": 25, "annual": 250, "savings": 50},
+}
+
+class SubscribeIn(BaseModel):
+    plan: str  # "free" | "basic" | "pro" | "premium"
+    billing_cycle: Optional[str] = "monthly"
+
+class CancelSubIn(BaseModel):
+    reason: Optional[str] = None
+
+def _renewal_in_days(days: int) -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+
+def _cancellation_email_html(name: str, plan_label: str, access_until: str, locale: str = "es") -> str:
+    is_en = locale.startswith("en")
+    headline = "Subscription cancelled" if is_en else "Suscripción cancelada"
+    body1 = (f"We've confirmed your <strong>{plan_label}</strong> plan cancellation."
+             if is_en else f"Confirmamos que tu plan <strong>{plan_label}</strong> ha sido cancelado.")
+    body2 = (f"Your access stays active until <strong>{access_until}</strong>. After that you'll automatically move to the free plan."
+             if is_en else f"Tu acceso sigue activo hasta el <strong>{access_until}</strong>. Después pasarás automáticamente al plan Gratis.")
+    body3 = ("Changed your mind? Reactivate anytime in your dashboard."
+             if is_en else "¿Cambiaste de opinión? Reactiva en cualquier momento desde tu panel.")
+    contact = "Questions? hola@getamano.us" if is_en else "¿Dudas? Escríbenos a hola@getamano.us"
+    return f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc;padding:40px 20px;"><tr><td align="center">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.06);">
+  <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:32px 28px;text-align:center;">
+    <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">getamano</h1>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <h2 style="margin:0 0 16px 0;color:#0F172A;font-size:22px;font-weight:700;">{headline}</h2>
+    <p style="margin:0 0 12px 0;color:#475569;font-size:15px;line-height:1.6;">Hola {name},</p>
+    <p style="margin:0 0 12px 0;color:#475569;font-size:15px;line-height:1.6;">{body1}</p>
+    <p style="margin:0 0 12px 0;color:#475569;font-size:15px;line-height:1.6;">{body2}</p>
+    <p style="margin:0 0 24px 0;color:#475569;font-size:15px;line-height:1.6;">{body3}</p>
+    <p style="margin:24px 0 0 0;color:#94A3B8;font-size:12px;">{contact}</p>
+  </td></tr>
+</table></td></tr></table></body></html>"""
+
+
+@api_router.get("/me/subscription")
+async def get_my_subscription(user: User = Depends(get_current_user)):
+    sub = await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not sub:
+        return {
+            "plan": "free", "billing_cycle": "monthly", "amount": 0,
+            "annual_discount_applied": False, "status": "active",
+            "next_renewal_date": None, "cancelled_at": None,
+        }
+    return sub
+
+@api_router.post("/me/subscription")
+async def subscribe(payload: SubscribeIn, request: Request, user: User = Depends(get_current_user)):
+    plan = payload.plan if payload.plan in _PLAN_PRICES else "free"
+    billing = payload.billing_cycle if payload.billing_cycle in ("monthly", "annual") else "monthly"
+    prices = _PLAN_PRICES[plan]
+    amount = prices["annual"] if billing == "annual" else prices["monthly"]
+    now = datetime.now(timezone.utc).isoformat()
+    days = 365 if billing == "annual" else 30
+    sub_doc = {
+        "user_id": user.user_id,
+        "plan": plan,
+        "billing_cycle": billing,
+        "amount": amount,
+        "annual_discount_applied": billing == "annual" and plan != "free",
+        "next_renewal_date": _renewal_in_days(days) if plan != "free" else None,
+        "status": "active",
+        "cancelled_at": None,
+        "cancel_reason": None,
+        "updated_at": now,
+    }
+    existing = await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+    if existing:
+        await db.subscriptions.update_one({"user_id": user.user_id}, {"$set": sub_doc})
+    else:
+        sub_doc["created_at"] = now
+        await db.subscriptions.insert_one(sub_doc)
+    await audit_log(user.user_id, "subscription.upserted", {"plan": plan, "billing_cycle": billing}, request)
+    sub_doc.pop("_id", None)
+    return sub_doc
+
+@api_router.post("/me/subscription/cancel")
+async def cancel_my_subscription(payload: CancelSubIn, request: Request, user: User = Depends(get_current_user)):
+    """FTC Click-to-Cancel — flag the sub as cancelled, keep access until next_renewal_date."""
+    sub = await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not sub or sub.get("plan") == "free":
+        raise HTTPException(status_code=400, detail="No tienes una suscripción de pago activa.")
+    if sub.get("status") == "cancelled":
+        return {**sub, "_already_cancelled": True}
+    now = datetime.now(timezone.utc).isoformat()
+    await db.subscriptions.update_one(
+        {"user_id": user.user_id, "status": "active"},
+        {"$set": {
+            "status": "cancelled",
+            "cancelled_at": now,
+            "cancel_reason": (payload.reason or "").strip()[:280] or None,
+            "updated_at": now,
+        }},
+    )
+    await audit_log(user.user_id, "subscription.cancelled", {"plan": sub.get("plan"), "reason": payload.reason}, request)
+
+    # FTC requires immediate email confirmation — fall back to log when Resend not configured.
+    user_doc = await db.users.find_one({"user_id": user.user_id}, {"_id": 0, "email": 1, "name": 1, "language": 1})
+    if user_doc and user_doc.get("email"):
+        locale = (user_doc.get("language") or "es").lower()
+        plan_label = {"basic": "Básico", "pro": "Pro", "premium": "Premium"}.get(sub.get("plan"), sub.get("plan", "").title())
+        next_date = (sub.get("next_renewal_date") or now)[:10]
+        subject = ("Tu suscripción a getamano ha sido cancelada"
+                   if locale.startswith("es") else "Your getamano subscription has been cancelled")
+        html = _cancellation_email_html(
+            name=user_doc.get("name") or "amigo",
+            plan_label=plan_label,
+            access_until=next_date,
+            locale=locale,
+        )
+        await _send_email_via_resend(user_doc["email"], subject, html)
+
+    return await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+
+@api_router.post("/me/subscription/reactivate")
+async def reactivate_my_subscription(request: Request, user: User = Depends(get_current_user)):
+    """Undo a cancellation before the next renewal date hits."""
+    sub = await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not sub or sub.get("status") != "cancelled":
+        raise HTTPException(status_code=400, detail="Tu suscripción no está cancelada.")
+    next_date = sub.get("next_renewal_date")
+    try:
+        if next_date and datetime.fromisoformat(next_date) < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="El periodo ya expiró. Elige un plan en /plans.")
+    except (TypeError, ValueError):
+        pass
+    await db.subscriptions.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"status": "active", "cancelled_at": None, "cancel_reason": None,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    await audit_log(user.user_id, "subscription.reactivated", {"plan": sub.get("plan")}, request)
+    return await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+
 
 # ============ SERVICE REQUESTS ============
 @api_router.post("/service-requests")
