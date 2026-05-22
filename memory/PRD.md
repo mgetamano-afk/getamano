@@ -275,6 +275,36 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### Feb 2026 — Sections 23, 24, 25 + Sitemap (combined sprint)
+
+**Section 25 — AI Description Assistant for providers**
+- New endpoint `POST /api/ai/improve-description` powered by `claude-haiku-4-5-20251001` via Emergent LLM key. Accepts `{text, category, business_name, locale}`, returns `{improved, original, was_improved, model}`. Rejects text < 10 chars or > 2000 chars. Uses dual prompt (ES/EN) and forbids empty marketing phrases ("the best", "#1", "amazing"). Strips quote wrappers Claude sometimes adds.
+- New component `AIDescriptionAssistant.jsx` — debounced bubble that appears 2.5s after typing pauses with ≥30 chars. Three states: offering · loading · showing. Avatar gradient + sparkle icon. Once dismissed or accepted, won't re-offer for current session.
+- Wired into `ProviderOnboarding.jsx` step 2 ("Datos del negocio") below the description textarea. On `Use this version` click, the textarea state replaces with the improved text.
+- Real test: `"hola tenemos servico de limpiesa de casa, somos los mejores y mas baratos"` → `"Hola, somos Maria Cleaning y nos especializamos en limpiezas de casa con atención al detalle y precios accesibles. Trabajamos rápido y dejamos tu hogar impecable para que disfrutes más tiempo con tu familia. Contáctame para tu cotización gratis y conoce nuestras opciones de servicio."` ✓
+
+**Section 24 — Email OTP verification**
+- New endpoints: `POST /api/auth/send-otp` (cooldown 60s · 5 attempts/min · TTL 10min · hashed code stored), `POST /api/auth/verify-otp` (max 5 attempts before invalidation), `GET /api/auth/me/email-verified` (poll endpoint). Uses bcrypt for hashing OTP at rest (never plaintext stored).
+- Resend SDK installed (`resend==2.30.1`). Falls back to backend logger when `RESEND_API_KEY` is unset — log line `[EMAIL DEV-FALLBACK] OTP code for <email> = <6digits>` lets devs/founder grab the code without external service. Production: just set `RESEND_API_KEY` + `SENDER_EMAIL` in `/app/backend/.env` to flip on real delivery.
+- Beautiful HTML email template: gradient header, monospace 6-digit code in dashed border, footer. All inline CSS for max client compatibility.
+- New page `/verificar-correo` (alias `/verify-email`): 6 separate digit boxes, auto-advance on type, backspace navigates back, ⌘V/Ctrl+V pastes full code and auto-submits. Resend button with live cooldown timer. Success state with confetti CTA → "Ir a mi panel".
+- `Register.jsx` now redirects new accounts to `/verificar-correo?email=<...>` instead of `/dashboard`. Login flow unchanged for existing users.
+- New users get `email_verified: false` on creation; existing users default to undefined (treated as unverified by frontend if check is added later).
+
+**Section 23 — Light scalability + security hardening**
+- New `rate_limit_middleware` on `/api/auth/login`, `/api/auth/register`, `/api/auth/send-otp`, `/api/auth/verify-otp`, `/api/ai/improve-description`, `/api/translate`, `/api/card-scan`. 60-second sliding window stored in `db.rate_limit_buckets` (TTL-indexed at 2min retention). Reads `X-Forwarded-For` so the limiter sees the real client IP (not the proxy). Fails OPEN if Mongo hiccups — never blocks legit traffic.
+- Verified: 8 successful 401s on /login, then 4× HTTP 429 with detail "Demasiadas peticiones. Espera 60 segundos." ✓
+- New `audit_log()` async helper writes structured entries to `db.audit_log` (actor_id, action, details, ip, created_at). Best-effort — never raises.
+- New TTL indexes: `email_otps.expires_at_native` (TTL 0s — auto-delete past expiry), `rate_limit_buckets.expires_at_native` (TTL 0s after 2min)
+- New audit indexes: `audit_log` on `(actor_id, created_at)` and `(action, created_at)` for fast forensic lookups.
+
+**Sitemap.xml expansion** — `/api/sitemap.xml` now includes:
+- 12 SEO category hubs (`/categoria/<slug>` priority 0.9 + `/category/<slug>` priority 0.7) for organic discovery
+- `/instalar` PWA install landing
+- Total URL count: 4475 (up from 4450)
+
+**Testing:** `iteration_26.json` — **11/11 backend pytest + 100% frontend on tested flows**, ZERO bugs found. AI flow E2E verified, OTP wrong/correct/expired all flagged correctly, rate limiter triggers at request 9, sitemap includes new URLs, Register → /verificar-correo redirect works.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)
