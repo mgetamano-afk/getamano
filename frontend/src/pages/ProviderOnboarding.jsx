@@ -169,10 +169,10 @@ export default function ProviderOnboarding() {
               </div>
               <Field label="Descripción corta" value={form.description} onChange={v => update("description", v)} textarea testid="onboarding-description" />
               <div className="grid md:grid-cols-2 gap-4">
-                <Field label="Teléfono" value={form.phone} onChange={v => update("phone", v)} testid="onboarding-phone" />
-                <Field label="Email de contacto" value={form.email} onChange={v => update("email", v)} testid="onboarding-email" />
+                <Field label="Teléfono" value={form.phone} onChange={v => update("phone", v)} testid="onboarding-phone" type="tel" inputMode="tel" autoComplete="tel" />
+                <Field label="Email de contacto" value={form.email} onChange={v => update("email", v)} testid="onboarding-email" type="email" inputMode="email" autoComplete="email" />
               </div>
-              <Field label="Sitio web (opcional)" value={form.website} onChange={v => update("website", v)} testid="onboarding-website" />
+              <Field label="Sitio web (opcional)" value={form.website} onChange={v => update("website", v)} testid="onboarding-website" type="url" inputMode="url" autoComplete="url" />
             </div>
           )}
 
@@ -328,13 +328,22 @@ export default function ProviderOnboarding() {
   );
 }
 
-function Field({ label, value, onChange, textarea, testid, placeholder }) {
+function Field({ label, value, onChange, textarea, testid, placeholder, type, inputMode, autoComplete }) {
   return (
     <div>
       <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       {textarea
         ? <textarea value={value || ""} onChange={e => onChange(e.target.value)} rows={3} placeholder={placeholder} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid={testid} />
-        : <input value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full h-12 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-600" data-testid={testid} />}
+        : <input
+            type={type || "text"}
+            inputMode={inputMode}
+            autoComplete={autoComplete}
+            value={value || ""}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full h-12 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-600"
+            data-testid={testid}
+          />}
     </div>
   );
 }
