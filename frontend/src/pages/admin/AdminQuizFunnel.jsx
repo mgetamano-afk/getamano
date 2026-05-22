@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import AdminLayout from "../../components/AdminLayout";
-import { TrendingUp, Mail, Users, ArrowDownRight, RefreshCw, Award, Loader2, Copy, Check } from "lucide-react";
+import { TrendingUp, Mail, Users, ArrowDownRight, RefreshCw, Award, Loader2, Copy, Check, Beaker, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 /**
@@ -141,6 +141,9 @@ export default function AdminQuizFunnel() {
           </div>
         </div>
 
+        {/* A/B Test Comparison */}
+        {data?.ab_test && <ABTestSection ab={data.ab_test} />}
+
         {/* Leads list */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-3">
@@ -204,6 +207,119 @@ function Kpi({ icon: Icon, label, value, sub, color }) {
       </div>
       <div className="font-display text-3xl font-bold" style={{ color }}>{value}</div>
       {sub && <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{sub}</div>}
+    </div>
+  );
+}
+
+/**
+ * ABTestSection — side-by-side A vs B funnel comparison with statistical hint.
+ * Currently testing `result_cta_v1` experiment: variant A keeps the control copy
+ * ("Elegir este plan" + "Recibir en correo"), variant B uses urgency/value
+ * copy ("Empezar a recibir clientes hoy" + "Mándame 5 tips").
+ */
+function ABTestSection({ ab }) {
+  const A = ab.variants.A;
+  const B = ab.variants.B;
+  const unassigned = ab.variants.unassigned;
+  const sig = ab.significance;
+
+  const VARIANT_META = {
+    A: { name: "A — Control", color: "#64748B", description: '"Elegir este plan" · banner "Enviarme mi resultado"' },
+    B: { name: "B — Urgencia", color: "#F97316", description: '"Empezar a recibir clientes hoy" · banner "Mándame mis 5 tips"' },
+  };
+
+  const winnerKey = sig.winner; // null until we have ≥30 each AND diff ≥ 3pp
+  const winnerEmoji = winnerKey === "A" ? "🟦" : winnerKey === "B" ? "🟧" : "⏳";
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5" data-testid="ab-test-section">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+          <Beaker className="w-5 h-5 text-orange-500" /> Test A/B en marcha
+        </h3>
+        <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+          {ab.experiment}
+        </span>
+      </div>
+      <p className="text-xs text-slate-500 mb-4">
+        Asignación 50/50 determinística por <code className="text-[10px] bg-slate-100 px-1 rounded">session_id</code>.
+        Cada sesión ve siempre la misma variante.
+      </p>
+
+      {/* Winner banner */}
+      <div className={`rounded-2xl px-4 py-3 mb-4 flex items-start gap-3 ${winnerKey ? "bg-green-50 border border-green-200" : "bg-slate-50 border border-slate-200"}`} data-testid="ab-winner-banner">
+        <Trophy className={`w-5 h-5 flex-shrink-0 ${winnerKey ? "text-green-700" : "text-slate-400"}`} />
+        <div className="text-sm">
+          {winnerKey ? (
+            <>
+              <p className="font-semibold text-green-900">{winnerEmoji} Variante {winnerKey} está ganando ({sig.diff_pp > 0 ? "+" : ""}{sig.diff_pp} pp de conversión end-to-end)</p>
+              <p className="text-green-800 text-xs mt-0.5">Después de {A.started} + {B.started} sesiones, podemos llamarlo. Considera promover {winnerKey} a default.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-slate-700">⏳ Recolectando datos…</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Faltan {Math.max(0, 30 - A.started)} sesiones en A y {Math.max(0, 30 - B.started)} en B para llamar al ganador.
+                Diferencia actual: {sig.diff_pp > 0 ? "+" : ""}{sig.diff_pp} pp (B vs A).
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Side-by-side cards */}
+      <div className="grid md:grid-cols-2 gap-3">
+        {["A", "B"].map(k => {
+          const v = ab.variants[k];
+          const meta = VARIANT_META[k];
+          const isWinner = winnerKey === k;
+          return (
+            <div key={k}
+                 className={`rounded-2xl border-2 p-4 ${isWinner ? "shadow-lg" : ""}`}
+                 style={isWinner ? { borderColor: meta.color } : { borderColor: "#E2E8F0" }}
+                 data-testid={`ab-variant-${k}`}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs"
+                        style={{ backgroundColor: meta.color }}>{k}</span>
+                  <h4 className="font-display font-bold text-slate-900">{meta.name}</h4>
+                </div>
+                {isWinner && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-800">GANADOR</span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 italic mb-3">{meta.description}</p>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <Mini label="Sesiones" value={v.started} />
+                <Mini label="Completaron" value={v.completed} sub={`${v.completion_rate_pct}%`} />
+                <Mini label="Click CTA" value={v.cta_clicked} sub={`${v.cta_conversion_pct}%`} />
+                <Mini label="Emails" value={v.email_captured} sub={`${v.recovery_rate_pct}%`} />
+              </div>
+              <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">End-to-end</span>
+                <span className="font-display text-2xl font-bold" style={{ color: meta.color }}>
+                  {v.overall_conversion_pct}<span className="text-sm">%</span>
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {unassigned.sessions > 0 && (
+        <p className="text-[10px] text-slate-400 mt-3 text-center">
+          {unassigned.sessions} sesión(es) sin variante asignada (probablemente datos previos al lanzamiento del test).
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Mini({ label, value, sub }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-2">
+      <div className="text-[9px] uppercase tracking-widest text-slate-500 font-semibold">{label}</div>
+      <div className="font-display text-lg font-bold text-slate-900">{value || 0}</div>
+      {sub && <div className="text-[10px] text-slate-500">{sub}</div>}
     </div>
   );
 }

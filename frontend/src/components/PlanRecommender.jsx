@@ -18,18 +18,29 @@ function getOrCreateSessionId() {
   }
 }
 
+/** Deterministic A/B variant assignment from sessionId. Same session = same variant.
+ *  ~50/50 split via simple char-sum modulo 2. Idempotent and zero-state. */
+function getVariant(sessionId) {
+  if (!sessionId) return "A";
+  let h = 0;
+  for (let i = 0; i < sessionId.length; i++) h = (h + sessionId.charCodeAt(i)) % 1000;
+  return h % 2 === 0 ? "A" : "B";
+}
+
+const EXPERIMENT = "result_cta_v1";
+
 /** Fire-and-forget tracking call. Never blocks the UI. */
 function track(sessionId, event, extra = {}) {
   try {
-    // Use sendBeacon when the browser is unloading (more reliable than fetch)
+    const variant = getVariant(sessionId);
     const url = `${process.env.REACT_APP_BACKEND_URL}/api/quiz/track`;
-    const body = JSON.stringify({ session_id: sessionId, event, ...extra });
+    const body = JSON.stringify({ session_id: sessionId, event, variant, experiment: EXPERIMENT, ...extra });
     if (event === "abandoned" && navigator.sendBeacon) {
       const blob = new Blob([body], { type: "application/json" });
       navigator.sendBeacon(url, blob);
       return;
     }
-    api.post("/quiz/track", { session_id: sessionId, event, ...extra }).catch(() => {});
+    api.post("/quiz/track", { session_id: sessionId, event, variant, experiment: EXPERIMENT, ...extra }).catch(() => {});
   } catch (_e) { /* ignore */ }
 }
 
@@ -148,6 +159,7 @@ export default function PlanRecommender() {
   const emailCapturedRef = useRef(false);
 
   if (!sessionIdRef.current) sessionIdRef.current = getOrCreateSessionId();
+  const variant = getVariant(sessionIdRef.current);
 
   // Fire "opened" the first time the user clicks the CTA
   useEffect(() => {
@@ -249,6 +261,24 @@ export default function PlanRecommender() {
     pillsLabel: "Tu puntaje",
   }, [lang]);
 
+  // A/B variant copy — overrides the default `cta_go` and email banner labels
+  // for variant B (urgency/value-driven). Both variants ship in production
+  // simultaneously; the backend pairs the session_id with the variant value.
+  const VARIANT_COPY = useMemo(() => {
+    if (variant !== "B") return null;
+    return lang === "en" ? {
+      cta_go: "Start getting clients today",
+      bannerTitle: "Want 5 quick wins for your eCard?",
+      bannerSub: "We'll email you 5 actionable tips this week + save your recommendation.",
+      bannerCta: "Send me my 5 tips",
+    } : {
+      cta_go: "Empezar a recibir clientes hoy",
+      bannerTitle: "¿Quieres 5 acciones rápidas para tu eCard?",
+      bannerSub: "Te mandamos 5 tips esta semana + guardamos tu recomendación.",
+      bannerCta: "Mándame mis 5 tips",
+    };
+  }, [variant, lang]);
+
   if (!opened) {
     return (
       <section className="mt-12 max-w-4xl mx-auto px-4" data-testid="plan-recommender-collapsed">
@@ -321,8 +351,9 @@ export default function PlanRecommender() {
               className="inline-flex items-center gap-1 px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:opacity-90 transition"
               style={{ backgroundColor: meta.color }}
               data-testid="plan-recommender-cta-confirm"
+              data-variant={variant}
             >
-              {T.cta_go} <ChevronRight className="w-4 h-4" />
+              {(VARIANT_COPY && VARIANT_COPY.cta_go) || T.cta_go} <ChevronRight className="w-4 h-4" />
             </Link>
             <button
               onClick={() => { setOpened(true); setStep(0); setAnswers({}); setSubmitted(false); completedRef.current = false; emailCapturedRef.current = false; }}
@@ -338,6 +369,7 @@ export default function PlanRecommender() {
           {!emailCapturedRef.current && (
             <EmailCaptureBanner
               lang={lang}
+              variantCopy={VARIANT_COPY}
               onCaptured={async (email) => {
                 emailCapturedRef.current = true;
                 try {
@@ -345,7 +377,7 @@ export default function PlanRecommender() {
                     session_id: sessionIdRef.current,
                     email, answers,
                     recommended_plan: recommended,
-                    lang,
+                    lang, variant, experiment: EXPERIMENT,
                   });
                 } catch (_e) { /* never blocks */ }
               }}
@@ -474,12 +506,12 @@ function buildReasons(answers, plan, lang) {
  * save their result + receive bilingual tips. Captured leads are stored in
  * lead_recoveries and will be emailed once Resend is configured.
  */
-function EmailCaptureBanner({ lang, onCaptured }) {
+function EmailCaptureBanner({ lang, variantCopy, onCaptured }) {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const T = lang === "en" ? {
+  const defaults = lang === "en" ? {
     title: "Want this in your inbox?",
     sub: "We'll save your recommendation and send tips for your eCard. No spam.",
     placeholder: "your@email.com",
@@ -491,6 +523,14 @@ function EmailCaptureBanner({ lang, onCaptured }) {
     placeholder: "tu@email.com",
     cta: "Enviarme mi resultado",
     sent: "¡Guardado! Pronto recibirás un correo.",
+  };
+  // Merge variant overrides on top of defaults
+  const T = {
+    title: variantCopy?.bannerTitle || defaults.title,
+    sub: variantCopy?.bannerSub || defaults.sub,
+    placeholder: defaults.placeholder,
+    cta: variantCopy?.bannerCta || defaults.cta,
+    sent: defaults.sent,
   };
 
   const submit = async (e) => {

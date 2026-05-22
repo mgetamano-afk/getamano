@@ -5055,6 +5055,8 @@ class QuizTrackIn(BaseModel):
     answers: Optional[dict] = None
     recommended_plan: Optional[str] = None
     lang: Optional[str] = "es"
+    variant: Optional[Literal["A", "B"]] = None
+    experiment: Optional[str] = "result_cta_v1"
 
 
 class LeadRecoveryIn(BaseModel):
@@ -5063,6 +5065,8 @@ class LeadRecoveryIn(BaseModel):
     answers: dict
     recommended_plan: Optional[str] = None
     lang: Optional[str] = "es"
+    variant: Optional[Literal["A", "B"]] = None
+    experiment: Optional[str] = "result_cta_v1"
 
 
 @api_router.post("/quiz/track")
@@ -5077,6 +5081,8 @@ async def quiz_track(payload: QuizTrackIn, request: Request,
         "answers": payload.answers or {},
         "recommended_plan": payload.recommended_plan,
         "lang": payload.lang or "es",
+        "variant": payload.variant,
+        "experiment": payload.experiment or "result_cta_v1",
         "user_id": user.user_id if user else None,
         "ip": request.client.host if request.client else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -5102,6 +5108,8 @@ async def quiz_recover(payload: LeadRecoveryIn, request: Request,
             "answers": payload.answers,
             "recommended_plan": payload.recommended_plan,
             "lang": payload.lang or "es",
+            "variant": payload.variant,
+            "experiment": payload.experiment or "result_cta_v1",
             "status": "pending",
             "user_id": user.user_id if user else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -5118,6 +5126,8 @@ async def quiz_recover(payload: LeadRecoveryIn, request: Request,
         "answers": payload.answers,
         "recommended_plan": payload.recommended_plan,
         "lang": payload.lang or "es",
+        "variant": payload.variant,
+        "experiment": payload.experiment or "result_cta_v1",
         "user_id": user.user_id if user else None,
         "email": email,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -5128,7 +5138,7 @@ async def quiz_recover(payload: LeadRecoveryIn, request: Request,
 @api_router.get("/admin/quiz-funnel")
 async def admin_quiz_funnel(_user: User = Depends(require_admin)):
     """Admin dashboard data: counts per stage, conversion rates, recent leads,
-    distribution of recommended plans. Useful to assess quiz performance."""
+    distribution of recommended plans, AND per-variant A/B breakdown."""
     sessions_pipeline = [
         {"$sort": {"created_at": 1}},
         {"$group": {
@@ -5136,54 +5146,88 @@ async def admin_quiz_funnel(_user: User = Depends(require_admin)):
             "events": {"$push": "$event"},
             "recommended_plan": {"$last": "$recommended_plan"},
             "lang": {"$last": "$lang"},
+            "variant": {"$last": "$variant"},
             "last_seen": {"$last": "$created_at"},
         }},
     ]
     sessions = await db.quiz_funnel.aggregate(sessions_pipeline).to_list(5000)
-    started = answered_any = q1_done = q2_done = q3_done = q4_done = 0
-    completed = cta_clicked = email_captured = 0
-    plan_dist = {"free": 0, "basic": 0, "pro": 0, "premium": 0}
+
+    def empty_counts():
+        return {"sessions": 0, "started": 0, "q1": 0, "q2": 0, "q3": 0, "q4": 0,
+                "completed": 0, "cta_clicked": 0, "abandoned": 0, "email_captured": 0,
+                "plan_dist": {"free": 0, "basic": 0, "pro": 0, "premium": 0}}
+
+    overall = empty_counts()
+    by_variant = {"A": empty_counts(), "B": empty_counts(), "unassigned": empty_counts()}
+
     for s in sessions:
+        v = s.get("variant") if s.get("variant") in {"A", "B"} else "unassigned"
+        for bucket in (overall, by_variant[v]):
+            bucket["sessions"] += 1
         evs = s["events"]
         if "opened" in evs:
-            started += 1
+            for bucket in (overall, by_variant[v]): bucket["started"] += 1
         answered_count = sum(1 for e in evs if e == "answered")
-        if answered_count >= 1:
-            answered_any += 1
-        if answered_count >= 1: q1_done += 1
-        if answered_count >= 2: q2_done += 1
-        if answered_count >= 3: q3_done += 1
-        if answered_count >= 4: q4_done += 1
+        for q_n in range(1, 5):
+            if answered_count >= q_n:
+                for bucket in (overall, by_variant[v]): bucket[f"q{q_n}"] += 1
         if "completed" in evs:
-            completed += 1
-            if s.get("recommended_plan") in plan_dist:
-                plan_dist[s["recommended_plan"]] += 1
+            for bucket in (overall, by_variant[v]):
+                bucket["completed"] += 1
+                if s.get("recommended_plan") in bucket["plan_dist"]:
+                    bucket["plan_dist"][s["recommended_plan"]] += 1
         if "cta_clicked" in evs:
-            cta_clicked += 1
+            for bucket in (overall, by_variant[v]): bucket["cta_clicked"] += 1
         if "email_captured" in evs:
-            email_captured += 1
-    abandonments = max(0, answered_any - completed)
-    recovery_rate = round((email_captured / abandonments * 100), 1) if abandonments > 0 else 0.0
-    completion_rate = round((completed / max(started, 1) * 100), 1)
-    cta_conversion = round((cta_clicked / max(completed, 1) * 100), 1)
-    # Recent leads (last 20 email_captured)
+            for bucket in (overall, by_variant[v]): bucket["email_captured"] += 1
+
+    def derive_rates(b):
+        # answered_any = b['q1']
+        abandoned = max(0, b["q1"] - b["completed"])
+        b["abandoned"] = abandoned
+        b["completion_rate_pct"] = round(b["completed"] / max(b["started"], 1) * 100, 1)
+        b["cta_conversion_pct"] = round(b["cta_clicked"] / max(b["completed"], 1) * 100, 1)
+        b["recovery_rate_pct"] = round(b["email_captured"] / max(abandoned, 1) * 100, 1) if abandoned > 0 else 0.0
+        # Composite: end-to-end conversion (started → cta_clicked)
+        b["overall_conversion_pct"] = round(b["cta_clicked"] / max(b["started"], 1) * 100, 1)
+        return b
+
+    overall = derive_rates(overall)
+    for k in ("A", "B", "unassigned"):
+        by_variant[k] = derive_rates(by_variant[k])
+
+    # Statistical hint: if both A and B have ≥30 sessions, we surface a winner indicator.
+    # Difference in overall_conversion_pct is the headline KPI.
+    diff_pct = by_variant["B"]["overall_conversion_pct"] - by_variant["A"]["overall_conversion_pct"]
+    can_call = by_variant["A"]["started"] >= 30 and by_variant["B"]["started"] >= 30
+    significance = {
+        "samples_ready": can_call,
+        "samples_needed_each": 30,
+        "diff_pp": round(diff_pct, 1),  # percentage points
+        "winner": (("B" if diff_pct > 0 else "A") if can_call and abs(diff_pct) >= 3.0 else None),
+        "note": ("Significant" if can_call and abs(diff_pct) >= 3.0 else "Keep collecting data"),
+    }
+
     leads = await db.lead_recoveries.find(
-        {}, {"_id": 0, "email": 1, "recommended_plan": 1, "status": 1, "created_at": 1, "lang": 1}
+        {}, {"_id": 0, "email": 1, "recommended_plan": 1, "status": 1, "created_at": 1, "lang": 1, "variant": 1}
     ).sort("created_at", -1).limit(20).to_list(20)
+
+    # Map "totals/rates" to the legacy shape so existing UI keeps working.
     return {
-        "totals": {
-            "sessions": len(sessions), "started": started,
-            "q1": q1_done, "q2": q2_done, "q3": q3_done, "q4": q4_done,
-            "completed": completed, "cta_clicked": cta_clicked,
-            "abandoned": abandonments, "email_captured": email_captured,
-        },
+        "totals": {k: overall[k] for k in ("sessions", "started", "q1", "q2", "q3", "q4",
+                                             "completed", "cta_clicked", "abandoned", "email_captured")},
         "rates": {
-            "completion_rate_pct": completion_rate,
-            "cta_conversion_pct": cta_conversion,
-            "recovery_rate_pct": recovery_rate,
+            "completion_rate_pct": overall["completion_rate_pct"],
+            "cta_conversion_pct": overall["cta_conversion_pct"],
+            "recovery_rate_pct": overall["recovery_rate_pct"],
         },
-        "plan_distribution": plan_dist,
+        "plan_distribution": overall["plan_dist"],
         "recent_leads": leads,
+        "ab_test": {
+            "experiment": "result_cta_v1",
+            "variants": {"A": by_variant["A"], "B": by_variant["B"], "unassigned": by_variant["unassigned"]},
+            "significance": significance,
+        },
     }
 
 
