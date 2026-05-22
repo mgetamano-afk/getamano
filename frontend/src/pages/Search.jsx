@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, Loader2 } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, Loader2, X } from "lucide-react";
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
@@ -32,6 +32,10 @@ export default function Search() {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
   const { position, loading: geoLoading, requestLocation, clear: clearGeo } = useGeolocation();
+  const [radiusMiles, setRadiusMiles] = useState(() => {
+    const r = parseInt(params.get("radius_miles") || "", 10);
+    return Number.isFinite(r) && r > 0 ? r : 75;
+  });
   const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
   const [stuck, setStuck] = useState(false);
   const [view, setView] = useState(() => {
@@ -78,7 +82,7 @@ export default function Search() {
     if (position && !cur.city) {
       qs.lat = position.lat;
       qs.lng = position.lng;
-      qs.radius_miles = 75;
+      qs.radius_miles = cur.radiusMiles || radiusMiles;
     }
     const urlQs = { ...qs };
     if (view !== "list") urlQs.view = view;
@@ -217,6 +221,44 @@ export default function Search() {
             </div>
             <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
           </form>
+
+          {/* Section 18F — Radius selector (only when "Near me" is active) */}
+          {position && (
+            <div className="mb-4 flex items-center gap-2 flex-wrap bg-teal-50/60 border border-teal-100 rounded-2xl px-3 py-2.5" data-testid="radius-selector">
+              <Navigation className="w-4 h-4 flex-shrink-0" style={{ color: "#025F67" }} />
+              <span className="text-xs font-medium text-slate-700">
+                {lang === "en" ? "Within:" : "Radio:"}
+              </span>
+              {[10, 25, 50, 75, 150, 300].map(r => {
+                const active = radiusMiles === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setRadiusMiles(r);
+                      doSearch(null, { radiusMiles: r });
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${active ? "text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                    style={active ? { backgroundColor: "#025F67" } : {}}
+                    data-testid={`radius-chip-${r}`}
+                    aria-pressed={active}
+                  >
+                    {r} mi
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => { clearGeo(); doSearch(null, { city: "" }); }}
+                className="ml-auto text-xs text-slate-500 hover:text-red-600 inline-flex items-center gap-1"
+                title={lang === "en" ? "Clear location" : "Quitar ubicación"}
+                data-testid="radius-clear"
+              >
+                <X className="w-3 h-3" /> {lang === "en" ? "Clear" : "Quitar"}
+              </button>
+            </div>
+          )}
 
           {/* Identity chips (inclusive filter, no flags) */}
           <div className="flex flex-wrap items-center gap-2" data-testid="identity-filter-chips">
