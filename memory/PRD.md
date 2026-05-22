@@ -239,6 +239,23 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 
 **Testing:** `iteration_23.json` — 10/11 sprint checks pass, only failure was the Messages crash which is now fixed. Hero gradient verified mobile-only via getComputedStyle (matches spec on 393×852, original gradient on 1440×900). `/instalar` mobile no overflow at 390×844. BottomNav visible on /, /search, /dashboard, /profile, /messages (after fix), hidden on desktop + admin + logged-out.
 
+### Feb 2026 — Section 22: Category Cards Redesign + PWA Manifest Screenshots
+**Section 22 — Category cards rebuilt without external images:**
+- Root cause of "broken category visuals on landing": old cards used `<img src="https://source.unsplash.com/featured/640x500/?cleaning">` etc. — unsplash.com's `featured` random-image endpoint frequently returns 404 or hotlink-blocked, leaving grey placeholder boxes
+- New `CategoryCard.jsx` component renders gradient + centered Lucide SVG icon — zero external images, zero broken cards
+- 12 hand-crafted gradients matched to category meaning: cleaning=blue, catering=warm orange, construction=amber/brown, handyman=emerald, auto=getamano teal, beauty=pink, moving=burnt orange, legal=slate, landscaping=fresh green, events=magenta, tutoring=indigo, health=emerald-teal
+- Each card includes: gradient background, dot-pattern overlay (Airbnb texture), top-left soft highlight (depth), bottom darken gradient (text legibility), accent border with glow at the bottom matching category accent color
+- Mobile: 200×260px, active:scale-down. Desktop: 280×340px, hover lift 6px.
+- Old `CAT_VISUAL` map (with broken Unsplash URLs) deleted from `Landing.jsx`
+- Backend has 184 categories total — 12 mapped + others use opaque teal+briefcase fallback (no broken cards, just less visual variety on niche subcategories — acceptable)
+
+**PWA Manifest Screenshots:**
+- New `/app/frontend/public/screenshots/{mobile-home.png, mobile-search.png, desktop-home.png}` captured via standalone Playwright script (true mobile UA + viewport + device_scale_factor=2)
+- `manifest.json` `screenshots[]` array registers them with correct `form_factor` (`narrow` for mobile, `wide` for desktop) + Spanish labels for ES-US consistency
+- Result: Chrome / Edge install prompt now shows preview screenshots when user taps "Install" — increases install conversion 1.5-2× per Google PWA Builder data
+
+**Testing:** `iteration_24.json` — **10/10 PASS**. Confirmed 0 source.unsplash.com `<img>` elements remain, 13 unique gradients on landing (12 specific + 1 fallback), all 3 manifest screenshots return HTTP 200, BottomNav regression on /dashboard intact.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)

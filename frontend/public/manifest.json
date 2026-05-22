@@ -55,21 +55,21 @@
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "getamano — Latino marketplace home"
+      "label": "getamano — Marketplace latino en USA"
     },
     {
       "src": "/screenshots/mobile-search.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Search verified Latino providers near you"
+      "label": "Encuentra proveedores latinos verificados cerca de ti"
     },
     {
       "src": "/screenshots/desktop-home.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "getamano — Marketplace home"
+      "label": "getamano — Marketplace latino"
     }
   ]
 }
