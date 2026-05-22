@@ -129,12 +129,28 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
     - **Phase E frontend**: `BookingModal.jsx` Calendly-style 3-step wizard (date strip → time slot grid → form), `CalendarTab.jsx` provider availability editor + appointments list with confirm/decline. Booking button wired into `ProviderECard` (when `calendar_active=true`) AND `InboxView` chat header (when current user is the client side). New "Citas" tab in `ProviderDashboard`.
     - **Bug fix**: `Depends(lambda: None)` replaced with proper `get_optional_user` helper (server.py:491) for `/api/appointments` and `/api/messaging/start`. Also `GET /api/conversations` 500 KeyError on missing `unread_for_provider/client` fields now defensively defaults to 0 (server.py:2160).
     - **Testing**: Iteration 16 — 14/14 backend pytest + 100% frontend testids verified.
+  - **SECTION 18 (May 22, 2026)** — Google Cloud APIs (Geocoding + Places + Translation + Analytics):
+    - **Single unified `GOOGLE_API_KEY`** in `/app/backend/.env` and `REACT_APP_GOOGLE_API_KEY` in `/app/frontend/.env` powers Translation, Geocoding, Places autocomplete, and (when restrictions are configured) Maps JS.
+    - **Backend `/api/geocode`**: city/state → lat/lng with MongoDB cache (`city_coordinates` collection), pre-seeded with 24 US cities at startup. Falls through to real Google Geocoding API for uncached cities. Admin endpoint `/api/admin/geocode/seed` for idempotent re-seeding.
+    - **Backend proximity search**: `/api/providers?lat&lng&radius_km` enables "Near me" — computes Haversine distance in Python, filters by radius, sorts closest-first, returns `distance_km` field on each result. Backwards-compatible (no lat/lng → original behavior).
+    - **Frontend `CityAutocomplete.jsx`**: Google Places-powered city/state input with graceful fallback to plain text when Maps JS fails to load (e.g. referrer restriction). Wired into Search bar.
+    - **Frontend `useGeolocation` hook + Near-me button** on /search — requests browser geolocation, auto-fires proximity API call, shows distance badges on result cards.
+    - **Frontend GA4 (Section 18G)**: `lib/analytics.js` exports typed tracking helpers (page_view, search, language_switch, sign_up, purchase, booking_request, etc.). `AnalyticsTracker.jsx` mounted in App.js fires page_view on every route change. **NO-OP when REACT_APP_GA4_MEASUREMENT_ID is empty** — safe to ship.
+    - **Translation API consolidation (Section 18E)**: `/api/translate` now reads `GOOGLE_API_KEY` (legacy `GOOGLE_TRANSLATE_API_KEY` still honored as fallback).
+    - **NOT IMPLEMENTED**: 18A Card Scanner with Vision API (deferred — no Section 11 scanner exists yet), 18C Maps JS provider area map (user opted to keep free Leaflet for ProvidersMap).
+    - **Pending user action on Google Cloud Console**:
+      1. Enable **Cloud Translation API** on the GCP project (currently 403 PERMISSION_DENIED — fallback path returns original text).
+      2. Add `*.emergentagent.com/*` to the API key's HTTP referrer restrictions (currently only `*.getamano.us/*` and `*.emergent.sh/*` work — the preview URL is `*.emergentagent.com`).
+      3. (Optional) Provide a valid `G-XXXXXXXXXX` GA4 Measurement ID — placeholder is empty so analytics is currently inactive.
+    - **Testing**: Iteration 17 — 15/15 backend pytest pass, frontend smoke 100% (CityAutocomplete + Near-me + distance badges + GA4 no-op all verified).
 
 ## Completed (May 22, 2026)
 - Section 17 (i18n + Translation API mock with production-ready abstraction)
 - Phase E (Calendar/Bookings) — backend + provider dashboard + eCard + inbox booking
+- Section 18 — Google Cloud APIs integrated (Geocoding live, Translation pending GCP project enable, Maps JS / Places working with graceful degradation, GA4 wired but inert until Measurement ID provided)
 - Bug fix: `/api/conversations` regression from iter-15 messaging schema migration
 - Bug fix: `Depends(lambda: None)` anti-pattern replaced with `get_optional_user`
+- Bug fix: distance_km badge moved from Split view (dead code) to List view (visible to users on Near Me)
 
 ## Prioritized Backlog
 

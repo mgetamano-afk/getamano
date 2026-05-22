@@ -474,7 +474,14 @@ export default function Search() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h3 className="font-display font-semibold text-slate-900">{p.business_name}</h3>
-                          <p className="text-sm text-slate-500 mt-0.5">{p.city}{p.state ? `, ${p.state}` : ""}</p>
+                          <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {p.city}{p.state ? `, ${p.state}` : ""}
+                            {typeof p.distance_km === "number" && p.distance_km < 9999 && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-${p.slug}`}>
+                                <Navigation className="w-2.5 h-2.5" /> {p.distance_km.toFixed(1)} km
+                              </span>
+                            )}
+                          </p>
                         </div>
                         {p.rating_count > 0 && (
                           <div className="flex items-center gap-1 text-sm font-medium">
