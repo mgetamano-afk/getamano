@@ -305,6 +305,46 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_26.json` — **11/11 backend pytest + 100% frontend on tested flows**, ZERO bugs found. AI flow E2E verified, OTP wrong/correct/expired all flagged correctly, rate limiter triggers at request 9, sitemap includes new URLs, Register → /verificar-correo redirect works.
 
+### May 22 — Founder Audit Sprint (14 fixes)
+**11 fixes shipped + 3 acknowledged as N/A.**
+
+- ✅ **FIX-01 / FIX-02 — Stats are real, test data archived**
+  Created `/app/backend/scripts/cleanup_test_providers.py` (one-shot, idempotent). Archived 3 junk providers ('palas', 'elyte ja', 'jaz limoia', plus 1 TEST_promo_biz). After cleanup: 1 real provider (María's Cleaning Services), stats show "1+ proveedores verificados". Also hides 8 TEST-prefixed reviews on public eCards via `is_hidden` flag. Added validation in `POST /api/providers`: rejects empty names, names matching `\b(test|qa|prueba|asdf|xxxx)\b`, and lowercase ≤8-char names with ≤2 words. Future test providers can't slip in.
+
+- ✅ **FIX-03 — Admin queue filters complete**
+  `AdminQueue.jsx` now has 5 status tabs: Pendiente · En revisión · Requiere info · **Verificados** · **Rechazados**.
+
+- ✅ **FIX-04 — Emergent badge gone**
+  Removed `<script src="https://assets.emergent.sh/scripts/emergent-main.js">` from `public/index.html`. CSS hider was already in place; now both the load and the visual are clean.
+
+- ⏭️ **FIX-05 — Stray "L"**: Investigated — the vertical line in hero is the typewriter cursor (`<Typewriter>` component, intentional UX, hides after typing finishes + 2s). Not a bug in our deployment.
+
+- ⏭️ **FIX-06 — /empleos blank**: `/empleos` route never existed in our codebase. No fix needed.
+
+- ✅ **FIX-07 — Borrador banner now admin-only**
+  `LegalLayout.jsx` reads `useAuth()` and shows the yellow Borrador banner only when `user?.role === "admin"`. Public visitors see clean legal pages.
+
+- ✅ **FIX-08 — Login inputs accessibility + autofill**
+  Added `id`, `name`, `placeholder`, and matching `htmlFor` on `<label>` for both email and password. Password managers (1Password, Apple Keychain, LastPass) now save and autofill correctly.
+
+- ✅ **FIX-09 — HTML lang attribute**
+  `<html lang="en">` → `<html lang="es">`. Google now serves Spanish snippets, browser translate toolbar respects the language, screen readers use Spanish pronunciation.
+
+- ✅ **FIX-10 — Legacy URL aliases**
+  Added `/provider/:slug` and `/proveedor/:slug` routes pointing to `<ProviderECard />` so old Google/Bing search results and inbound WhatsApp/Instagram links don't 404. (Already had `/services/:slug` and `/p/:slug`.)
+
+- ✅ **FIX-11 — Empty city CTA**
+  `SeoCitiesIndex.jsx`: when `c.providers_count === 0`, the subtitle becomes "Sé el primero — únete como proveedor →" instead of a sad "0 proveedores". Same energy: turns dead data into provider acquisition.
+
+- ✅ **FIX-12 — Stripe placeholder**
+  `AdminOverview.jsx`: "Ingresos plan: — / Stripe pronto" → "Ingresos plan: $0 / Q3 2026 launch". More honest, less promissory.
+
+- ⏭️ **FIX-13 — Duplicate metas**: Investigated in iter-25; `react-helmet-async`'s policy is intentional (last-tag-wins for crawlers). Acceptable.
+
+- ⏭️ **FIX-14 — Category cards**: Already shipped in iter-24 (CategoryCard.jsx with gradients + Lucide icons).
+
+**Testing:** `iteration_27.json` — **7/7 backend pytest + 100% frontend on all 9 audit-fix flows**. Zero regressions. Critical fixes (badge removed, lang=es, stats real, test data archived, hidden reviews) all E2E verified.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)

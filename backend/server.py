@@ -1542,8 +1542,11 @@ async def get_provider_by_slug(slug: str):
     p["category"] = cat
     # increment views
     await db.provider_profiles.update_one({"slug": slug}, {"$inc": {"views": 1}})
-    # reviews
-    reviews = await db.reviews.find({"provider_id": p["provider_id"]}, {"_id": 0, "paid_amount_range": 0}).sort("created_at", -1).limit(20).to_list(20)
+    # reviews (exclude hidden — see /app/backend/scripts/cleanup_test_providers.py)
+    reviews = await db.reviews.find(
+        {"provider_id": p["provider_id"], "is_hidden": {"$ne": True}},
+        {"_id": 0, "paid_amount_range": 0},
+    ).sort("created_at", -1).limit(20).to_list(20)
     p["reviews"] = reviews
     return p
 

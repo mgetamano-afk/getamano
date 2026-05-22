@@ -65,6 +65,22 @@ async def main():
     for name in kept:
         print(f"  - {name!r}")
 
+    # ─── Reviews — strip TEST-prefixed reviews that leaked into public eCards ───
+    review_filter = {
+        "$or": [
+            {"client_name": {"$regex": r"^(TestUser|TEST[_ ]|QA[_ ])", "$options": "i"}},
+            {"comment": {"$regex": r"^TEST[_ ]", "$options": "i"}},
+            {"comment": {"$regex": r"^(asdf|qwer|xxxx)", "$options": "i"}},
+        ],
+    }
+    reviews_to_archive = await db.reviews.count_documents(review_filter)
+    if reviews_to_archive:
+        await db.reviews.update_many(
+            review_filter,
+            {"$set": {"is_hidden": True, "hidden_reason": "test_data_cleanup_may22"}},
+        )
+    print(f"\nHidden TEST reviews: {reviews_to_archive}")
+
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()) or 0)
