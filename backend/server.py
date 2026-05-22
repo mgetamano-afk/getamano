@@ -526,7 +526,24 @@ async def seed():
         await db.users.create_index("email", unique=True)
         await db.users.create_index("country")
         await db.user_sessions.create_index("session_token", unique=True)
-        await db.conversations.create_index([("client_id", 1), ("provider_id", 1)], unique=True)
+        # SECTION 13 — Conversations index migrated to PARTIAL unique:
+        # Only enforce dedup when client_id is a real string (legacy /messages flow).
+        # New anonymous /messaging/start inserts have no client_id and must not collide.
+        try:
+            await db.conversations.drop_index("client_id_1_provider_id_1")
+        except Exception:
+            pass
+        await db.conversations.create_index(
+            [("client_id", 1), ("provider_id", 1)],
+            unique=True,
+            partialFilterExpression={"client_id": {"$type": "string"}},
+        )
+        await db.conversations.create_index([("provider_user_id", 1), ("last_message_at", -1)])
+        await db.conversations.create_index([("participant_user_id", 1), ("last_message_at", -1)])
+        await db.messages.create_index([("conversation_id", 1), ("created_at", 1)])
+        await db.notification_queue.create_index([("status", 1), ("created_at", 1)])
+        await db.referrals.create_index("referred_user_id", unique=True)
+        await db.referrals.create_index("referrer_user_id")
         await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
         await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
         await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
@@ -4231,17 +4248,20 @@ async def my_conversations(user: User = Depends(get_current_user),
                             filter: Optional[Literal["all", "unread", "quote", "job", "appointment"]] = "all",
                             search: Optional[str] = None):
     """Provider's inbox (or participant's). Returns list of conversations."""
-    q = {"$or": [{"provider_user_id": user.user_id}, {"participant_user_id": user.user_id}]}
+    clauses: list[dict] = [{"$or": [{"provider_user_id": user.user_id}, {"participant_user_id": user.user_id}]}]
     if filter == "unread":
-        q["$and"] = [{"$or": [
+        clauses.append({"$or": [
             {"provider_user_id": user.user_id, "unread_count_provider": {"$gt": 0}},
             {"participant_user_id": user.user_id, "unread_count_participant": {"$gt": 0}},
-        ]}]
+        ]})
     elif filter in {"quote", "job", "appointment"}:
-        q["conversation_type"] = filter
+        clauses.append({"conversation_type": filter})
     if search:
-        q["$or"] = q.get("$or", []) + [{"participant_name": {"$regex": search, "$options": "i"}},
-                                       {"last_message_preview": {"$regex": search, "$options": "i"}}]
+        clauses.append({"$or": [
+            {"participant_name": {"$regex": search, "$options": "i"}},
+            {"last_message_preview": {"$regex": search, "$options": "i"}},
+        ]})
+    q = {"$and": clauses} if len(clauses) > 1 else clauses[0]
     items = await db.conversations.find(q, {"_id": 0}).sort("last_message_at", -1).to_list(200)
     return {"items": items, "total": len(items)}
 
