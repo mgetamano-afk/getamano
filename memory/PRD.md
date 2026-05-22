@@ -148,6 +148,11 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 - Section 17 (i18n + Translation API mock with production-ready abstraction)
 - Phase E (Calendar/Bookings) — backend + provider dashboard + eCard + inbox booking
 - Section 18 — Google Cloud APIs integrated (Geocoding live, Translation pending GCP project enable, Maps JS / Places working with graceful degradation, GA4 wired but inert until Measurement ID provided)
+- Pre-launch bug sweep (9/9 bugs fixed — prices unified, TEST data hidden, i18n auto-detect, Emergent badge removed, admin pages cities seeded, FAQ added to /plans)
+- **Iteration 19 (May 22)**:
+  - PlanRecommender 4-question quiz on /plans with scoring, contextual reasons, score pills, tie-breaker favoring cheapest plan, and CTA tracking via `?via=quiz`
+  - translation_cache TTL index `expires_at_1: expireAfterSeconds=0` (90-day auto-purge) — production-ready
+  - BusinessCardScanner with Vision API (Section 18A) — file/camera input, scanline animation, graceful fallback when Vision API is disabled, integrated into ProviderOnboarding Step 2
 - Bug fix: `/api/conversations` regression from iter-15 messaging schema migration
 - Bug fix: `Depends(lambda: None)` anti-pattern replaced with `get_optional_user`
 - Bug fix: distance_km badge moved from Split view (dead code) to List view (visible to users on Near Me)
