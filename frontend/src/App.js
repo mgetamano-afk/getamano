@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { I18nProvider } from "./contexts/I18nContext";
+import { PwaInstallProvider } from "./contexts/PwaInstallContext";
 import { Toaster } from "sonner";
 import { useEffect } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
@@ -123,12 +124,14 @@ function App() {
     <div className="App">
       <I18nProvider>
         <AuthProvider>
-          <BrowserRouter>
-            <Toaster position="top-right" richColors />
-            <AnalyticsTracker />
-            <InstallPrompt />
-            <AppRouter />
-          </BrowserRouter>
+          <PwaInstallProvider>
+            <BrowserRouter>
+              <Toaster position="top-right" richColors />
+              <AnalyticsTracker />
+              <InstallPrompt />
+              <AppRouter />
+            </BrowserRouter>
+          </PwaInstallProvider>
         </AuthProvider>
       </I18nProvider>
     </div>
