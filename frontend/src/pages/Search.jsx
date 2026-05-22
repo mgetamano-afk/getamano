@@ -74,11 +74,11 @@ export default function Search() {
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     if (cur.hasVideo) qs.has_video = "true";
-    // Section 18F — proximity ("Near me") search
+    // Section 18F — proximity ("Near me") search — US default: miles
     if (position && !cur.city) {
       qs.lat = position.lat;
       qs.lng = position.lng;
-      qs.radius_km = 50;
+      qs.radius_miles = 30;
     }
     const urlQs = { ...qs };
     if (view !== "list") urlQs.view = view;
@@ -363,9 +363,9 @@ export default function Search() {
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> {p.city}{p.state ? `, ${p.state}` : ""}
-                            {typeof p.distance_km === "number" && p.distance_km < 9999 && (
-                              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-${p.slug}`}>
-                                <Navigation className="w-2.5 h-2.5" /> {p.distance_km.toFixed(1)} km
+                            {typeof p.distance_miles === "number" && p.distance_miles < 9999 && (
+                              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-split-${p.slug}`}>
+                                <Navigation className="w-2.5 h-2.5" /> {p.distance_miles.toFixed(1)} mi
                               </span>
                             )}
                           </p>
@@ -476,9 +476,9 @@ export default function Search() {
                           <h3 className="font-display font-semibold text-slate-900">{p.business_name}</h3>
                           <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                             {p.city}{p.state ? `, ${p.state}` : ""}
-                            {typeof p.distance_km === "number" && p.distance_km < 9999 && (
+                            {typeof p.distance_miles === "number" && p.distance_miles < 9999 && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-${p.slug}`}>
-                                <Navigation className="w-2.5 h-2.5" /> {p.distance_km.toFixed(1)} km
+                                <Navigation className="w-2.5 h-2.5" /> {p.distance_miles.toFixed(1)} {lang === "en" ? "mi" : "mi"}
                               </span>
                             )}
                           </p>

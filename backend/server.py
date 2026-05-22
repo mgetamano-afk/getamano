@@ -893,7 +893,9 @@ async def search_providers(
         ]
     # Section 18F — Proximity search ("Near me"): if lat/lng provided, fetch
     # candidates with coordinates, compute haversine distance, filter by radius.
+    # Radius input: accept BOTH radius_miles (preferred, US default) and radius_km (back-compat).
     use_proximity = lat is not None and lng is not None
+    effective_radius_km = radius_km if radius_km is not None else (radius_miles * 1.60934)
     if use_proximity:
         query["latitude"] = {"$ne": None}
         query["longitude"] = {"$ne": None}
@@ -911,10 +913,13 @@ async def search_providers(
             return 2 * R * asin(sqrt(a))
         for p in providers:
             try:
-                p["distance_km"] = round(_hav_km(lat, lng, float(p["latitude"]), float(p["longitude"])), 2)
+                dist_km = _hav_km(lat, lng, float(p["latitude"]), float(p["longitude"]))
+                p["distance_km"] = round(dist_km, 2)
+                p["distance_miles"] = round(dist_km * 0.621371, 1)
             except Exception:
                 p["distance_km"] = 9999.0
-        providers = [p for p in providers if p["distance_km"] <= radius_km]
+                p["distance_miles"] = 9999.0
+        providers = [p for p in providers if p["distance_km"] <= effective_radius_km]
         providers.sort(key=lambda p: (p["distance_km"], PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0)))
     else:
         providers.sort(key=lambda p: (PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0), -p.get("rating_avg", 0)))
