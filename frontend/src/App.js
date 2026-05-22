@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import { useEffect } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
 import InstallPrompt from "./components/InstallPrompt";
+import InstallAppModal from "./components/InstallAppModal";
 import { registerServiceWorker } from "./lib/pwa";
 
 import Landing from "./pages/Landing";
@@ -129,6 +130,7 @@ function App() {
               <Toaster position="top-right" richColors />
               <AnalyticsTracker />
               <InstallPrompt />
+              <InstallAppModal />
               <AppRouter />
             </BrowserRouter>
           </PwaInstallProvider>

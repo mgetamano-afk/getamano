@@ -28,6 +28,17 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
+// Apple only allows PWA installation from real Safari. The auto-popup must
+// not show "Tap Share → Add to Home Screen" inside Chrome/Edge/Firefox iOS
+// because that menu item doesn't exist there. For non-Safari iOS users the
+// "Get the app" CTA in the landing hero (InstallAppModal) is the right path.
+function isIOSSafari() {
+  if (!isIOS()) return false;
+  const ua = navigator.userAgent || "";
+  const isOtherIOSBrowser = /CriOS|EdgiOS|FxiOS|OPiOS/.test(ua) || (/Brave/.test(ua));
+  return /Safari/.test(ua) && !isOtherIOSBrowser;
+}
+
 function isInCooldown() {
   try {
     const ts = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10);
@@ -65,7 +76,10 @@ export default function InstallPrompt() {
     window.addEventListener("appinstalled", onInstalled);
 
     // iOS path: Safari has no programmatic install — show manual instructions
-    if (isIOS()) {
+    // ONLY when we know we're in real Safari (not Chrome/Edge/Firefox iOS,
+    // where "Add to Home Screen" doesn't exist). Other iOS browsers are
+    // handled by the explicit "Get the app" hero CTA.
+    if (isIOSSafari()) {
       // Only after the user has spent time exploring (12s)
       setTimeout(() => setShowIos(true), 12000);
     }

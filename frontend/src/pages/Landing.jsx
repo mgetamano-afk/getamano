@@ -4,10 +4,11 @@ import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award, Video, Play } from "lucide-react";
+import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award, Video, Play, Smartphone } from "lucide-react";
 import FoundingCounter from "../components/FoundingCounter";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import { buildFileUrl } from "../components/ImageUpload";
+import { openInstallModal } from "../components/InstallAppModal";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -185,6 +186,25 @@ export default function Landing() {
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link to="/registro?intent=provider" className="btn-primary" data-testid="hero-cta-open-ecard">Quiero abrir mi eCard</Link>
                 <Link to="/buscar" className="px-6 py-3 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium" data-testid="hero-cta-explore">Explorar servicios</Link>
+                <button
+                  type="button"
+                  onClick={openInstallModal}
+                  className="group relative px-5 py-3 rounded-full font-semibold text-sm inline-flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.99]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 100%)",
+                    border: "1px solid rgba(255,255,255,0.35)",
+                    color: "white",
+                    backdropFilter: "blur(12px)",
+                  }}
+                  data-testid="hero-cta-download-app"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  {lang === "en" ? "Get the app" : "Descarga la app"}
+                  <span
+                    className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full"
+                    style={{ background: "#FF6B2C", boxShadow: "0 0 0 4px rgba(255,107,44,0.25)", animation: "pulse-dot 1.8s infinite" }}
+                  />
+                </button>
               </div>
 
               {/* Founding Members live urgency counter */}

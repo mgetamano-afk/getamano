@@ -157,6 +157,18 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 - Bug fix: `Depends(lambda: None)` anti-pattern replaced with `get_optional_user`
 - Bug fix: distance_km badge moved from Split view (dead code) to List view (visible to users on Near Me)
 
+### Feb 2026 — PWA Smart Install (Get the App)
+- New component `InstallAppModal.jsx` — single CTA "Descarga la app" in landing hero
+- Auto-detects device + browser and routes to fastest install path:
+  - **Android Chrome / Edge** → triggers native `beforeinstallprompt` (1-tap)
+  - **iPhone Safari** → animated 3-step guide (Share → Add to Home Screen)
+  - **iPhone Chrome / Edge / Firefox / Brave** → "Apple restricts to Safari" + Copy link button (handles ~25% of iOS users that previously couldn't install)
+  - **Desktop** → QR code rendered with `qrcode.react` so user scans with phone
+  - **Already installed** → confirmation view
+- Updated `InstallPrompt.jsx` auto-popup so it only triggers on real iOS Safari (was incorrectly showing "Tap Share → Add to Home Screen" inside Chrome iOS where that menu doesn't exist)
+- Fixed `apple-touch-icon-*.png` files: removed alpha channel, composited onto opaque `#025F67` teal background per Apple iOS guidelines (icons no longer render dark/transparent on iPhone home screens)
+- Tested with Playwright UA emulation: iPhone Safari ✓, iPhone Chrome ✓, Desktop ✓
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)
