@@ -26,8 +26,11 @@ export default function Register() {
     try {
       const role = intentToRole(intent);
       const user = await register({ email, password, name, role });
-      toast.success("¡Cuenta creada!");
-      navigate(user.role === "provider" ? "/dashboard/provider" : "/dashboard/client");
+      toast.success("¡Cuenta creada! Verifica tu correo para continuar.");
+      // Section 24: route every new account through email verification first.
+      // The verify page reads `?email=` so the user can confirm even if they
+      // get logged out before completing the OTP flow.
+      navigate(`/verificar-correo?email=${encodeURIComponent(user.email || email)}`);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Error");
     } finally {

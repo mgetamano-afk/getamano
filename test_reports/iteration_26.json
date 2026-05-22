@@ -1,0 +1,39 @@
+{
+  "summary": "iter-26 backend+frontend tested for Sections 23 (rate-limit + sitemap), 24 (Email OTP), 25 (AI description). All 11 pytest backend tests pass (after fixing role='client' in registration payload). Frontend: /verificar-correo renders correctly on mobile (393x852) with title, target email, 6 digit inputs, submit, resend; auto-advance, backspace-nav, paste-fill-and-auto-submit all confirmed working. Register flow correctly navigates new accounts to /verificar-correo?email=<...> (with @ URL-encoded as %40 — semantically equivalent). ProviderOnboarding step 2 ('Datos del negocio') triggers AIDescriptionAssistant bubble ~2.5s after 30+ chars typed; clicking 'Yes, polish it' calls /api/ai/improve-description, returns polished version with conversion-friendly Claude-Haiku copy, and 'Use this version' updates the textarea. Sitemap has >4400 URLs (4480+) and includes the 12 category hubs + /instalar.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter26_otp_ai_ratelimit.py",
+    "/app/test_reports/pytest/iter26_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "send-otp leaks no email enumeration (good): when email is unknown returns ok:true with delivery:queued and a 400ms sleep — solid timing-safe defense.",
+    "verify-otp returns specific 'Código incorrecto' / 'No hay código activo' messages — fine for UX but technically a small enumeration vector (attacker can tell if email has a pending OTP). Acceptable for current trust level.",
+    "Rate limiter uses Mongo count_documents on every protected request — adds 1 RTT to /api/auth/login etc. Fine at current scale; consider in-memory token bucket if QPS grows.",
+    "AIDescriptionAssistant has language-aware bubble (es/en) — Spanish UI is primary but the testing surfaced that demo provider is logged in with EN locale; both flows verified.",
+    "Sitemap.xml is built on every request with a full DB scan (provider_profiles.find with limit 2000 + city/category nested loop). With 4400+ URLs the response is sub-second now but consider caching with a 1h TTL.",
+    "VerifyEmail.jsx onPaste handler is attached to the wrapper div, not each input — works correctly since paste events bubble. paste handler then auto-submits 50ms later; good UX.",
+    "Server.py is 5780 lines — exceeds the 700-line guideline. Splitting into routers (auth, ai, sitemap, providers, payments) would help maintainability but is out-of-scope for this iter."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter26_otp_ai_ratelimit.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 pytest)",
+    "frontend": "100% on tested flows (verify-email page, register redirect, AI assistant full flow)"
+  },
+  "test_credentials": "Provider: demo.provider@getamano.com / provider123. New providers/clients registered with prov.<ts>@example.com / Password123 and test.<ts>@example.com / Password123.",
+  "seed_data_creation": "Test created several test.<ts>@example.com client accounts and prov.<ts>@example.com provider accounts during register-flow / onboarding tests. OTP codes consumed via /var/log/supervisor/backend.err.log fallback.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 24 OTP flow uses /var/log/supervisor/backend.err.log as the dev-fallback delivery sink (RESEND_API_KEY not set). To grab a fresh code: `grep 'OTP code for <email>' /var/log/supervisor/backend.err.log | tail -1`. Rate limits: login 8/60s, send-otp 5/60s, verify-otp 12/60s, improve-description 20/60s. If running tests back-to-back, wait 65s between full passes to avoid hitting send-otp limit. Register endpoint requires role ∈ {client, provider, admin} (NOT 'user'). Provider onboarding has 6 steps — description field is on STEP 2 ('Datos del negocio'), step 1 is plan selection. /provider/onboarding redirects to /dashboard/provider if user already has a profile, so use a freshly registered provider for AI bubble tests. AIDescriptionAssistant bubble text follows useI18n() lang; demo provider's default lang is 'en' so the Spanish phrases like 'Sí, mejórala' don't appear unless the language toggle is switched first.",
+  "rca of the issue": "No production bugs found. Initial backend test failure was a test-side bug: I used role='user' in the register payload but the API validates against literal['client','provider','admin']. Fixed by changing to role='client'. Initial frontend register test failed because I used input[name='email'] selectors but the form inputs use only data-testid attributes (no name). Switched to data-testid selectors. Initial AI-bubble test failed to find the 'mejórala' button because the demo provider session loaded with EN locale, so the bubble showed 'Yes, polish it' — switched the matcher to /mejórala|polish/i and the full flow passed."
+}

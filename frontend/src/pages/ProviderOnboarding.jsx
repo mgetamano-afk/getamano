@@ -8,6 +8,7 @@ import ImageUpload from "../components/ImageUpload";
 import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import BusinessCardScanner from "../components/BusinessCardScanner";
+import AIDescriptionAssistant from "../components/AIDescriptionAssistant";
 
 const STEPS = [
   { id: "plan", title: "Elige tu plan" },
@@ -167,7 +168,16 @@ export default function ProviderOnboarding() {
                   })}
                 </div>
               </div>
-              <Field label="Descripción corta" value={form.description} onChange={v => update("description", v)} textarea testid="onboarding-description" />
+              <div>
+                <Field label="Descripción corta" value={form.description} onChange={v => update("description", v)} textarea testid="onboarding-description" />
+                <AIDescriptionAssistant
+                  value={form.description}
+                  category={form.category_slug}
+                  businessName={form.business_name}
+                  onAccept={(improved) => update("description", improved)}
+                  testid="ai-description-assistant"
+                />
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <Field label="Teléfono" value={form.phone} onChange={v => update("phone", v)} testid="onboarding-phone" type="tel" inputMode="tel" autoComplete="tel" />
                 <Field label="Email de contacto" value={form.email} onChange={v => update("email", v)} testid="onboarding-email" type="email" inputMode="email" autoComplete="email" />

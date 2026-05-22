@@ -30,6 +30,7 @@ import UserProfile from "./pages/UserProfile";
 import ServiceRequests from "./pages/ServiceRequests";
 import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
+import VerifyEmail from "./pages/VerifyEmail";
 
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -76,6 +77,10 @@ function AppRouter() {
       {/* SEO category hubs — indexed by Google for organic search */}
       <Route path="/categoria/:slug" element={<CategoryHub />} />
       <Route path="/category/:slug" element={<CategoryHub />} />
+
+      {/* Email OTP verification — Section 24 */}
+      <Route path="/verificar-correo" element={<VerifyEmail />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />
