@@ -157,13 +157,13 @@ export default function Landing() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="min-w-0">
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
-                <Sparkles className="w-3.5 h-3.5" /> Comunidad Latina · USA
+                <Sparkles className="w-3.5 h-3.5" /> {t("hero.eyebrow")}
               </span>
               <h1 className="font-display mt-5 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1] break-words">
-                <Typewriter text="Lo latino, a la mano." className="inline" />
+                <Typewriter text={t("hero.typewriter")} className="inline" />
               </h1>
               <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-xl leading-relaxed animate-in fade-in-50 duration-700 delay-700">
-                El marketplace para encontrar profesionales latinos verificados en todo Estados Unidos. Negocios reales, calificados por tu comunidad.
+                {t("hero.subtitle")}
               </p>
 
               <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 transition-shadow" style={{ boxShadow: "0 0 40px rgba(255, 107, 44, 0.25)" }} data-testid="hero-search-form">

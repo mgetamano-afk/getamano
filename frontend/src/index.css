@@ -101,7 +101,4 @@ html { scroll-behavior: smooth; }
 a[href*="emergent.sh"][class*="badge"],
 a[href*="app.emergent.sh"] {
   display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
 }
