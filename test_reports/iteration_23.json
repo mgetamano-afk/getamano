@@ -1,0 +1,74 @@
+{
+  "summary": "Iter-23 — Tested the 3 sprint features: BottomNav, /instalar page, Landing hero gradient mobile redesign. 10/11 expected outcomes pass. Only failure is BottomNav not appearing on /messages — root cause is a pre-existing crash inside the Messages component (TypeError: Cannot read properties of undefined reading 'charAt' inside Array.map), which unmounts the whole React tree including BottomNav. The BottomNav feature itself is implemented correctly. /instalar (and /install alias) render perfectly with QR + 3 benefit cards + back link + footer install link. Landing hero gradient is now the new black->teal on mobile (393x852) and remains the original #063154 deep-teal on desktop (1440x900). No horizontal overflow on /instalar at 390x844.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Messages (pre-existing, NOT this sprint)", "issue": "Uncaught TypeError: Cannot read properties of undefined (reading 'charAt') in Array.map inside <Messages>. Crashes the route and unmounts BottomNav. Likely a conversation/user field is undefined when rendering the list (e.g. a participant name initial).", "selector": "route /messages", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "BottomNav on /messages", "issue": "BottomNav disappears on /messages because the Messages page crashes (root cause above). Once Messages is fixed, BottomNav will render correctly since the same component works on /, /search, /dashboard, /profile.", "affected_selectors": ["[data-testid=bottom-nav]", "[data-testid=bottom-nav-messages]"]}
+    ],
+    "design_issues": []
+  },
+  "sprint_feature_verification": {
+    "bottomnav": {
+      "visible_logged_in_mobile_/": true,
+      "visible_logged_in_mobile_/search": true,
+      "visible_logged_in_mobile_/dashboard": true,
+      "visible_logged_in_mobile_/messages": false,
+      "visible_logged_in_mobile_/profile": true,
+      "hidden_on_desktop_1440": true,
+      "hidden_on_/admin_route": true,
+      "hidden_when_logged_out": true,
+      "body_has_bottom_nav_class_when_rendered": true,
+      "no_horizontal_overflow_at_393": true,
+      "5_testids_present": ["bottom-nav-home", "bottom-nav-search", "bottom-nav-dashboard", "bottom-nav-messages", "bottom-nav-profile"],
+      "active_indicator_bar_on_active_item": true,
+      "active_label_color_inline_style": "#025F67 (set via inline style on label span; verified the indicator span exists on /dashboard with bg #025F67)",
+      "note_on_color_test": "Initial getComputedStyle on span:last-child returned rgb(6,49,84) because the indicator span (last child when active) has no explicit color — it inherits from a parent. The active label span has the correct #025F67 color inline. Visually no concern."
+    },
+    "instalar_page": {
+      "title_renders": true,
+      "action_card": true,
+      "desktop_state_with_qr": true,
+      "qr_svg_count": 1,
+      "page_link_text": true,
+      "benefit_cards_1_2_3": true,
+      "back_home_link": true,
+      "english_alias_/install_works": true,
+      "mobile_no_horizontal_overflow_390": true
+    },
+    "landing_hero": {
+      "mobile_393_gradient": "linear-gradient(170deg, rgb(10,10,10) 0%, rgb(13,31,30) 45%, rgb(10,53,53) 75%, rgb(2,95,103) 100%) — MATCHES SPEC",
+      "mobile_animation_disabled": "none — correct (avoids auroraShift on phones)",
+      "desktop_1440_gradient": "linear-gradient(135deg, rgb(6,49,84) 0%, rgb(10,77,94) 50%, rgb(2,95,103) 100%) — DESKTOP UNCHANGED ✓"
+    },
+    "footer_install_link": {
+      "visible": true,
+      "href": "/instalar",
+      "data_testid": "footer-install"
+    }
+  },
+  "console_errors_observed": [
+    "Multiple /api 401 responses on anonymous landing — expected (auth probe).",
+    "On /messages (pre-existing): pageerror TypeError ... 'charAt' inside <Messages> Array.map. Followed by 500 from a downstream API.",
+    "No console errors on /instalar or / (landing) when logged out."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Fix <Messages> component: guard against undefined fields in Array.map before calling .charAt (likely a participant.name or similar). Add an ErrorBoundary around routes so a single page crash doesn't unmount the BottomNav / global chrome.",
+    "Pre-existing 500s on some /api endpoints after login (not in this sprint scope) — worth a follow-up."
+  ],
+  "critical_code_review_comments": [
+    "BottomNav.jsx is clean and well-commented. The body.has-bottom-nav toggle effect uses navVisible derived from user+path+keyboardOpen, but the early return below (if !user) means the component unmounts on logout and the cleanup function in the effect runs — good. However, when Messages crashes, BottomNav unmounts without graceful cleanup; an app-level ErrorBoundary would protect the global chrome.",
+    "Install.jsx duplicates copy strings inline for EN/ES. Consider moving to I18nContext for maintainability — non-blocking.",
+    "Footer install link uses an animated pulsing dot which is good for attention, but no aria-label distinguishing it from the other links — minor a11y nit."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "91% (10/11 sprint checks pass; /messages BottomNav failure is caused by unrelated pre-existing crash)"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (works, redirects to /dashboard/provider); admin@getamano.com / admin123 (works, redirects to /dashboard/admin).",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Sprint 23 (BottomNav, /instalar, hero gradient) is verified. The Messages page crash is pre-existing and NOT introduced by this sprint — it should be tracked as a separate bug. BottomNav's logic is correct; once Messages is fixed, BottomNav will appear there too. Hero gradient and /instalar are fully production-ready."
+}

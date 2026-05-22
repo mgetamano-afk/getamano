@@ -8,7 +8,9 @@ import { useEffect } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
 import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
+import BottomNav from "./components/BottomNav";
 import { registerServiceWorker } from "./lib/pwa";
+import { trackIOSFirstLaunchOnce } from "./lib/deviceDetection";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -25,6 +27,7 @@ import DashboardRouter from "./pages/DashboardRouter";
 import Messages from "./pages/Messages";
 import UserProfile from "./pages/UserProfile";
 import ServiceRequests from "./pages/ServiceRequests";
+import Install from "./pages/Install";
 
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -63,6 +66,10 @@ function AppRouter() {
     <Routes>
       {/* Zone 1: Landing */}
       <Route path="/" element={<Landing />} />
+
+      {/* PWA install landing — share-friendly URL for QR codes / WhatsApp links */}
+      <Route path="/instalar" element={<Install />} />
+      <Route path="/install" element={<Install />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />
@@ -120,6 +127,9 @@ function AppRouter() {
 function App() {
   // Register the PWA service worker once at boot. Idempotent — safe to call.
   useEffect(() => { registerServiceWorker(); }, []);
+  // iOS has no `appinstalled` event, so we detect the first launch in
+  // standalone mode and fire `pwa_installed` exactly once.
+  useEffect(() => { trackIOSFirstLaunchOnce(); }, []);
 
   return (
     <div className="App">
@@ -132,6 +142,7 @@ function App() {
               <InstallPrompt />
               <InstallAppModal />
               <AppRouter />
+              <BottomNav />
             </BrowserRouter>
           </PwaInstallProvider>
         </AuthProvider>

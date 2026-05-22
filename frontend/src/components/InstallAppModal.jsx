@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { X, Share, Plus, Download, Smartphone, Copy, Check, Compass, Sparkles, MoreVertical } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 import SafariInstallTutorial from "./SafariInstallTutorial";
+import { trackPwaInstalled } from "../lib/deviceDetection";
 
 /**
  * InstallAppModal — One CTA, fully automatic experience.
@@ -80,6 +81,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("appinstalled", () => {
     _deferredPrompt = null;
     _hasNativePrompt = false;
+    trackPwaInstalled("android");
     _listeners.forEach((fn) => fn(false));
   });
 }

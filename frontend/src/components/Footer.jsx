@@ -28,6 +28,7 @@ export default function Footer() {
             <li><Link to="/ciudades" className="hover:text-white transition" data-testid="footer-cities">Ciudades</Link></li>
             <li><Link to="/plans" className="hover:text-white transition" data-testid="footer-plans">{t("nav.plans")}</Link></li>
             <li><Link to="/register?intent=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>
+            <li><Link to="/instalar" className="hover:text-white transition inline-flex items-center gap-1" data-testid="footer-install"><span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" /> Descarga la app</Link></li>
           </ul>
         </div>
         <div>

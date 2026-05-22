@@ -140,8 +140,8 @@ export default function Landing() {
       )}
 
       {/* HERO with animated background */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0" style={{
+      <section className="hero-section relative overflow-hidden">
+        <div className="hero-background absolute inset-0" style={{
           background: "linear-gradient(135deg, #063154 0%, #0A4D5E 50%, #025F67 100%)",
           backgroundSize: "300% 300%",
           animation: "auroraShift 60s ease infinite",
@@ -154,6 +154,22 @@ export default function Landing() {
           @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:.4} }
           @keyframes draw-divider { from{transform:scaleX(0)}to{transform:scaleX(1)} }
           @keyframes scroll-x { from{transform:translateX(0)}to{transform:translateX(-50%)} }
+
+          /* SECTION 21 — Mobile-only hero gradient. Desktop unchanged.
+             The default 3-stop teal gradient is too saturated when it covers
+             100% of a phone viewport — it reads as a wall of green. On mobile
+             we transition from deep brand black to a very desaturated teal,
+             letting #025F67 show only as a soft accent at the bottom. */
+          @media (max-width: 767px) {
+            .hero-background {
+              background: linear-gradient(170deg, #0A0A0A 0%, #0D1F1E 45%, #0A3535 75%, #025F67 100%) !important;
+              background-size: 100% 100% !important;
+              animation: none !important;
+            }
+            .hero-section {
+              min-height: auto;
+            }
+          }
         `}</style>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-20 md:pt-20 md:pb-32">
@@ -301,7 +317,18 @@ export default function Landing() {
       </section>
 
       {/* CÓMO FUNCIONA (dark) */}
-      <section className="relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#063154" }}>
+      <section className="how-it-works-section relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#063154" }}>
+        <style>{`
+          /* SECTION 21 — Soften this dark section on mobile so it doesn't read
+             as a second wall of saturated navy after the hero. */
+          @media (max-width: 767px) {
+            .how-it-works-section {
+              background-color: #0A1F2E !important;
+              padding-top: 56px !important;
+              padding-bottom: 56px !important;
+            }
+          }
+        `}</style>
         <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 50% 0%, rgba(255,140,68,0.18), transparent 50%)" }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-white">Cómo funciona</h2>
