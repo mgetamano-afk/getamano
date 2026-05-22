@@ -118,7 +118,18 @@ function AppRouter() {
       <Route path="/admin/reportes" element={<AdminReportsBidirectional />} />
       <Route path="/admin/catalog" element={<AdminCatalog />} />
       <Route path="/admin/audit" element={<AdminAudit />} />
+      {/* FIX-14 audit may22 — legacy /dashboard/admin/* aliases so old bookmarks
+          and inbound links don't 404 on the founder's CEO panel. */}
       <Route path="/dashboard/admin" element={<AdminOverview />} />
+      <Route path="/dashboard/admin/ceo" element={<AdminCEO />} />
+      <Route path="/dashboard/admin/quiz-funnel" element={<AdminQuizFunnel />} />
+      <Route path="/dashboard/admin/pricing" element={<AdminPricingIntelligence />} />
+      <Route path="/dashboard/admin/queue" element={<AdminQueue />} />
+      <Route path="/dashboard/admin/providers" element={<AdminProviders />} />
+      <Route path="/dashboard/admin/reviews" element={<AdminReviews />} />
+      <Route path="/dashboard/admin/reportes" element={<AdminReportsBidirectional />} />
+      <Route path="/dashboard/admin/catalog" element={<AdminCatalog />} />
+      <Route path="/dashboard/admin/audit" element={<AdminAudit />} />
 
       {/* Legal */}
       <Route path="/terminos" element={<Terms />} />
