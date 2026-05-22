@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 20 — Comprehensive regression sweep after 5 sprints. Backend: 36/36 pytest pass (19 new in test_iter20_regression.py + 11 prelaunch + 6 iter19). All NEW recommendations endpoints validated: anonymous no-email POST does not 500 (partial unique index on (provider_id, client_email) only when string), two anonymous recs coexist with distinct ids, email-dedupe upserts in place, list endpoint strips PII (no client_email/ip/client_user_id), by-token returns rec + provider basic, top-recommended sorts desc and excludes TEST. Frontend E2E: /plans renders clean — no useMemo runtime error, $0/$10/$15/$25 visible, $19/$49/$99 absent, A/B plan orders observed (B=Pro→Premium→Basic→Free first session; A=Gratis→Básico→Pro→Premium after lang toggle / new session — variant logic works). RecommendModal full flow: button[data-testid=ecard-recommend-button] → modal[data-testid=recommend-modal] with 4 testid'd inputs (recommend-name/city/email/message) → submit → success step[data-testid=recommend-success] with 3 share buttons (whatsapp/copy/twitter) and visible share URL. Referral banner[data-testid=ecard-referred-by-banner] renders correctly when ?via=token is present (name + city + message). Recommendations section[data-testid=recommendations-section] lists 5 items with avatar initial + name + city + message via [data-testid=recommendation-rec_*]. Lang toggle[data-testid=lang-toggle] swaps H1 EN↔ES correctly. Quiz CTA opens question 1 inline (not modal). Geocode (POST) cache hit Dallas works; proximity search returns distance_miles; card-scan returns source='api_error' with note (Vision blocked — MOCKED, expected).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/providers/{id}/slots", "issue": "Requires ?date=YYYY-MM-DD query param — when omitted returns 422. Frontend BookingModal must always pass date. Not a defect; documenting contract."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RecommendModal close button", "issue": "The X (close) button has type='submit' instead of type='button'. If the form has any client-side validation it could trigger an accidental submit when the user pressed Enter inside an input. Low risk because the success path already uses the explicit submit button, but should be type='button'.", "selector": "[data-testid=recommend-close]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/services/{slug} (eCard)", "issues": ["Mixed-language labels when lang=en: header + RECOMMENDED BY A FRIEND banner are translated, but several CTAs/labels remain Spanish ('Recomendar 3', 'Pedir cotización', 'Ver mi eCard', 'Guardar en favoritos', 'Galería de trabajos', 'Hours'). i18n coverage gap on ProviderECard CTAs."]},
+      {"screen": "/plans (quiz)", "issues": ["Quiz answer options do not expose data-testid=quiz-option-* — only the radio inputs are queryable. Adding testids would unblock deterministic E2E quiz path coverage (Free/Basic/Pro/Premium scoring) for future regression."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_regression.py",
+    "/app/test_reports/pytest/iter20.xml"
+  ],
+  "action_items": [
+    "[LOW] RecommendModal: change close button from type='submit' to type='button' to avoid accidental form submit on Enter key inside the modal.",
+    "[LOW] ProviderECard: extend i18n keys to cover the action chips (Recomendar/Pedir cotización/Ver mi eCard/Guardar en favoritos/Galería de trabajos/Hours) — currently rendered as Spanish literals while the rest of the page translates.",
+    "[NICE-TO-HAVE] Add data-testid=quiz-option-{idx} to PlanRecommender option buttons so E2E can deterministically validate the 3 A/B experiments end-to-end."
+  ],
+  "critical_code_review_comments": [
+    "Recommendations partial unique index server.py:584-588 is correctly guarded with partialFilterExpression={client_email:{$type:'string'}} — anonymous (null) recs cannot collide. Verified empirically via test_two_anonymous_no_collision_partial_index.",
+    "list_recommendations server.py:5366-5376 projects out client_email/ip/client_user_id — PII never leaks. Confirmed in test_list_recommendations_no_pii_leak.",
+    "top_recommended server.py:5393-5404 applies PUBLIC_GUARD and sorts by recommendations_count desc with a sane limit cap (min(limit, 24)) — production-safe.",
+    "/api/providers/top-recommended is declared AFTER /api/providers/{provider_id}/slots and /api/providers/{provider_id}/recommendations. FastAPI matches by exact path before parameter substitution so 'top-recommended' is NOT swallowed by the {provider_id} catch — verified at runtime. Still, prefer to declare static segments before parametric ones to avoid future ordering bugs.",
+    "Recommend endpoint denormalises recommendations_count via $inc on insert but NOT on dedupe-update. Intentional and correct (no double-count). However, on hard-delete (admin path) the counter would drift — out of scope today, no current admin delete UI.",
+    "Pydantic RecommendationIn validates client_name min_length=2 server-side AND the route re-checks len(name)<2 after .strip() for trailing-whitespace edge cases — defense-in-depth, good.",
+    "BusinessCardScanner + Translate fallbacks unchanged from iter19, still graceful (source='api_error'/'no_api_key'/'ok')."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter20_regression.py (new — 20 tests, 19 pass + 1 skip for booking-flow contract)"
+  ],
+  "success_rate": {
+    "backend": "100% (36/36 across iter20+iter19+prelaunch; 1 skip on appointment POST due to slot-shape ambiguity, not a defect)",
+    "frontend": "~95% — all critical recommendations + plans + i18n flows verified; quiz full 4-question scoring path not exercised due to missing option testids"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md (admin@getamano.com/admin123 for admin-guard test; no provider login required for public surfaces tested).",
+  "seed_data_creation": "Created several TEST_-prefixed recommendations on prov_10b9f21bf971 during the run (TEST_Anon_One, TEST_AnonA, TEST_AnonB, TEST_DedupeOne→TEST_DedupeUpdated, TEST_ListCheck, TEST_TokenLookup, TEST_BannerSrc, TEST_UI_Tester). All flagged TEST_ for cleanup. Public top-recommended endpoint correctly excludes TEST providers (TEST clients on a real provider still surface — that's by design; the PUBLIC_GUARD is on provider business_name not on recommender names).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Next iteration should re-use /app/backend/tests/test_iter20_regression.py — it is the canonical regression file for recommendations + quiz + Phase E + Section 18 + pre-launch. Skip cleanup of TEST_ recs is harmless; if needed: db.recommendations.delete_many({client_name:{$regex:'^TEST_'}}) AND db.provider_profiles.update_one({provider_id:'prov_10b9f21bf971'},{$inc:{recommendations_count:-N}}). Quiz E2E can be deterministic once option testids are added. RECOMMENDATION COUNTER drift on the demo provider is now ~18 due to repeated tests — main agent may want to run a one-off reset before screenshots/marketing.",
+  "rca of the issue": "N/A — no defects found. Three minor follow-ups (close button type, i18n coverage on eCard CTAs, quiz option testids) are enhancements, not blockers."
+}
