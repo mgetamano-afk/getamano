@@ -1,0 +1,52 @@
+{
+  "name": "getamano — Comunidad latina, a la mano",
+  "short_name": "getamano",
+  "description": "Marketplace de profesionales latinos verificados en Estados Unidos. Encuentra y reserva servicios de confianza en tu ciudad.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#025F67",
+  "background_color": "#F7F6F2",
+  "lang": "es-US",
+  "dir": "ltr",
+  "categories": ["business", "lifestyle", "social"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-128x128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-144x144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-152x152.png", "sizes": "152x152", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-180x180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-256x256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-384x384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Buscar servicios",
+      "short_name": "Buscar",
+      "description": "Encuentra proveedores latinos cerca de ti",
+      "url": "/search?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mi panel",
+      "short_name": "Mi panel",
+      "description": "Acceder a tu eCard de proveedor",
+      "url": "/dashboard?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mensajes",
+      "short_name": "Inbox",
+      "description": "Mensajes con clientes",
+      "url": "/dashboard?tab=mensajes&utm_source=pwa_shortcut",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

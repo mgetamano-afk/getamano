@@ -3,7 +3,10 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { I18nProvider } from "./contexts/I18nContext";
 import { Toaster } from "sonner";
+import { useEffect } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
+import InstallPrompt from "./components/InstallPrompt";
+import { registerServiceWorker } from "./lib/pwa";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -113,6 +116,9 @@ function AppRouter() {
 }
 
 function App() {
+  // Register the PWA service worker once at boot. Idempotent — safe to call.
+  useEffect(() => { registerServiceWorker(); }, []);
+
   return (
     <div className="App">
       <I18nProvider>
@@ -120,6 +126,7 @@ function App() {
           <BrowserRouter>
             <Toaster position="top-right" richColors />
             <AnalyticsTracker />
+            <InstallPrompt />
             <AppRouter />
           </BrowserRouter>
         </AuthProvider>

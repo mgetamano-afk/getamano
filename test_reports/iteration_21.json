@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 21 — PWA (Path A) full validation + regression sweep. Verified manifest.json (12 icons, 3 shortcuts, correct theme/bg), service-worker.js (3.7KB, registers + activates with scope=/), all 15 PNG icons return 200, index.html PWA meta tags (theme-color, apple-touch-icon variants 120/152/167/180, Open Graph, viewport-fit=cover). Service worker registration confirmed via navigator.serviceWorker.getRegistration() (state=activated). /api/* requests pass through SW correctly (network-only). InstallPrompt: Android banner appears 8s after beforeinstallprompt event, [data-testid='pwa-install-btn'] correctly invokes deferredPrompt.prompt(). Banner hidden on /admin route. 14-day cooldown via localStorage honored. Backend regression: 11/11 prelaunch_bugs.py + 9/9 new pwa_regression.py = 20/20 passing. /plans renders 4 tiers, /search renders CityAutocomplete + radius chips + results.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_pwa_regression.py",
+    "/app/backend/tests/test_prelaunch_bugs.py",
+    "/app/test_reports/pytest/iter21_pwa.xml",
+    "/app/test_reports/pytest/iter21_prelaunch.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Pre-existing: Google Maps `places.Autocomplete` is deprecated (March 1, 2025). Migrate to `PlaceAutocompleteElement` in CityAutocomplete component. Not a PWA defect, but worth a follow-up sprint.",
+    "Several `/api/auth/me` style calls return 401 for guest users on every page (visible as console errors). Functional but noisy. Consider treating 401 silently for guest/me checks.",
+    "service-worker.js: APP_SHELL pre-caches '/' but on first install of HTML routes this can become stale. Network-first navigation handler covers this — current behavior is correct, just worth a comment that 'cached fallback only used when offline'.",
+    "InstallPrompt iOS path uses 12s timer but does not check `isInCooldown()` re-entry on visibility change — minor: if the user dismisses, the localStorage cooldown is read once on mount only. Acceptable for MVP."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter21_pwa_regression.py (NEW)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin: admin@getamano.com / admin123. Provider: demo.provider@getamano.com / provider123. (From /app/memory/test_credentials.md — not exercised in this iteration; PWA flows are anonymous.)",
+  "seed_data_creation": "None. Used existing seeded providers/plans.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "PWA Path A is fully validated. Next iteration should re-run /app/backend/tests/test_iter21_pwa_regression.py + test_prelaunch_bugs.py as a regression baseline. iOS InstallPrompt manual instructions banner ([data-testid='pwa-install-ios']) was NOT directly exercised because the runtime UA is desktop Chrome — would require either a mobile UA emulation context or an explicit React feature flag to force render on desktop. The iOS code path is straightforward (same component, sibling branch) and was code-reviewed; if main agent wants empirical verification, a targeted unit test in Jest mocking navigator.userAgent='iPhone' would be the fastest route. Mocked APIs (Cloud Translation, Vision, GA4, Resend) are in graceful fallback per problem statement — not defects.",
+  "rca of the issue": "N/A — no issues found."
+}
