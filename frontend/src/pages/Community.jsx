@@ -100,52 +100,106 @@ export default function Community() {
           <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #063154 0%, #0A4D5E 55%, #025F67 100%)" }} />
           <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "28px 28px" }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
-            <div className="max-w-3xl">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
-                <Trophy className="w-3.5 h-3.5" /> Wall of Fame · getamano
-              </span>
-              <h1 className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.05]">
-                La comunidad latina,<br/><span className="text-orange-400">en movimiento.</span>
-              </h1>
-              <p className="mt-5 text-lg text-slate-300 max-w-2xl leading-relaxed">
-                Cada logro aquí es un proveedor latino construyendo confianza en Estados Unidos. Esta pared se actualiza cada 30 segundos con los hitos que nuestra gente desbloquea.
-              </p>
+            <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-14 items-center">
+              {/* LEFT — copy */}
+              <div className="max-w-3xl">
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
+                  <Trophy className="w-3.5 h-3.5" /> Wall of Fame · getamano
+                </span>
+                <h1 className="font-display mt-5 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.05]">
+                  La comunidad latina,<br/><span className="text-orange-400">en movimiento.</span>
+                </h1>
+                <p className="mt-5 text-lg text-slate-300 max-w-2xl leading-relaxed">
+                  Cada logro aquí es un proveedor latino construyendo confianza en Estados Unidos. Esta pared se actualiza cada 30 segundos con los hitos que nuestra gente desbloquea.
+                </p>
 
-              {/* Live stats */}
-              <div className="mt-8 grid grid-cols-3 gap-3 max-w-2xl">
-                <div className="rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-4">
-                  <div className="flex items-center gap-1.5 text-orange-300 text-xs font-semibold uppercase tracking-widest mb-1">
-                    <Flame className="w-3.5 h-3.5" /> Logros
+                {/* Live stats */}
+                <div className="mt-8 grid grid-cols-3 gap-3 max-w-2xl">
+                  <div className="rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-4">
+                    <div className="flex items-center gap-1.5 text-orange-300 text-xs font-semibold uppercase tracking-widest mb-1">
+                      <Flame className="w-3.5 h-3.5" /> Logros
+                    </div>
+                    <div className="font-display text-3xl font-bold text-white" data-testid="wall-stat-unlocked">{top.total_unlocked || 0}</div>
+                    <div className="text-xs text-white/60">desbloqueados en total</div>
                   </div>
-                  <div className="font-display text-3xl font-bold text-white" data-testid="wall-stat-unlocked">{top.total_unlocked || 0}</div>
-                  <div className="text-xs text-white/60">desbloqueados en total</div>
+                  <div className="rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-4">
+                    <div className="flex items-center gap-1.5 text-blue-300 text-xs font-semibold uppercase tracking-widest mb-1">
+                      <Users className="w-3.5 h-3.5" /> Negocios
+                    </div>
+                    <div className="font-display text-3xl font-bold text-white" data-testid="wall-stat-providers">{top.total_providers || 0}</div>
+                    <div className="text-xs text-white/60">activos en la red</div>
+                  </div>
+                  <div className="rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 backdrop-blur border border-orange-400/20 p-4">
+                    <div className="flex items-center gap-1.5 text-orange-200 text-xs font-semibold uppercase tracking-widest mb-1">
+                      <Sparkles className="w-3.5 h-3.5" /> En vivo
+                    </div>
+                    <div className="font-display text-3xl font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-400 inline-block animate-pulse" />
+                      Wall
+                    </div>
+                    <div className="text-xs text-white/60">refresca cada 30s</div>
+                  </div>
                 </div>
-                <div className="rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-4">
-                  <div className="flex items-center gap-1.5 text-blue-300 text-xs font-semibold uppercase tracking-widest mb-1">
-                    <Users className="w-3.5 h-3.5" /> Negocios
-                  </div>
-                  <div className="font-display text-3xl font-bold text-white" data-testid="wall-stat-providers">{top.total_providers || 0}</div>
-                  <div className="text-xs text-white/60">activos en la red</div>
-                </div>
-                <div className="rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 backdrop-blur border border-orange-400/20 p-4">
-                  <div className="flex items-center gap-1.5 text-orange-200 text-xs font-semibold uppercase tracking-widest mb-1">
-                    <Sparkles className="w-3.5 h-3.5" /> En vivo
-                  </div>
-                  <div className="font-display text-3xl font-bold text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block animate-pulse" />
-                    Wall
-                  </div>
-                  <div className="text-xs text-white/60">refresca cada 30s</div>
+
+                <div className="mt-7 flex flex-wrap gap-2">
+                  <Link to="/registro?intent=provider&promo=GETAMANO50" className="btn-primary inline-flex items-center gap-1" data-testid="wall-cta-join">
+                    <Award className="w-4 h-4" /> Abre tu eCard y aparece aquí
+                  </Link>
+                  <Link to="/buscar" className="px-5 py-2.5 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium text-sm inline-flex items-center gap-1">
+                    Explorar servicios <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </div>
               </div>
 
-              <div className="mt-7 flex flex-wrap gap-2">
-                <Link to="/registro?intent=provider&promo=GETAMANO50" className="btn-primary inline-flex items-center gap-1" data-testid="wall-cta-join">
-                  <Award className="w-4 h-4" /> Abre tu eCard y aparece aquí
-                </Link>
-                <Link to="/buscar" className="px-5 py-2.5 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium text-sm inline-flex items-center gap-1">
-                  Explorar servicios <ArrowRight className="w-4 h-4" />
-                </Link>
+              {/* RIGHT — community portrait collage */}
+              <div className="relative hidden lg:block" data-testid="community-hero-image">
+                {/* Decorative corner badge */}
+                <div className="absolute -top-3 -left-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest shadow-xl"
+                     style={{ backgroundColor: "#F59E0B", color: "#063154" }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                  Nuestra gente · USA
+                </div>
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl"
+                     style={{ borderColor: "rgba(245, 158, 11, 0.3)", borderWidth: "2px", borderStyle: "solid", boxShadow: "0 25px 60px -20px rgba(2, 95, 103, 0.6)" }}>
+                  <picture>
+                    <source srcSet="/community-hero.webp" type="image/webp" />
+                    <img
+                      src="/community-hero.jpg"
+                      alt="Comunidad de proveedores latinos en Estados Unidos — construcción, oficios, salud y gastronomía"
+                      className="block w-full h-auto"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </picture>
+                  {/* Bottom-up gradient over photo for legibility of label */}
+                  <div className="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
+                       style={{ background: "linear-gradient(to top, rgba(6,49,84,0.85) 0%, rgba(6,49,84,0) 100%)" }} />
+                  {/* Bottom label */}
+                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-orange-300" />
+                      <span className="font-medium">Construimos USA con manos latinas</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-white/15 backdrop-blur border border-white/20 font-semibold text-[10px] uppercase tracking-widest">
+                      Real people
+                    </span>
+                  </div>
+                </div>
+
+                {/* Floating "tag" chips — anchored to the image to add depth */}
+                <div className="absolute -right-3 top-12 z-20 flex flex-col gap-2">
+                  {[
+                    { label: "Construcción", color: "#F59E0B" },
+                    { label: "Salud", color: "#2F9D94" },
+                    { label: "Gastronomía", color: "#E15A2F" },
+                  ].map(tag => (
+                    <span key={tag.label}
+                          className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur shadow-lg"
+                          style={{ backgroundColor: "rgba(255,255,255,0.92)", color: tag.color, border: `1px solid ${tag.color}40` }}>
+                      {tag.label}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
