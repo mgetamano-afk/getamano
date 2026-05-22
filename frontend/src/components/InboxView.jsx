@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../lib/api";
-import { Send, Phone, MessageCircle, Mail, Search as SearchIcon, ArrowLeft, MessageSquare } from "lucide-react";
+import { Send, Phone, MessageCircle, Mail, Search as SearchIcon, ArrowLeft, MessageSquare, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import BookingModal from "./BookingModal";
 
 const TYPE_LABELS = {
   direct: { lbl: "Directo", color: "#94A3B8" },
@@ -31,6 +32,7 @@ export default function InboxView({ currentUser }) {
   const [search, setSearch] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
   const messagesEndRef = useRef(null);
 
   const loadConvs = useCallback(async () => {
@@ -225,6 +227,13 @@ export default function InboxView({ currentUser }) {
           </>
         )}
       </main>
+      {active?.provider_id && (
+        <BookingModal
+          open={showBooking}
+          provider={{ provider_id: active.provider_id, business_name: active.participant_user_id === myUserId ? "Proveedor" : active.participant_name }}
+          onClose={() => setShowBooking(false)}
+        />
+      )}
     </div>
   );
 }

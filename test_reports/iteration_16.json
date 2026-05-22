@@ -1,0 +1,43 @@
+{
+  "summary": "Phase E (Calendar/Booking) and Section 17 (/api/translate mock) tested end-to-end. 14/14 backend pytest pass; full anonymous booking flow on eCard works (open modal → pick date → pick slot → fill form → POST /appointments returns 200 → success toast); Provider Dashboard 'Citas' tab loads CalendarTab with availability editor (all 8 testids: calendar-slot-duration, calendar-buffer, calendar-advance-days, calendar-toggle-active, calendar-save, block-add-mon/fri/sun) + appointment list with confirm/decline buttons that actually transition status (verified pending→confirmed via PUT, and provider sees the newly-booked appointment in real-time after re-fetch); Save shows 'Disponibilidad guardada' toast; lang-toggle now shows flag emoji 🇲🇽/🇺🇸 next to ES/EN and persists in localStorage as 'tx_lang' (verified: before='🇲🇽es' → after click '🇺🇸en' → stored='en'). Translation endpoint without API key returns original text + source='no_api_key' + Spanish note as required. ONE prior regression confirmed: /api/conversations still 500's with KeyError 'unread_for_provider' (server.py:2160) — pre-existing from iter-15 messaging schema migration, NOT introduced by Phase E.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/conversations", "issue": "500 KeyError 'unread_for_provider' (server.py line 2160) — older conversations from /messaging/start path don't have the unread_for_{provider,client} counter fields. Causes 3 console errors on every dashboard mount (Mensajes tab list is broken). Carry-over from iteration 15. Fix: default to 0 via dict.get(), e.g. `c['unread_for_provider'] = c.get('unread_for_provider', 0)`."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Mensajes (Inbox) tab list", "issue": "Cannot load list because GET /api/conversations returns 500 (see backend minor above). Anonymous-message conversations created by new /messaging/start endpoint are missing unread counters.", "affected_selectors": ["[data-testid='conversation-item-*']", "[data-testid='inbox-view']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration16_phaseE_calendar_test.py",
+    "/app/test_reports/pytest/iteration16_results.xml"
+  ],
+  "action_items": [
+    "Fix server.py line 2160 (and the assignments at 2087/2095/2137/2139/2173) to defensively default `unread_for_provider`/`unread_for_client` to 0 when missing — or run a one-time migration to backfill these fields on existing docs. This regression has now spanned 2 iterations; Mensajes inbox listing remains broken for the demo provider.",
+    "Optional: set REACT_APP_BACKEND_URL key as Authorization-aware on /api/auth/me to avoid the 2× 401 noise on pre-login (cosmetic console clutter, not a bug)."
+  ],
+  "critical_code_review_comments": [
+    "server.py now 4710 lines — Phase E added ~190 lines + translate ~60 lines. Strongly recommend splitting into routers (appointments.py, translate.py, messaging.py) before adding more sections.",
+    "POST /api/appointments re-uses get_provider_slots() which does another DB lookup to validate the slot — fine for now but consider extracting `_compute_slots()` so both endpoints can share a cached slot list (saves 1 round trip per booking).",
+    "BookingModal.jsx state reset uses 7 useStates; consider a single useReducer for the wizard. Minor maintainability nit only.",
+    "/api/translate stores no TTL on cache docs — over time translation_cache will grow unbounded. Add Mongo TTL index or a `last_used_at` + cleanup job before turning on Google API."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration16_phaseE_calendar_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14) for Phase E + translate endpoints",
+    "frontend": "100% of requested testids verified (ecard-book-button, booking-modal, booking-day-*, booking-slot-*, booking-form-{name,phone,email,desc}, booking-submit, dashboard Citas tab, calendar-* editor testids, appt-confirm-*, appt-decline-*, lang-toggle flag+persistence)"
+  },
+  "test_credentials": "demo.provider@getamano.com / provider123 ; admin@getamano.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Backend test suite created 1 anonymous appointment for prov_10b9f21bf971 (status pending → confirmed → cancelled, cleaned up at test end). Playwright run created an additional anonymous appointment on 2026-05-22 at 09:00 (status pending → confirmed via Citas tab click); did NOT clean it up so main agent can see it persisted in DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase E + translate mock fully verified. Next testing agent should focus on (a) ensuring /api/conversations regression is fixed before testing Mensajes/Inbox flow, (b) testing the InboxView inbox-book-button when a LOGGED-IN CLIENT (not provider) opens a conversation with a provider — this case is not exercisable today because we have no client user with an existing conversation seeded, and (c) re-running iteration16_phaseE_calendar_test.py as regression. The demo provider's availability is now persisted as Mon-Fri 09:00-17:00, slot=60, buffer=15, advance_days=30.",
+  "rca of the issue": "/api/conversations 500: line 2160 unconditionally reads c['unread_for_provider'] but the new /api/messaging/start (added in iter-15) inserts conversation docs WITHOUT those counter fields, so accessing the key raises KeyError on the first mixed-schema doc encountered. Reproduce: login demo.provider → GET /api/conversations → 500. Mitigation: use c.get('unread_for_provider', 0) and c.get('unread_for_client', 0) at line 2160, OR run a migration $set: {unread_for_provider:0, unread_for_client:0} on all docs where the field is missing."
+}

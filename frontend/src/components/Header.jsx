@@ -42,10 +42,12 @@ export default function Header() {
             <Link to="/plans" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-plans">{t("nav.plans")}</Link>
             <button
               onClick={() => changeLang(lang === "es" ? "en" : "es")}
-              className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 rounded-full hover:bg-slate-100"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 rounded-full hover:bg-slate-100"
               data-testid="lang-toggle"
+              title={lang === "es" ? "Switch to English" : "Cambiar a Español"}
             >
-              <Globe className="w-4 h-4" /> {lang.toUpperCase()}
+              <span className="text-base leading-none">{lang === "es" ? "🇲🇽" : "🇺🇸"}</span>
+              <span className="text-xs uppercase tracking-wide">{lang}</span>
             </button>
             {user ? (
               <>
@@ -80,7 +82,7 @@ export default function Header() {
             <Link to="/comunidad" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium" data-testid="mobile-nav-community">Comunidad 🔴</Link>
             <Link to="/plans" onClick={() => setOpen(false)} className="block px-4 py-2 text-slate-700 font-medium">{t("nav.plans")}</Link>
             <button onClick={() => { changeLang(lang === "es" ? "en" : "es"); setOpen(false); }} className="w-full text-left px-4 py-2 text-slate-700 font-medium" data-testid="mobile-lang-toggle">
-              <Globe className="w-4 h-4 inline mr-2" />{lang === "es" ? "English" : "Español"}
+              <span className="text-base mr-2">{lang === "es" ? "🇺🇸" : "🇲🇽"}</span>{lang === "es" ? "English" : "Español"}
             </button>
             {user ? (
               <>

@@ -8,7 +8,7 @@ import SocialLinks from "../components/SocialLinks";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard, Flag } from "lucide-react";
+import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard, Flag, Calendar } from "lucide-react";
 import WhatsAppButton from "../components/WhatsAppButton";
 import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
@@ -17,6 +17,7 @@ import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
 import GalleryGrid from "../components/GalleryGrid";
 import CategoryIcon from "../components/CategoryIcon";
+import BookingModal from "../components/BookingModal";
 import { LicenseBadge } from "../components/LicenseSection";
 import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ export default function ProviderECard() {
   const [showECardModal, setShowECardModal] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
   const [rates, setRates] = useState([]);
 
   useEffect(() => {
@@ -166,6 +168,11 @@ export default function ProviderECard() {
               <button onClick={() => setShowQuote(true)} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
                 <FileText className="w-4 h-4" /> Pedir cotización
               </button>
+              {p.calendar_active && (
+                <button onClick={() => setShowBooking(true)} className="btn-primary justify-center flex items-center gap-1 text-sm bg-teal-600 hover:bg-teal-700 border-teal-600" data-testid="ecard-book-button">
+                  <Calendar className="w-4 h-4" /> {lang === "en" ? "Book appointment" : "Reservar cita"}
+                </button>
+              )}
               {!p.is_home_based && p.city && (
                 <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-map-button">
                   <MapPin className="w-4 h-4" /> {t("provider.map")}
@@ -361,6 +368,7 @@ export default function ProviderECard() {
 
         {showECardModal && <ECardModal provider={p} onClose={() => setShowECardModal(false)} />}
         <QuoteRequestModal open={showQuote} provider={p} onClose={() => setShowQuote(false)} />
+        <BookingModal open={showBooking} provider={p} onClose={() => setShowBooking(false)} onBooked={() => trackClick()} />
         <ReportModal
           open={showReport}
           onClose={() => setShowReport(false)}

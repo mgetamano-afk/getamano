@@ -6,7 +6,7 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import MilestoneCelebration from "../components/MilestoneCelebration";
@@ -19,12 +19,14 @@ import ProfileCompletion from "../components/ProfileCompletion";
 import ReferralsTab from "../components/ReferralsTab";
 import LicenseSection from "../components/LicenseSection";
 import InboxView from "../components/InboxView";
+import CalendarTab from "../components/CalendarTab";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: Settings },
   { id: "tarifas", label: "Mis Tarifas", Icon: DollarSign },
   { id: "galeria", label: "Galería", Icon: ImageIcon },
+  { id: "citas", label: "Citas", Icon: Calendar },
   { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
   { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
   { id: "referidos", label: "Referidos", Icon: Trophy },
@@ -326,6 +328,10 @@ export default function ProviderDashboard() {
 
             {tab === "galeria" && (
               <DashboardGallery profile={profile} setProfile={setProfile} />
+            )}
+
+            {tab === "citas" && (
+              <CalendarTab />
             )}
 
             {tab === "solicitudes" && (

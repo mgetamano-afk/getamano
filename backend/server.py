@@ -487,6 +487,14 @@ async def get_current_user(request: Request) -> User:
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
     return User(**user_doc)
 
+async def get_optional_user(request: Request) -> Optional[User]:
+    """Returns the authenticated user or None — never raises 401.
+    Used for endpoints that accept both anonymous and logged-in clients (e.g. /api/appointments)."""
+    try:
+        return await get_current_user(request)
+    except HTTPException:
+        return None
+
 async def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
@@ -4199,7 +4207,7 @@ class MessageIn(BaseModel):
 
 
 @api_router.post("/messaging/start")
-async def messaging_start(payload: ConversationStartIn, request: Request, user: Optional[User] = Depends(lambda: None)):
+async def messaging_start(payload: ConversationStartIn, request: Request, user: Optional[User] = Depends(get_optional_user)):
     """Anonymous OR authenticated visitor starts a conversation with a provider.
     Sends first message + enqueues a notification to the provider."""
     prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
@@ -4516,7 +4524,7 @@ class AppointmentIn(BaseModel):
 
 @api_router.post("/appointments")
 async def book_appointment(payload: AppointmentIn, request: Request,
-                            user: Optional[User] = Depends(lambda: None)):
+                            user: Optional[User] = Depends(get_optional_user)):
     prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
     if not prof:
         raise HTTPException(status_code=404, detail="Provider not found")
