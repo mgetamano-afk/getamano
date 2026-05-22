@@ -14,6 +14,9 @@ const CACHE_RUNTIME = `getamano-runtime-${CACHE_VERSION}`;
 const CACHE_IMAGES = `getamano-images-${CACHE_VERSION}`;
 
 // Pre-cache the app shell on install
+// Note: The cached '/' is only ever served as fallback when the network is
+// completely unavailable (offline). The network-first navigation handler
+// below ALWAYS tries fresh content first — so users never see stale HTML.
 const APP_SHELL = [
   "/",
   "/manifest.json",
