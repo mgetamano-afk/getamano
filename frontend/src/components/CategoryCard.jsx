@@ -99,7 +99,7 @@ export default function CategoryCard({ category, name, providerCount, lang = "es
 
   return (
     <Link
-      to={`/buscar?category=${category.slug}`}
+      to={`/categoria/${category.slug}`}
       className="relative flex-shrink-0 w-[200px] h-[260px] sm:w-[260px] sm:h-[320px] md:w-[280px] md:h-[340px] rounded-[20px] overflow-hidden snap-start group transition-transform duration-300 active:scale-[0.97] md:hover:-translate-y-1.5"
       style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
       data-testid={`category-card-${category.slug}`}

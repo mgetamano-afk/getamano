@@ -1,0 +1,32 @@
+{
+  "summary": "iter-25 frontend-only test of new /categoria/:slug SEO hub pages. All 12 main categories render correctly with category-specific H1, description, 3+ FAQs, valid JSON-LD (@graph with BreadcrumbList+Service+ItemList+FAQPage), unique hero gradient, breadcrumbs (3 items Home>Services>Category), canonical URL, CTAs. Spanish/English switching works. Fallback for unknown slug works (teal gradient + briefcase + generic FAQs). Mobile responsiveness clean (no horizontal overflow at 393x852). Regression: Landing CategoryCard click navigates to /categoria/<slug> correctly. BottomNav renders for logged-in provider on /categoria/cleaning. Found ONE design issue: H1 text color is dark teal (#025F67) on the colored gradient hero — low contrast, hard to read across categories. JSON-LD payload is valid JSON containing all 4 required @types per category.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CategoryHub hero H1", "issue": "H1 computed color is rgb(2,95,103) (#025F67 brand teal) instead of inherited white from parent section.text-white. Confirmed via CSS diagnosis: removing 'font-display' class does not change color; inline color:white fixes it. Means a global CSS rule (likely a global `h1` selector in App.css/index.css, or .font-display { color:#025F67 }) is overriding the white inheritance. On colored gradient hero this produces poor contrast (e.g. dark teal on blue/amber/teal gradient is barely legible). Affects every /categoria/:slug page.", "selector": "[data-testid='category-hub-h1']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/categoria/:slug hero", "issues": ["H1 contrast issue described above — should add `text-white` class explicitly on the H1 or fix the global rule that forces #025F67 color on h1 elements"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix H1 color on CategoryHub: add explicit `text-white` to the h1 (or whatever color guarantees contrast on the gradient), OR scope the global #025F67 h1 rule so it doesn't override hero h1s. Quick fix: add `text-white` to className on line 363 of /app/frontend/src/pages/CategoryHub.jsx."
+  ],
+  "critical_code_review_comments": [
+    "I18nContext uses localStorage key `tx_lang`, NOT `getamano_lang` as stated in the review_request. The test instructions were inaccurate; behavior with `tx_lang` works correctly.",
+    "SEO_COPY uses curly quotes (“ ”) inside strings — fine for display but watch for stray escape issues; here they render correctly.",
+    "Meta description count = 2 per page (static one from index.html + Helmet-injected) — confirmed last-wins per Google. Acceptable but noisy; consider removing the static placeholder from index.html for cleanliness.",
+    "When providers API returns data, the JSON-LD ItemList.numberOfItems updates and the grid renders correctly. ItemList for empty categories still emits with numberOfItems=0 — valid schema.",
+    "Hero h1 lacks explicit text color; relies on parent `.text-white` which is being overridden — see UI bug."
+  ],
+  "updated_files": [],
+  "success_rate": {"frontend": "92%"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (used for BottomNav regression)",
+  "seed_data_creation": "None — used existing provider data.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 12 categories (cleaning, catering, construction, handyman, auto, beauty, moving, legal, landscaping, events, tutoring, health) verified with correct SEO copy, FAQs, JSON-LD, canonical, gradients, CTAs, breadcrumbs. ES/EN switching uses localStorage key `tx_lang` (not `getamano_lang`). Fallback works for unknown slug with FALLBACK_COPY + briefcase + teal gradient. Mobile responsiveness clean. Only remaining issue is H1 dark-teal-on-gradient contrast on the hero — main agent should add `text-white` to h1 className. After fix, no full retest needed; just spot-check 2-3 categories.",
+  "rca of the issue": "H1 in CategoryHub.jsx (line 363) inherits text color from parent section.text-white. However, computed color is #025F67 — a global CSS rule (likely a default `h1 { color: #025F67 }` in App.css/index.css used for the rest of the app's headings) takes precedence over inherited color from parent. Reproduction: visit /categoria/cleaning, inspect h1 — computed color = rgb(2,95,103) despite parent.text-white. Mitigation: add `text-white` (or `text-white drop-shadow`) class to the h1 element on line 363, OR refactor the global h1 color rule to be class-scoped."
+}
