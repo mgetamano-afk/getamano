@@ -209,7 +209,7 @@ export default function ProviderECard() {
                 <MessageSquare className="w-4 h-4" /> {t("provider.message")}
               </button>
               <button onClick={() => setShowQuote(true)} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
-                <FileText className="w-4 h-4" /> Pedir cotización
+                <FileText className="w-4 h-4" /> {lang === "en" ? "Request quote" : "Pedir cotización"}
               </button>
               {p.calendar_active && (
                 <button onClick={() => setShowBooking(true)} className="btn-primary justify-center flex items-center gap-1 text-sm bg-teal-600 hover:bg-teal-700 border-teal-600" data-testid="ecard-book-button">
@@ -231,11 +231,11 @@ export default function ProviderECard() {
                 </a>
               )}
               <button onClick={() => setShowECardModal(true)} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-view-button">
-                <CreditCard className="w-4 h-4" /> Ver mi eCard
+                <CreditCard className="w-4 h-4" /> {lang === "en" ? "View my eCard" : "Ver mi eCard"}
               </button>
             </div>
             <button onClick={addFavorite} className="mt-2 text-sm text-slate-500 hover:text-orange-500 flex items-center gap-1" data-testid="ecard-favorite-button">
-              <Heart className="w-4 h-4" /> Guardar en favoritos
+              <Heart className="w-4 h-4" /> {lang === "en" ? "Save to favorites" : "Guardar en favoritos"}
             </button>
             {user && user.user_id !== p.user_id && (
               <button onClick={() => setShowReport(true)} className="ml-3 mt-2 text-xs text-slate-400 hover:text-red-600 inline-flex items-center gap-1" data-testid="ecard-report-button">
@@ -271,7 +271,7 @@ export default function ProviderECard() {
             {p.gallery?.length > 0 && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-gallery">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-display font-semibold text-slate-900">Galería de trabajos</h3>
+                  <h3 className="font-display font-semibold text-slate-900">{lang === "en" ? "Work gallery" : "Galería de trabajos"}</h3>
                   <span className="text-xs text-slate-500">{p.gallery.length} foto{p.gallery.length > 1 ? "s" : ""}</span>
                 </div>
                 <GalleryGrid items={p.gallery} testid="ecard-gallery-grid" />
@@ -292,7 +292,7 @@ export default function ProviderECard() {
                   <h3 className="font-display font-semibold text-slate-900 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-orange-500" /> Tarifas referenciales
                   </h3>
-                  <button onClick={() => setShowQuote(true)} className="text-xs text-orange-600 font-semibold hover:underline" data-testid="ecard-rates-quote-cta">Pedir cotización exacta →</button>
+                  <button onClick={() => setShowQuote(true)} className="text-xs text-orange-600 font-semibold hover:underline" data-testid="ecard-rates-quote-cta">{lang === "en" ? "Request exact quote →" : "Pedir cotización exacta →"}</button>
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {rates.map(r => (

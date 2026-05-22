@@ -127,7 +127,7 @@ export default function RecommendModal({ open, onClose, provider, onSubmitted })
               <p className="text-xs text-slate-500 truncate">{provider?.business_name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full flex-shrink-0" data-testid="recommend-close">
+          <button type="button" onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full flex-shrink-0" data-testid="recommend-close">
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>

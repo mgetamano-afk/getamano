@@ -457,9 +457,12 @@ export default function PlanRecommender() {
             return (
               <button
                 key={i}
+                type="button"
                 onClick={() => choose(i)}
                 className={`w-full text-left px-4 py-3.5 rounded-2xl border-2 transition flex items-center justify-between gap-3 ${active ? "border-orange-500 bg-orange-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
                 data-testid={`quiz-q${step}-option-${i}`}
+                data-quiz-option={i}
+                data-quiz-step={step}
               >
                 <span className={`text-sm sm:text-base ${active ? "font-semibold text-slate-900" : "text-slate-700"}`}>{opt.label}</span>
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? "bg-orange-500 border-orange-500" : "border-slate-300"}`}>
