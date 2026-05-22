@@ -1,18 +1,19 @@
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { AlertTriangle } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 /**
  * Shared layout for getamano legal pages.
- * Banner can be hidden by setting SHOW_LEGAL_DRAFT_BANNER to false when content is reviewed.
+ * Draft banner is only visible to admins so public visitors see a clean page.
  */
-const SHOW_LEGAL_DRAFT_BANNER = true;
-
 export default function LegalLayout({ title, lastUpdated, children, testId }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
       <Header />
-      {SHOW_LEGAL_DRAFT_BANNER && (
+      {isAdmin && (
         <div
           className="px-4 py-3 text-sm"
           style={{ backgroundColor: "#FFF8E1", borderLeft: "4px solid #F59E0B", color: "#7A5A00" }}
@@ -21,7 +22,7 @@ export default function LegalLayout({ title, lastUpdated, children, testId }) {
           <div className="max-w-[760px] mx-auto flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>
-              <strong>Borrador</strong> — Este contenido está pendiente de revisión y aprobación por el equipo legal de getamano. No representa asesoría legal. Contacto: <a className="underline font-medium" href="mailto:hola@getamano.us">hola@getamano.us</a>
+              <strong>Borrador — vista admin</strong> — Este contenido está pendiente de revisión y aprobación por el equipo legal de getamano. Los visitantes públicos no ven este aviso.
             </span>
           </div>
         </div>

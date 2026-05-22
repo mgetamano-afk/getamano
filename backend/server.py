@@ -1558,6 +1558,17 @@ async def get_my_provider(user: User = Depends(get_current_user)):
 
 @api_router.post("/providers")
 async def create_provider(payload: ProviderProfileIn, user: User = Depends(get_current_user)):
+    # SECTION 23 — input validation to prevent test/junk data from polluting public stats.
+    name = (payload.business_name or "").strip()
+    if len(name) < 3:
+        raise HTTPException(status_code=400, detail="El nombre del negocio debe tener al menos 3 caracteres.")
+    if re.search(r"\b(test|qa|prueba|asdf|xxxx)\b", name.lower()) or "test_" in name.lower():
+        raise HTTPException(status_code=400, detail="Nombre del negocio no válido. Usa el nombre real de tu empresa.")
+    if name == name.lower() and len(name) <= 8 and len(name.split()) <= 2:
+        raise HTTPException(status_code=400, detail="Escribe el nombre completo de tu negocio con mayúsculas iniciales.")
+    desc = (payload.description or "").strip()
+    if desc and len(desc) < 20:
+        raise HTTPException(status_code=400, detail="La descripción debe tener al menos 20 caracteres. Cuéntale al cliente qué haces.")
     if user.role != "provider":
         # auto-upgrade to provider
         await db.users.update_one({"user_id": user.user_id}, {"$set": {"role": "provider"}})

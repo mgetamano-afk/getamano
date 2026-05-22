@@ -23,7 +23,7 @@ export default function AdminOverview() {
         <Stat icon={CheckCircle2} label="Aprobados" value={stats?.approved_providers ?? "—"} color="from-green-500/20 to-green-500/5 text-green-300" testid="ov-approved" />
         <Stat icon={Star} label="Reseñas" value={stats?.total_reviews ?? "—"} color="from-pink-500/20 to-pink-500/5 text-pink-300" testid="ov-reviews" />
         <Stat icon={MessageSquare} label="Clientes" value={stats?.total_clients ?? "—"} color="from-purple-500/20 to-purple-500/5 text-purple-300" testid="ov-clients" />
-        <Stat icon={TrendingUp} label="Ingresos plan" value="—" color="from-slate-500/20 to-slate-500/5 text-slate-300" testid="ov-revenue" subtitle="Stripe pronto" />
+        <Stat icon={TrendingUp} label="Ingresos plan" value="$0" color="from-slate-500/20 to-slate-500/5 text-slate-300" testid="ov-revenue" subtitle="Q3 2026 launch" />
       </div>
 
       <div className="mt-8 bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden">

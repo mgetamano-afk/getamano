@@ -49,7 +49,9 @@ export default function SeoCitiesIndex() {
                 </div>
                 <div className="text-xs text-slate-500">{c.state}</div>
                 <div className="text-xs mt-2 font-medium" style={{ color: c.providers_count > 0 ? "#025F67" : "#94A3B8" }}>
-                  {c.providers_count} {c.providers_count === 1 ? "proveedor" : "proveedores"}
+                  {c.providers_count > 0
+                    ? `${c.providers_count} ${c.providers_count === 1 ? "proveedor" : "proveedores"}`
+                    : "Sé el primero — únete como proveedor →"}
                 </div>
               </Link>
             ))}

@@ -92,6 +92,7 @@ function AppRouter() {
       <Route path="/buscar" element={<Search />} />
       <Route path="/services/:slug" element={<ProviderECard />} />
       <Route path="/proveedor/:slug" element={<ProviderECard />} />
+      <Route path="/provider/:slug" element={<ProviderECard />} />
       <Route path="/p/:slug" element={<ProviderECard />} />
       <Route path="/comunidad" element={<Community />} />
       <Route path="/community" element={<Community />} />

@@ -8,6 +8,8 @@ const STATUSES = [
   { value: "pending", label: "Pendiente" },
   { value: "in_review", label: "En revisión" },
   { value: "needs_info", label: "Requiere info" },
+  { value: "approved", label: "Verificados" },
+  { value: "rejected", label: "Rechazados" },
 ];
 
 export default function AdminQueue() {
