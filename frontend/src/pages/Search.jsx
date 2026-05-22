@@ -439,6 +439,8 @@ export default function Search() {
                   onMarkerHover={setHighlightedId}
                   onMarkerClick={handleMarkerClick}
                   onSearchArea={handleSearchArea}
+                  userPosition={position}
+                  radiusMiles={position ? radiusMiles : null}
                 />
               </div>
             </div>
@@ -488,6 +490,8 @@ export default function Search() {
                 onMarkerHover={setHighlightedId}
                 onMarkerClick={handleMarkerClick}
                 onSearchArea={handleSearchArea}
+                userPosition={position}
+                radiusMiles={position ? radiusMiles : null}
               />
             ) : loading ? (
               <div className="text-center text-slate-500 py-12">{t("common.loading")}</div>

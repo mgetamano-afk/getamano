@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, CircleMarker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { ShieldCheck, Star, MapPin as MapPinIcon, Search as SearchIcon } from "lucide-react";
@@ -74,7 +74,7 @@ const MapMoveBridge = ({ onMove }) => {
   return null;
 };
 
-export default function ProvidersMap({ providers, loading, highlightedId, onMarkerHover, onMarkerClick, onSearchArea }) {
+export default function ProvidersMap({ providers, loading, highlightedId, onMarkerHover, onMarkerClick, onSearchArea, userPosition = null, radiusMiles = null }) {
   const markerRefs = useRef({});
   const lastFetchCenterRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -160,6 +160,38 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
           />
           <FitToMarkers points={items} />
           <PanToHighlighted points={items} highlightedId={highlightedId} openPopup={openPopupForHighlighted} />
+
+          {/* Section 18F — Coverage radius circle when "Cerca de mí" is active */}
+          {userPosition && radiusMiles && (
+            <>
+              <Circle
+                center={[userPosition.lat, userPosition.lng]}
+                radius={radiusMiles * 1609.34 /* miles → meters */}
+                pathOptions={{
+                  color: "#025F67",
+                  fillColor: "#2F9D94",
+                  fillOpacity: 0.10,
+                  weight: 1.5,
+                  dashArray: "6 4",
+                }}
+              />
+              <CircleMarker
+                center={[userPosition.lat, userPosition.lng]}
+                radius={8}
+                pathOptions={{
+                  color: "#FFFFFF",
+                  weight: 3,
+                  fillColor: "#2F9D94",
+                  fillOpacity: 1,
+                }}
+              >
+                <Tooltip permanent direction="top" offset={[0, -10]} className="getamano-user-tooltip">
+                  Tú estás aquí · {radiusMiles} mi
+                </Tooltip>
+              </CircleMarker>
+            </>
+          )}
+
           {items.map(p => {
             const isHighlighted = highlightedId === p.provider_id;
             return (
@@ -250,6 +282,17 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
         .leaflet-popup-tip { background: white; }
         .getamano-marker { background: transparent !important; border: none !important; transition: transform 180ms ease; }
         .getamano-marker-active { z-index: 1000 !important; }
+        .getamano-user-tooltip {
+          background: #025F67 !important;
+          color: white !important;
+          border: none !important;
+          border-radius: 9999px !important;
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          padding: 3px 10px !important;
+          box-shadow: 0 4px 12px -4px rgba(2,95,103,0.4) !important;
+        }
+        .getamano-user-tooltip::before { border-top-color: #025F67 !important; }
       `}</style>
     </div>
   );
