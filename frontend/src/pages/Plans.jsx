@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
@@ -6,6 +6,30 @@ import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
 import { Check, Sparkles } from "lucide-react";
 import PlanRecommender from "../components/PlanRecommender";
+
+/** Per-experiment deterministic A/B assignment from session_id.
+ *  Matches the same algorithm in PlanRecommender so a session sees consistent
+ *  variants across pages. */
+function getOrCreateSessionId() {
+  try {
+    let id = localStorage.getItem("quiz_session_id");
+    if (!id) {
+      id = "qs_" + Math.random().toString(36).slice(2, 14) + Date.now().toString(36);
+      localStorage.setItem("quiz_session_id", id);
+    }
+    return id;
+  } catch (_e) { return "qs_" + Math.random().toString(36).slice(2, 14); }
+}
+function getVariant(sessionId, experimentName) {
+  if (!sessionId) return "A";
+  const key = `${sessionId}:${experimentName}`;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h + key.charCodeAt(i) * 31) % 100003;
+  return h % 2 === 0 ? "A" : "B";
+}
+const ORDER_EXPERIMENT = "plan_card_order_v1";
+// A = ascending (free → premium, default). B = anchor in value (pro → premium → basic → free).
+const PLAN_ORDER_B = ["pro", "premium", "basic", "free"];
 
 export default function Plans() {
   const { t, lang } = useI18n();
