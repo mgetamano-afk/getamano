@@ -544,6 +544,11 @@ async def seed():
         await db.notification_queue.create_index([("status", 1), ("created_at", 1)])
         await db.referrals.create_index("referred_user_id", unique=True)
         await db.referrals.create_index("referrer_user_id")
+        await db.appointments.create_index([("provider_id", 1), ("date", 1), ("time", 1)])
+        await db.appointments.create_index([("provider_user_id", 1), ("status", 1), ("date", 1)])
+        await db.translation_cache.create_index(
+            [("source_id", 1), ("source_field", 1), ("target_lang", 1)], unique=True
+        )
         await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
         await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
         await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
@@ -4396,6 +4401,300 @@ async def admin_remind_incomplete(user_id: str, admin: User = Depends(require_ad
         try: send_sms(u["phone"], body, event="incomplete_registration")
         except Exception: pass
     return {"ok": True}
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 14 — Appointment Calendar (availability + booking)
+# ════════════════════════════════════════════════════════════════════
+
+class AvailabilityRuleIn(BaseModel):
+    """Provider's weekly availability template."""
+    is_active: bool = True
+    weekly: dict  # {"mon": [{"start":"09:00","end":"17:00"}], ...}
+    slot_duration_min: int = Field(60, ge=15, le=240)  # default 60 min, allowed 15-240
+    buffer_min: int = Field(15, ge=0, le=120)
+    advance_days: int = Field(30, ge=1, le=90)
+    timezone: str = "America/Chicago"
+
+
+@api_router.get("/providers/me/availability")
+async def get_my_availability(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "availability": 1, "calendar_active": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return prof.get("availability") or {
+        "is_active": False,
+        "weekly": {d: [] for d in ["mon","tue","wed","thu","fri","sat","sun"]},
+        "slot_duration_min": 60, "buffer_min": 15, "advance_days": 30,
+        "timezone": "America/Chicago",
+    }
+
+
+@api_router.put("/providers/me/availability")
+async def upsert_availability(payload: AvailabilityRuleIn, user: User = Depends(get_current_user)):
+    upd = {
+        "availability": payload.dict(),
+        "calendar_active": bool(payload.is_active),
+    }
+    res = await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True, **upd}
+
+
+def _parse_hm(s: str) -> int:
+    """'HH:MM' -> minutes since 00:00. Returns -1 on parse failure."""
+    try:
+        h, m = s.split(":")
+        return int(h) * 60 + int(m)
+    except Exception:
+        return -1
+
+
+def _weekday_key(d: datetime) -> str:
+    return ["mon","tue","wed","thu","fri","sat","sun"][d.weekday()]
+
+
+@api_router.get("/providers/{provider_id}/slots")
+async def get_provider_slots(provider_id: str, date: str):
+    """Public: returns ISO list of available slot start times for a given date (YYYY-MM-DD).
+    Excludes already-booked slots (status pending/confirmed)."""
+    prof = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0, "availability": 1, "calendar_active": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    avail = prof.get("availability") or {}
+    if not prof.get("calendar_active") or not avail.get("is_active"):
+        return {"slots": [], "calendar_active": False}
+    try:
+        target = datetime.fromisoformat(date)
+    except Exception:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    today = datetime.now(timezone.utc).date()
+    if target.date() < today:
+        return {"slots": [], "calendar_active": True}
+    horizon = today + timedelta(days=avail.get("advance_days", 30))
+    if target.date() > horizon:
+        return {"slots": [], "calendar_active": True}
+    day_key = _weekday_key(target)
+    blocks = (avail.get("weekly") or {}).get(day_key, []) or []
+    dur = int(avail.get("slot_duration_min", 60))
+    buf = int(avail.get("buffer_min", 15))
+    # Build candidate slots
+    candidates: list[str] = []
+    for b in blocks:
+        start_m = _parse_hm(b.get("start", "00:00"))
+        end_m = _parse_hm(b.get("end", "00:00"))
+        if start_m < 0 or end_m <= start_m:
+            continue
+        t = start_m
+        while t + dur <= end_m:
+            h, m = divmod(t, 60)
+            candidates.append(f"{h:02d}:{m:02d}")
+            t += dur + buf
+    if not candidates:
+        return {"slots": [], "calendar_active": True}
+    # Exclude booked slots for that date
+    day_iso = target.date().isoformat()
+    booked = await db.appointments.find(
+        {"provider_id": provider_id, "date": day_iso,
+         "status": {"$in": ["pending", "confirmed"]}},
+        {"_id": 0, "time": 1}
+    ).to_list(200)
+    booked_set = {b["time"] for b in booked}
+    return {"slots": [s for s in candidates if s not in booked_set], "calendar_active": True}
+
+
+class AppointmentIn(BaseModel):
+    provider_id: str
+    date: str  # YYYY-MM-DD
+    time: str  # HH:MM
+    client_name: str = Field(min_length=2, max_length=100)
+    client_phone: str = Field(min_length=7, max_length=20)
+    client_email: Optional[str] = None
+    service_description: str = Field(min_length=4, max_length=500)
+
+
+@api_router.post("/appointments")
+async def book_appointment(payload: AppointmentIn, request: Request,
+                            user: Optional[User] = Depends(lambda: None)):
+    prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    if not prof.get("calendar_active"):
+        raise HTTPException(status_code=400, detail="Este proveedor no tiene el calendario activo.")
+    # Verify slot is still available
+    available = await get_provider_slots(payload.provider_id, payload.date)
+    if payload.time not in available.get("slots", []):
+        raise HTTPException(status_code=409, detail="Ese horario ya no está disponible. Refresca para ver opciones actualizadas.")
+    apt = {
+        "appointment_id": f"apt_{uuid.uuid4().hex[:14]}",
+        "provider_id": payload.provider_id,
+        "provider_user_id": prof.get("user_id"),
+        "client_user_id": user.user_id if user else None,
+        "client_name": payload.client_name.strip(),
+        "client_phone": payload.client_phone.strip(),
+        "client_email": (payload.client_email or "").strip(),
+        "service_description": payload.service_description.strip(),
+        "date": payload.date,
+        "time": payload.time,
+        "status": "pending",  # pending → confirmed/declined → completed/no_show
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.appointments.insert_one(dict(apt))
+    body = f"📅 Nueva cita en getamano: {payload.client_name} pidió visita el {payload.date} a las {payload.time}. Confirma en getamano.us/dashboard/citas"
+    await enqueue_notification(recipient_phone=prof.get("phone", ""), channel="sms",
+                                body=body, trigger_type="new_appointment_request")
+    if prof.get("phone"):
+        try: send_sms(prof["phone"], body, event="new_appointment_request")
+        except Exception: pass
+    apt.pop("_id", None)
+    return apt
+
+
+@api_router.get("/providers/me/appointments")
+async def my_appointments(user: User = Depends(get_current_user),
+                           status: Optional[Literal["pending","confirmed","declined","completed","no_show","cancelled","all"]] = "all"):
+    q = {"provider_user_id": user.user_id}
+    if status and status != "all":
+        q["status"] = status
+    items = await db.appointments.find(q, {"_id": 0}).sort([("date", 1), ("time", 1)]).to_list(500)
+    return {"items": items, "total": len(items)}
+
+
+class AppointmentActionIn(BaseModel):
+    action: Literal["confirm", "decline", "complete", "no_show", "cancel"]
+    note: Optional[str] = None
+
+
+@api_router.put("/appointments/{appointment_id}")
+async def update_appointment(appointment_id: str, payload: AppointmentActionIn,
+                              user: User = Depends(get_current_user)):
+    apt = await db.appointments.find_one({"appointment_id": appointment_id}, {"_id": 0})
+    if not apt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if user.user_id not in {apt.get("provider_user_id"), apt.get("client_user_id")}:
+        raise HTTPException(status_code=403, detail="Not your appointment")
+    new_status = {"confirm": "confirmed", "decline": "declined", "complete": "completed",
+                  "no_show": "no_show", "cancel": "cancelled"}[payload.action]
+    await db.appointments.update_one(
+        {"appointment_id": appointment_id},
+        {"$set": {"status": new_status, "admin_note": (payload.note or "")[:300],
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    # Notify the other party
+    notify_phone = apt.get("client_phone") if user.user_id == apt.get("provider_user_id") else ""
+    if notify_phone:
+        verb = {"confirm": "confirmó", "decline": "rechazó", "cancel": "canceló"}.get(payload.action, "actualizó")
+        body = f"📅 Tu cita en getamano fue {verb} para el {apt['date']} a las {apt['time']}."
+        await enqueue_notification(recipient_phone=notify_phone, channel="sms",
+                                    body=body, trigger_type="appointment_update")
+        try: send_sms(notify_phone, body, event="appointment_update")
+        except Exception: pass
+    return {"ok": True, "status": new_status}
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 16G — Activity feed (public, for homepage)
+# ════════════════════════════════════════════════════════════════════
+
+@api_router.get("/activity-feed")
+async def activity_feed(limit: int = 12):
+    """Mix of recent providers joined, reviews posted, milestones reached.
+    Public endpoint — feeds the landing's 'Lo que está pasando' card."""
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=14)).isoformat()
+    items: list[dict] = []
+    # Recent providers
+    recent = await db.provider_profiles.find(
+        {"created_at": {"$gte": cutoff}, "is_active": True},
+        {"_id": 0, "business_name": 1, "city": 1, "state": 1, "slug": 1, "category_id": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    for p in recent:
+        items.append({
+            "type": "new_provider",
+            "icon": "👋",
+            "text_es": f"{p.get('business_name', '?')} se unió a getamano en {p.get('city','')}",
+            "text_en": f"{p.get('business_name', '?')} joined getamano in {p.get('city','')}",
+            "link": f"/services/{p.get('slug', '')}",
+            "at": p.get("created_at"),
+        })
+    # Recent reviews
+    recent_reviews = await db.reviews.find(
+        {"created_at": {"$gte": cutoff}},
+        {"_id": 0, "provider_id": 1, "rating": 1, "created_at": 1, "user_name": 1}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    for r in recent_reviews:
+        prof = await db.provider_profiles.find_one({"provider_id": r["provider_id"]}, {"_id": 0, "business_name": 1, "slug": 1, "city": 1})
+        if not prof: continue
+        items.append({
+            "type": "new_review",
+            "icon": "⭐",
+            "text_es": f"Nueva reseña {r.get('rating', 5)}★ para {prof.get('business_name', '?')} en {prof.get('city','')}",
+            "text_en": f"New {r.get('rating', 5)}★ review for {prof.get('business_name', '?')} in {prof.get('city','')}",
+            "link": f"/services/{prof.get('slug','')}",
+            "at": r.get("created_at"),
+        })
+    items.sort(key=lambda x: x.get("at", ""), reverse=True)
+    return {"items": items[:limit], "generated_at": now.isoformat()}
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 17D/E — Translation cache (infrastructure, ready for Google API)
+# ════════════════════════════════════════════════════════════════════
+
+class TranslateRequestIn(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+    target_lang: Literal["es", "en"]
+    source_id: str = Field(min_length=1, max_length=120)
+    source_field: str = Field(min_length=1, max_length=60)
+    source_lang: Literal["es", "en"] = "es"
+
+
+@api_router.post("/translate")
+async def translate_text(payload: TranslateRequestIn):
+    """Translation service with cache. Returns original text when no API key is set
+    (gracefully degrades — UI shows the 'translate' button but click reveals original)."""
+    if payload.source_lang == payload.target_lang:
+        return {"translated_text": payload.text, "cached": True, "source": "noop"}
+    # 1) Check cache
+    cached = await db.translation_cache.find_one(
+        {"source_id": payload.source_id, "source_field": payload.source_field,
+         "target_lang": payload.target_lang},
+        {"_id": 0}
+    )
+    if cached:
+        return {"translated_text": cached["translated_text"], "cached": True, "source": "cache"}
+    # 2) Call Google Translate if API key configured
+    api_key = os.environ.get("GOOGLE_TRANSLATE_API_KEY", "").strip()
+    if not api_key:
+        # Graceful fallback: return original. UI shows a small note "Traducción no disponible aún".
+        return {"translated_text": payload.text, "cached": False, "source": "no_api_key",
+                "note": "Sistema de traducción automática no configurado aún."}
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10.0) as cli:
+            r = await cli.post(
+                f"https://translation.googleapis.com/language/translate/v2?key={api_key}",
+                json={"q": payload.text, "target": payload.target_lang,
+                      "source": payload.source_lang, "format": "text"},
+            )
+            r.raise_for_status()
+            translated = r.json()["data"]["translations"][0]["translatedText"]
+    except Exception as e:
+        logger.warning(f"translate API call failed: {e}")
+        return {"translated_text": payload.text, "cached": False, "source": "api_error"}
+    # 3) Store in cache (upsert defensively)
+    await db.translation_cache.update_one(
+        {"source_id": payload.source_id, "source_field": payload.source_field, "target_lang": payload.target_lang},
+        {"$set": {
+            "source_id": payload.source_id, "source_field": payload.source_field,
+            "source_lang": payload.source_lang, "target_lang": payload.target_lang,
+            "original_text": payload.text, "translated_text": translated,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"translated_text": translated, "cached": False, "source": "google"}
 
 
 # Mount api_router AFTER all route definitions so Sections 13–16 are included.
