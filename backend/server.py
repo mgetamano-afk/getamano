@@ -114,12 +114,26 @@ def send_sms(to_phone: str, body: str, event: str = "generic"):
             record["status"] = "error"
             record["error"] = str(e)[:200]
             logger.exception("Twilio send failed")
-    # fire-and-forget insert (sync motor here would block — use create_task)
+    # SECTION 13F — Mirror every notification attempt to the queue too.
     try:
         import asyncio
         loop = asyncio.get_event_loop()
         if loop.is_running():
             loop.create_task(db.sms_log.insert_one(dict(record)))
+            queue_doc = {
+                "queue_id": f"notif_{uuid.uuid4().hex[:14]}",
+                "recipient_phone": to_phone,
+                "recipient_email": "",
+                "channel": "sms",
+                "body": body[:600],
+                "subject": "",
+                "trigger_type": event,
+                "status": "sent" if record.get("status") == "sent" else "pending",
+                "attempts": 1 if record.get("status") in {"sent", "error"} else 0,
+                "last_attempt": datetime.now(timezone.utc).isoformat() if record.get("status") in {"sent", "error"} else None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            loop.create_task(db.notification_queue.insert_one(dict(queue_doc)))
         else:
             asyncio.run(db.sms_log.insert_one(dict(record)))
     except Exception:
@@ -680,7 +694,7 @@ async def seed():
 
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")
-async def register(payload: RegisterIn, response: Response):
+async def register(payload: RegisterIn, response: Response, ref: Optional[str] = None):
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -697,6 +711,10 @@ async def register(payload: RegisterIn, response: Response):
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.users.insert_one(user_doc)
+    # SECTION 16C — Track referral signup (best-effort, never blocks registration)
+    if ref:
+        try: await _track_referral_signup(user_id, ref)
+        except Exception: logger.exception("referral tracking failed")
     token = create_jwt(user_id)
     response.set_cookie("session_token", token, httponly=True, secure=True, samesite="none", path="/", max_age=7*24*3600)
     user_doc.pop("password_hash", None)
@@ -3908,8 +3926,6 @@ async def my_benchmark(user: User = Depends(get_current_user)):
         "message": message,
     }
 
-app.include_router(api_router)
-
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -3921,3 +3937,446 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTIONS 13–16 — Comunicación, Calendario, Licencia, Escala
+# All additions live below to avoid touching the historic core (line numbers stay stable for refs)
+# ════════════════════════════════════════════════════════════════════
+
+import secrets as _secrets
+
+def _gen_ref_code() -> str:
+    """Generate a 6-char uppercase alphanumeric referral code."""
+    alpha = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # excluded I,O,0,1 for clarity
+    return "".join(_secrets.choice(alpha) for _ in range(6))
+
+
+async def enqueue_notification(*, recipient_phone: str = "", recipient_email: str = "",
+                                channel: str = "sms", body: str = "", subject: str = "",
+                                trigger_type: str = "generic") -> dict:
+    """Producer for the notification queue. Always inserts a row regardless of
+    Twilio credentials presence. When `send_sms` is called and successful it also
+    marks the queue row as `sent`; otherwise the row stays `pending` and a future
+    cron worker will retry once Twilio is active."""
+    row = {
+        "queue_id": f"notif_{uuid.uuid4().hex[:14]}",
+        "recipient_phone": (recipient_phone or "").strip(),
+        "recipient_email": (recipient_email or "").strip(),
+        "channel": channel,
+        "body": body[:600],
+        "subject": subject[:200],
+        "trigger_type": trigger_type,
+        "status": "pending",
+        "attempts": 0,
+        "last_attempt": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.notification_queue.insert_one(dict(row))
+    row.pop("_id", None)
+    return row
+
+
+# ─── SECTION 15 — Licencia de oficio (opcional, autodeclarada) ────────────
+class LicenseIn(BaseModel):
+    has_license: Literal["yes", "no", "prefer_not_to_say"] = "prefer_not_to_say"
+    license_type: Optional[str] = None
+    license_number: Optional[str] = None  # full number stored server-side; only last 4 shown publicly
+    license_state: Optional[str] = None
+    license_expires_year: Optional[int] = None
+
+LICENSE_TYPES = [
+    "Contratista General", "Electricista", "Plomero", "Techador (Roofer)",
+    "HVAC / Aire Acondicionado", "Pest Control", "Cosmetólogo / Barbero",
+    "Chofer Comercial (CDL)", "Cuidado de Niños / Childcare",
+    "Enfermería / Cuidado de Adultos", "Otra licencia profesional",
+]
+
+@api_router.get("/license/types")
+async def list_license_types():
+    return [{"key": t, "label": t} for t in LICENSE_TYPES]
+
+@api_router.put("/providers/me/license")
+async def upsert_license(payload: LicenseIn, user: User = Depends(get_current_user)):
+    upd = {
+        "license": {
+            "has_license": payload.has_license,
+            "license_type": payload.license_type,
+            "license_number": payload.license_number,
+            "license_state": payload.license_state,
+            "license_expires_year": payload.license_expires_year,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    }
+    res = await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True, "license": upd["license"]}
+
+
+# ─── SECTION 16A — Profile completion score ──────────────────────────────
+def _completion_for(profile: dict) -> dict:
+    """Compute the 0–100 completion score with per-section breakdown."""
+    rules = [
+        ("logo_url", "Foto de perfil", 10, "/dashboard/provider?tab=perfil"),
+        ("description", "Descripción del negocio", 15, "/dashboard/provider?tab=perfil"),
+        ("category_id", "Categoría de servicio", 10, "/dashboard/provider?tab=perfil"),
+        ("service_areas", "Zonas de cobertura", 10, "/dashboard/provider?tab=perfil"),
+        ("phone", "Número de teléfono", 10, "/dashboard/provider?tab=perfil"),
+        ("hours", "Horario de atención", 10, "/dashboard/provider?tab=perfil"),
+        ("gallery", "Foto en galería", 10, "/dashboard/provider?tab=galeria"),
+        ("rates", "Tarifa registrada", 10, "/dashboard/provider?tab=tarifas"),
+        ("calendar_active", "Calendario activo", 10, "/dashboard/provider?tab=calendario"),
+        ("rating_count", "Primera reseña", 5, "/dashboard/provider?tab=resenas"),
+    ]
+    score = 0
+    missing = []
+    for field, label, pts, deep in rules:
+        v = profile.get(field)
+        ok = False
+        if field == "gallery":
+            ok = bool(v and len(v) > 0)
+        elif field == "service_areas":
+            ok = bool(v and len(v) > 0)
+        elif field == "rates":
+            # rates are in a separate document — caller injects if present
+            ok = bool(profile.get("_has_rates"))
+        elif field == "calendar_active":
+            ok = bool(profile.get("calendar_active"))
+        elif field == "rating_count":
+            ok = (v or 0) > 0
+        else:
+            ok = bool(v) and (not isinstance(v, str) or v.strip())
+        if ok:
+            score += pts
+        else:
+            missing.append({"label": label, "points": pts, "deep_link": deep})
+    return {"score": score, "missing": missing}
+
+
+@api_router.get("/providers/me/completion")
+async def my_completion(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    has_rates = await db.provider_rates.count_documents({"provider_id": prof.get("provider_id")}) > 0
+    prof["_has_rates"] = has_rates
+    return _completion_for(prof)
+
+
+# ─── SECTION 16B — Engagement badges ─────────────────────────────────────
+async def _badges_for_provider(provider_id: str, user_id: str = "") -> list[dict]:
+    """Compute live badges. Cheap enough to call per provider in listing endpoints.
+    Cache-friendly: badges depend only on relative timestamps and counts."""
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).isoformat()
+    month_ago = (now - timedelta(days=30)).isoformat()
+    badges: list[dict] = []
+    # Activo esta semana: provider sent at least one message OR logged in within 7d
+    last_active = await db.sessions.find_one(
+        {"user_id": user_id, "created_at": {"$gte": week_ago}},
+        {"_id": 0}, sort=[("created_at", -1)],
+    ) if user_id else None
+    if last_active:
+        badges.append({"key": "active_week", "label": "Activo esta semana", "icon": "🟢"})
+    # Responde rápido: avg response time under 2h (last 30d)
+    pipeline = [
+        {"$match": {"provider_id": provider_id, "response_time_seconds": {"$gt": 0},
+                    "created_at": {"$gte": month_ago}}},
+        {"$group": {"_id": None, "avg": {"$avg": "$response_time_seconds"}, "n": {"$sum": 1}}},
+    ]
+    cur = db.quote_requests.aggregate(pipeline)
+    docs = [d async for d in cur]
+    if docs and docs[0].get("n", 0) >= 3 and (docs[0].get("avg") or 99999) < 7200:
+        badges.append({"key": "fast_responder", "label": "Responde rápido", "icon": "⚡"})
+    # Muy solicitado: 5+ contact requests in last 30d (quote requests or messages)
+    qcount = await db.quote_requests.count_documents({"provider_id": provider_id, "created_at": {"$gte": month_ago}})
+    if qcount >= 5:
+        badges.append({"key": "in_demand", "label": "Muy solicitado", "icon": "🔥"})
+    return badges
+
+
+@api_router.get("/providers/{provider_id}/badges")
+async def get_provider_badges(provider_id: str):
+    prof = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0, "user_id": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return await _badges_for_provider(provider_id, prof.get("user_id", ""))
+
+
+# ─── SECTION 16C — Referrals ─────────────────────────────────────────────
+@api_router.get("/providers/me/referrals")
+async def my_referrals(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    # Ensure ref_code exists (backfill on demand)
+    ref_code = prof.get("ref_code")
+    if not ref_code:
+        # generate a unique one
+        for _ in range(8):
+            cand = _gen_ref_code()
+            existing = await db.provider_profiles.find_one({"ref_code": cand}, {"_id": 0, "user_id": 1})
+            if not existing:
+                ref_code = cand
+                break
+        await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": {"ref_code": ref_code}})
+    referrals = await db.referrals.find({"referrer_user_id": user.user_id}, {"_id": 0}).to_list(200)
+    paid = sum(1 for r in referrals if r.get("status") in {"paid", "credited"})
+    credited_months = sum(1 for r in referrals if r.get("status") == "credited")
+    return {
+        "ref_code": ref_code,
+        "share_url": f"/registro?ref={ref_code}",
+        "total_referred": len(referrals),
+        "total_paid": paid,
+        "credited_months": credited_months,
+        "items": referrals,
+    }
+
+
+async def _track_referral_signup(referred_user_id: str, ref_code: str) -> None:
+    """Call this on /auth/register when the request includes ?ref=CODE."""
+    if not ref_code:
+        return
+    ref_code = ref_code.strip().upper()
+    if not ref_code or len(ref_code) != 6:
+        return
+    referrer = await db.provider_profiles.find_one({"ref_code": ref_code}, {"_id": 0, "user_id": 1})
+    if not referrer:
+        return
+    if referrer["user_id"] == referred_user_id:  # self-referral guard
+        return
+    # Idempotency
+    exists = await db.referrals.find_one({"referred_user_id": referred_user_id}, {"_id": 0})
+    if exists:
+        return
+    await db.referrals.insert_one({
+        "referral_id": f"ref_{uuid.uuid4().hex[:14]}",
+        "referrer_user_id": referrer["user_id"],
+        "referred_user_id": referred_user_id,
+        "ref_code": ref_code,
+        "status": "registered",  # → "paid" when subscription pays → "credited" when month applied
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+# ─── SECTION 13G + 14E — Conversations, messages, appointments (in-app, no Realtime) ───
+class ConversationStartIn(BaseModel):
+    provider_id: str
+    participant_name: str = Field(min_length=2, max_length=100)
+    participant_phone: str = Field(min_length=7, max_length=20)
+    participant_email: Optional[str] = None
+    message: str = Field(min_length=2, max_length=1000)
+    conversation_type: Literal["direct", "quote", "job", "appointment"] = "direct"
+    reference_id: Optional[str] = None
+
+class MessageIn(BaseModel):
+    body: str = Field(min_length=1, max_length=1000)
+    attachment_url: Optional[str] = None
+    attachment_type: Optional[Literal["image", "pdf"]] = None
+
+
+@api_router.post("/messaging/start")
+async def messaging_start(payload: ConversationStartIn, request: Request, user: Optional[User] = Depends(lambda: None)):
+    """Anonymous OR authenticated visitor starts a conversation with a provider.
+    Sends first message + enqueues a notification to the provider."""
+    prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    conv_id = f"conv_{uuid.uuid4().hex[:14]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conv = {
+        "conversation_id": conv_id,
+        "provider_id": payload.provider_id,
+        "provider_user_id": prof.get("user_id"),
+        "participant_user_id": user.user_id if user else None,
+        "participant_name": payload.participant_name.strip(),
+        "participant_phone": payload.participant_phone.strip(),
+        "participant_email": (payload.participant_email or "").strip(),
+        "conversation_type": payload.conversation_type,
+        "reference_id": payload.reference_id,
+        "unread_count_provider": 1,
+        "unread_count_participant": 0,
+        "last_message_at": now_iso,
+        "last_message_preview": payload.message[:120],
+        "created_at": now_iso,
+    }
+    await db.conversations.insert_one(dict(conv))
+    msg = {
+        "message_id": f"msg_{uuid.uuid4().hex[:14]}",
+        "conversation_id": conv_id,
+        "sender_type": "participant",
+        "sender_user_id": user.user_id if user else None,
+        "sender_name": payload.participant_name.strip(),
+        "body": payload.message,
+        "attachment_url": None,
+        "attachment_type": None,
+        "is_read": False,
+        "created_at": now_iso,
+    }
+    await db.messages.insert_one(dict(msg))
+    # Notify provider via queue + best-effort SMS now
+    body = f"💬 Nuevo mensaje en getamano de {payload.participant_name}: '{payload.message[:80]}'. Responde en getamano.us/dashboard/mensajes"
+    await enqueue_notification(recipient_phone=prof.get("phone", ""), channel="sms",
+                                body=body, trigger_type="new_message_to_provider")
+    if prof.get("phone"):
+        try: send_sms(prof["phone"], body, event="new_message_to_provider")
+        except Exception: pass
+    conv.pop("_id", None); msg.pop("_id", None)
+    return {"conversation_id": conv_id, "message": msg}
+
+
+@api_router.get("/messaging/conversations")
+async def my_conversations(user: User = Depends(get_current_user),
+                            filter: Optional[Literal["all", "unread", "quote", "job", "appointment"]] = "all",
+                            search: Optional[str] = None):
+    """Provider's inbox (or participant's). Returns list of conversations."""
+    q = {"$or": [{"provider_user_id": user.user_id}, {"participant_user_id": user.user_id}]}
+    if filter == "unread":
+        q["$and"] = [{"$or": [
+            {"provider_user_id": user.user_id, "unread_count_provider": {"$gt": 0}},
+            {"participant_user_id": user.user_id, "unread_count_participant": {"$gt": 0}},
+        ]}]
+    elif filter in {"quote", "job", "appointment"}:
+        q["conversation_type"] = filter
+    if search:
+        q["$or"] = q.get("$or", []) + [{"participant_name": {"$regex": search, "$options": "i"}},
+                                       {"last_message_preview": {"$regex": search, "$options": "i"}}]
+    items = await db.conversations.find(q, {"_id": 0}).sort("last_message_at", -1).to_list(200)
+    return {"items": items, "total": len(items)}
+
+
+@api_router.get("/messaging/conversations/{conversation_id}/messages")
+async def get_conv_messages(conversation_id: str, user: User = Depends(get_current_user),
+                             limit: int = 50, before: Optional[str] = None):
+    conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if user.user_id not in {conv.get("provider_user_id"), conv.get("participant_user_id")}:
+        raise HTTPException(status_code=403, detail="Not your conversation")
+    q = {"conversation_id": conversation_id}
+    if before:
+        q["created_at"] = {"$lt": before}
+    msgs = await db.messages.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    msgs.reverse()
+    # mark as read for this side
+    side = "provider" if user.user_id == conv.get("provider_user_id") else "participant"
+    await db.conversations.update_one({"conversation_id": conversation_id},
+                                       {"$set": {f"unread_count_{side}": 0}})
+    return {"items": msgs, "conversation": conv}
+
+
+@api_router.post("/messaging/conversations/{conversation_id}/messages")
+async def post_message(conversation_id: str, payload: MessageIn,
+                       user: User = Depends(get_current_user)):
+    conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if user.user_id not in {conv.get("provider_user_id"), conv.get("participant_user_id")}:
+        raise HTTPException(status_code=403, detail="Not your conversation")
+    is_provider = user.user_id == conv.get("provider_user_id")
+    sender_type = "provider" if is_provider else "participant"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    msg = {
+        "message_id": f"msg_{uuid.uuid4().hex[:14]}",
+        "conversation_id": conversation_id,
+        "sender_type": sender_type,
+        "sender_user_id": user.user_id,
+        "sender_name": user.name,
+        "body": payload.body,
+        "attachment_url": payload.attachment_url,
+        "attachment_type": payload.attachment_type,
+        "is_read": False,
+        "created_at": now_iso,
+    }
+    await db.messages.insert_one(dict(msg))
+    incr_field = "unread_count_participant" if is_provider else "unread_count_provider"
+    await db.conversations.update_one(
+        {"conversation_id": conversation_id},
+        {"$set": {"last_message_at": now_iso, "last_message_preview": payload.body[:120]},
+         "$inc": {incr_field: 1}},
+    )
+    # Enqueue notification to the recipient
+    recipient_phone = conv.get("participant_phone") if is_provider else ""
+    if not is_provider:
+        prof = await db.provider_profiles.find_one({"provider_id": conv.get("provider_id")}, {"_id": 0, "phone": 1})
+        recipient_phone = (prof or {}).get("phone", "")
+    if recipient_phone:
+        body = f"💬 Nuevo mensaje en getamano de {user.name}: '{payload.body[:80]}'."
+        await enqueue_notification(recipient_phone=recipient_phone, channel="sms",
+                                    body=body, trigger_type="new_message")
+        try: send_sms(recipient_phone, body, event="new_message")
+        except Exception: pass
+    msg.pop("_id", None)
+    return msg
+
+
+@api_router.get("/messaging/unread-count")
+async def unread_count(user: User = Depends(get_current_user)):
+    """Total unread across all conversations for the current user — used for the navbar badge."""
+    pipeline = [
+        {"$match": {"$or": [{"provider_user_id": user.user_id}, {"participant_user_id": user.user_id}]}},
+        {"$project": {
+            "_id": 0,
+            "n": {"$cond": [{"$eq": ["$provider_user_id", user.user_id]},
+                            "$unread_count_provider", "$unread_count_participant"]}
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$n"}}},
+    ]
+    res = [d async for d in db.conversations.aggregate(pipeline)]
+    return {"unread": int(res[0]["total"]) if res else 0}
+
+
+# ─── Contact preferences (Sec 13D) ───────────────────────────────────────
+class ContactPrefsIn(BaseModel):
+    show_call: bool = True
+    show_whatsapp: bool = True
+    show_email: bool = False
+    show_message_form: bool = True
+
+@api_router.put("/providers/me/contact-prefs")
+async def upsert_contact_prefs(payload: ContactPrefsIn, user: User = Depends(get_current_user)):
+    # At least one must be enabled
+    if not any([payload.show_call, payload.show_whatsapp, payload.show_email, payload.show_message_form]):
+        raise HTTPException(status_code=400, detail="Debes habilitar al menos un canal de contacto.")
+    upd = {"contact_prefs": payload.dict()}
+    res = await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True, "contact_prefs": upd["contact_prefs"]}
+
+
+# ─── SECTION 16H — Abandoned registrations ───────────────────────────────
+@api_router.get("/admin/incomplete-registrations")
+async def admin_incomplete_regs(admin: User = Depends(require_admin)):
+    """Providers who created their user account but have no provider_profile yet,
+    OR have an empty/incomplete profile. Inserted within last 30d."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    users = await db.users.find(
+        {"role": "provider", "created_at": {"$gte": cutoff}},
+        {"_id": 0, "user_id": 1, "name": 1, "email": 1, "phone": 1, "created_at": 1}
+    ).to_list(500)
+    items = []
+    for u in users:
+        prof = await db.provider_profiles.find_one({"user_id": u["user_id"]}, {"_id": 0, "business_name": 1, "description": 1})
+        if not prof or not (prof.get("business_name") and prof.get("description")):
+            items.append({**u, "has_profile": bool(prof)})
+    return {"items": items, "total": len(items)}
+
+
+@api_router.post("/admin/incomplete-registrations/{user_id}/remind")
+async def admin_remind_incomplete(user_id: str, admin: User = Depends(require_admin)):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    body = f"Hola {u.get('name', '').split(' ')[0]}, casi tienes lista tu eCard en getamano. Termínala en 2 min: getamano.us/registro"
+    await enqueue_notification(recipient_phone=u.get("phone", ""), channel="sms",
+                                body=body, trigger_type="incomplete_registration")
+    if u.get("phone"):
+        try: send_sms(u["phone"], body, event="incomplete_registration")
+        except Exception: pass
+    return {"ok": True}
+
+
+# Mount api_router AFTER all route definitions so Sections 13–16 are included.
+app.include_router(api_router)

@@ -15,6 +15,10 @@ import ShareLinkCard from "../components/ShareLinkCard";
 import ProviderRates from "../components/ProviderRates";
 import MarketPulseCard from "../components/MarketPulseCard";
 import DashboardGallery from "../components/DashboardGallery";
+import ProfileCompletion from "../components/ProfileCompletion";
+import ReferralsTab from "../components/ReferralsTab";
+import LicenseSection from "../components/LicenseSection";
+import InboxView from "../components/InboxView";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -23,6 +27,7 @@ const TABS = [
   { id: "galeria", label: "Galería", Icon: ImageIcon },
   { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
   { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
+  { id: "referidos", label: "Referidos", Icon: Trophy },
   { id: "diario", label: "Mi diario", Icon: Trophy },
   { id: "suscripcion", label: "Suscripción", Icon: CreditCard },
 ];
@@ -34,7 +39,7 @@ export default function ProviderDashboard() {
   const [profile, setProfile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [conversations, setConversations] = useState([]);
+  const [unread, setUnread] = useState(0);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("perfil");
@@ -48,15 +53,24 @@ export default function ProviderDashboard() {
       api.get("/categories"),
       api.get("/providers/me"),
       api.get("/plans"),
-      api.get("/conversations").catch(() => ({ data: [] })),
-    ]).then(([c, p, pl, conv]) => {
-      setCategories(c.data); setPlans(pl.data); setConversations(conv.data);
+      api.get("/messaging/unread-count").catch(() => ({ data: { unread: 0 } })),
+    ]).then(([c, p, pl, u]) => {
+      setCategories(c.data); setPlans(pl.data); setUnread(u.data.unread || 0);
       if (!p.data) { navigate("/provider/onboarding", { replace: true }); return; }
       setProfile(p.data);
       setForm(initForm(p.data));
     }).finally(() => setLoading(false));
     // eslint-disable-next-line
   }, [user, authLoading]);
+
+  // Poll unread count every 30s while dashboard is open
+  useEffect(() => {
+    if (!user) return;
+    const t = setInterval(() => {
+      api.get("/messaging/unread-count").then(r => setUnread(r.data.unread || 0)).catch(() => {});
+    }, 30000);
+    return () => clearInterval(t);
+  }, [user]);
 
   const initForm = (p) => ({
     business_name: p.business_name || "", legal_name: p.legal_name || "",
@@ -114,7 +128,8 @@ export default function ProviderDashboard() {
 
   if (loading || !profile || !form) return <div className="min-h-screen flex items-center justify-center text-slate-500">{t("common.loading")}</div>;
 
-  const unread = conversations.filter(c => c.unread).length;
+  // Compute messaging unread badge via the dedicated endpoint
+  // (set in the effect above; nothing to compute here.)
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -138,6 +153,9 @@ export default function ProviderDashboard() {
             Ver mi eCard <ExternalLink className="w-3.5 h-3.5" />
           </Link>
         </div>
+
+        {/* SECTION 16A — Profile Completion */}
+        <ProfileCompletion onTabChange={setTab} />
 
         {/* Analytics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -295,6 +313,9 @@ export default function ProviderDashboard() {
                   <Field label="LinkedIn" value={form.social?.linkedin || ""} onChange={v => update("social", { ...form.social, linkedin: v })} placeholder="usuario-li" testid="form-social-linkedin" />
                 </Section>
 
+                {/* SECTION 15 — Licencia */}
+                <LicenseSection profile={profile} setProfile={setProfile} />
+
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                   <button type="submit" disabled={saving} className="btn-primary" data-testid="provider-save-button">
                     {saving ? "Guardando..." : "Guardar cambios"}
@@ -338,27 +359,11 @@ export default function ProviderDashboard() {
             )}
 
             {tab === "mensajes" && (
-              <div data-testid="dashboard-messages">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-display font-semibold text-lg text-slate-900">Bandeja de entrada</h3>
-                  <Link to="/messages" className="btn-outline text-sm">Abrir bandeja completa</Link>
-                </div>
-                {conversations.length === 0 ? (
-                  <div className="text-slate-500 text-sm">Aún no tienes mensajes.</div>
-                ) : (
-                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl">
-                    {conversations.slice(0, 5).map(c => (
-                      <Link key={c.conversation_id} to="/messages" state={{ conversation_id: c.conversation_id }} className="flex items-center gap-3 p-4 hover:bg-slate-50">
-                        <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center text-slate-600 font-bold">{c.client_name.charAt(0)}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between"><span className="font-medium text-slate-900 text-sm truncate">{c.client_name}</span>{c.unread && <span className="w-2 h-2 bg-orange-500 rounded-full" />}</div>
-                          <p className="text-xs text-slate-500 truncate">{c.last_message}</p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <InboxView currentUser={user} />
+            )}
+
+            {tab === "referidos" && (
+              <ReferralsTab />
             )}
 
             {tab === "tarifas" && (

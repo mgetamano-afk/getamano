@@ -17,6 +17,7 @@ import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
 import GalleryGrid from "../components/GalleryGrid";
 import CategoryIcon from "../components/CategoryIcon";
+import { LicenseBadge } from "../components/LicenseSection";
 import { formatRate } from "../components/ProviderRates";
 import { toast } from "sonner";
 
@@ -188,6 +189,9 @@ export default function ProviderECard() {
         {/* Details grid */}
         <div className="grid md:grid-cols-3 gap-5 mt-6 px-4 md:px-8">
           <div className="md:col-span-2 space-y-5">
+            {/* Licencia opcional (Sec 15) */}
+            <LicenseBadge license={p.license} />
+
             {/* Presentation video (Pro/Premium) */}
             {p.video_url && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-video">

@@ -1,0 +1,54 @@
+{
+  "summary": "Tested Sections 13/14/15/16 (license, completion, badges, referrals, messaging, contact-prefs, admin incomplete-regs). 15/19 backend tests pass. CRITICAL bug: stale unique Mongo index `client_id_1_provider_id_1` on `db.conversations` makes the new anonymous `POST /api/messaging/start` endpoint fail with 500 (DuplicateKeyError) after the first anonymous conversation per provider — the new endpoint never sets `client_id`, so `(null, provider_id)` collides on every subsequent anonymous insert. Frontend looks great: ProfileCompletion 85%, Mensajes/Referidos/Perfil tabs present, Inbox renders the seeded 'Test Cliente' conversation, ReferralsTab shows ref_code GRY9J9 + share URL + WhatsApp + stats, LicenseSection renders, eCard LicenseBadge appears with disclaimer when has_license=yes.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/messaging/start",
+        "issue": "500 DuplicateKeyError on second anonymous start to the same provider. Mongo `conversations` collection has legacy unique index `client_id_1_provider_id_1` (created at server.py line 529 for the older /messages flow). The new `messaging_start` (line 4179) inserts WITHOUT `client_id`, so Mongo treats client_id as null → unique violation on the 2nd anonymous insert per provider. Demo provider already has 1 such anonymous doc ('Test Cliente'), so EVERY further anonymous /messaging/start to the demo provider currently fails. Repro: `curl -X POST $BASE/api/messaging/start -d '{...same provider_id...}'` → 500.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Provider dashboard initial load",
+        "issue": "3x 500 errors observed in browser console during dashboard mount. Likely the new InboxView/Conversation polling endpoints hitting the same broken /messaging path or another stale endpoint; needs main agent to confirm via backend logs.",
+        "affected_selectors": ["[data-testid=\"inbox-view\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/iteration15_sections_13_14_15_16_test.py",
+    "/app/test_reports/pytest/iteration15_results.xml"
+  ],
+  "action_items": [
+    "Drop or convert the legacy unique index `client_id_1_provider_id_1` on db.conversations to a PARTIAL unique index that only applies when client_id is a string (e.g. `db.conversations.createIndex({client_id:1,provider_id:1},{unique:true,partialFilterExpression:{client_id:{\\$type:'string'}}})`). Without this fix anonymous first-message flow is broken for any provider that already has one anonymous conversation.",
+    "Investigate the 3x console 500 errors on /dashboard/provider (check supervisor backend logs around polling endpoints).",
+    "Consider removing pydantic[email]'s rejection of .test TLD OR documenting that test data must use @example.com (low priority — only impacts test scripts).",
+    "Optional: extract a helper module for the new endpoints; server.py is now 4382 lines and many endpoints share patterns (auth+profile lookup)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 4382 lines — Sections 13/14/15/16 alone added ~440 lines at the bottom. Should split into router modules (messaging.py, referrals.py, license.py, completion.py, admin.py) to keep maintainable.",
+    "`/api/messaging/start` (line 4180): `Depends(lambda: None)` is a hack to make auth optional but always returns None — current authenticated visitors will NOT be tracked as participant_user_id. Use a proper `get_current_user_optional` dependency instead.",
+    "`/api/messaging/conversations` (line 4243): when both `filter==unread` AND `search` are used, the `$or` for search overrides the `$or` already mutated for unread (because q['$or'] is reassigned), breaking the unread filter. Use `$and:[{search},{unread}]` composition instead.",
+    "send_sms wrapper is duplicated in /messaging/start and /admin/.../remind; should call enqueue_notification only and let a background worker dispatch — currently every endpoint try/except's Twilio inline (acceptable for now but couples HTTP latency to SMS provider).",
+    "_track_referral_signup status is hard-coded 'registered'; no observable transition path to 'paid' or 'credited' in the codebase — referrals will never auto-credit until a webhook on subscription pay is wired."
+  ],
+  "updated_files": [
+    "/app/backend/tests/iteration15_sections_13_14_15_16_test.py (new)"
+  ],
+  "success_rate": {
+    "backend": "78.9% (15/19 pytest); 4 failures all caused by ONE root cause (legacy unique index)",
+    "frontend": "100% on the 6 testids requested (profile-completion, dashboard-tab-mensajes, dashboard-tab-referidos, dashboard-tab-perfil, inbox-view, referrals-tab, license-section, ecard-license)"
+  },
+  "test_credentials": "demo.provider@getamano.com / provider123 ; admin@getamano.com / admin123 (from /app/memory/test_credentials.md). NOTE: tests use @example.com for new registrations because pydantic[email] rejects .test TLD.",
+  "seed_data_creation": "Tests created multiple TEST_*@example.com users (clients + 1 provider 'Inc Provider') for referral and incomplete-registration flows; left in DB for follow-up verification. Demo provider license is currently has_license='yes', license_type='General Contractor', license_number='ABC123', license_state='OK', expires=2027 (so LicenseBadge renders on eCard). Demo provider ref_code = GRY9J9 (already had 1+ referral from this test run).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent migrates the conversations index (partial unique), re-run only the 4 TestMessaging tests that errored. The other 15 already pass. Demo provider license/ref_code/contact-prefs were mutated by parametrized tests, so re-set them via PUTs if you need pristine state. Pytest file is at /app/backend/tests/iteration15_sections_13_14_15_16_test.py and auto-loads REACT_APP_BACKEND_URL from /app/frontend/.env if not in env.",
+  "rca of the issue": "Root cause: when section 13G/14E was added, a NEW conversations schema was introduced (`participant_user_id` instead of `client_id`) but the legacy unique index on (`client_id`, `provider_id`) — created at server.py:529 to dedup the old /messages upsert — was never adjusted. Mongo treats missing fields as null, so all anonymous inserts collide on (null, provider_id). Reproduction: (1) login demo.provider, (2) POST /api/messaging/start with provider_id=prov_10b9f21bf971 from any anonymous client → 500 DuplicateKeyError because demo provider already has one anonymous doc seeded ('Test Cliente'). Mitigation: convert the index to a partial unique index filtered on `client_id: {\\$type:'string'}` so it only enforces uniqueness for the legacy client_id-based flow, leaving new anonymous (client_id=null) inserts unrestricted."
+}
