@@ -5,8 +5,9 @@ import { useAuth } from "../contexts/AuthContext";
 import Header from "../components/Header";
 import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload from "../components/ImageUpload";
-import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2 } from "lucide-react";
+import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2, ScanLine } from "lucide-react";
 import { toast } from "sonner";
+import BusinessCardScanner from "../components/BusinessCardScanner";
 
 const STEPS = [
   { id: "plan", title: "Elige tu plan" },
@@ -21,6 +22,7 @@ export default function ProviderOnboarding() {
   const { user, loading: authLoading, refresh } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [showScanner, setShowScanner] = useState(false);
   const [plans, setPlans] = useState([]);
   const [categories, setCategories] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -121,6 +123,23 @@ export default function ProviderOnboarding() {
 
           {step === 1 && (
             <div className="mt-6 space-y-4">
+              {/* Section 18A — Card scanner CTA */}
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-dashed hover:bg-teal-50/50 transition group"
+                style={{ borderColor: "#2F9D9466", backgroundColor: "#F0FDFA" }}
+                data-testid="onboarding-open-scanner"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#025F6720" }}>
+                  <ScanLine className="w-5 h-5" style={{ color: "#025F67" }} />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="text-sm font-semibold text-slate-900">¿Tienes tarjeta de presentación?</div>
+                  <div className="text-xs text-slate-500">Escanea y llenamos el formulario por ti — ahorra 60 segundos.</div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-teal-700 transition" />
+              </button>
               <Field label="Nombre del negocio *" value={form.business_name} onChange={v => update("business_name", v)} testid="onboarding-business-name" />
               <Field label="Nombre legal (LLC, Inc., etc.)" value={form.legal_name} onChange={v => update("legal_name", v)} testid="onboarding-legal-name" />
               <div>
@@ -285,6 +304,26 @@ export default function ProviderOnboarding() {
           </div>
         </div>
       </main>
+      <BusinessCardScanner
+        open={showScanner}
+        onClose={() => setShowScanner(false)}
+        onExtracted={(ext) => {
+          // Merge extracted fields into form, but only fill empty values so we
+          // never override anything the user already typed.
+          setForm(f => ({
+            ...f,
+            business_name: f.business_name || ext.business_name || "",
+            legal_name: f.legal_name || ext.owner_name || "",
+            phone: f.phone || ext.phone || "",
+            email: f.email || ext.email || "",
+            website: f.website || ext.website || "",
+            city: f.city || ext.city || "",
+            state: f.state || ext.state || "",
+            zip_code: f.zip_code || ext.zip_code || "",
+          }));
+          toast.success("Datos importados de la tarjeta — revisa antes de continuar.");
+        }}
+      />
     </div>
   );
 }

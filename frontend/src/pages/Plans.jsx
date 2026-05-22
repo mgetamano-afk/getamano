@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
 import { Check, Sparkles } from "lucide-react";
+import PlanRecommender from "../components/PlanRecommender";
 
 export default function Plans() {
   const { t, lang } = useI18n();
@@ -26,7 +27,10 @@ export default function Plans() {
           <p className="text-slate-500 mt-3 max-w-2xl mx-auto">{t("plans.subtitle")}</p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Smart Recommender — quiz "What plan do I need?" */}
+        <PlanRecommender />
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
           {plans.map(p => {
             const features = lang === "es" ? p.features_es : p.features_en;
             const name = lang === "es" ? p.name : p.name_en;

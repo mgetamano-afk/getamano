@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 19 — Verified 3 new P2 features: (1) PlanRecommender 4-question quiz on /plans, (2) translation_cache TTL index expires_at_1/expireAfterSeconds=0 + POST /api/translate returns 200 without 500, (3) POST /api/card-scan graceful fallback (source='api_error') + BusinessCardScanner modal on ProviderOnboarding Step 2. Backend pytest 6/6 green (/app/backend/tests/test_iter19_features.py). Frontend E2E: quiz Paths A/B/C produce expected recommendations (Free idx0 score 11/4/0/0 → Free; idx1 score 0/9/8/0 → Basic — tie-cheapest rule honored; idx2 score 0/0/8/12 → Premium). CTA href matches /register?intent=provider&plan={planId}&via=quiz exactly. Plan cards $0/$10/$15/$25 still render below quiz (visually confirmed). Lang toggle correctly swaps copy ES↔EN ('What plan do I need?' / '¿Qué plan necesito?'). Scanner banner [data-testid=onboarding-open-scanner] appears on Step 2 'Datos de tu negocio' (NOT Step 1 as spec said — Step 1 is 'Elige tu plan'); modal opens, file input accepts PNG, transitions idle→scanning→review with amber 'OCR is warming up — El servicio OCR no respondió. Llena el formulario manualmente.' notice, skip button closes modal cleanly. Regression: /api/providers public excludes TEST (PUBLIC_GUARD intact), /api/public/stats includes providers_label.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/provider/onboarding", "issues": ["Spec says scanner banner is on 'Step 1 (Datos de tu negocio)' but the actual flow has 'Elige tu plan' as Step 1 and 'Datos de tu negocio' as Step 2. The banner correctly lives on the Datos step; the spec doc should be updated to say Step 2. No code change needed — this is a documentation/spec mismatch only."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_features.py",
+    "/app/test_reports/pytest/iter19.xml"
+  ],
+  "action_items": [
+    "(Doc only) Update spec/PRD: business-card scanner banner lives on ProviderOnboarding Step 2 'Datos de tu negocio', not Step 1.",
+    "(Optional, future) When Vision API is unblocked on the GCP project, retest /api/card-scan to confirm source='ok' path returns parsed { business_name, owner_name, phone, email, website, city, state, zip_code } fields and that the review form auto-populates."
+  ],
+  "critical_code_review_comments": [
+    "PlanRecommender.jsx ties-breaker logic (lines 127-140) correctly favors cheapest plan via TIE_ORDER constant. Verified empirically: idx=1 yields Basic·9 vs Pro·8 → Basic wins; equal-score scenarios would still favor cheaper. Production-safe.",
+    "BusinessCardScanner.jsx properly handles 3 fallback paths (source='no_api_key' | 'api_error' | 'ok') and never blocks the user — 'Continue manually' always available. trackCardScan() analytics call fires the appropriate source label.",
+    "Translation cache TTL: confirmed Mongo index 'expires_at_1' with expireAfterSeconds=0 exists. Cache entries with expires_at field will auto-purge 90 days post-write per server.py 4815-4827 logic. Index ensures no manual cleanup needed.",
+    "/api/card-scan returns 200 with source='api_error' even when image_b64 is empty/missing — graceful but consider 400 for explicit empty-payload cases (currently accepts empty string and treats as no-image-data). Not a launch blocker.",
+    "PlanRecommender opens to result view after 4 answers but does not warn if user skips ahead without selecting (the next button is correctly disabled — verified). No defect."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter19_features.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 pytest)",
+    "frontend": "100% — quiz 3 paths + lang toggle + scanner modal full E2E"
+  },
+  "test_credentials": "Used admin@getamano.com/admin123 implicit context; for scanner test created fresh TEST_scanner_<ts>@example.com via POST /api/auth/register (Test1234!) — role=client at registration, /provider/onboarding accessible to client to upgrade.",
+  "seed_data_creation": "Created 2 TEST_scanner_<timestamp>@example.com client accounts during onboarding scanner test. They are flagged TEST_ for cleanup. No provider profile completed (skipped at modal).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iter19 features (quiz + TTL + card scanner) verified production-ready with graceful fallbacks. Vision API + Translation API + GA4 remain MOCKED per user's GCP project state — that's intentional. Next testing agent: regression file /app/backend/tests/test_iter19_features.py keeps the TTL index + endpoint contracts green. Phase E booking flow + /search radius selector + Leaflet circle were NOT re-tested this round (iter16/17/18 covered) but should be revisited if PlanRecommender or onboarding scanner are refactored. Test credentials in /app/memory/test_credentials.md remain valid.",
+  "rca of the issue": "N/A — no defects found."
+}

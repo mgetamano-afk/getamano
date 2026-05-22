@@ -562,6 +562,9 @@ async def seed():
         await db.translation_cache.create_index(
             [("source_id", 1), ("source_field", 1), ("target_lang", 1)], unique=True
         )
+        # TTL: auto-expire translation cache entries after 90 days. Indexed on a
+        # native BSON Date field (`expires_at`). Cheap insurance against unbounded growth.
+        await db.translation_cache.create_index("expires_at", expireAfterSeconds=0)
         await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
         await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
         await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
@@ -4808,13 +4811,17 @@ async def translate_text(payload: TranslateRequestIn):
         logger.warning(f"translate API call failed: {e}")
         return {"translated_text": payload.text, "cached": False, "source": "api_error"}
     # 3) Store in cache (upsert defensively)
+    now_dt = datetime.now(timezone.utc)
     await db.translation_cache.update_one(
         {"source_id": payload.source_id, "source_field": payload.source_field, "target_lang": payload.target_lang},
         {"$set": {
             "source_id": payload.source_id, "source_field": payload.source_field,
             "source_lang": payload.source_lang, "target_lang": payload.target_lang,
             "original_text": payload.text, "translated_text": translated,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": now_dt.isoformat(),
+            # TTL anchor: native Date 90 days from now. MongoDB removes the doc
+            # automatically once this timestamp is passed.
+            "expires_at": now_dt + timedelta(days=90),
         }},
         upsert=True,
     )
@@ -4917,6 +4924,113 @@ async def admin_geocode_seed(_user: User = Depends(require_admin)):
         if res.upserted_id is not None:
             n += 1
     return {"ok": True, "inserted": n, "total_seed": len(US_CITY_SEED)}
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 18A — Business Card Scanner (Google Cloud Vision API)
+# ════════════════════════════════════════════════════════════════════
+# Uses Vision API's TEXT_DETECTION on a base64 image. Extracts business name,
+# phone, email, address via regex + heuristics from the OCR text.
+# Falls back to MOCK MODE when GOOGLE_API_KEY missing OR Vision API blocked.
+
+class CardScanIn(BaseModel):
+    image_b64: str = Field(min_length=64, description="Base64 image (no data: prefix)")
+
+
+_PHONE_RE = re.compile(r"(?:\+?1[\s\-.])?\(?(\d{3})\)?[\s\-.](\d{3})[\s\-.](\d{4})")
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+_URL_RE = re.compile(r"(?:https?://)?(?:www\.)?([a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(?:/[\w\-./?#=&%+]*)?)")
+_ZIP_RE = re.compile(r"\b(\d{5})(?:[\-\s](\d{4}))?\b")
+_STATE_RE = re.compile(r"\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b")
+
+
+def _parse_card_text(text: str) -> dict:
+    """Heuristic parser. Lines come from Vision API's DOCUMENT_TEXT_DETECTION result."""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    out = {"business_name": "", "owner_name": "", "phone": "", "email": "",
+           "website": "", "city": "", "state": "", "zip_code": "",
+           "raw_text": text, "lines_count": len(lines)}
+    # email + phone + url first (high-confidence regex matches)
+    em = _EMAIL_RE.search(text)
+    if em:
+        out["email"] = em.group(0).lower()
+    ph = _PHONE_RE.search(text)
+    if ph:
+        out["phone"] = f"+1 ({ph.group(1)}) {ph.group(2)}-{ph.group(3)}"
+    url = _URL_RE.search(text.replace(out["email"], ""))  # don't grab email domain
+    if url:
+        out["website"] = url.group(1).lower()
+    z = _ZIP_RE.search(text)
+    if z:
+        out["zip_code"] = z.group(1)
+    st = _STATE_RE.search(text)
+    if st:
+        out["state"] = st.group(0)
+    # Heuristic: largest UPPER/Title-case line near top = business name; 2nd-largest = owner
+    candidates = [l for l in lines if not _PHONE_RE.search(l) and not _EMAIL_RE.search(l) and not _URL_RE.search(l) and len(l) >= 3 and len(l) <= 60]
+    if candidates:
+        out["business_name"] = candidates[0]
+        if len(candidates) > 1:
+            out["owner_name"] = candidates[1]
+    # City: look for "City, ST" pattern on any line
+    city_match = re.search(r"([A-Z][a-zA-Z\.\s]{2,30}),\s*([A-Z]{2})\b", text)
+    if city_match:
+        out["city"] = city_match.group(1).strip()
+        out["state"] = city_match.group(2)
+    return out
+
+
+@api_router.post("/card-scan")
+async def scan_business_card(payload: CardScanIn, user: Optional[User] = Depends(get_optional_user)):
+    """Scan a business card image and extract structured fields.
+
+    Returns: { source, fields: {...}, raw_text, note? }
+    - source = 'vision'      → real Google Vision OCR result
+    - source = 'no_api_key'  → MOCK MODE (no Google API key configured)
+    - source = 'api_error'   → Vision API returned 4xx/5xx (e.g., API disabled on GCP project)
+
+    Frontend should always check `fields` and let the user edit before saving.
+    """
+    api_key = (os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not api_key:
+        return {"source": "no_api_key",
+                "fields": {}, "raw_text": "",
+                "note": "Sistema OCR no configurado aún. Llena el formulario manualmente."}
+    # Strip data: prefix if present
+    img_b64 = payload.image_b64
+    if img_b64.startswith("data:"):
+        try:
+            img_b64 = img_b64.split(",", 1)[1]
+        except IndexError:
+            raise HTTPException(status_code=400, detail="Invalid base64 image")
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as cli:
+            r = await cli.post(
+                f"https://vision.googleapis.com/v1/images:annotate?key={api_key}",
+                json={"requests": [{
+                    "image": {"content": img_b64},
+                    "features": [{"type": "DOCUMENT_TEXT_DETECTION", "maxResults": 1}],
+                    "imageContext": {"languageHints": ["es", "en"]},
+                }]},
+            )
+            r.raise_for_status()
+            data = r.json()
+    except Exception as e:
+        logger.warning(f"Vision OCR call failed: {e}")
+        return {"source": "api_error", "fields": {}, "raw_text": "",
+                "note": "El servicio OCR no respondió. Llena el formulario manualmente."}
+    try:
+        annotation = data["responses"][0].get("fullTextAnnotation") or {}
+        text = annotation.get("text", "") or ""
+        if not text and data["responses"][0].get("textAnnotations"):
+            text = data["responses"][0]["textAnnotations"][0].get("description", "")
+    except Exception:
+        text = ""
+    if not text:
+        return {"source": "vision", "fields": {}, "raw_text": "",
+                "note": "No detectamos texto. Asegúrate de que la tarjeta esté enfocada y bien iluminada."}
+    fields = _parse_card_text(text)
+    return {"source": "vision", "fields": fields, "raw_text": text}
 
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.
