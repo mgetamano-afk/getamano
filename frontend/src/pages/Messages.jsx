@@ -79,11 +79,11 @@ export default function Messages() {
                 data-testid={`conversation-${c.conversation_id}`}
               >
                 <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center text-slate-600 font-bold flex-shrink-0">
-                  {(c.my_role === "provider" ? c.client_name : c.business_name).charAt(0)}
+                  {((c.my_role === "provider" ? c.client_name : c.business_name) || "?").charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="font-medium text-slate-900 text-sm truncate">{c.my_role === "provider" ? c.client_name : c.business_name}</span>
+                    <span className="font-medium text-slate-900 text-sm truncate">{(c.my_role === "provider" ? c.client_name : c.business_name) || "—"}</span>
                     {c.unread && <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />}
                   </div>
                   <p className="text-xs text-slate-500 truncate mt-0.5">{c.last_message}</p>
@@ -103,7 +103,7 @@ export default function Messages() {
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <div className="w-9 h-9 rounded-xl bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
-                    {(active.business_name || active.client_name).charAt(0)}
+                    {(active.business_name || active.client_name || "?").charAt(0)}
                   </div>
                   <div className="min-w-0">
                     <div className="font-medium text-slate-900 truncate">{user?.user_id === active.provider_user_id ? active.client_name : active.business_name}</div>

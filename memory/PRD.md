@@ -206,6 +206,39 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 
 **Testing:** `iteration_22.json` — 36/36 PASS (6 viewports × 6 critical pages, ZERO horizontal overflow, drawer portal verified, install modal verified, font-size 16px verified on Login inputs, all CTAs ≥44px height).
 
+### Feb 2026 — Mobile Bottom Navigation + PWA Section 20 Polish + Visual Mobile Redesign (3 sprints)
+**Sprint A — `BottomNav.jsx` (5-tab Instagram-style mobile nav):**
+- Sticky 56px bottom nav with 5 tabs: Inicio, Buscar, Panel, Mensajes (with unread badge), Perfil
+- Visible only when (a) user is logged in, (b) viewport < 768px, (c) NOT on `/admin/*`, (d) virtual keyboard not detected open (Android resize-based detection)
+- Active tab: teal `#025F67` icon + label + small top indicator bar
+- Toggles `body.has-bottom-nav` class so global CSS adds `padding-bottom: 56px + env(safe-area-inset-bottom)` to leave room (avoids content hidden behind nav on long pages — tested on Provider Dashboard with all the cards visible above nav)
+
+**Sprint B — Section 21: Landing Mobile Visual Redesign:**
+- Root cause of "broken iPhone visuals" identified: Hero used `linear-gradient(135deg, #063154 → #0A4D5E → #025F67)` which on phones reads as a saturated wall of teal taking 100% of the viewport.
+- Fix (mobile only — desktop kept identical): swap to `linear-gradient(170deg, #0A0A0A → #0D1F1E → #0A3535 → #025F67)` so it transitions from brand black to teal accent only at the bottom. Auroral animation also disabled on mobile (was a perf/visual cost there).
+- "Cómo funciona" section dark navy (`#063154`) tonned down to `#0A1F2E` on mobile so it reads as a quiet break instead of a second wall
+- Verified via Playwright `getComputedStyle` that desktop gradient is unchanged at 1440px
+
+**Sprint C — Section 20: PWA Install Enhancements:**
+- New `lib/deviceDetection.js` utility: `detectDevice()`, `isStandalonePWA()`, `hasRecentlyDeclined()`, `markInstallDeclined()`, `trackPwaInstalled(platform)`, `trackIOSFirstLaunchOnce()`. Detects iPhone model from screen size (iphone-se / iphone-13-14 / iphone-15-16 / iphone-17 / iphone-pro-max), Samsung Internet (which doesn't fire `beforeinstallprompt`), and all iOS sub-browsers
+- New page `/instalar` (alias `/install`): dedicated install landing optimised for QR codes printed on physical cards, WhatsApp/Instagram bio links, and onboarding emails. Renders a different state per device:
+  - Already installed → "App ya instalada" + Open button
+  - iOS Safari → 3-step animated SafariInstallTutorial side-by-side with text steps
+  - iOS Chrome/Edge/Firefox → "Apple solo permite Safari" warning + "Copiar link"
+  - Android Chrome (with deferred prompt) → "Instalar ahora" 1-tap button
+  - Android Chrome (no prompt yet) → ⋮ menu instructions
+  - Samsung Internet → ☰ menu instructions
+  - Desktop → QR code + URL
+  - 3 benefit cards (1-tap, offline, push notifications) + framing footer about saving 30% Apple/Google fee
+- Analytics: `pwa_installed` event fires on Android `appinstalled` event AND once on first iOS standalone-mode launch (PostHog + GA4 dual-track, both wrapped in try/catch)
+- Footer link `/instalar` added with pulsing orange dot for attention
+
+**Sprint D (cleanup) — RouteErrorBoundary + Messages crash fix:**
+- New `RouteErrorBoundary.jsx` wraps `<Routes>` so a single page crash NO LONGER unmounts the global chrome (Header + InstallAppModal + BottomNav). Shows a friendly fallback with "Refrescar" and "Inicio" CTAs. PostHog `ui_error` event fired with stack/path.
+- Fixed pre-existing `Messages.jsx` crash: `.charAt(0)` was called on possibly-undefined `client_name`/`business_name` — now guards with `|| "?"` fallback. Discovered during iter-23 testing when /messages was the only route where BottomNav didn't appear; root cause was Messages crashing and unmounting the tree.
+
+**Testing:** `iteration_23.json` — 10/11 sprint checks pass, only failure was the Messages crash which is now fixed. Hero gradient verified mobile-only via getComputedStyle (matches spec on 393×852, original gradient on 1440×900). `/instalar` mobile no overflow at 390×844. BottomNav visible on /, /search, /dashboard, /profile, /messages (after fix), hidden on desktop + admin + logged-out.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)
