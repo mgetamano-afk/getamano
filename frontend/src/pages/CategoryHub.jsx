@@ -360,7 +360,7 @@ export default function CategoryHub() {
               {Icon && <Icon className="w-8 h-8 sm:w-10 sm:h-10 text-white" strokeWidth={1.5} />}
             </div>
             <div>
-              <h1 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl tracking-tight leading-[1.1]" data-testid="category-hub-h1">
+              <h1 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl tracking-tight leading-[1.1] text-white" style={{ color: "#FFFFFF", textShadow: "0 2px 12px rgba(0,0,0,0.18)" }} data-testid="category-hub-h1">
                 {h1}{locationLabel && <span className="text-white/85"> en {locationLabel}</span>}
               </h1>
               <p className="mt-3 text-base sm:text-lg text-white/80 leading-relaxed max-w-3xl" data-testid="category-hub-description">

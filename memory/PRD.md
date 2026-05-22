@@ -256,6 +256,25 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 
 **Testing:** `iteration_24.json` — **10/10 PASS**. Confirmed 0 source.unsplash.com `<img>` elements remain, 13 unique gradients on landing (12 specific + 1 fallback), all 3 manifest screenshots return HTTP 200, BottomNav regression on /dashboard intact.
 
+### Feb 2026 — SEO Category Hubs (`/categoria/:slug`)
+Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latinos cerca", "catering quinceañera Tampa".
+
+**New page `/app/frontend/src/pages/CategoryHub.jsx`:**
+- Routes: `/categoria/:slug` + English alias `/category/:slug`
+- 12 main categories with hand-written SEO copy in BOTH Spanish and English: cleaning, catering, construction, handyman, auto, beauty, moving, legal, landscaping, events, tutoring, health
+- Per-category fields: `h1Es`, `h1En`, `descEs`, `descEn`, `faqsEs[]`, `faqsEn[]` (3-4 FAQs each, written to match Google's "People Also Ask" intent)
+- Schema.org JSON-LD payload with `@graph` containing 4 schema types: BreadcrumbList, Service, ItemList (provider list), FAQPage
+- Hero matches the category's gradient + Lucide icon (reuses CATEGORY_VISUALS map exported from CategoryCard)
+- Full-page sections: Hero with breadcrumbs + 2 CTAs · Featured providers (top 12 from /api/providers?category=) · Trust strip (Verified · Real reviews · Free for clients) · FAQ accordion · Bottom CTA strip with category gradient
+- Empty state CTA: "Soy proveedor" — turns dead categories into provider acquisition funnels
+- `?city=…&state=…` query support: when present, the URL becomes location-aware, H1 shows "en {city, state}", and the schema.org `Service.areaServed` updates
+
+**CategoryCard.jsx** updated: cards on landing now link to `/categoria/<slug>` (the SEO hub) instead of `/buscar?category=`. SEO hubs then have a "See all providers" CTA that points to the search page — best of both worlds.
+
+**H1 contrast bug fixed:** A global CSS rule (`#025F67` color on `h1`) was overriding parent `.text-white` inheritance. The H1 was rendering dark teal on the colored gradient hero (poor contrast). Fixed with explicit `text-white` class + inline `color: #FFFFFF` + `text-shadow` for safety on every category color.
+
+**Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)
