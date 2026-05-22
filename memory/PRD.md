@@ -345,6 +345,15 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_27.json` — **7/7 backend pytest + 100% frontend on all 9 audit-fix flows**. Zero regressions. Critical fixes (badge removed, lang=es, stats real, test data archived, hidden reviews) all E2E verified.
 
+### May 22 — Audit Update: FIX-14 NEW (admin sub-pages blank)
+**Root cause:** The audit reported 7 admin sub-pages blank at `/dashboard/admin/{ceo, queue, providers, reviews, reportes, catalog, audit}`. Our app's admin routes live at `/admin/*` (no `/dashboard/` prefix). When the founder navigated using the URL pattern the audit assumed, React Router fell through to the catch-all and rendered an empty section.
+
+**Fix:** Added 10 alias `<Route>` entries in `App.js` (lines 123-132) so `/dashboard/admin/*` URLs map to the same components as `/admin/*`. Both prefixes now work; old bookmarks, audit URLs, and inbound links never 404.
+
+**Verified routes after fix:** `/dashboard/admin`, `/ceo`, `/queue`, `/providers`, `/reviews`, `/reportes`, `/catalog`, `/audit`, `/quiz-funnel`, `/pricing` — all render `AdminLayout` with sidebar + main content (531-9866 chars). RouteErrorBoundary did not trigger on any of them.
+
+**Testing:** `iteration_28.json` — **100% pass (18/18 admin routes + 6/6 regression)**. ZERO bugs, ZERO error boundaries, ZERO pageerrors. Only nit flagged: sidebar nav links still target `/admin/*` not `/dashboard/admin/*` — non-blocking, since both prefixes render identical content.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)
