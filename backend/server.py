@@ -2156,8 +2156,11 @@ async def list_conversations(user: User = Depends(get_current_user)):
     convs = await db.conversations.find(query, {"_id": 0}).sort("last_at", -1).to_list(200)
     # mark which side I am
     for c in convs:
-        c["my_role"] = "provider" if c["provider_user_id"] == user.user_id else "client"
-        c["unread"] = c["unread_for_provider"] if c["my_role"] == "provider" else c["unread_for_client"]
+        c["my_role"] = "provider" if c.get("provider_user_id") == user.user_id else "client"
+        if c["my_role"] == "provider":
+            c["unread"] = c.get("unread_for_provider", 0) or c.get("unread_count_provider", 0) or 0
+        else:
+            c["unread"] = c.get("unread_for_client", 0) or c.get("unread_count_participant", 0) or 0
     return convs
 
 @api_router.get("/conversations/{conversation_id}/messages")

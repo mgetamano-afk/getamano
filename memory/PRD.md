@@ -121,6 +121,20 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
     - **Frontend**: nuevo componente `MarketPulseCard.jsx` (3 estados: loading skeleton, empty/educational, full card) renderizado en ProviderDashboard arriba de los stats. 3 stat blocks (Cotizaciones con delta % vs semana anterior, Precio promedio con delta histórico, Lo más pedido con budget+tamaño) + insight accionable inteligente que cambia según delta. Diseño glass-morphism con gradiente Alabaster→Scooter sutil.
     - **Testing**: iteration 6 — 13/13 backend + 10/10 frontend (100%).
   - **LOGO OFICIAL (Feb 21, 2026)**: Integrados los logos v1 que envió el usuario (g icon con curva tipo mano + wordmark "getamano" en Blue Lagoon). Assets: `/getamano-logo-mark.png` (512×512 PNG transparente, 70KB), `/getamano-logo-full.png` (800×800, 122KB), `/favicon.ico` (multi-size cropped, 11KB), `/apple-touch-icon.png` (512×512, 86KB). Componente `Logo.jsx` reutilizable. Reemplazados todos los placeholders "g" en gradiente naranja-azul por el logo oficial en: Header (10×10), Footer (12×12 sobre card Alabaster), AdminLayout sidebar (10×10), ShareLinkCard URL preview (7×7), Login/Register (16×16 centrado encima del welcome). Favicon y apple-touch-icon agregados a public/index.html.
+  - **SECTION 17 + PHASE E (May 22, 2026)** — i18n & Calendar/Bookings:
+    - **i18n**: Static ES/EN dictionary (~115 keys) in `I18nContext.jsx` + flag-emoji language toggle (🇲🇽 ES / 🇺🇸 EN) in `Header.jsx` (persisted in `localStorage.tx_lang`). New booking/calendar keys added.
+    - **Translation backend**: `POST /api/translate` with `translation_cache` MongoDB collection + provider abstraction. Currently runs in MOCK MODE (no Google Cloud API key); returns original text + `source:"no_api_key"` + Spanish note. Set `GOOGLE_TRANSLATE_API_KEY` in backend/.env to enable real Google Cloud Translation v2 — code path is production-ready.
+    - **Translation frontend hook**: `useTranslate()` at `/app/frontend/src/hooks/useTranslate.js` returns `{translate, translated, loading, note, reset}`.
+    - **Phase E Calendar/Bookings backend** (`/api/providers/me/availability` GET/PUT, `/api/providers/{id}/slots` PUBLIC, `/api/appointments` POST anonymous-friendly, `/api/providers/me/appointments` GET, `/api/appointments/{id}` PUT confirm/decline/complete/no_show/cancel). Models: `availability` embedded in `provider_profiles` (`is_active`, `weekly{mon..sun:[{start,end}]}`, `slot_duration_min`, `buffer_min`, `advance_days`, `timezone`). Collection: `appointments` (status: pending → confirmed/declined → completed/no_show/cancelled).
+    - **Phase E frontend**: `BookingModal.jsx` Calendly-style 3-step wizard (date strip → time slot grid → form), `CalendarTab.jsx` provider availability editor + appointments list with confirm/decline. Booking button wired into `ProviderECard` (when `calendar_active=true`) AND `InboxView` chat header (when current user is the client side). New "Citas" tab in `ProviderDashboard`.
+    - **Bug fix**: `Depends(lambda: None)` replaced with proper `get_optional_user` helper (server.py:491) for `/api/appointments` and `/api/messaging/start`. Also `GET /api/conversations` 500 KeyError on missing `unread_for_provider/client` fields now defensively defaults to 0 (server.py:2160).
+    - **Testing**: Iteration 16 — 14/14 backend pytest + 100% frontend testids verified.
+
+## Completed (May 22, 2026)
+- Section 17 (i18n + Translation API mock with production-ready abstraction)
+- Phase E (Calendar/Bookings) — backend + provider dashboard + eCard + inbox booking
+- Bug fix: `/api/conversations` regression from iter-15 messaging schema migration
+- Bug fix: `Depends(lambda: None)` anti-pattern replaced with `get_optional_user`
 
 ## Prioritized Backlog
 
