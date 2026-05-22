@@ -82,15 +82,15 @@ export default function Register() {
               <form onSubmit={onSubmit} className="mt-8 space-y-4" data-testid="register-form">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t("auth.name")}</label>
-                  <input required value={name} onChange={e => setName(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-name-input" />
+                  <input required value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-name-input" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t("auth.email")}</label>
-                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-email-input" />
+                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)} inputMode="email" autoComplete="email" className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-email-input" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t("auth.password")}</label>
-                  <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-password-input" />
+                  <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-password-input" />
                 </div>
                 <button type="submit" disabled={loading} className="btn-primary w-full justify-center" data-testid="register-submit">
                   {loading ? t("common.loading") : t("auth.signup")}

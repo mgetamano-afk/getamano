@@ -212,6 +212,9 @@ export default function InstallAppModal() {
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm animate-in fade-in"
       onClick={() => setOpen(false)}
       data-testid="install-app-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="install-app-modal-title"
     >
       <div
         className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 sm:p-7 animate-in slide-in-from-bottom-4 fade-in"
@@ -235,7 +238,7 @@ export default function InstallAppModal() {
             <Sparkles className="w-7 h-7 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-display text-lg font-bold text-slate-900 leading-tight">{T.title}</h2>
+            <h2 id="install-app-modal-title" className="font-display text-lg font-bold text-slate-900 leading-tight">{T.title}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{T.subtitle}</p>
           </div>
         </div>

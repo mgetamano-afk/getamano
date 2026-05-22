@@ -47,6 +47,7 @@ export default function Login() {
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("auth.email")}</label>
               <input
                 type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                inputMode="email" autoComplete="email"
                 className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none"
                 data-testid="login-email-input"
               />
@@ -55,6 +56,7 @@ export default function Login() {
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("auth.password")}</label>
               <input
                 type="password" required value={password} onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password"
                 className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none"
                 data-testid="login-password-input"
               />

@@ -168,7 +168,43 @@ Marketplace digital "getamano" que conecta a comunidad latina en USA con proveed
 - Updated `InstallPrompt.jsx` auto-popup so it only triggers on real iOS Safari (was incorrectly showing "Tap Share → Add to Home Screen" inside Chrome iOS where that menu doesn't exist)
 - Fixed `apple-touch-icon-*.png` files: removed alpha channel, composited onto opaque `#025F67` teal background per Apple iOS guidelines (icons no longer render dark/transparent on iPhone home screens)
 - New component `SafariInstallTutorial.jsx` — pure-SVG animated demo (~3KB, no GIF) showing 8s loop: iPhone Safari → Share button pulse → share sheet with "Add to Home Screen" highlighted → home screen reveal with getamano icon "popping" in. Increases install conversion 2-3x.
+- New hook `useIsPwaInstalled.js` — detects display-mode standalone; landing hero auto-swaps "Descarga la app" button for a green "App instalada ✓" badge so recurring users aren't pestered
 - Tested with Playwright UA emulation: iPhone Safari ✓ (with tutorial), iPhone Chrome ✓, Desktop ✓
+
+### Feb 2026 — Section 19: Total Mobile Responsiveness
+**Context:** 90% of getamano users are mobile-first. Founder reported app rendering broken on iPhone 17 Pro. Sprint focused on bullet-proofing every viewport from iPhone SE 375px to iPad 1024px.
+
+**Global CSS rules (`/app/frontend/src/index.css`):**
+- Anti-overflow guard: `html, body, #root { max-width: 100vw; overflow-x: hidden }` and `* { box-sizing: border-box }`
+- Universal media safety: `img, video, iframe, svg, canvas { max-width: 100%; height: auto }`
+- iOS auto-zoom prevention: `font-size: max(16px, 1rem)` forced on every form input/textarea/select (iOS Safari zooms when font-size < 16px and an input gains focus)
+- 44×44 minimum touch target on mobile (`@media (max-width: 767px)` rule applied to `button`, `[role=button]`, `a.btn*`)
+- Tap feedback (no hover on mobile): `button:active { transform: scale(0.98) }`
+- Safe-area-inset CSS variables (`--safe-top/bottom/left/right`) wired to utility classes `.pt-safe`, `.pb-safe`, `.px-safe` for notch / Dynamic Island / home indicator support
+- Dynamic viewport height utility `.h-screen-d { height: 100dvh }` (replaces 100vh which is buggy in iOS Safari with URL bar showing/hiding)
+- `overscroll-behavior-y: none` to prevent accidental "pull to refresh" inside the app
+- `.scroll-touch { -webkit-overflow-scrolling: touch }` for smooth momentum scrolling on iOS
+- Fluid typography scale via `clamp()`: `.text-fluid-base` through `.text-fluid-4xl` (no media queries needed, scales naturally between iPhone SE 375 and 1280+)
+
+**Header.jsx (mobile drawer redesign):**
+- Replaced inline expand-down mobile menu with proper slide-in drawer from right + dark backdrop overlay
+- **CRITICAL BUG FIX:** the previous drawer was rendered inside `<header className="glass-header">` which has `backdrop-filter: blur(16px)` — this CSS property creates a new containing block that traps `position: fixed` children. Drawer was positioned relative to header bounds instead of the viewport, breaking on every mobile device. Fix: portal drawer to `document.body` via `createPortal()`.
+- Drawer width: `w-[85%] max-w-sm` (333px on iPhone 14, 384px on tablets), full height, slide-in animation
+- Hamburger button now 44×44 minimum touch target with `min-h-[44px] min-w-[44px]`
+- Body scroll lock when drawer open
+- Header height reduced from `h-16 md:h-20` (64/80px) to `h-14 md:h-20` (56/80px) per Apple HIG mobile standards
+
+**Form fields (`ProviderOnboarding`, `Login`, `Register`):**
+- `Field` component in ProviderOnboarding now accepts `type` / `inputMode` / `autoComplete` props
+- Phone field: `type="tel" inputMode="tel" autoComplete="tel"`
+- Email field: `type="email" inputMode="email" autoComplete="email"`
+- Login: `autoComplete="email"` + `inputMode="email"` on email, `autoComplete="current-password"` on password
+- Register: `autoComplete="name|email|new-password"` + `inputMode="email"` (better mobile keyboard hints + password manager autofill)
+
+**InstallAppModal accessibility:**
+- Added `role="dialog"`, `aria-modal="true"`, `aria-labelledby="install-app-modal-title"` for screen-reader compliance
+
+**Testing:** `iteration_22.json` — 36/36 PASS (6 viewports × 6 critical pages, ZERO horizontal overflow, drawer portal verified, install modal verified, font-size 16px verified on Login inputs, all CTAs ≥44px height).
 
 ## Prioritized Backlog
 
