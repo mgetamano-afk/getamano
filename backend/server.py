@@ -572,6 +572,13 @@ async def seed():
         await db.provider_rates.create_index([("provider_id", 1), ("is_active", 1)])
         # SECTION 18 — Geocoding cache
         await db.city_coordinates.create_index([("city", 1), ("state", 1)], unique=True)
+        # Quiz funnel (PlanRecommender abandonment tracking)
+        await db.quiz_funnel.create_index([("session_id", 1)])
+        await db.quiz_funnel.create_index([("created_at", -1)])
+        await db.quiz_funnel.create_index([("event", 1), ("created_at", -1)])
+        # Email captures for the recovery flow
+        await db.lead_recoveries.create_index("email", unique=True)
+        await db.lead_recoveries.create_index([("status", 1), ("created_at", -1)])
     except Exception as e:
         logger.warning(f"Index creation: {e}")
 
@@ -5031,6 +5038,163 @@ async def scan_business_card(payload: CardScanIn, user: Optional[User] = Depends
                 "note": "No detectamos texto. Asegúrate de que la tarjeta esté enfocada y bien iluminada."}
     fields = _parse_card_text(text)
     return {"source": "vision", "fields": fields, "raw_text": text}
+
+
+# ════════════════════════════════════════════════════════════════════
+# QUIZ FUNNEL — Recovery system for abandoned plan-recommender visitors
+# ════════════════════════════════════════════════════════════════════
+# Every quiz interaction emits an event to /api/quiz/track. When the user
+# leaves after answering 2+ questions (without finishing) we capture an
+# "abandoned" event. The /api/quiz/recover endpoint stores their email +
+# partial answers so we can email them later (once Resend is configured).
+
+class QuizTrackIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=80)
+    event: Literal["opened", "answered", "completed", "abandoned", "cta_clicked"]
+    step: Optional[int] = Field(default=None, ge=0, le=10)
+    answers: Optional[dict] = None
+    recommended_plan: Optional[str] = None
+    lang: Optional[str] = "es"
+
+
+class LeadRecoveryIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=80)
+    email: str = Field(min_length=5, max_length=200)
+    answers: dict
+    recommended_plan: Optional[str] = None
+    lang: Optional[str] = "es"
+
+
+@api_router.post("/quiz/track")
+async def quiz_track(payload: QuizTrackIn, request: Request,
+                     user: Optional[User] = Depends(get_optional_user)):
+    """Fire-and-forget endpoint: store one quiz funnel event.
+    Public — no auth required. session_id is generated client-side."""
+    doc = {
+        "session_id": payload.session_id,
+        "event": payload.event,
+        "step": payload.step,
+        "answers": payload.answers or {},
+        "recommended_plan": payload.recommended_plan,
+        "lang": payload.lang or "es",
+        "user_id": user.user_id if user else None,
+        "ip": request.client.host if request.client else None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.quiz_funnel.insert_one(doc)
+    return {"ok": True}
+
+
+@api_router.post("/quiz/recover")
+async def quiz_recover(payload: LeadRecoveryIn, request: Request,
+                       user: Optional[User] = Depends(get_optional_user)):
+    """Capture an email at quiz-abandonment. Persisted in lead_recoveries
+    with status='pending'. When Resend (or similar) is enabled, a background
+    worker will read these and send the recovery email."""
+    email = payload.email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Invalid email")
+    await db.lead_recoveries.update_one(
+        {"email": email},
+        {"$set": {
+            "email": email,
+            "session_id": payload.session_id,
+            "answers": payload.answers,
+            "recommended_plan": payload.recommended_plan,
+            "lang": payload.lang or "es",
+            "status": "pending",
+            "user_id": user.user_id if user else None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, "$setOnInsert": {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    # Drop a matching funnel event so the abandonment is paired with recovery
+    await db.quiz_funnel.insert_one({
+        "session_id": payload.session_id,
+        "event": "email_captured",
+        "step": None,
+        "answers": payload.answers,
+        "recommended_plan": payload.recommended_plan,
+        "lang": payload.lang or "es",
+        "user_id": user.user_id if user else None,
+        "email": email,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True, "message": "lead_captured"}
+
+
+@api_router.get("/admin/quiz-funnel")
+async def admin_quiz_funnel(_user: User = Depends(require_admin)):
+    """Admin dashboard data: counts per stage, conversion rates, recent leads,
+    distribution of recommended plans. Useful to assess quiz performance."""
+    sessions_pipeline = [
+        {"$sort": {"created_at": 1}},
+        {"$group": {
+            "_id": "$session_id",
+            "events": {"$push": "$event"},
+            "recommended_plan": {"$last": "$recommended_plan"},
+            "lang": {"$last": "$lang"},
+            "last_seen": {"$last": "$created_at"},
+        }},
+    ]
+    sessions = await db.quiz_funnel.aggregate(sessions_pipeline).to_list(5000)
+    started = answered_any = q1_done = q2_done = q3_done = q4_done = 0
+    completed = cta_clicked = email_captured = 0
+    plan_dist = {"free": 0, "basic": 0, "pro": 0, "premium": 0}
+    for s in sessions:
+        evs = s["events"]
+        if "opened" in evs:
+            started += 1
+        answered_count = sum(1 for e in evs if e == "answered")
+        if answered_count >= 1:
+            answered_any += 1
+        if answered_count >= 1: q1_done += 1
+        if answered_count >= 2: q2_done += 1
+        if answered_count >= 3: q3_done += 1
+        if answered_count >= 4: q4_done += 1
+        if "completed" in evs:
+            completed += 1
+            if s.get("recommended_plan") in plan_dist:
+                plan_dist[s["recommended_plan"]] += 1
+        if "cta_clicked" in evs:
+            cta_clicked += 1
+        if "email_captured" in evs:
+            email_captured += 1
+    abandonments = max(0, answered_any - completed)
+    recovery_rate = round((email_captured / abandonments * 100), 1) if abandonments > 0 else 0.0
+    completion_rate = round((completed / max(started, 1) * 100), 1)
+    cta_conversion = round((cta_clicked / max(completed, 1) * 100), 1)
+    # Recent leads (last 20 email_captured)
+    leads = await db.lead_recoveries.find(
+        {}, {"_id": 0, "email": 1, "recommended_plan": 1, "status": 1, "created_at": 1, "lang": 1}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    return {
+        "totals": {
+            "sessions": len(sessions), "started": started,
+            "q1": q1_done, "q2": q2_done, "q3": q3_done, "q4": q4_done,
+            "completed": completed, "cta_clicked": cta_clicked,
+            "abandoned": abandonments, "email_captured": email_captured,
+        },
+        "rates": {
+            "completion_rate_pct": completion_rate,
+            "cta_conversion_pct": cta_conversion,
+            "recovery_rate_pct": recovery_rate,
+        },
+        "plan_distribution": plan_dist,
+        "recent_leads": leads,
+    }
+
+
+@api_router.get("/admin/lead-recoveries")
+async def admin_list_leads(status: Optional[str] = None, _user: User = Depends(require_admin)):
+    """Admin: full list of captured leads for outreach (until Resend is wired)."""
+    q = {}
+    if status:
+        q["status"] = status
+    leads = await db.lead_recoveries.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
+    return {"items": leads, "total": len(leads)}
 
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.

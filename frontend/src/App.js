@@ -24,6 +24,7 @@ import ServiceRequests from "./pages/ServiceRequests";
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminCEO from "./pages/admin/AdminCEO";
+import AdminQuizFunnel from "./pages/admin/AdminQuizFunnel";
 import AdminPricingIntelligence from "./pages/admin/AdminPricingIntelligence";
 import AdminQueue from "./pages/admin/AdminQueue";
 import AdminProviders from "./pages/admin/AdminProviders";
@@ -85,6 +86,7 @@ function AppRouter() {
       {/* Zone 4: Admin (separate dark layout) */}
       <Route path="/admin" element={<AdminOverview />} />
       <Route path="/admin/ceo" element={<AdminCEO />} />
+      <Route path="/admin/quiz-funnel" element={<AdminQuizFunnel />} />
       <Route path="/admin/pricing" element={<AdminPricingIntelligence />} />
       <Route path="/admin/queue" element={<AdminQueue />} />
       <Route path="/admin/providers" element={<AdminProviders />} />

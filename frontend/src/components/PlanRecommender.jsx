@@ -1,7 +1,37 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, ChevronRight, Camera, MessageSquare, MapPin, CreditCard, Award, ArrowRight, RefreshCcw, Check } from "lucide-react";
+import { Sparkles, ChevronRight, Camera, MessageSquare, MapPin, CreditCard, Award, ArrowRight, RefreshCcw, Check, Mail, Heart } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
+import { api } from "../lib/api";
+
+/** Generate or fetch a stable browser session id for funnel tracking. */
+function getOrCreateSessionId() {
+  try {
+    let id = localStorage.getItem("quiz_session_id");
+    if (!id) {
+      id = "qs_" + Math.random().toString(36).slice(2, 14) + Date.now().toString(36);
+      localStorage.setItem("quiz_session_id", id);
+    }
+    return id;
+  } catch (_e) {
+    return "qs_" + Math.random().toString(36).slice(2, 14);
+  }
+}
+
+/** Fire-and-forget tracking call. Never blocks the UI. */
+function track(sessionId, event, extra = {}) {
+  try {
+    // Use sendBeacon when the browser is unloading (more reliable than fetch)
+    const url = `${process.env.REACT_APP_BACKEND_URL}/api/quiz/track`;
+    const body = JSON.stringify({ session_id: sessionId, event, ...extra });
+    if (event === "abandoned" && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon(url, blob);
+      return;
+    }
+    api.post("/quiz/track", { session_id: sessionId, event, ...extra }).catch(() => {});
+  } catch (_e) { /* ignore */ }
+}
 
 /**
  * PlanRecommender — 4-question interactive quiz that scores each tier
@@ -109,9 +139,22 @@ const TIE_ORDER = { free: 0, basic: 1, pro: 2, premium: 3 };
 export default function PlanRecommender() {
   const { lang } = useI18n();
   const questions = lang === "en" ? QUESTIONS_EN : QUESTIONS_ES;
-  const [step, setStep] = useState(0);  // 0..questions.length-1, then results
-  const [answers, setAnswers] = useState({});  // { qid: optionIdx }
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const sessionIdRef = useRef(null);
+  const completedRef = useRef(false);
+  const emailCapturedRef = useRef(false);
+
+  if (!sessionIdRef.current) sessionIdRef.current = getOrCreateSessionId();
+
+  // Fire "opened" the first time the user clicks the CTA
+  useEffect(() => {
+    if (opened) {
+      track(sessionIdRef.current, "opened", { lang });
+    }
+  }, [opened, lang]);
 
   const totals = useMemo(() => {
     const acc = { free: 0, basic: 0, pro: 0, premium: 0 };
@@ -138,6 +181,37 @@ export default function PlanRecommender() {
     });
     return best;
   }, [totals, submitted]);
+
+  // Fire "completed" + final recommendation once the result view is reached
+  useEffect(() => {
+    if (submitted && recommended && !completedRef.current) {
+      completedRef.current = true;
+      track(sessionIdRef.current, "completed", {
+        answers, recommended_plan: recommended, lang,
+      });
+    }
+  }, [submitted, recommended, answers, lang]);
+
+  // Abandonment tracking: if the user closes/navigates after answering 2+
+  // questions WITHOUT completing, send a beacon. Only fires once.
+  useEffect(() => {
+    if (!opened) return;
+    const onBeforeUnload = () => {
+      const answeredCount = Object.keys(answers).length;
+      if (answeredCount >= 2 && !completedRef.current) {
+        track(sessionIdRef.current, "abandoned", {
+          step, answers, lang,
+        });
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") onBeforeUnload();
+    });
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [opened, answers, step, lang]);
 
   const T = useMemo(() => lang === "en" ? {
     title: "What plan do I need?",
@@ -174,8 +248,6 @@ export default function PlanRecommender() {
     restart: "Hacer el quiz otra vez",
     pillsLabel: "Tu puntaje",
   }, [lang]);
-
-  const [opened, setOpened] = useState(false);
 
   if (!opened) {
     return (
@@ -245,6 +317,7 @@ export default function PlanRecommender() {
           <div className="mt-7 flex flex-col sm:flex-row gap-3 items-center justify-center">
             <Link
               to={`/register?intent=provider&plan=${recommended}&via=quiz`}
+              onClick={() => track(sessionIdRef.current, "cta_clicked", { recommended_plan: recommended, answers, lang })}
               className="inline-flex items-center gap-1 px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:opacity-90 transition"
               style={{ backgroundColor: meta.color }}
               data-testid="plan-recommender-cta-confirm"
@@ -252,7 +325,7 @@ export default function PlanRecommender() {
               {T.cta_go} <ChevronRight className="w-4 h-4" />
             </Link>
             <button
-              onClick={() => { setOpened(true); setStep(0); setAnswers({}); setSubmitted(false); }}
+              onClick={() => { setOpened(true); setStep(0); setAnswers({}); setSubmitted(false); completedRef.current = false; emailCapturedRef.current = false; }}
               className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
               data-testid="plan-recommender-restart"
             >
@@ -260,6 +333,24 @@ export default function PlanRecommender() {
             </button>
           </div>
           <p className="text-center text-xs text-slate-400 mt-3">{T.cta_alt}</p>
+
+          {/* Email capture banner — optional "save my recommendation" */}
+          {!emailCapturedRef.current && (
+            <EmailCaptureBanner
+              lang={lang}
+              onCaptured={async (email) => {
+                emailCapturedRef.current = true;
+                try {
+                  await api.post("/quiz/recover", {
+                    session_id: sessionIdRef.current,
+                    email, answers,
+                    recommended_plan: recommended,
+                    lang,
+                  });
+                } catch (_e) { /* never blocks */ }
+              }}
+            />
+          )}
         </div>
       </section>
     );
@@ -272,7 +363,11 @@ export default function PlanRecommender() {
   const isLast = step === questions.length - 1;
 
   const choose = (idx) => {
-    setAnswers(a => ({ ...a, [currentQ.id]: idx }));
+    const newAnswers = { ...answers, [currentQ.id]: idx };
+    setAnswers(newAnswers);
+    track(sessionIdRef.current, "answered", {
+      step, answers: newAnswers, lang,
+    });
   };
 
   return (
@@ -371,4 +466,81 @@ function buildReasons(answers, plan, lang) {
   }
   // Fallback if no answers matched
   return r.length ? r.slice(0, 4) : [lang === "en" ? "Best balance between cost and reach for your stage." : "Es el balance ideal entre costo y alcance para tu etapa."];
+}
+
+
+/**
+ * EmailCaptureBanner — appears under the recommendation card. Lets the user
+ * save their result + receive bilingual tips. Captured leads are stored in
+ * lead_recoveries and will be emailed once Resend is configured.
+ */
+function EmailCaptureBanner({ lang, onCaptured }) {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const T = lang === "en" ? {
+    title: "Want this in your inbox?",
+    sub: "We'll save your recommendation and send tips for your eCard. No spam.",
+    placeholder: "your@email.com",
+    cta: "Send me my result",
+    sent: "Saved! Check your inbox soon.",
+  } : {
+    title: "¿Quieres recibir esto en tu correo?",
+    sub: "Guardamos tu recomendación y te mandamos tips para abrir tu eCard. Cero spam.",
+    placeholder: "tu@email.com",
+    cta: "Enviarme mi resultado",
+    sent: "¡Guardado! Pronto recibirás un correo.",
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) return;
+    setSubmitting(true);
+    await onCaptured(email.trim().toLowerCase());
+    setSubmitted(true);
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="mt-6 rounded-2xl bg-green-50 border border-green-200 px-4 py-3 flex items-center gap-2 text-sm text-green-800" data-testid="quiz-email-captured">
+        <Heart className="w-4 h-4 fill-green-600 text-green-600" />
+        {T.sent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 p-5" data-testid="quiz-email-banner">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+          <Mail className="w-5 h-5 text-orange-600" />
+        </div>
+        <div>
+          <p className="font-semibold text-slate-900 text-sm">{T.title}</p>
+          <p className="text-xs text-slate-600 mt-0.5">{T.sub}</p>
+        </div>
+      </div>
+      <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder={T.placeholder}
+          required
+          className="flex-1 h-11 px-4 rounded-full border border-orange-200 outline-none focus:border-orange-400 text-sm bg-white"
+          data-testid="quiz-email-input"
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="h-11 px-5 rounded-full bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 disabled:opacity-60"
+          data-testid="quiz-email-submit"
+        >
+          {T.cta}
+        </button>
+      </form>
+    </div>
+  );
 }
