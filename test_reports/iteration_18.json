@@ -1,0 +1,43 @@
+{
+  "summary": "Pre-launch BUG sweep verification (BUG-01..BUG-09) for getamano. All 11 backend pytest cases pass (/app/backend/tests/test_prelaunch_bugs.py). Frontend smoke covered: /plans (4 cards $0/$10/$15/$25, FAQ x3, Pro 'Más popular' highlighted, CTAs go to /register?intent=provider&plan={planId}), /search public (no TEST providers leaking, 3 real cards: María's Cleaning, elyte ja, palas), /admin/queue (25 pending items + Aprobar/Rechazar/Pedir info buttons, verified end-to-end with real POST /api/admin/providers/{pid}/verify {status:'needs_info'} → DB updated → state reverted), /admin/providers (search bar + 26 rows), /admin/catalog (catalog-categories + catalog-cities sections both render, 24 cities seeded — Dallas/Houston/LA/Miami/Chicago all have featured:true), /admin/pricing (h1 'Inteligencia de precios' renders, not blank), /admin/audit (100+ audit-row entries visible), BUG-07 Emergent badge HIDDEN on /plans + /search via visibility:hidden + opacity:0 (still satisfies spec accept criteria 'display===none OR visibility===hidden'), BUG-08 i18n nailed: es-MX browser context → 'Explorar servicios / Planes / Iniciar sesión / 🇲🇽 ES'; en-US context → 'Explore services / Plans / Sign in / 🇺🇸 EN'. /api/public/stats returns {providers:3, providers_label:'registered', states:2, rating:4.9}. /api/promo-codes/founding-status returns used:int, max:50, available:bool, recent excludes TEST.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/categories", "issue": "Returns only 1 row in admin-managed categories collection. The public /api/categories returns 184 categories (different source). Not a launch blocker because the public catalog renders fine, but the admin/catalog 'Categorías' section will look almost empty. Likely caused by prior test cleanup deleting seeded admin categories. Recommend re-seeding admin categories on startup similar to the cities seed."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ landing (en-US context)", "issues": ["Header navigation correctly switches to English ('Explore services', 'Plans', 'Sign in') when navigator.language=en-US, but the hero H1 typewriter still shows Spanish phrase 'Lo latino' and the body subtitle remains Spanish ('El marketplace para encontrar profesionales latinos verificados...'). The es-MX context shows fully Spanish UI as expected. This is likely because the hero phrases use hardcoded Spanish rather than t() — confirm whether en versions exist in /app/frontend/src/translations or similar."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_prelaunch_bugs.py",
+    "/app/test_reports/pytest/iteration18_prelaunch.xml"
+  ],
+  "action_items": [
+    "(Minor) Re-seed admin-managed categories on startup so /admin/catalog 'Categorías' section shows the curated ~26 rows instead of just 1. Mirror the cities seed pattern in server.py.",
+    "(Minor) Audit hero/landing copy for English fallback: 'Lo latino' typewriter and 'El marketplace para encontrar...' subtitle still render in Spanish even when navigator.language=en-US. Header nav correctly switches. Recommend wrapping the typewriter phrases and hero subtitle through the I18nContext t() function or providing en variants in the same translations file."
+  ],
+  "critical_code_review_comments": [
+    "PUBLIC_GUARD constant (server.py:149) is correctly spread into 5+ public queries (866/975/1132/1382/1473/1490). Good DRY pattern — keep it as the single source of truth for is_test exclusion.",
+    "Admin verify endpoint at server.py:1628 correctly accepts {status} pydantic model. AdminQueue.jsx:29 sends the matching {status}. Frontend/backend contract aligned.",
+    "Emergent badge is hidden via visibility:hidden + opacity:0 (not display:none). Effective hide is identical but consider switching to display:none in /app/frontend/src/index.css to match the BUG-07 spec language literally and to also remove the element from accessibility tree.",
+    "AdminCatalog.jsx city testid is `catalog-city-${city_id}` AND `catalog-city-delete-${city_id}` on the trash button — they both match the loose selector `[data-testid^='catalog-city-']`. Not a bug, just an observation for future tests (use exact match or a more specific prefix like `catalog-city-row-`).",
+    "server.py file is still growing (4861+ lines) — consider router-based split before next big feature.",
+    "Header lang toggle UX: flag+code shows current lang ('🇲🇽 ES' / '🇺🇸 EN'). Some users may expect it to show the target language they'll toggle to. Consider adding a tooltip on hover for clarity."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (11/11 prelaunch + spot-checked verify endpoint with live mutation)",
+    "frontend": "100% on all 9 BUG acceptance criteria; 1 cosmetic landing-page copy mismatch noted but not in BUG list"
+  },
+  "test_credentials": "admin@getamano.com / admin123 (verified). demo.provider@getamano.com / provider123 (not exercised this round — Phase E booking regression deferred since iter16/17 already covered).",
+  "seed_data_creation": "No new test data created. Verify endpoint was called on prov_d89139900257 changing status pending→needs_info then reverted to pending (round-trip verified). Audit log has 2 new entries: verify:needs_info and verify:pending on prov_d89139900257.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 9 pre-launch bugs verified fixed end-to-end. Backend regression file /app/backend/tests/test_prelaunch_bugs.py is the source of truth — keep running it before each deploy. Two minor non-blocking items left: (1) admin/categories only has 1 row (seed needed), (2) landing hero copy stays Spanish even with en-US navigator. Phase E booking + Section 18 geocoding were NOT re-tested this round because they passed in iter16/17. /api/admin/pricing-intelligence currently 404s — that's acceptable per the pytest assertion (200 OR 404). Mocked APIs status: Cloud Translation API still blocked (403 from GCP), Google Maps JS legacy Places warning still visible, GA4 measurement ID still empty — all known/documented.",
+  "rca of the issue": "N/A — all 9 BUGs reported as fixed are confirmed fixed. The 2 minor items above are recommendations, not regressions."
+}

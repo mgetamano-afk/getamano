@@ -219,8 +219,22 @@ const dict = {
 
 const I18nContext = createContext(null);
 
+// BUG-08 — Smart language detection on first visit.
+// Priority: explicit user choice (localStorage.tx_lang) > browser language > 'es'.
+function detectInitialLang() {
+  try {
+    const stored = localStorage.getItem("tx_lang");
+    if (stored === "es" || stored === "en") return stored;
+    const candidates = [navigator.language, ...(navigator.languages || [])].filter(Boolean);
+    const latinRegex = /^(es|pt|ca|gl|it)\b/i;
+    if (candidates.some(c => latinRegex.test(c))) return "es";
+    if (candidates.some(c => /^en\b/i.test(c))) return "en";
+  } catch (_err) { /* ignore */ }
+  return "es";
+}
+
 export function I18nProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem("tx_lang") || "es");
+  const [lang, setLang] = useState(detectInitialLang);
   const t = useCallback((key) => (dict[lang] && dict[lang][key]) || (dict.es[key]) || key, [lang]);
   const changeLang = (l) => { setLang(l); localStorage.setItem("tx_lang", l); };
   return (

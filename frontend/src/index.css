@@ -91,3 +91,17 @@ html { scroll-behavior: smooth; }
 .pac-item-selected { background: #E6F7F5; }
 .pac-matched { color: #2F9D94; font-weight: 600; }
 .pac-icon { display: none; }
+
+/* BUG-07 PRE-LAUNCH — Hide the platform-injected "Made with Emergent" badge
+   on all public pages so the launch looks production-clean. */
+#emergent-badge,
+.emergent-badge,
+[data-emergent-badge],
+.powered-by-emergent,
+a[href*="emergent.sh"][class*="badge"],
+a[href*="app.emergent.sh"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

@@ -146,6 +146,11 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# PRE-LAUNCH BUG-04 — Public query guard: hide all rows flagged as is_test=True
+# (filled by the startup migration that flags business_name regex /^TEST/i).
+# Use this in EVERY public-facing query, never in admin queries.
+PUBLIC_GUARD = {"is_test": {"$ne": True}}
+
 # ============ MODELS ============
 Role = Literal["client", "provider", "admin"]
 VerificationStatus = Literal["pending", "in_review", "needs_info", "approved", "rejected", "suspended"]
@@ -587,6 +592,47 @@ async def seed():
     except Exception as e:
         logger.warning(f"Sec 18 city seed warn: {e}")
 
+    # PRE-LAUNCH BUG-09 — Seed db.cities (admin catalog) with the active US cities
+    try:
+        for city, state, _lat, _lng in US_CITY_SEED:
+            display_name = city.replace("-", " ").title()
+            await db.cities.update_one(
+                {"name": display_name, "state": state},
+                {"$setOnInsert": {
+                    "city_id": f"city_{uuid.uuid4().hex[:10]}",
+                    "name": display_name, "state": state,
+                    "featured": display_name.lower() in {"dallas", "houston", "los angeles", "miami", "chicago", "new york", "phoenix"},
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+    except Exception as e:
+        logger.warning(f"Cities seed warn: {e}")
+
+    # PRE-LAUNCH BUG-04 — Flag all TEST providers as is_test=True so they stay
+    # hidden from PUBLIC endpoints (search, featured, founding-status, map).
+    # Admin still sees them because admin endpoints don't apply this filter.
+    try:
+        r1 = await db.provider_profiles.update_many(
+            {"$or": [
+                {"business_name": {"$regex": "^TEST", "$options": "i"}},
+                {"business_name": {"$regex": "^TEST_", "$options": "i"}},
+            ], "is_test": {"$ne": True}},
+            {"$set": {"is_test": True}}
+        )
+        if r1.modified_count > 0:
+            logger.info(f"Pre-launch: flagged {r1.modified_count} TEST providers as hidden from public")
+        # Also flag their users so founding-status recent shows real members only
+        test_user_ids = [p["user_id"] async for p in db.provider_profiles.find(
+            {"is_test": True}, {"_id": 0, "user_id": 1})]
+        if test_user_ids:
+            await db.users.update_many(
+                {"user_id": {"$in": test_user_ids}, "is_test": {"$ne": True}},
+                {"$set": {"is_test": True}}
+            )
+    except Exception as e:
+        logger.warning(f"Pre-launch TEST flagging warn: {e}")
+
     # Migrations (idempotent): backfill country/currency on legacy docs
     try:
         await db.provider_profiles.update_many({"country": {"$exists": False}}, {"$set": {"country": DEFAULT_COUNTRY}})
@@ -863,7 +909,7 @@ async def search_providers(
     radius_miles: float = 75.0,
     limit: int = 24,
 ):
-    query = {"is_active": True}
+    query = {"is_active": True, **PUBLIC_GUARD}
     if country:
         query["country"] = country
     if category:
@@ -943,7 +989,7 @@ async def providers_identity_counts(
 ):
     """Counts of active providers by owner_identity respecting current search filters
     (excluding the owner_identity filter). Used by inclusive identity chips on /search."""
-    query = {"is_active": True}
+    query = {"is_active": True, **PUBLIC_GUARD}
     if country:
         query["country"] = country
     if category:
@@ -978,7 +1024,7 @@ async def seo_cities():
     """Return all SEO-target cities for hub /ciudades."""
     items = []
     for c in SEO_CITIES:
-        count = await db.provider_profiles.count_documents({"is_active": True, "city": {"$regex": f"^{c['name']}$", "$options": "i"}})
+        count = await db.provider_profiles.count_documents({"is_active": True, "city": {"$regex": f"^{c['name']}$", "$options": "i"}, **PUBLIC_GUARD})
         items.append({**c, "providers_count": count})
     items.sort(key=lambda x: -x["providers_count"])
     return {"items": items, "total": len(items)}
@@ -1012,7 +1058,7 @@ async def seo_city_detail(city_slug: str):
     if not city:
         raise HTTPException(status_code=404, detail="City not found")
     pipeline = [
-        {"$match": {"is_active": True, "city": {"$regex": f"^{city['name']}$", "$options": "i"}}},
+        {"$match": {"is_active": True, "city": {"$regex": f"^{city['name']}$", "$options": "i"}, "is_test": {"$ne": True}}},
         {"$group": {"_id": "$category_id", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
     ]
@@ -1036,7 +1082,7 @@ async def seo_category_detail(category_slug: str):
         raise HTTPException(status_code=404, detail="Category not found")
     items = []
     for c in SEO_CITIES:
-        count = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{c['name']}$", "$options": "i"}})
+        count = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{c['name']}$", "$options": "i"}, **PUBLIC_GUARD})
         if count > 0:
             items.append({**c, "providers_count": count})
     items.sort(key=lambda x: -x["providers_count"])
@@ -1053,7 +1099,7 @@ async def seo_page_data(category_slug: str, city_slug: str):
     if not city:
         raise HTTPException(status_code=404, detail="City not found")
     providers = await db.provider_profiles.find(
-        {"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{city['name']}$", "$options": "i"}},
+        {"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{city['name']}$", "$options": "i"}, **PUBLIC_GUARD},
         {"_id": 0}
     ).limit(12).to_list(12)
     PLAN_RANK = {"premium": 0, "pro": 1, "basic": 2, "free": 3}
@@ -1100,7 +1146,7 @@ async def sitemap():
             urls.append(f"<url><loc>{base}/servicios/{cat['slug']}/{city['slug']}</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>")
     for city in SEO_CITIES:
         urls.append(f"<url><loc>{base}/ciudades/{city['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
-    providers = await db.provider_profiles.find({"is_active": True}, {"_id": 0, "slug": 1}).to_list(2000)
+    providers = await db.provider_profiles.find({"is_active": True, **PUBLIC_GUARD}, {"_id": 0, "slug": 1}).to_list(2000)
     for p in providers:
         if p.get("slug"):
             urls.append(f"<url><loc>{base}/proveedor/{p['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
@@ -1350,7 +1396,7 @@ async def providers_map(
     (rate-limit safety) and persists them. Supports optional bounding-box filtering for the
     'Buscar en esta zona' feature — when bbox is supplied, only providers with stored coords inside
     the box are returned (no geocoding triggered). City/state/zip filters still apply."""
-    query = {"is_active": True}
+    query = {"is_active": True, **PUBLIC_GUARD}
     if country:
         query["country"] = country
     if category:
@@ -1441,7 +1487,7 @@ async def providers_map(
 @api_router.get("/providers/featured")
 async def featured_providers():
     providers = await db.provider_profiles.find(
-        {"is_active": True, "verification_status": "approved"}, {"_id": 0}
+        {"is_active": True, "verification_status": "approved", **PUBLIC_GUARD}, {"_id": 0}
     ).sort("rating_avg", -1).limit(6).to_list(6)
     cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(100)}
     for p in providers:
@@ -2283,7 +2329,7 @@ async def founding_status():
         return {"available": False, "used": 0, "max": 50, "recent": []}
     # Last 3 founding members (newest first) — public-safe fields only
     recent_cursor = db.users.find(
-        {"founding_member": True, "founding_member_at": {"$ne": None}},
+        {"founding_member": True, "founding_member_at": {"$ne": None}, "is_test": {"$ne": True}},
         {"_id": 0, "full_name": 1, "founding_member_at": 1, "user_id": 1}
     ).sort("founding_member_at", -1).limit(3)
     recent = []
@@ -2658,7 +2704,8 @@ async def ceo_metrics(admin: User = Depends(require_admin)):
     plans_dist = {r["_id"] or "free": r["count"] for r in plan_rows}
 
     # === Revenue projection (MRR + ARR) ===
-    PLAN_PRICES = {"free": 0, "basic": 19, "pro": 49, "premium": 99}
+    # SOURCE OF TRUTH: Free $0 / Basic $10 / Pro $15 / Premium $25 (matches /api/plans).
+    PLAN_PRICES = {"free": 0, "basic": 10, "pro": 15, "premium": 25}
     mrr = sum(PLAN_PRICES.get(plan, 0) * count for plan, count in plans_dist.items())
     arr = mrr * 12
     # Founding members get pro free until 2027, so we don't count their MRR (but show count)
@@ -2807,8 +2854,8 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
     top_state = max(state_providers, key=state_providers.get) if state_providers else None
     top_state_providers = state_providers.get(top_state, 0) if top_state else 0
 
-    # Revenue
-    PLAN_PRICES = {"free": 0, "basic": 19, "pro": 49, "premium": 99}
+    # Revenue (SOURCE OF TRUTH: matches /api/plans)
+    PLAN_PRICES = {"free": 0, "basic": 10, "pro": 15, "premium": 25}
     plan_rows = await db.provider_profiles.aggregate([
         {"$match": {"is_active": True}},
         {"$group": {"_id": "$plan", "count": {"$sum": 1}}},
@@ -2965,11 +3012,11 @@ async def daily_brief(admin: User = Depends(require_admin), language: str = "es"
         if free_count > 5:
             recommendations.append({
                 "title": f"Upgrade campaign: {free_count} en Free",
-                "why": f"Tienes {free_count} proveedores en Free. Con conversión 10% al plan Pro ganarías ~${free_count * 0.1 * 49:.0f}/mes.",
+                "why": f"Tienes {free_count} proveedores en Free. Con conversión 10% al plan Pro ganarías ~${free_count * 0.1 * 15:.0f}/mes.",
                 "action": "Lanza una campaña con beneficios Pro vs Free + descuento founding mientras queden cupos.",
                 "priority": "medium",
                 "icon": "dollar",
-                "impact_estimate": f"+${int(free_count * 0.1 * 49)}/mes",
+                "impact_estimate": f"+${int(free_count * 0.1 * 15)}/mes",
             })
 
     # Build structured highlights
@@ -3101,14 +3148,24 @@ async def wall_of_fame(limit: int = 50):
 
 @api_router.get("/public/stats")
 async def public_stats():
-    total = await db.provider_profiles.count_documents({"verification_status": "approved", "is_active": True})
-    states = await db.provider_profiles.distinct("state", {"is_active": True})
+    # BUG-05: real stats with TEST data excluded
+    base_q = {"verification_status": "approved", "is_active": True, **PUBLIC_GUARD}
+    total = await db.provider_profiles.count_documents(base_q)
+    registered_total = await db.provider_profiles.count_documents({"is_active": True, **PUBLIC_GUARD})
+    states = await db.provider_profiles.distinct("state", {"is_active": True, **PUBLIC_GUARD})
     avg_doc = await db.provider_profiles.aggregate([
-        {"$match": {"rating_count": {"$gt": 0}}},
+        {"$match": {"rating_count": {"$gt": 0}, "is_test": {"$ne": True}}},
         {"$group": {"_id": None, "avg": {"$avg": "$rating_avg"}}}
     ]).to_list(1)
     avg = round(avg_doc[0]["avg"], 1) if avg_doc else 4.9
-    return {"providers": max(total, 100), "states": max(len([s for s in states if s]), 12), "rating": avg}
+    # Until 'approved' count reaches critical mass, show 'registered'.
+    label_key = "verified" if total >= 25 else "registered"
+    return {
+        "providers": total if total >= 25 else registered_total,
+        "providers_label": label_key,
+        "states": len([s for s in states if s]),
+        "rating": avg,
+    }
 
 # ============ NOTIFICATIONS (inteligentes para proveedores y clientes) ============
 # Notification templates. Each generator returns a list of dicts (key, title, body, cta_label, cta_url, icon, priority).
@@ -3223,7 +3280,7 @@ def _provider_notifications(user: dict, profile: dict, ctx: dict) -> list[dict]:
             "key": "upgrade_to_pro",
             "category": "monetization",
             "title": "¿Quieres aparecer primero en búsquedas? 👑",
-            "body": "Plan Pro: prioridad en búsquedas, badge destacado, sin límite de fotos. $49/mes (o gratis hasta 2027 si te haces Founding).",
+            "body": "Plan Pro: prioridad en búsquedas, badge destacado, sin límite de fotos. $15/mes (o gratis hasta 2027 si te haces Founding).",
             "cta_label": "Ver planes",
             "cta_url": "/plans",
             "icon": "crown", "priority": "low",
