@@ -354,6 +354,30 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_28.json` — **100% pass (18/18 admin routes + 6/6 regression)**. ZERO bugs, ZERO error boundaries, ZERO pageerrors. Only nit flagged: sidebar nav links still target `/admin/*` not `/dashboard/admin/*` — non-blocking, since both prefixes render identical content.
 
+### Feb 2026 — Section 26: Annual plans + FTC-compliant cancellation
+**Backend** (`/app/backend/server.py`)
+- `_PLAN_PRICES` source-of-truth map (monthly/annual/savings per plan)
+- `GET /api/plans` now exposes `price_monthly`, `price_annual`, `annual_savings` per tier (Basic save $20/yr, Pro $30/yr, Premium $50/yr — all 17%)
+- New endpoints:
+  - `GET /api/me/subscription` — defaults to free for new users
+  - `POST /api/me/subscription` — upserts plan + billing_cycle, computes `next_renewal_date` (+30 days monthly, +365 annual)
+  - `POST /api/me/subscription/cancel` — FTC compliant: flips `status='cancelled'` + `cancelled_at`, **keeps `next_renewal_date` intact so access preserved until period end**. Triggers email confirmation via Resend (fallback to log when API key missing).
+  - `POST /api/me/subscription/reactivate` — undoes cancel before `next_renewal_date` passes
+- Per-plan locale-aware cancellation email HTML (gradient header, plan label, access-until date, reactivation CTA)
+- `db.subscriptions` collection with unique index on `user_id`
+
+**Frontend**
+- New `BillingToggle.jsx` — pill switch with sliding white indicator + floating orange "Save 17%" badge. Persists choice to `localStorage["plans_billing_cycle"]`.
+- `Plans.jsx` updates: toggle above grid · price block swaps `$15/mes` ↔ `$150/año` · "≈ $12.50 per month" subtitle on annual · green "Ahorras $30/año" savings copy · CTA URL carries `?plan=pro&cycle=annual`
+- New `SubscriptionManager.jsx` — 3 states: Free (blue upgrade card), Active (green card with renewal date + cancel button), Cancelled (amber card with reactivate button + access-until date)
+- New `CancelSubscriptionModal.jsx` — FTC Click-to-Cancel 3-step flow:
+  1. Warning + benefit list user is about to lose (both "Quedarme" and "Cancelar" buttons present per FTC)
+  2. Optional reason selector (6 options + "Other" textarea, 280 char limit) + "Skip and cancel" escape hatch
+  3. Success confirmation with reactivation reminder
+  Portal-mounted, body scroll lock, ESC closes, prev-overflow restored on unmount
+
+**Testing:** `iteration_29.json` — **11/11 backend pytest + 100% frontend**. Demo provider lifecycle (free → subscribe Pro annual → cancel with reason → reactivate → cancel again) all verified end-to-end. Email confirmation lands in backend log. Mobile responsive @393px. Pytest suite saved at `/app/backend/tests/test_iter29_subscriptions.py` for future regression.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)

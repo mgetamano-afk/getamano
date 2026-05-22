@@ -35,7 +35,10 @@ export default function CancelSubscriptionModal({ sub, onClose, onSuccess, lang 
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      // Restore to whatever it was before — empty string clears inline style.
+      document.body.style.overflow = prev || "";
+    };
   }, []);
 
   // ESC closes
