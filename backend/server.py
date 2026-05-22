@@ -859,7 +859,8 @@ async def search_providers(
     has_video: Optional[bool] = None,
     lat: Optional[float] = None,
     lng: Optional[float] = None,
-    radius_km: float = 50.0,
+    radius_km: Optional[float] = None,
+    radius_miles: float = 75.0,
     limit: int = 24,
 ):
     query = {"is_active": True}

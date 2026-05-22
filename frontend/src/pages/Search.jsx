@@ -74,11 +74,11 @@ export default function Search() {
     if (cur.language) qs.language = cur.language;
     if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     if (cur.hasVideo) qs.has_video = "true";
-    // Section 18F — proximity ("Near me") search — US default: miles
+    // Section 18F — proximity ("Near me") — US default radius: 75 miles (~1.5h drive)
     if (position && !cur.city) {
       qs.lat = position.lat;
       qs.lng = position.lng;
-      qs.radius_miles = 30;
+      qs.radius_miles = 75;
     }
     const urlQs = { ...qs };
     if (view !== "list") urlQs.view = view;
