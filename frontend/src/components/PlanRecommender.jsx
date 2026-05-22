@@ -18,30 +18,46 @@ function getOrCreateSessionId() {
   }
 }
 
-/** Deterministic A/B variant assignment from sessionId. Same session = same variant.
- *  ~50/50 split via simple char-sum modulo 2. Idempotent and zero-state. */
-function getVariant(sessionId) {
+/** Deterministic per-experiment variant assignment. Each (sessionId, experiment)
+ *  pair gets its own ~50/50 split via salted hash, so a session can participate
+ *  in N experiments simultaneously without cross-contamination. Same inputs
+ *  always produce the same output, no backend state required. */
+function getVariant(sessionId, experimentName = "default") {
   if (!sessionId) return "A";
+  const key = `${sessionId}:${experimentName}`;
   let h = 0;
-  for (let i = 0; i < sessionId.length; i++) h = (h + sessionId.charCodeAt(i)) % 1000;
+  for (let i = 0; i < key.length; i++) h = (h + key.charCodeAt(i) * 31) % 100003;
   return h % 2 === 0 ? "A" : "B";
 }
 
-const EXPERIMENT = "result_cta_v1";
+const ACTIVE_EXPERIMENTS = {
+  RESULT_CTA: "result_cta_v1",       // CTA + email-banner copy on the result page
+  QUESTION_ORDER: "question_order_v1", // Order of the 4 questions (asc vs desc difficulty)
+};
 
 /** Fire-and-forget tracking call. Never blocks the UI. */
 function track(sessionId, event, extra = {}) {
   try {
-    const variant = getVariant(sessionId);
+    const experiment = extra.experiment || ACTIVE_EXPERIMENTS.RESULT_CTA;
+    const variant = extra.variant || getVariant(sessionId, experiment);
+    const payload = { session_id: sessionId, event, variant, experiment, ...extra };
     const url = `${process.env.REACT_APP_BACKEND_URL}/api/quiz/track`;
-    const body = JSON.stringify({ session_id: sessionId, event, variant, experiment: EXPERIMENT, ...extra });
     if (event === "abandoned" && navigator.sendBeacon) {
-      const blob = new Blob([body], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
       navigator.sendBeacon(url, blob);
       return;
     }
-    api.post("/quiz/track", { session_id: sessionId, event, variant, experiment: EXPERIMENT, ...extra }).catch(() => {});
+    api.post("/quiz/track", payload).catch(() => {});
   } catch (_e) { /* ignore */ }
+}
+
+/** Mirror a lifecycle event across multiple active experiments. Useful for
+ *  question-phase events that are relevant to both `result_cta_v1` (overall
+ *  funnel) and `question_order_v1` (completion rate by ordering). */
+function trackAll(sessionId, event, extra = {}) {
+  Object.values(ACTIVE_EXPERIMENTS).forEach(exp => {
+    track(sessionId, event, { ...extra, experiment: exp, variant: getVariant(sessionId, exp) });
+  });
 }
 
 /**
@@ -159,12 +175,20 @@ export default function PlanRecommender() {
   const emailCapturedRef = useRef(false);
 
   if (!sessionIdRef.current) sessionIdRef.current = getOrCreateSessionId();
-  const variant = getVariant(sessionIdRef.current);
+  const variant = getVariant(sessionIdRef.current, ACTIVE_EXPERIMENTS.RESULT_CTA);
+  const orderVariant = getVariant(sessionIdRef.current, ACTIVE_EXPERIMENTS.QUESTION_ORDER);
 
-  // Fire "opened" the first time the user clicks the CTA
+  // QUESTION_ORDER experiment: A = easy first (current order), B = qualifier first (reversed)
+  const orderedQuestions = useMemo(
+    () => (orderVariant === "B" ? [...questions].reverse() : questions),
+    [questions, orderVariant]
+  );
+
+  // Fire "opened" the first time the user clicks the CTA. Mirrors across all
+  // active experiments so each gets its exposure recorded.
   useEffect(() => {
     if (opened) {
-      track(sessionIdRef.current, "opened", { lang });
+      trackAll(sessionIdRef.current, "opened", { lang });
     }
   }, [opened, lang]);
 
@@ -194,24 +218,25 @@ export default function PlanRecommender() {
     return best;
   }, [totals, submitted]);
 
-  // Fire "completed" + final recommendation once the result view is reached
+  // Fire "completed" + final recommendation once the result view is reached.
+  // Mirror to all experiments so question_order_v1 also counts completion.
   useEffect(() => {
     if (submitted && recommended && !completedRef.current) {
       completedRef.current = true;
-      track(sessionIdRef.current, "completed", {
+      trackAll(sessionIdRef.current, "completed", {
         answers, recommended_plan: recommended, lang,
       });
     }
   }, [submitted, recommended, answers, lang]);
 
   // Abandonment tracking: if the user closes/navigates after answering 2+
-  // questions WITHOUT completing, send a beacon. Only fires once.
+  // questions WITHOUT completing, send a beacon to every active experiment.
   useEffect(() => {
     if (!opened) return;
     const onBeforeUnload = () => {
       const answeredCount = Object.keys(answers).length;
       if (answeredCount >= 2 && !completedRef.current) {
-        track(sessionIdRef.current, "abandoned", {
+        trackAll(sessionIdRef.current, "abandoned", {
           step, answers, lang,
         });
       }
@@ -347,7 +372,7 @@ export default function PlanRecommender() {
           <div className="mt-7 flex flex-col sm:flex-row gap-3 items-center justify-center">
             <Link
               to={`/register?intent=provider&plan=${recommended}&via=quiz`}
-              onClick={() => track(sessionIdRef.current, "cta_clicked", { recommended_plan: recommended, answers, lang })}
+              onClick={() => track(sessionIdRef.current, "cta_clicked", { recommended_plan: recommended, answers, lang, experiment: ACTIVE_EXPERIMENTS.RESULT_CTA, variant })}
               className="inline-flex items-center gap-1 px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:opacity-90 transition"
               style={{ backgroundColor: meta.color }}
               data-testid="plan-recommender-cta-confirm"
@@ -381,7 +406,7 @@ export default function PlanRecommender() {
                     session_id: sessionIdRef.current,
                     email, answers,
                     recommended_plan: recommended,
-                    lang, variant, experiment: EXPERIMENT,
+                    lang, variant, experiment: ACTIVE_EXPERIMENTS.RESULT_CTA,
                   });
                 } catch (_e) { /* never blocks */ }
               }}
@@ -411,11 +436,11 @@ export default function PlanRecommender() {
       <div className="rounded-3xl bg-white border border-slate-200 shadow-xl p-6 sm:p-8">
         {/* Progress */}
         <div className="flex items-center gap-1.5 mb-5" data-testid="quiz-progress">
-          {questions.map((_, i) => (
+          {orderedQuestions.map((_, i) => (
             <div key={i} className={`h-1.5 flex-1 rounded-full ${i < step ? "bg-orange-500" : i === step ? "bg-slate-900" : "bg-slate-200"}`} />
           ))}
         </div>
-        <p className="text-xs text-slate-500 mb-2">{T.progress} {step + 1} {T.of} {questions.length}</p>
+        <p className="text-xs text-slate-500 mb-2">{T.progress} {step + 1} {T.of} {orderedQuestions.length}</p>
 
         {/* Question */}
         <div className="flex items-start gap-3 mb-5">

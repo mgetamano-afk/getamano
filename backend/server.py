@@ -5137,82 +5137,105 @@ async def quiz_recover(payload: LeadRecoveryIn, request: Request,
 
 @api_router.get("/admin/quiz-funnel")
 async def admin_quiz_funnel(_user: User = Depends(require_admin)):
-    """Admin dashboard data: counts per stage, conversion rates, recent leads,
-    distribution of recommended plans, AND per-variant A/B breakdown."""
-    sessions_pipeline = [
-        {"$sort": {"created_at": 1}},
-        {"$group": {
-            "_id": "$session_id",
-            "events": {"$push": "$event"},
-            "recommended_plan": {"$last": "$recommended_plan"},
-            "lang": {"$last": "$lang"},
-            "variant": {"$last": "$variant"},
-            "last_seen": {"$last": "$created_at"},
-        }},
-    ]
-    sessions = await db.quiz_funnel.aggregate(sessions_pipeline).to_list(5000)
+    """Admin dashboard data. Returns funnel + plan distribution + recent leads
+    (legacy shape kept) PLUS a dict of active experiments with per-variant funnels.
+    Each experiment is computed independently so a single session can contribute
+    to multiple experiment buckets."""
+    # Step 1: pull every event ordered by time
+    all_events = await db.quiz_funnel.find({}, {"_id": 0}).sort("created_at", 1).to_list(50000)
+
+    # Step 2: group events by (experiment, session_id) for per-experiment funnels.
+    # Also collect "any-experiment" session events for the overall funnel display.
+    by_exp = {}  # { exp_name: { sid: {events:[], variant, recommended_plan, lang} } }
+    by_overall = {}  # { sid: {events:[], recommended_plan, lang} }
+    for ev in all_events:
+        sid = ev.get("session_id")
+        if not sid:
+            continue
+        # Overall (any experiment) accumulator — used for the legacy KPI cards
+        overall = by_overall.setdefault(sid, {"events": [], "recommended_plan": None, "lang": None})
+        overall["events"].append(ev["event"])
+        overall["recommended_plan"] = ev.get("recommended_plan") or overall["recommended_plan"]
+        overall["lang"] = ev.get("lang") or overall["lang"]
+        exp = ev.get("experiment")
+        if exp:
+            exp_bucket = by_exp.setdefault(exp, {})
+            sess = exp_bucket.setdefault(sid, {"events": [], "variant": None, "recommended_plan": None, "lang": None})
+            sess["events"].append(ev["event"])
+            sess["variant"] = ev.get("variant") or sess["variant"]
+            sess["recommended_plan"] = ev.get("recommended_plan") or sess["recommended_plan"]
+            sess["lang"] = ev.get("lang") or sess["lang"]
 
     def empty_counts():
         return {"sessions": 0, "started": 0, "q1": 0, "q2": 0, "q3": 0, "q4": 0,
                 "completed": 0, "cta_clicked": 0, "abandoned": 0, "email_captured": 0,
                 "plan_dist": {"free": 0, "basic": 0, "pro": 0, "premium": 0}}
 
-    overall = empty_counts()
-    by_variant = {"A": empty_counts(), "B": empty_counts(), "unassigned": empty_counts()}
-
-    for s in sessions:
-        v = s.get("variant") if s.get("variant") in {"A", "B"} else "unassigned"
-        for bucket in (overall, by_variant[v]):
-            bucket["sessions"] += 1
-        evs = s["events"]
-        if "opened" in evs:
-            for bucket in (overall, by_variant[v]): bucket["started"] += 1
+    def accumulate(bucket, sess):
+        bucket["sessions"] += 1
+        evs = sess["events"]
+        if "opened" in evs: bucket["started"] += 1
         answered_count = sum(1 for e in evs if e == "answered")
         for q_n in range(1, 5):
-            if answered_count >= q_n:
-                for bucket in (overall, by_variant[v]): bucket[f"q{q_n}"] += 1
+            if answered_count >= q_n: bucket[f"q{q_n}"] += 1
         if "completed" in evs:
-            for bucket in (overall, by_variant[v]):
-                bucket["completed"] += 1
-                if s.get("recommended_plan") in bucket["plan_dist"]:
-                    bucket["plan_dist"][s["recommended_plan"]] += 1
-        if "cta_clicked" in evs:
-            for bucket in (overall, by_variant[v]): bucket["cta_clicked"] += 1
-        if "email_captured" in evs:
-            for bucket in (overall, by_variant[v]): bucket["email_captured"] += 1
+            bucket["completed"] += 1
+            if sess.get("recommended_plan") in bucket["plan_dist"]:
+                bucket["plan_dist"][sess["recommended_plan"]] += 1
+        if "cta_clicked" in evs: bucket["cta_clicked"] += 1
+        if "email_captured" in evs: bucket["email_captured"] += 1
 
     def derive_rates(b):
-        # answered_any = b['q1']
         abandoned = max(0, b["q1"] - b["completed"])
         b["abandoned"] = abandoned
         b["completion_rate_pct"] = round(b["completed"] / max(b["started"], 1) * 100, 1)
         b["cta_conversion_pct"] = round(b["cta_clicked"] / max(b["completed"], 1) * 100, 1)
         b["recovery_rate_pct"] = round(b["email_captured"] / max(abandoned, 1) * 100, 1) if abandoned > 0 else 0.0
-        # Composite: end-to-end conversion (started → cta_clicked)
         b["overall_conversion_pct"] = round(b["cta_clicked"] / max(b["started"], 1) * 100, 1)
         return b
 
+    # Build legacy overall funnel (KPI cards + step bars + plan dist)
+    overall = empty_counts()
+    for sid, sess in by_overall.items():
+        accumulate(overall, sess)
     overall = derive_rates(overall)
-    for k in ("A", "B", "unassigned"):
-        by_variant[k] = derive_rates(by_variant[k])
 
-    # Statistical hint: if both A and B have ≥30 sessions, we surface a winner indicator.
-    # Difference in overall_conversion_pct is the headline KPI.
-    diff_pct = by_variant["B"]["overall_conversion_pct"] - by_variant["A"]["overall_conversion_pct"]
-    can_call = by_variant["A"]["started"] >= 30 and by_variant["B"]["started"] >= 30
-    significance = {
-        "samples_ready": can_call,
-        "samples_needed_each": 30,
-        "diff_pp": round(diff_pct, 1),  # percentage points
-        "winner": (("B" if diff_pct > 0 else "A") if can_call and abs(diff_pct) >= 3.0 else None),
-        "note": ("Significant" if can_call and abs(diff_pct) >= 3.0 else "Keep collecting data"),
+    # Build per-experiment A/B comparison
+    # Each experiment has its own "primary KPI":
+    #   result_cta_v1   → overall_conversion_pct (started → cta_clicked)
+    #   question_order_v1 → completion_rate_pct (started → completed)
+    #   plan_card_order_v1 → overall_conversion_pct (started → cta_clicked)
+    PRIMARY_KPI = {
+        "question_order_v1": "completion_rate_pct",
+        "result_cta_v1": "overall_conversion_pct",
+        "plan_card_order_v1": "overall_conversion_pct",
     }
+    experiments_out = {}
+    for exp_name, sessions in by_exp.items():
+        variants = {"A": empty_counts(), "B": empty_counts(), "unassigned": empty_counts()}
+        for sid, sess in sessions.items():
+            v = sess.get("variant") if sess.get("variant") in {"A", "B"} else "unassigned"
+            accumulate(variants[v], sess)
+        for k in variants:
+            variants[k] = derive_rates(variants[k])
+        # Pick the right primary KPI per experiment for the winner calc
+        kpi = PRIMARY_KPI.get(exp_name, "overall_conversion_pct")
+        diff_pct = variants["B"][kpi] - variants["A"][kpi]
+        can_call = variants["A"]["started"] >= 30 and variants["B"]["started"] >= 30
+        sig = {
+            "samples_ready": can_call,
+            "samples_needed_each": 30,
+            "primary_kpi": kpi,
+            "diff_pp": round(diff_pct, 1),
+            "winner": (("B" if diff_pct > 0 else "A") if can_call and abs(diff_pct) >= 3.0 else None),
+            "note": ("Significant" if can_call and abs(diff_pct) >= 3.0 else "Keep collecting data"),
+        }
+        experiments_out[exp_name] = {"variants": variants, "significance": sig}
 
     leads = await db.lead_recoveries.find(
-        {}, {"_id": 0, "email": 1, "recommended_plan": 1, "status": 1, "created_at": 1, "lang": 1, "variant": 1}
+        {}, {"_id": 0, "email": 1, "recommended_plan": 1, "status": 1, "created_at": 1, "lang": 1, "variant": 1, "experiment": 1}
     ).sort("created_at", -1).limit(20).to_list(20)
 
-    # Map "totals/rates" to the legacy shape so existing UI keeps working.
     return {
         "totals": {k: overall[k] for k in ("sessions", "started", "q1", "q2", "q3", "q4",
                                              "completed", "cta_clicked", "abandoned", "email_captured")},
@@ -5223,11 +5246,14 @@ async def admin_quiz_funnel(_user: User = Depends(require_admin)):
         },
         "plan_distribution": overall["plan_dist"],
         "recent_leads": leads,
-        "ab_test": {
+        # Legacy key kept for the existing card (defaults to result_cta_v1)
+        "ab_test": (lambda: {
             "experiment": "result_cta_v1",
-            "variants": {"A": by_variant["A"], "B": by_variant["B"], "unassigned": by_variant["unassigned"]},
-            "significance": significance,
-        },
+            "variants": experiments_out.get("result_cta_v1", {"variants": {"A": empty_counts(), "B": empty_counts(), "unassigned": empty_counts()}})["variants"],
+            "significance": experiments_out.get("result_cta_v1", {"significance": {"samples_ready": False, "samples_needed_each": 30, "diff_pp": 0.0, "winner": None, "note": "Keep collecting data"}})["significance"],
+        })(),
+        # NEW: dict of every active experiment for the multi-experiment UI
+        "experiments": experiments_out,
     }
 
 

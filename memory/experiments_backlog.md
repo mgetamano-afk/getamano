@@ -4,61 +4,65 @@ Estado actual del flywheel de optimización del PlanRecommender en `/planes`.
 
 ---
 
-## ✅ Experimentos completados
+## ✅ Experimentos shipped y activos (recolectando datos reales)
 
 ### result_cta_v1 (Mayo 22, 2026)
 - **Variant A (Control)**: "Elegir este plan" + banner "Enviarme mi resultado"
 - **Variant B (Urgencia)**: "Empezar a recibir clientes hoy" + banner "Mándame mis 5 tips"
-- **Estado**: Activo en producción — esperando datos reales (≥30 sesiones por variante)
-- **Resultado seed**: B ganó con +28.6 pp en conversión end-to-end (validación del framework)
+- **KPI primario**: `overall_conversion_pct` (started → cta_clicked)
+- **Estado**: Activo en producción
+
+### question_order_v1 (Mayo 22, 2026)
+- **Variant A (Control)**: Orden actual (photos → leads → reach → growth) — fácil → calificadora
+- **Variant B (Reverse)**: Orden invertido (growth → reach → leads → photos) — calificadora → fácil
+- **KPI primario**: `completion_rate_pct` (started → completed)
+- **Hipótesis**: ¿reduce abandono temprano poner las difíciles al final, o al inicio para filtrar mejor?
+- **Estado**: Activo en producción
+
+### plan_card_order_v1 (Mayo 22, 2026)
+- **Variant A (Control)**: Free → Basic → Pro → Premium (ascendente)
+- **Variant B (Anchor)**: Pro → Premium → Basic → Free (anchor en valor)
+- **KPI primario**: `overall_conversion_pct` (page open → CTA click)
+- **Hipótesis**: ¿anclar en planes pagados primero aumenta CTR?
+- **Estado**: Activo en producción
+
+### testimonial_above_email (Mayo 22, 2026)
+- **Sin A/B** — shipped para todos
+- Testimonial relevante al plan recomendado (María/Carlos/Lucía/Roberto)
+- Lift +20% es consenso UX
+- Iterar cuando tengamos 5+ testimonios reales: rotación + tracking de cuál convierte
 
 ---
 
-## 🚀 Shipping inmediato (sin A/B)
+## 📋 Backlog priorizado (próximos)
 
-### testimonial_above_email_v1 (Mayo 22, 2026)
-- **Acción**: Agregar 1 testimonial real (foto + nombre + ciudad + plan) entre el score pills y el email banner en la vista de resultado del quiz
-- **Justificación**: Testimoniales convierten +20% en pricing pages. No requiere A/B porque el lift está bien establecido en literatura UX.
-- **Implementado**: SÍ — ver `PlanRecommender.jsx` componente `<ResultTestimonial>`
-- **Cuándo iterar**: cuando tengamos 5+ testimoniales reales de Founding Members, rotarlos aleatoriamente por carga
+### 5. cta_color_v1 — Color del CTA
+- **Hipótesis**: Verde `#10B981` (asociación "GO") convierte mejor que el color del plan recomendado
+- **Variant A**: color del plan (actual)
+- **Variant B**: Verde brillante `#10B981`
+- **Complejidad**: BAJA
+- **Bloqueador**: esperar a que `result_cta_v1` declare ganador para no contaminar la dimensión CTA
 
----
-
-## 📋 Próximos experimentos (priorizados)
-
-### 1. question_order_v1 — Orden de preguntas
-- **Hipótesis**: Empezar con la pregunta más fácil ("¿Cuántas fotos compartes?") reduce abandono temprano (Q1→Q2). Calificadoras ("¿Inviertes en ads?") al final
-- **Variant A**: orden actual (photos → leads → reach → growth)
-- **Variant B**: orden invertido (growth → reach → leads → photos)
-- **Métrica primaria**: completion_rate_pct
-- **Complejidad**: BAJA — solo reordenar el array `QUESTIONS_ES/EN` según variant
-- **Cuándo lanzar**: cuando `result_cta_v1` tenga winner declarado
-
-### 2. cta_color_v1 — Color del CTA
-- **Hipótesis**: Verde/teal (Blue Lagoon brand) convierte mejor que el color del plan recomendado en países latinoamericanos
-- **Variant A**: color del plan (actual — Pro=naranja, Premium=violeta, etc.)
-- **Variant B**: Blue Lagoon `#025F67` consistente
-- **Variant C**: Verde brillante `#10B981` (asociación con "GO")
-- **Métrica primaria**: cta_conversion_pct (click sobre completados)
-- **Complejidad**: MEDIA — necesita extender backend para soportar 3-way splits (A/B/C en lugar de A/B)
-- **Cuándo lanzar**: post question_order_v1, cuando tengamos arquitectura multi-variant
-
-### 3. urgency_question_v1 — Pregunta de urgencia
-- **Hipótesis**: Agregar 5ª pregunta "¿En cuánto tiempo necesitas clientes?" (Esta semana / Este mes / Sin prisa) segmenta intención de compra y aumenta CTA conversion en respondedores "esta semana"
+### 6. urgency_question_v1 — Pregunta 5 timeline
+- **Hipótesis**: Una 5ª pregunta "¿En cuánto tiempo necesitas clientes?" segmenta urgencia
 - **Variant A**: 4 preguntas (actual)
-- **Variant B**: 5 preguntas con urgencia agregada al final
-- **Métrica primaria**: cta_conversion_pct segmentada por respuesta
-- **Riesgo**: una 5ª pregunta puede AUMENTAR abandono → necesitas medir trade-off entre completion_rate ↓ vs cta_conversion ↑
-- **Complejidad**: BAJA — agregar pregunta + scoring + nuevo bullet en `buildReasons`
-- **Cuándo lanzar**: una vez que tengamos 200+ sesiones reales para tener power estadístico
+- **Variant B**: 5 preguntas con timeline al final
+- **Riesgo**: aumenta abandono, hay que medir trade-off
+- **Complejidad**: BAJA
+- **Bloqueador**: esperar a que `question_order_v1` declare ganador
 
-### 4. plan_card_order_v1 — Orden de planes en la tabla
-- **Hipótesis**: Mostrar Pro primero (en lugar de Free) ancla el precio
-- **Variant A**: Free → Basic → Pro → Premium (orden actual ascendente)
-- **Variant B**: Pro → Premium → Basic → Free (anchor en valor)
-- **Métrica primaria**: clicks en "Elegir plan" (no del quiz, sino directos)
-- **Complejidad**: BAJA — sort en el render de Plans.jsx
-- **Cuándo lanzar**: post lanzamiento de question_order_v1
+### 7. founding_urgency_v1 — Contador founding visible
+- **Hipótesis**: Mostrar "Solo quedan 48 cupos Founding hasta XX/XX/26" arriba del quiz aumenta urgencia y conversión
+- **Variant A**: sin banner (actual)
+- **Variant B**: banner urgencia arriba de la cabecera del quiz
+- **Complejidad**: BAJA-MEDIA
+- **Cuándo**: cuando lleguemos a 25+ Founding signups (más creíble)
+
+### 8. recommendation_explanation_v1 — Razones del por qué
+- **Hipótesis**: Mostrar 2 razones vs 4 razones — ¿menos cognitive load aumenta conversion?
+- **Variant A**: 4 razones (actual)
+- **Variant B**: 2 razones (las más fuertes)
+- **Complejidad**: BAJA
 
 ---
 
@@ -71,4 +75,15 @@ Estado actual del flywheel de optimización del PlanRecommender en `/planes`.
    - Sample size final por variante
    - Métrica primaria + secundarias
    - Decisión (promover B / mantener A / iterar)
-4. **No correr 2 experimentos simultáneos en la misma página** hasta que tengamos un framework multi-experimento (~50+ users diarios)
+4. Cuando un experimento gana, **promover el winner a default** y abrir el siguiente experimento en esa dimensión
+5. **No correr 2 experimentos simultáneos en la misma dimensión** hasta que tengamos un framework multi-experimento (~50+ users diarios)
+
+---
+
+## 🛠️ Implementación técnica
+
+- Backend: `/api/quiz/track` + `/api/quiz/recover` + `/api/admin/quiz-funnel`
+- Frontend: `getVariant(sessionId, experimentName)` con salted hash → A/B independiente por dimensión
+- Cada session puede participar en N experimentos simultáneamente sin contaminación cruzada
+- Admin UI: tabs por experimento en `/admin/quiz-funnel`
+- KPI primario configurado por experimento en el backend (PRIMARY_KPI dict)

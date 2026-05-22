@@ -141,8 +141,8 @@ export default function AdminQuizFunnel() {
           </div>
         </div>
 
-        {/* A/B Test Comparison */}
-        {data?.ab_test && <ABTestSection ab={data.ab_test} />}
+        {/* A/B Tests — multi-experiment view */}
+        {data?.experiments && <MultiExperimentSection experiments={data.experiments} />}
 
         {/* Leads list */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -217,33 +217,84 @@ function Kpi({ icon: Icon, label, value, sub, color }) {
  * ("Elegir este plan" + "Recibir en correo"), variant B uses urgency/value
  * copy ("Empezar a recibir clientes hoy" + "Mándame 5 tips").
  */
-function ABTestSection({ ab }) {
+/**
+ * MultiExperimentSection — tab bar of active experiments + the selected one's
+ * A/B comparison card. Switching tabs only re-renders the comparison.
+ */
+function MultiExperimentSection({ experiments }) {
+  const names = Object.keys(experiments).filter(n => n !== "default");
+  const [active, setActive] = useState(names[0] || null);
+  if (!names.length) return null;
+
+  const META = {
+    "result_cta_v1": {
+      label: "CTA del resultado",
+      A: "Elegir este plan + Enviarme mi resultado",
+      B: "Empezar a recibir clientes hoy + Mándame 5 tips",
+    },
+    "question_order_v1": {
+      label: "Orden de preguntas",
+      A: "Fácil → calificadora (fotos → leads → alcance → marketing)",
+      B: "Calificadora → fácil (marketing → alcance → leads → fotos)",
+    },
+    "plan_card_order_v1": {
+      label: "Orden de planes",
+      A: "Free → Basic → Pro → Premium (ascendente)",
+      B: "Pro → Premium → Basic → Free (anchor en valor)",
+    },
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5" data-testid="ab-test-section">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+          <Beaker className="w-5 h-5 text-orange-500" /> Tests A/B activos ({names.length})
+        </h3>
+      </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-4">
+        {names.map(name => (
+          <button
+            key={name}
+            onClick={() => setActive(name)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${active === name ? "text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+            style={active === name ? { backgroundColor: "#025F67" } : {}}
+            data-testid={`ab-tab-${name}`}
+          >
+            {META[name]?.label || name}
+          </button>
+        ))}
+      </div>
+      {active && (
+        <ABTestCard
+          name={active}
+          meta={META[active]}
+          ab={experiments[active]}
+        />
+      )}
+    </div>
+  );
+}
+
+function ABTestCard({ name, meta, ab }) {
   const A = ab.variants.A;
   const B = ab.variants.B;
   const unassigned = ab.variants.unassigned;
   const sig = ab.significance;
-
-  const VARIANT_META = {
-    A: { name: "A — Control", color: "#64748B", description: '"Elegir este plan" · banner "Enviarme mi resultado"' },
-    B: { name: "B — Urgencia", color: "#F97316", description: '"Empezar a recibir clientes hoy" · banner "Mándame mis 5 tips"' },
-  };
-
-  const winnerKey = sig.winner; // null until we have ≥30 each AND diff ≥ 3pp
+  const winnerKey = sig.winner;
   const winnerEmoji = winnerKey === "A" ? "🟦" : winnerKey === "B" ? "🟧" : "⏳";
 
+  const VARIANT_COLOR = { A: "#64748B", B: "#F97316" };
+  const kpiLabel = (k) => ({
+    "completion_rate_pct": "tasa de finalización",
+    "overall_conversion_pct": "conversión end-to-end",
+    "cta_conversion_pct": "click en CTA",
+  }[k] || k);
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5" data-testid="ab-test-section">
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-          <Beaker className="w-5 h-5 text-orange-500" /> Test A/B en marcha
-        </h3>
-        <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-          {ab.experiment}
-        </span>
-      </div>
-      <p className="text-xs text-slate-500 mb-4">
-        Asignación 50/50 determinística por <code className="text-[10px] bg-slate-100 px-1 rounded">session_id</code>.
-        Cada sesión ve siempre la misma variante.
+    <div data-testid={`ab-experiment-${name}`}>
+      <p className="text-[11px] text-slate-500 mb-3">
+        Experimento <code className="text-[10px] bg-slate-100 px-1 rounded">{name}</code> · asignación 50/50 determinística por session_id.
       </p>
 
       {/* Winner banner */}
@@ -252,15 +303,14 @@ function ABTestSection({ ab }) {
         <div className="text-sm">
           {winnerKey ? (
             <>
-              <p className="font-semibold text-green-900">{winnerEmoji} Variante {winnerKey} está ganando ({sig.diff_pp > 0 ? "+" : ""}{sig.diff_pp} pp de conversión end-to-end)</p>
-              <p className="text-green-800 text-xs mt-0.5">Después de {A.started} + {B.started} sesiones, podemos llamarlo. Considera promover {winnerKey} a default.</p>
+              <p className="font-semibold text-green-900">{winnerEmoji} Variante {winnerKey} está ganando ({sig.diff_pp > 0 ? "+" : ""}{sig.diff_pp} pp en {kpiLabel(sig.primary_kpi)})</p>
+              <p className="text-green-800 text-xs mt-0.5">Después de {A.started} + {B.started} sesiones, considera promover {winnerKey} a default.</p>
             </>
           ) : (
             <>
               <p className="font-semibold text-slate-700">⏳ Recolectando datos…</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Faltan {Math.max(0, 30 - A.started)} sesiones en A y {Math.max(0, 30 - B.started)} en B para llamar al ganador.
-                Diferencia actual: {sig.diff_pp > 0 ? "+" : ""}{sig.diff_pp} pp (B vs A).
+                Faltan {Math.max(0, 30 - A.started)} en A y {Math.max(0, 30 - B.started)} en B. KPI: {kpiLabel(sig.primary_kpi)}. Diferencia: {sig.diff_pp > 0 ? "+" : ""}{sig.diff_pp} pp.
               </p>
             </>
           )}
@@ -271,24 +321,21 @@ function ABTestSection({ ab }) {
       <div className="grid md:grid-cols-2 gap-3">
         {["A", "B"].map(k => {
           const v = ab.variants[k];
-          const meta = VARIANT_META[k];
           const isWinner = winnerKey === k;
           return (
             <div key={k}
                  className={`rounded-2xl border-2 p-4 ${isWinner ? "shadow-lg" : ""}`}
-                 style={isWinner ? { borderColor: meta.color } : { borderColor: "#E2E8F0" }}
+                 style={isWinner ? { borderColor: VARIANT_COLOR[k] } : { borderColor: "#E2E8F0" }}
                  data-testid={`ab-variant-${k}`}>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                   <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs"
-                        style={{ backgroundColor: meta.color }}>{k}</span>
-                  <h4 className="font-display font-bold text-slate-900">{meta.name}</h4>
+                        style={{ backgroundColor: VARIANT_COLOR[k] }}>{k}</span>
+                  <h4 className="font-display font-bold text-slate-900">{k === "A" ? "Control" : "Variante B"}</h4>
                 </div>
-                {isWinner && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-800">GANADOR</span>
-                )}
+                {isWinner && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-800">GANADOR</span>}
               </div>
-              <p className="text-[11px] text-slate-500 italic mb-3">{meta.description}</p>
+              <p className="text-[11px] text-slate-500 italic mb-3">{meta?.[k] || ""}</p>
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <Mini label="Sesiones" value={v.started} />
                 <Mini label="Completaron" value={v.completed} sub={`${v.completion_rate_pct}%`} />
@@ -297,7 +344,7 @@ function ABTestSection({ ab }) {
               </div>
               <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between">
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">End-to-end</span>
-                <span className="font-display text-2xl font-bold" style={{ color: meta.color }}>
+                <span className="font-display text-2xl font-bold" style={{ color: VARIANT_COLOR[k] }}>
                   {v.overall_conversion_pct}<span className="text-sm">%</span>
                 </span>
               </div>
@@ -323,3 +370,4 @@ function Mini({ label, value, sub }) {
     </div>
   );
 }
+

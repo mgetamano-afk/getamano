@@ -15,6 +15,40 @@ export default function Plans() {
     api.get("/plans").then(r => setPlans(r.data));
   }, []);
 
+  // plan_card_order_v1: A = ascending (free → premium, default).
+  //                    B = anchor on value (pro → premium → basic → free)
+  const sessionId = useMemo(() => getOrCreateSessionId(), []);
+  const orderVariant = useMemo(() => getVariant(sessionId, ORDER_EXPERIMENT), [sessionId]);
+  const orderedPlans = useMemo(() => {
+    if (orderVariant !== "B" || !plans.length) return plans;
+    const map = Object.fromEntries(plans.map(p => [p.id, p]));
+    return PLAN_ORDER_B.map(id => map[id]).filter(Boolean);
+  }, [plans, orderVariant]);
+
+  // Fire "opened" event for plan_card_order_v1 once per page load
+  useEffect(() => {
+    if (!plans.length) return;
+    api.post("/quiz/track", {
+      session_id: sessionId,
+      event: "opened",
+      experiment: ORDER_EXPERIMENT,
+      variant: orderVariant,
+      lang,
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plans.length]);
+
+  const trackPlanClick = (planId) => {
+    api.post("/quiz/track", {
+      session_id: sessionId,
+      event: "cta_clicked",
+      experiment: ORDER_EXPERIMENT,
+      variant: orderVariant,
+      recommended_plan: planId,
+      lang,
+    }).catch(() => {});
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <Header />
@@ -30,8 +64,8 @@ export default function Plans() {
         {/* Smart Recommender — quiz "What plan do I need?" */}
         <PlanRecommender />
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-12">
-          {plans.map(p => {
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-12" data-variant={orderVariant}>
+          {orderedPlans.map(p => {
             const features = lang === "es" ? p.features_es : p.features_en;
             const name = lang === "es" ? p.name : p.name_en;
             return (
@@ -49,7 +83,7 @@ export default function Plans() {
                     </li>
                   ))}
                 </ul>
-                <Link to={`/register?intent=provider&plan=${p.id}`} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
+                <Link to={`/register?intent=provider&plan=${p.id}`} onClick={() => trackPlanClick(p.id)} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
                   {p.id === "free" ? (lang === "en" ? "Start free" : "Empezar gratis") : t("plans.choose")}
                 </Link>
               </div>
