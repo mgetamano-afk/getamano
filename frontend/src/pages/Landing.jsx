@@ -17,6 +17,7 @@ import DownloadBadgesSection from "../components/DownloadBadgesSection";
 import FeaturedProvidersReel from "../components/FeaturedProvidersReel";
 import ProviderCTASection from "../components/ProviderCTASection";
 import LiveActivityTicker from "../components/LiveActivityTicker";
+import PushOptInBanner from "../components/PushOptInBanner";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -569,6 +570,7 @@ export default function Landing() {
       <ProviderCTASection />
 
       <Footer />
+      <PushOptInBanner />
     </div>
   );
 }

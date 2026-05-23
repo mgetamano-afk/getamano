@@ -1559,3 +1559,48 @@ Reuses an existing endpoint to convert static placeholder copy into trust-buildi
 - **P1**: Real Twilio + Stripe + Resend keys (blocked on user).
 - **P2**: GCP Translation/Vision APIs (blocked on user GCP config).
 
+
+
+---
+
+## Iteration 44c — Browser Push Notifications opt-in (Feb 23, 2026)
+
+### Goal
+Drive return visits + FOMO-style engagement by letting visitors (anonymous OR logged-in) receive native browser notifications for new providers + reviews.
+
+### What was done
+- **New helper**: `/app/frontend/src/lib/pushNotifications.js` (~110 lines).
+  - `isSupported`, `getPermission`, `requestPermission`, `dismissOptIn`, `isOptInDismissed`, `wasGranted` — small composable API.
+  - `startActivityFeedPolling(api, getLang)` — polls `/api/activity-feed` every 90s, fires up to 2 native `Notification` per cycle for fresh items only (compares `at` against `localStorage.gm_push_last_seen_at`).
+  - First-run seed: stores the latest `at` without firing so users don't get spammed by historical events the first time they grant permission.
+  - Click handler on each Notification opens the linked eCard in a new tab.
+- **New component**: `/app/frontend/src/components/PushOptInBanner.jsx` (~130 lines).
+  - Bottom-right card, slide-in animation, branded teal-gradient CTA.
+  - Trust-first UX: only shown **after** 20s on the page AND scrollY > 600 — never on initial load (preserves conversion).
+  - Skipped entirely when: API unsupported, permission already granted/denied, OR user dismissed within 30 days.
+  - Bilingual (ES/EN auto from `useI18n`).
+  - "Ahora no / Not now" persists via `gm_push_opt_dismissed_at` with 30-day TTL.
+  - data-testids: `push-optin-banner`, `push-optin-activate`, `push-optin-dismiss`, `push-optin-close`.
+- **Landing wiring**: mounted `<PushOptInBanner />` at the bottom of `Landing.jsx`. On any subsequent visit by an already-granted user, the banner stays hidden but `startActivityFeedPolling` auto-kicks in via the same component's effect.
+
+### Files touched
+- New: `/app/frontend/src/lib/pushNotifications.js`, `/app/frontend/src/components/PushOptInBanner.jsx`.
+- Modified: `/app/frontend/src/pages/Landing.jsx` — added 2 imports + `<PushOptInBanner />` mount.
+
+### Testing
+- ESLint clean for all 3 touched files.
+- Playwright validation in 3 scenarios:
+  1. **Headless default permission denied** (real Chromium headless behavior) → banner correctly hidden ✓
+  2. **Mocked permission='default' + scroll past 600 + 20s wait** → banner renders with correct Spanish copy, all 4 testids present, clicking "Activar" closes it after requestPermission resolves ✓
+  3. **Pre-set dismissed_at within 30 days** → banner stays hidden ✓
+- Backend: no changes — reuses the public `/api/activity-feed` endpoint already covered.
+
+### Notes for next iteration
+- This is **client-polled** push (works when the tab is open). Full server-pushed notifications (work when the tab is closed) need a Service Worker + VAPID + Web Push subscription endpoint. That's a 2-3 hour delta when we want it.
+- Polling interval 90 s + max 2 notifications/cycle is deliberately conservative to avoid spam.
+- The dismiss TTL (30 days) was chosen to balance respect-for-user vs. give-us-another-chance after a month.
+
+### Pending P0/P1 (unchanged from 44b)
+- Continue server.py extraction backlog (notifications, reports, admin, messaging, subscriptions).
+- Twilio + Stripe + Resend production keys (user-blocked).
+- GCP Translation + Vision API enablement (user-blocked).
