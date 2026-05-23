@@ -53,7 +53,7 @@ function StoriesRow() {
             className="flex flex-col items-center flex-shrink-0 w-16 group"
             data-testid={`comunidad-story-${s.user_id}`}
           >
-            <div className="relative p-[2px] rounded-full bg-gradient-to-br from-amber-500 via-rose-500 to-purple-600">
+            <div className="relative p-[2px] rounded-full" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 40%, #F59E0B 100%)" }}>
               <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white bg-slate-100">
                 <img src={s.picture || getDicebearAvatar(s.business_name)} alt={s.business_name} className="w-full h-full object-cover" loading="lazy" />
               </div>
@@ -206,32 +206,28 @@ function NewPostBox({ onPosted }) {
   );
 }
 
-// ─── Comments Modal ─────────────────────────────────────────────────────
-function CommentsModal({ post, onClose, onCommentCountChanged }) {
+// ─── Inline Comments Thread (replaces modal — Section 36b) ─────────────
+function InlineComments({ post, expanded, onCommentCountChanged }) {
   const { user } = useAuth();
   const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const inputRef = useRef(null);
 
-  const load = () => {
-    setLoading(true);
-    api.get(`/community/posts/${post.post_id}/comments`)
-      .then(r => setComments(r.data?.items || []))
-      .catch(() => setComments([]))
-      .finally(() => setLoading(false));
-  };
-
+  // Lazy-load when expanded the first time
   useEffect(() => {
-    load();
-    setTimeout(() => inputRef.current?.focus(), 100);
-    // Lock scroll on body
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post.post_id]);
+    if (expanded && !loaded) {
+      setLoading(true);
+      api.get(`/community/posts/${post.post_id}/comments`)
+        .then(r => setComments(r.data?.items || []))
+        .catch(() => setComments([]))
+        .finally(() => { setLoading(false); setLoaded(true); });
+    }
+  }, [expanded, loaded, post.post_id]);
+
+  if (!expanded) return null;
 
   const send = async () => {
     if (content.trim().length < 1) return;
@@ -258,52 +254,28 @@ function CommentsModal({ post, onClose, onCommentCountChanged }) {
       toast.success("Comentario eliminado");
     } catch (_e) {
       toast.error("No se pudo eliminar");
-      load();
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4 bg-black/55 backdrop-blur-sm"
-      onClick={onClose}
-      data-testid="comments-modal"
-    >
-      <div
-        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
-          <h3 className="font-display font-bold text-slate-900">Comentarios</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-100"
-            aria-label="Cerrar"
-            data-testid="comments-modal-close"
-          >
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
-        </header>
+    <div className="mt-3 pt-3 border-t border-slate-100" data-testid={`inline-comments-${post.post_id}`}>
+      {loading && (
+        <div className="text-center py-2 text-slate-400 text-xs flex items-center justify-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando comentarios…
+        </div>
+      )}
 
-        <div className="flex-1 overflow-y-auto px-4 py-3" data-testid="comments-modal-list">
-          {loading && (
-            <div className="text-center py-6 text-slate-400 text-sm flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Cargando…
-            </div>
-          )}
-          {!loading && comments.length === 0 && (
-            <div className="text-center py-8 text-slate-400 text-sm" data-testid="comments-modal-empty">
-              Sé el primero en comentar 💬
-            </div>
-          )}
-          {!loading && comments.map(c => {
+      {/* Thread — same post, threaded layout (avatar rail on the left) */}
+      {!loading && comments.length > 0 && (
+        <ul className="space-y-2.5 mb-3" data-testid={`inline-comments-list-${post.post_id}`}>
+          {comments.map(c => {
             const isOwn = c.user_id === user?.user_id;
             const a = c.author || {};
             const avatar = a.picture || getDicebearAvatar(a.business_name || a.name || "U");
             return (
-              <article key={c.comment_id} className="flex gap-2.5 py-2.5" data-testid={`comment-${c.comment_id}`}>
+              <li key={c.comment_id} className="flex gap-2.5" data-testid={`inline-comment-${c.comment_id}`}>
                 <Link to={a.slug ? `/services/${a.slug}` : "#"} className="flex-shrink-0">
-                  <img src={avatar} alt={a.name} className="w-8 h-8 rounded-full object-cover" loading="lazy" />
+                  <img src={avatar} alt={a.name} className="w-7 h-7 rounded-full object-cover" loading="lazy" />
                 </Link>
                 <div className="flex-1 min-w-0">
                   <div className="rounded-2xl bg-slate-50 px-3 py-2">
@@ -317,71 +289,77 @@ function CommentsModal({ post, onClose, onCommentCountChanged }) {
                         <span className="text-[9px] font-bold text-teal-700 bg-teal-100 px-1 py-0.5 rounded">✓</span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap" data-testid={`comment-content-${c.comment_id}`}>{c.content}</p>
+                    <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap" data-testid={`inline-comment-content-${c.comment_id}`}>{c.content}</p>
                   </div>
-                  <div className="flex items-center gap-2 mt-1 px-2 text-[10px] text-slate-400">
+                  <div className="flex items-center gap-2 mt-0.5 px-2 text-[10px] text-slate-400">
                     <span>{relTime(c.created_at)}</span>
                     {isOwn && (
                       <button
                         type="button"
                         onClick={() => remove(c.comment_id)}
                         className="hover:text-red-500 transition"
-                        data-testid={`comment-delete-${c.comment_id}`}
+                        data-testid={`inline-comment-delete-${c.comment_id}`}
                       >
                         Eliminar
                       </button>
                     )}
                   </div>
                 </div>
-              </article>
+              </li>
             );
           })}
-        </div>
+        </ul>
+      )}
 
-        <footer className="flex-shrink-0 border-t border-slate-100 px-4 py-3">
-          {user ? (
-            <div className="flex items-end gap-2">
-              <img src={user.picture || getDicebearAvatar(user.name || "U")} alt={user.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-              <div className="flex-1 min-w-0 flex items-end gap-2 bg-slate-50 rounded-2xl px-3 py-2">
-                <textarea
-                  ref={inputRef}
-                  value={content}
-                  onChange={e => setContent(e.target.value.slice(0, 300))}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                  placeholder="Escribe un comentario…"
-                  rows={1}
-                  className="flex-1 text-sm bg-transparent outline-none resize-none placeholder-slate-400 max-h-24"
-                  data-testid="comments-modal-input"
-                />
-                <button
-                  type="button"
-                  onClick={send}
-                  disabled={sending || content.trim().length < 1}
-                  className="p-1.5 rounded-full text-white disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
-                  aria-label="Enviar"
-                  data-testid="comments-modal-send"
-                >
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <Link to="/login" className="block text-center text-sm font-semibold text-teal-700 hover:underline py-2" data-testid="comments-modal-anon-login">
-              Inicia sesión para comentar →
-            </Link>
-          )}
-        </footer>
-      </div>
+      {!loading && comments.length === 0 && loaded && (
+        <p className="text-xs text-slate-400 text-center py-2" data-testid={`inline-comments-empty-${post.post_id}`}>
+          Sé el primero en comentar 💬
+        </p>
+      )}
+
+      {/* Composer */}
+      {user ? (
+        <div className="flex items-end gap-2">
+          <img src={user.picture || getDicebearAvatar(user.name || "U")} alt={user.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+          <div className="flex-1 min-w-0 flex items-end gap-2 bg-slate-50 rounded-2xl px-3 py-1.5">
+            <textarea
+              ref={inputRef}
+              value={content}
+              onChange={e => setContent(e.target.value.slice(0, 300))}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder="Escribe un comentario…"
+              rows={1}
+              className="flex-1 text-sm bg-transparent outline-none resize-none placeholder-slate-400 max-h-24 py-1"
+              data-testid={`inline-comments-input-${post.post_id}`}
+            />
+            <button
+              type="button"
+              onClick={send}
+              disabled={sending || content.trim().length < 1}
+              className="p-1.5 rounded-full text-white disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              aria-label="Enviar"
+              data-testid={`inline-comments-send-${post.post_id}`}
+            >
+              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <Link to="/login" className="block text-center text-xs font-semibold text-teal-700 hover:underline py-2" data-testid={`inline-comments-anon-${post.post_id}`}>
+          Inicia sesión para comentar →
+        </Link>
+      )}
     </div>
   );
 }
 
 // ─── Post Card ──────────────────────────────────────────────────────────
-function PostCard({ post, onLike, onDelete, onOpenComments, currentUserId }) {
+function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged }) {
   const isOwn = post.user_id === currentUserId;
   const a = post.author || {};
   const avatar = a.picture || getDicebearAvatar(a.business_name || a.name || "U");
+  const [commentsOpen, setCommentsOpen] = useState(false);
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 mb-3 hover:border-slate-300 transition" data-testid={`comunidad-post-${post.post_id}`}>
       <header className="flex items-start gap-3">
@@ -444,10 +422,11 @@ function PostCard({ post, onLike, onDelete, onOpenComments, currentUserId }) {
         </button>
         <button
           type="button"
-          onClick={() => onOpenComments(post)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-teal-700 transition"
+          onClick={() => setCommentsOpen(v => !v)}
+          aria-expanded={commentsOpen}
+          aria-controls={`inline-comments-${post.post_id}`}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${commentsOpen ? "text-teal-700 bg-teal-50" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`}
           data-testid={`comunidad-post-comments-${post.post_id}`}
-          aria-label="Ver comentarios"
         >
           <MessageCircle className="w-4 h-4" />
           <span data-testid={`comunidad-post-comments-count-${post.post_id}`}>{post.comments_count || 0}</span>
@@ -471,6 +450,12 @@ function PostCard({ post, onLike, onDelete, onOpenComments, currentUserId }) {
           <Share2 className="w-4 h-4" />
         </button>
       </footer>
+
+      <InlineComments
+        post={post}
+        expanded={commentsOpen}
+        onCommentCountChanged={onCommentCountChanged}
+      />
     </article>
   );
 }
@@ -482,7 +467,6 @@ function PostFeed() {
   const [loading, setLoading] = useState(true);
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [openCommentsPost, setOpenCommentsPost] = useState(null);
 
   const endpoint = user ? "/community/posts/feed" : "/community/posts";
 
@@ -553,8 +537,12 @@ function PostFeed() {
           post={p}
           onLike={onLike}
           onDelete={onDelete}
-          onOpenComments={(post) => setOpenCommentsPost(post)}
           currentUserId={user?.user_id}
+          onCommentCountChanged={(delta) => {
+            setPosts(prev => prev.map(post => post.post_id === p.post_id
+              ? { ...post, comments_count: Math.max(0, (post.comments_count || 0) + delta) }
+              : post));
+          }}
         />
       ))}
       {nextBefore && (
@@ -567,17 +555,6 @@ function PostFeed() {
         >
           {loadingMore ? "Cargando…" : "Cargar más"}
         </button>
-      )}
-      {openCommentsPost && (
-        <CommentsModal
-          post={openCommentsPost}
-          onClose={() => setOpenCommentsPost(null)}
-          onCommentCountChanged={(delta) => {
-            setPosts(prev => prev.map(p => p.post_id === openCommentsPost.post_id
-              ? { ...p, comments_count: Math.max(0, (p.comments_count || 0) + delta) }
-              : p));
-          }}
-        />
       )}
     </div>
   );
