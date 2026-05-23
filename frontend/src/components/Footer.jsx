@@ -50,6 +50,7 @@ export default function Footer() {
           <ul className="space-y-2 text-sm">
             <li><Link to="/search" className="hover:text-white transition" data-testid="footer-explore">{t("nav.explore")}</Link></li>
             <li><Link to="/servicios" className="hover:text-white transition" data-testid="footer-services">Todos los servicios</Link></li>
+            <li><Link to="/empleos" className="hover:text-white transition" data-testid="footer-empleos">Chambas</Link></li>
             <li><Link to="/ciudades" className="hover:text-white transition" data-testid="footer-cities">Ciudades</Link></li>
             <li><Link to="/plans" className="hover:text-white transition" data-testid="footer-plans">{t("nav.plans")}</Link></li>
             <li><Link to="/register?intent=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>

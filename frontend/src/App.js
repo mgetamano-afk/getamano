@@ -31,6 +31,7 @@ import ServiceRequests from "./pages/ServiceRequests";
 import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
+import EmpleosPage from "./pages/EmpleosPage";
 
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -81,6 +82,10 @@ function AppRouter() {
       {/* Email OTP verification — Section 24 */}
       <Route path="/verificar-correo" element={<VerifyEmail />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+
+      {/* Section 30 — Gigs / Chambas board (public + auth-aware) */}
+      <Route path="/empleos" element={<EmpleosPage />} />
+      <Route path="/gigs" element={<EmpleosPage />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />

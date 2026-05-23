@@ -21,6 +21,7 @@ import LicenseSection from "../components/LicenseSection";
 import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
 import SubscriptionManager from "../components/SubscriptionManager";
+import ChambasNearby from "../components/ChambasNearby";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -146,6 +147,38 @@ export default function ProviderDashboard() {
           newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
         />
         <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
+
+        {/* Section 30 — Chambas board CTA + nearby teaser */}
+        <div className="rounded-2xl p-5 mb-6 flex items-start justify-between gap-4 flex-wrap"
+             style={{ background: "linear-gradient(135deg, rgba(2,95,103,0.06) 0%, rgba(47,157,148,0.10) 100%)", border: "1px solid rgba(2,95,103,0.18)" }}
+             data-testid="provider-dashboard-chambas-promo">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+                 style={{ background: "rgba(255,107,44,0.15)", color: "#C2410C" }}>
+              Nuevo · Beta
+            </div>
+            <h3 className="font-display font-bold text-slate-900 text-lg mt-2 leading-tight">
+              ¿Necesitas ayuda extra esta semana?
+            </h3>
+            <p className="text-sm text-slate-600 mt-1 max-w-xl">
+              Publica una <strong>chamba temporal</strong> y recibe propuestas de otros proveedores latinos verificados. O aplica tú a chambas abiertas para sumar ingresos extra.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Link to="/empleos" target="_blank" className="px-4 py-2.5 rounded-full text-white text-sm font-bold inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-sm"
+                  style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                  data-testid="provider-dashboard-publish-chamba">
+              Publicar chamba →
+            </Link>
+            <Link to="/empleos" className="px-4 py-2.5 rounded-full text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:border-teal-500 inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                  data-testid="provider-dashboard-browse-chambas">
+              Ver chambas activas
+            </Link>
+          </div>
+        </div>
+
+        <ChambasNearby city={profile.city} role="provider" limit={3} />
+
         <MarketPulseCard />
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>

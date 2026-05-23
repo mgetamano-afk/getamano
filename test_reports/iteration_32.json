@@ -1,0 +1,37 @@
+{
+  "summary": "Sections 29 + 30 + Mobile Nav (iteration 32) tested end-to-end. Backend gigs API + frontend /empleos board + dashboard widgets + footer + BottomNav verified. 15/15 backend tests pass and all 12 critical frontend flows pass after auth-hydration tweak.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login", "issue": "Rate limit (5/min per email) hits during dense pytest runs; mitigated in test suite via session caching + 429 retry-once-with-backoff. Not a bug — just a testing affordance."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter32_section30_gigs.py",
+    "/app/test_reports/pytest/iter32_results.xml"
+  ],
+  "action_items": [
+    "Optional: consider adding visual tags/badges to ChambasNearby items (currently teaser-only); not blocking."
+  ],
+  "critical_code_review_comments": [
+    "/api/gigs response already strips _id and expires_at_native via _gig_public/projection — good MongoDB hygiene.",
+    "Gig title validator rejects words like 'test'/'qa' — be mindful this also blocks legitimate titles like 'Necesito test eléctrico'. Consider word-boundary nuance for Spanish vs English.",
+    "BottomNav uses both early return AND className based on path; check order matches intent for admin/login/register — works as expected.",
+    "EmpleosPage.jsx is approaching ~465 lines and contains 3 components (Page, PostGigModal, ApplyGigModal, GigCard). Splitting modals into their own files would aid maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter32_section30_gigs.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123",
+  "seed_data_creation": "Tests create gigs prefixed with 'TEST_iter32' and 'TEST_uiE2E'; old test gigs may remain in DB and should be filtered by client app over time. Each run leaves 1-2 closed gigs.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 15 backend tests in /app/backend/tests/test_iter32_section30_gigs.py pass. The /empleos board, post-gig modal, apply flow, owner-close, footer Chambas link, ClientDashboard ChambasNearby widget, ProviderDashboard promo card + ChambasNearby teaser, and BottomNav 'Chambas' tab all work. BottomNav correctly hides on /admin/* (admin role), /login, /register, /verificar-correo. Non-admin users hitting /admin get redirected to their own dashboard where BottomNav rightly stays visible — this is NOT a regression. The post-gig modal click requires ~2s for AuthContext hydration after navigation; tests should `wait_for_timeout(2000)` after page goto when click depends on user state. MOCKED integrations untouched: Resend OTP dev-fallback, Stripe/Twilio not wired, Google Translation+Vision 403.",
+  "rca of the issue": "N/A — no functional bugs found. Two intermediate false-failures during testing: (1) post-gig modal not opening was timing — AuthContext takes ~1.5s post-navigation to hydrate from /api/auth/me, so the CTA renders 'Log in to post' until the user state arrives; (2) bottom-nav-on-/admin count=1 was due to non-admin user being redirected to /dashboard/client where BottomNav is correct."
+}

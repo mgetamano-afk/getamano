@@ -7,6 +7,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { Heart, Search, ShieldCheck, Star } from "lucide-react";
 import { toast } from "sonner";
+import ChambasNearby from "../components/ChambasNearby";
 
 export default function ClientDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -37,6 +38,10 @@ export default function ClientDashboard() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8" data-testid="client-dashboard">
         <h1 className="font-display text-3xl font-bold text-slate-900">{t("dashboard.client.title")}</h1>
         <p className="text-slate-500 mt-1">Hola, {user?.name}</p>
+
+        <div className="mt-6">
+          <ChambasNearby city={user?.city} role="client" limit={3} />
+        </div>
 
         <div className="mt-8">
           <h2 className="font-display text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2"><Heart className="w-5 h-5 text-orange-500" /> {t("dashboard.client.favorites")}</h2>
