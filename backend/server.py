@@ -8200,6 +8200,19 @@ async def capture_exit_lead(payload: ExitLeadIn, request: Request):
         {"_id": 0, "lead_id": 1},
     )
     if existing:
+        # Section 45: merge fresher non-empty fields into the existing doc so the
+        # CEO sees the LATEST service/city/notes the lead provided, even if they
+        # re-submitted with updated info within the 24h dedupe window.
+        merge: dict = {}
+        for field in ("city", "state", "service", "notes"):
+            new_val = getattr(payload, field, None)
+            if new_val and str(new_val).strip():
+                merge[field] = str(new_val).strip()
+        if (payload.preferred_channel or "").strip():
+            merge["preferred_channel"] = payload.preferred_channel
+        if merge:
+            merge["updated_at"] = datetime.now(timezone.utc).isoformat()
+            await db.exit_leads.update_one({"lead_id": existing["lead_id"]}, {"$set": merge})
         return {"ok": True, "lead_id": existing["lead_id"], "duplicate": True}
     doc = {
         "lead_id": f"lead_{uuid.uuid4().hex[:12]}",
@@ -8222,6 +8235,20 @@ async def capture_exit_lead(payload: ExitLeadIn, request: Request):
         "updated_at": now,
     }
     await db.exit_leads.insert_one(doc)
+    # Section 45: observability — capture source/IP/channel for fraud + funnel analytics
+    await audit_log(
+        None,
+        "lead.captured",
+        {
+            "lead_id": doc["lead_id"],
+            "channel": doc["preferred_channel"],
+            "lang": doc["lang"],
+            "source": doc["source"],
+            "city": doc["city"],
+            "service": doc["service"],
+        },
+        request,
+    )
     return {"ok": True, "lead_id": doc["lead_id"], "duplicate": False}
 
 

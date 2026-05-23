@@ -232,7 +232,7 @@ function LeadRow({ lead, onContactClick, onStatusChange }) {
                 {lead.city}{lead.state ? `, ${lead.state}` : ""}
               </span>
             )}
-            {lead.service && <span className="text-teal-700 font-medium">· {lead.service}</span>}
+            {lead.service && <span className="text-teal-700 font-medium break-all">· {lead.service}</span>}
           </div>
         </div>
       </div>

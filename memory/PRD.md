@@ -1604,3 +1604,63 @@ Drive return visits + FOMO-style engagement by letting visitors (anonymous OR lo
 - Continue server.py extraction backlog (notifications, reports, admin, messaging, subscriptions).
 - Twilio + Stripe + Resend production keys (user-blocked).
 - GCP Translation + Vision API enablement (user-blocked).
+
+
+---
+
+## Iteration 45 — Exit-Intent Lead Capture + Admin Leads Inbox (Feb 23, 2026)
+
+### Goal
+Convert anonymous visitors into actionable leads BEFORE they leave the landing. American clients prefer **native SMS**, Latino clients prefer **WhatsApp** — capture both with manual deep-link outreach (no Twilio keys needed for v1).
+
+### What was done
+
+#### Backend (in `/app/backend/server.py`)
+- `POST /api/leads/capture` — public endpoint. Validates name + phone (E.164 normalize, 10-15 digits), stores in `exit_leads` collection.
+  - 24h dedupe by phone — but **merges** newer non-empty `service / city / state / notes / preferred_channel` into the existing doc so the CEO sees the latest intent (testing-agent recommendation).
+  - Writes to `audit_log` with action `lead.captured` + source/lang/channel for fraud + funnel analytics.
+- `GET /api/admin/leads` — admin only. Lists all leads with status + channel filters. For each lead, **synthesizes 3 fields server-side**:
+  - `message_body` — pre-filled outreach message in the lead's language (`¡Hola Lucía! Soy del equipo de getamano...`).
+  - `sms_link` — `sms:+15551234567?body=<urlencoded>` (opens native iOS/Android Messages app).
+  - `wa_link` — `https://wa.me/15551234567?text=<urlencoded>` (opens WhatsApp).
+  - Plus aggregate `counts` for the KPI cards.
+- `PATCH /api/admin/leads/{lead_id}` — admin only. Status workflow `pending → contacted → converted | lost`, auto-stamps `contacted_at` / `converted_at`. Validates "nothing to update" returns 400.
+- Mongo indexes seeded at startup: `lead_id` unique, `(status, created_at)`, `(phone, created_at)`.
+
+#### Frontend (3 new files)
+- **`/app/frontend/src/components/ExitIntentLeadCapture.jsx`** (~280 lines)
+  - Triggers on (desktop) `mouseleave` from top of viewport OR (mobile + desktop fallback) 60 s of inactivity.
+  - Suppressed by route (admin/dashboard), localStorage dismiss (7 day TTL), or already-captured flag.
+  - 2-stage UI: form → success with "Explorar proveedores" link.
+  - Bilingual ES/EN via `useI18n`, branded teal-gradient header, WhatsApp/SMS channel toggle.
+- **`/app/frontend/src/pages/admin/AdminLeadsInbox.jsx`** (~280 lines)
+  - 5 KPI cards (Total / Pendientes / Contactados / Convertidos / Perdidos).
+  - Filter chips by status.
+  - Per-row card: name + status badge + lang badge + phone formatted + city/service + pre-filled message preview (copyable) + WhatsApp / SMS CTAs + status dropdown.
+  - Clicking WhatsApp/SMS button: opens the deep link AND auto-PATCHes lead to `contacted` if it was `pending`.
+- **`/app/frontend/src/components/AdminLayout.jsx`** — added "Leads Inbox" sidebar entry highlighted.
+- **`/app/frontend/src/App.js`** — registered `/admin/leads` + `/dashboard/admin/leads` routes.
+- **Landing**: mounted `<ExitIntentLeadCapture />` at the bottom.
+
+### Testing (iteration_45.json)
+- **Backend: 20/20 pytest cases PASS** — capture happy/sad paths, duplicate-merge, admin filters, status workflow, deep-link shape validation, encoding sanity, auth gates.
+- **Frontend: 100%** — popup triggers via dispatched mouseleave + 60s idle fallback, form submits, admin inbox renders KPIs + filters + rows + sidebar entry.
+- **No critical bugs** found. 2 cosmetic improvements applied post-test:
+  1. Merge non-empty fields on duplicate capture (preserves CEO's view of latest intent).
+  2. `audit_log` write on `lead.captured` for observability.
+  3. `break-all` on long service strings in LeadRow header.
+
+### Files changed
+- New: `/app/frontend/src/components/ExitIntentLeadCapture.jsx`, `/app/frontend/src/pages/admin/AdminLeadsInbox.jsx`, `/app/backend/tests/test_iter45_exit_lead_capture.py`.
+- Modified: `/app/backend/server.py` (+~150 lines: 3 endpoints + 2 helpers + index seeds), `/app/frontend/src/components/AdminLayout.jsx`, `/app/frontend/src/App.js`, `/app/frontend/src/pages/Landing.jsx`.
+
+### Impact for the CEO
+- Every visitor who triggers exit-intent → captured as actionable lead with phone + intent + preferred channel.
+- The CEO opens `/admin/leads`, sees KPIs at a glance, and contacts each lead with **1 click** that opens iOS/Android Messages or WhatsApp with a pre-written message in the lead's language.
+- Status updates flow visually (Pendiente → Contactado → Convertido / Perdido) so the funnel is measurable from day 1.
+- **No third-party API keys required** to ship — works manually now, ready to flip to Twilio automated send once keys arrive.
+
+### Reviewer notes (deferred — non-blocking)
+- Pydantic min_length=7 vs digits-check 10–15 → standardize error format later.
+- Android compat: `sms:+1...?body=` works on modern Android; older Android may prefer `&body=`. Add UA sniff when we see field complaints.
+- Source telemetry (`?source=admin`) on deep links for click-through measurement.
