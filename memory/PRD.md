@@ -444,3 +444,57 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 - Programa de embajadores
 - CRM interno
 - Split `server.py` en módulos
+
+### Feb 23, 2026 — Sections 29 + 30 + Mobile Nav (Iteration 32)
+
+**Status from previous fork:** BottomNav (Chambas tab), EmpleosPage.jsx (full board with PostGig/ApplyGig modals), backend `/api/gigs/*` endpoints, categoryGroups.js with vertical-aware sub-services in ProviderOnboarding (with educational note "¿Tienes otro negocio diferente?") were already implemented. The only missing wiring: `/empleos` route + dashboard surfaces + footer link.
+
+**Iteration 32 ships (this fork):**
+- Registered `/empleos` and `/gigs` routes in `App.js` pointing to `EmpleosPage` (was 404 — BottomNav tab "Chambas" now navigates).
+- New `ChambasNearby.jsx` reusable teaser component: fetches `/api/gigs?limit=3`, renders compact card with urgency/budget/city, silent (returns null) when board is empty so dashboards never show a sad zero state.
+- `ClientDashboard.jsx` now renders `<ChambasNearby role="client" />` above favorites.
+- `ProviderDashboard.jsx` now renders a teal gradient promo card with "Publicar chamba →" + "Ver chambas activas" CTAs plus `<ChambasNearby role="provider" />` (both above `MarketPulseCard`).
+- `Footer.jsx` gets new "Chambas" link (`data-testid=footer-empleos`).
+
+**Backend gigs marketplace (preserved from prev fork):**
+- Collections: `gigs` (with `expires_at_native` TTL index → auto-expire after 30 days), `gig_applications` (unique on `gig_id + provider_id`)
+- Endpoints: `GET /api/gigs` (with optional category filter + applicant_count aggregation), `GET /api/gigs/{id}`, `POST /api/gigs` (auth, validates title ≥6 + description ≥20, blocks junk patterns like `test|qa|prueba|asdf`), `POST /api/gigs/{id}/close` (owner-only), `POST /api/gigs/{id}/apply` (provider-only, can't apply to own gig, can't apply twice)
+- Audit log entries: `gig.created`, `gig.closed`, `gig.application_sent`
+
+**Verification final del prompt:**
+- ✅ Mobile Nav: hamburguesa solo en desktop, BottomNav con 5 íconos (Inicio · Buscar · Chambas · Mensajes · Mi cuenta), tab activo en teal #025F67, badge rojo en Mensajes, respeta safe-area-inset iOS, oculto en /login y /register
+- ✅ Categorías Inteligentes: ProviderOnboarding step 2 muestra solo sub-servicios del giro principal + nota educativa "Crea una segunda eCard si tienes negocio diferente"
+- ✅ Chambas: /empleos renderiza board, modal de publicar abre desde abajo en mobile, "Me interesa" guarda la aplicación, ClientDashboard + ProviderDashboard muestran widget Chambas cerca de ti
+
+**Testing:** `iteration_32.json` — **15/15 backend pytest pass + 12/12 frontend flows pass = 100%**. Zero critical/minor bugs. Suite at `/app/backend/tests/test_iter32_section30_gigs.py` covers create → apply (provider) → owner-close lifecycle, owner-can't-apply guard, dup-apply guard, non-provider-can't-apply guard, list filter, applicant_count enrichment. Frontend E2E: post-gig modal lifecycle, apply modal lifecycle, footer link, BottomNav active state on /empleos, ChambasNearby widget on both dashboards.
+
+**Notes from testing agent:**
+- /api/gigs response correctly strips `_id` + `expires_at_native` via `_gig_public` (good MongoDB hygiene).
+- Title validator blocks junk words like 'test'/'qa' — flagged that "test eléctrico" could be a false positive; left as-is for now since the rate of legitimate Spanish titles containing "test" is low.
+- AuthContext takes ~1.5s post-navigation to hydrate; CTAs that depend on user state render the logged-out version briefly, then swap.
+- EmpleosPage.jsx is ~465 lines containing 3 sub-components (Page, PostGigModal, ApplyGigModal, GigCard). Splitting modals into their own files would aid maintainability — deferred (works correctly, no urgency).
+
+## Updated Backlog (post iter-32)
+
+### P0 (founder action required, not code)
+- Provide **Stripe** API keys (test+live) + connect bank for payouts
+- Provide **Twilio** account credentials (SMS verification will flip from log-only to real)
+- Set up **Resend** account + verified domain (real OTP emails) — `RESEND_API_KEY` + `SENDER_EMAIL` in `/app/backend/.env`
+- Enable **Cloud Translation API** + **Cloud Vision API** in user's GCP console (currently 403 — both are wired and will start working immediately)
+- Add `*.emergentagent.com/*` to the Google API key HTTP referrer restrictions
+- Onboard 5–10 real founding-member providers
+
+### P1
+- Refactor `server.py` (~6000 lines) into modular routers: `/app/backend/routes/{auth,providers,gigs,subscriptions,admin,reports,seo,...}.py`. Defer until after launch with full regression suite present.
+- Split `EmpleosPage.jsx` (modals into their own files)
+- Per-gig public detail page `/empleos/:gig_id` (currently links fall back to the board)
+- Provider dashboard "My applications" + "My posted gigs" mini-list
+- Push notifications for new chamba in proveedor's city (already have notification queue scaffolding)
+
+### P2
+- A/B test landing variants (system already exists)
+- WhatsApp Business API for OTP fallback
+- Embedded review collection email (post-job-complete trigger)
+- AI-powered gig matching (suggest top 3 providers per posted chamba)
+- Lead recovery quiz funnel iteration v2
+
