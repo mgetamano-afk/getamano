@@ -212,10 +212,9 @@ class TestLeaderboardSnapshot:
         data1 = r1.json()
         assert data1["ok"] is True
         assert data1["dry_run"] is False
-        # Run again — should be idempotent
+        # Run again — should be idempotent (we just verify status; payload re-check via DB below)
         r2 = admin_session.post(f"{API}/admin/leaderboard/snapshot?month=2026-05", timeout=20)
         assert r2.status_code == 200, r2.text
-        data2 = r2.json()
 
         async def _now():
             return await db.coupons.find_one({"user_id": demo_provider_user_id, "month_key": "2026-05"}, {"_id": 0})

@@ -22,11 +22,11 @@ def _load_base_url() -> str:
 BASE_URL = _load_base_url()
 assert BASE_URL, "REACT_APP_BACKEND_URL is required"
 
-PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
-ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
-MARIA_SLUG = "maria-cleaning-services-sallisaw-ok"
+PROVIDER_EMAIL = os.environ.get("TEST_PROVIDER_EMAIL", "demo.provider@getamano.com")
+PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "admin@getamano.com")
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
+MARIA_SLUG = os.environ.get("TEST_DEMO_SLUG", "maria-cleaning-services-sallisaw-ok")
 
 
 # ── helpers ─────────────────────────────────────────────────────────────

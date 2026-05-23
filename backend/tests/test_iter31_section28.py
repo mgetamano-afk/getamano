@@ -3,20 +3,20 @@ import os
 import time
 import pytest
 import requests
-
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-if not BASE_URL:
-    # Fallback to frontend .env
-    with open('/app/frontend/.env') as f:
-        for line in f:
-            if line.startswith('REACT_APP_BACKEND_URL'):
-                BASE_URL = line.split('=', 1)[1].strip().rstrip('/')
-                break
+from tests.test_config import (
+    BASE_URL,
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+    PROVIDER_EMAIL,
+    PROVIDER_PASSWORD,
+    CLIENT_EMAIL,
+    CLIENT_PASSWORD,
+)
 
 DEMOS = [
-    ("admin@getamano.com", "admin123", "admin"),
-    ("demo.provider@getamano.com", "provider123", "provider"),
-    ("demo.client@getamano.com", "client123", "client"),
+    (ADMIN_EMAIL, ADMIN_PASSWORD, "admin"),
+    (PROVIDER_EMAIL, PROVIDER_PASSWORD, "provider"),
+    (CLIENT_EMAIL, CLIENT_PASSWORD, "client"),
 ]
 
 SPLASH_FILES = [
@@ -62,7 +62,7 @@ def test_demo_client_email_verified_via_db():
     assert mongo_url and db_name
     async def _check():
         client = AsyncIOMotorClient(mongo_url)
-        doc = await client[db_name].users.find_one({"email": "demo.client@getamano.com"})
+        doc = await client[db_name].users.find_one({"email": CLIENT_EMAIL})
         client.close()
         return doc
     doc = asyncio.get_event_loop().run_until_complete(_check())

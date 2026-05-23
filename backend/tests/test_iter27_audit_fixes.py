@@ -1,11 +1,7 @@
 """iter-27 May 22 audit fix verification tests."""
-import os
 import pytest
 import requests
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
-PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+from tests.test_config import BASE_URL, PROVIDER_EMAIL, PROVIDER_PASSWORD
 
 
 @pytest.fixture(scope="module")

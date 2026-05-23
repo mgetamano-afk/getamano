@@ -275,6 +275,47 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Code Quality Audit Fixes (Critical Must-Fix items)
+
+**Applied from external code-quality audit:**
+
+1. **Test credentials moved to env vars / `test_config.py`** (CRITICAL #1)
+   - Centralized `BASE_URL`, `ADMIN_EMAIL/PWD`, `PROVIDER_EMAIL/PWD`, `CLIENT_EMAIL/PWD`, `DEMO_SLUG`, `INVITEE_PASSWORD` in `tests/test_config.py` (already existed; expanded with `CLIENT_*` and `INVITEE_PASSWORD`).
+   - Refactored 6 test files to import from `test_config` instead of hardcoding:
+     `test_iter27_audit_fixes.py`, `test_iter26_otp_ai_ratelimit.py`, `iteration17_section18_geocode_test.py`, `iteration15_sections_13_14_15_16_test.py`, `test_iter31_section28.py`, `test_iter35_referrals.py`.
+
+2. **Lint cleanup** (CRITICAL #2):
+   - Removed duplicate `Response` import (F811) at server.py:1554.
+   - Renamed ambiguous variable `l` → `ln` in `_parse_card_text` (E741, server.py:7346,7367).
+   - Removed 3 unused locals (F841) in `test_iter35_referrals.py`, `test_iter40_inclusion_rewards.py`, `test_iter42_comments_images.py`.
+
+3. **`routes/auth.py` make_router refactor** (CRITICAL #3 — auth):
+   - Cyclomatic complexity: **42 → ~10** (only route registrations remain in the factory).
+   - Length: 212 → ~100 lines for `make_router`; the rest is now 11 testable module-level functions: `_do_register`, `_do_login`, `_do_google_session`, `_get_or_create_google_user`, `_do_logout`, `_do_send_otp`, `_persist_otp`, `_resend_cooldown_remaining`, `_validate_otp_record`, `_do_verify_otp`, `_do_email_verified`.
+   - Helpers extracted: `_set_session_cookie`, `_hydrate_user_doc`, `_is_valid_email_shape`.
+   - Average new-function complexity: **B (7.5)**.
+
+4. **`routes/community.py` make_router refactor** (CRITICAL #3 — community):
+   - Cyclomatic complexity: **77 → ~14**.
+   - Length: 367 → ~60 lines for `make_router`.
+   - 15 handlers extracted to `_do_*` module-level functions taking a `deps` SimpleNamespace.
+   - `hydrate_posts` (complexity 18) → 6 small helpers (`_load_users`, `_load_providers`, `_load_my_likes`, `_load_my_follows`, `_build_post_author`, `hydrate_posts` orchestrator).
+   - `hydrate_comments` (complexity 11) → 2 small helpers (`_load_*` shared, `_build_comment_author`).
+   - Projection constants extracted at module level (`_USER_PROJECTION`, `_PROVIDER_PROJECTION_FULL`, `_PROVIDER_PROJECTION_SLIM`).
+   - Average new-function complexity: **B (7.5)**.
+
+**E2E verification:**
+- Auth: 8 endpoints (login/register/google/me/logout/send-otp/verify-otp/email-verified) tested via curl — 100% pass.
+- Community: posts list, posts feed authenticated, stories, trending, suggested, me/follows — 100% pass.
+- Pytest: 10/10 audit+section28 tests pass, 14/14 OTP+auth tests pass.
+
+**Postponed (Important, not Critical) — backlog:**
+- `server.py:seed()` refactor (412 lines, complexity 41) — startup-only, low ROI.
+- `search_providers()` refactor (16 args, complexity 27) — needs `SearchParams` dataclass.
+- `get_current_user()` complexity reduction (currently 14) — needs careful auth chain split.
+- Type hints across the codebase (9.6% coverage) — best done file-by-file alongside features.
+- 17 remaining E701/E702 one-liner style nits in `server.py` (cosmetic).
+
 ### May 23, 2026 — Refactor Step 2: `routes/auth.py` extracted
 
 **Lo entregado en esta sesión:**

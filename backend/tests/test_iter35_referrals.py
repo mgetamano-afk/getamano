@@ -30,7 +30,7 @@ from test_config import (
 DEMO_REF_CODE = os.environ.get("TEST_REF_CODE", "GRY9J9")
 TS = int(time.time())
 INVITEE_EMAIL = f"test_iter35_invitee_{TS}@getamano-test.dev"
-INVITEE_PASSWORD = "ReferralTest123!"
+INVITEE_PASSWORD = os.environ.get("TEST_INVITEE_PASSWORD", "ReferralTest123!")
 INVITEE_NAME = "Iter35 Invitee"
 INVITEE_BUSINESS = f"Iter35 Limpieza {TS}"  # realistic-looking, avoids 'test' word block
 
@@ -147,9 +147,8 @@ class TestReferralPreview:
         assert r.status_code == 400
 
     def test_malformed_non_alnum_returns_400(self):
-        r = requests.get(f"{API}/referral/preview/AB!@#1", timeout=20)
-        # FastAPI may treat '!' in path as part of path — encode-safe variant:
-        # try a clearly non-alnum but 6-char path
+        # First try with '!' (FastAPI may treat as path char); the assertion is on r2.
+        requests.get(f"{API}/referral/preview/AB!@#1", timeout=20)
         r2 = requests.get(f"{API}/referral/preview/AB-CD1", timeout=20)
         assert r2.status_code == 400
 

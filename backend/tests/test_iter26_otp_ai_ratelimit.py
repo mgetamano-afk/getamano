@@ -1,16 +1,16 @@
 """
 Iteration 26 - Test SECTION 23 (rate limit), SECTION 24 (OTP), SECTION 25 (AI), sitemap.
 """
-import os
 import re
 import time
 import subprocess
 import pytest
 import requests
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
-DEMO_PROVIDER_EMAIL = "demo.provider@getamano.com"
-DEMO_PROVIDER_PASSWORD = "provider123"
+from tests.test_config import (
+    BASE_URL,
+    PROVIDER_EMAIL as DEMO_PROVIDER_EMAIL,
+    PROVIDER_PASSWORD as DEMO_PROVIDER_PASSWORD,
+)
 
 
 @pytest.fixture(scope="module")

@@ -93,11 +93,9 @@ class TestCreateComment:
         assert seed_post, "Seed post not found"
         baseline = seed_post.get("comments_count", 0)
 
-        # Provider's notifications baseline
+        # Provider's notifications baseline (used implicitly via the after-call check below).
         nr0 = provider_session.get(f"{API}/notifications", timeout=20)
         assert nr0.status_code == 200
-        notif_before = nr0.json()
-        notif_before_count = notif_before.get("total", 0) if isinstance(notif_before, dict) else len(notif_before)
 
         # Carlos creates a fresh comment
         body = {"content": "TEST_iter42 comment from Carlos to María"}

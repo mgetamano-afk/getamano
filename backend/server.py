@@ -1551,7 +1551,7 @@ async def seo_page_data(category_slug: str, city_slug: str):
 
 
 # ============ SITEMAP.XML + ROBOTS.TXT ============
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse  # Response is already imported at top
 
 @app.get("/api/sitemap.xml")
 async def sitemap():
@@ -7343,7 +7343,7 @@ _STATE_RE = re.compile(r"\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|L
 
 def _parse_card_text(text: str) -> dict:
     """Heuristic parser. Lines come from Vision API's DOCUMENT_TEXT_DETECTION result."""
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
     out = {"business_name": "", "owner_name": "", "phone": "", "email": "",
            "website": "", "city": "", "state": "", "zip_code": "",
            "raw_text": text, "lines_count": len(lines)}
@@ -7364,7 +7364,7 @@ def _parse_card_text(text: str) -> dict:
     if st:
         out["state"] = st.group(0)
     # Heuristic: largest UPPER/Title-case line near top = business name; 2nd-largest = owner
-    candidates = [l for l in lines if not _PHONE_RE.search(l) and not _EMAIL_RE.search(l) and not _URL_RE.search(l) and len(l) >= 3 and len(l) <= 60]
+    candidates = [ln for ln in lines if not _PHONE_RE.search(ln) and not _EMAIL_RE.search(ln) and not _URL_RE.search(ln) and len(ln) >= 3 and len(ln) <= 60]
     if candidates:
         out["business_name"] = candidates[0]
         if len(candidates) > 1:

@@ -9,17 +9,16 @@ Coverage:
 - POST /api/translate fallback (api_error OR no_api_key, both acceptable)
 - Regression: GET /api/providers/me/availability still works for demo provider
 """
-import os
 import pytest
 import requests
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
-API = f"{BASE_URL}/api"
-
-ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
-PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
+from tests.test_config import (
+    BASE_URL,
+    API,
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+    PROVIDER_EMAIL,
+    PROVIDER_PASSWORD,
+)
 
 
 # ---------- Fixtures ----------
