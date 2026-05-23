@@ -459,33 +459,47 @@ def slugify(text: str) -> str:
     text = re.sub(r'[\s_-]+', '-', text)
     return text.strip('-')[:60]
 
-async def get_current_user(request: Request) -> User:
+def _extract_session_token(request: Request) -> Optional[str]:
+    """Pull session token from cookie first, then `Authorization: Bearer …`."""
     token = request.cookies.get("session_token")
-    if not token:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth.split(" ", 1)[1]
+    if token:
+        return token
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth.split(" ", 1)[1]
+    return None
+
+
+def _user_id_from_jwt(token: str) -> Optional[str]:
+    """Decode our own JWT. Returns None on any failure (lets caller fall back)."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except jwt.PyJWTError:
+        return None
+    return payload.get("sub")
+
+
+async def _user_id_from_emergent_session(token: str) -> Optional[str]:
+    """Resolve user_id from a stored Emergent OAuth session, enforcing expiry."""
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        return None
+    expires_at = session.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expired")
+    return session["user_id"]
+
+
+async def get_current_user(request: Request) -> User:
+    token = _extract_session_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    # Try JWT first
-    user_id = None
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-        user_id = payload.get("sub")
-    except jwt.PyJWTError:
-        # Try Emergent session token
-        session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-        if session:
-            expires_at = session.get("expires_at")
-            if isinstance(expires_at, str):
-                expires_at = datetime.fromisoformat(expires_at)
-            if expires_at and expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if expires_at and expires_at < datetime.now(timezone.utc):
-                raise HTTPException(status_code=401, detail="Session expired")
-            user_id = session["user_id"]
-
+    user_id = _user_id_from_jwt(token) or await _user_id_from_emergent_session(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -950,458 +964,16 @@ async def list_categories():
     cats = await db.categories.find({}, {"_id": 0}).to_list(500)
     return cats
 
-# ============ PROVIDERS ============
-@api_router.get("/providers")
-async def search_providers(
-    q: Optional[str] = None,
-    category: Optional[str] = None,
-    city: Optional[str] = None,
-    state: Optional[str] = None,
-    zip_code: Optional[str] = None,
-    verified: Optional[bool] = None,
-    language: Optional[str] = None,
-    latino_owned: Optional[bool] = None,
-    owner_identity: Optional[Literal["latino", "american"]] = None,
-    country: Optional[str] = DEFAULT_COUNTRY,
-    has_video: Optional[bool] = None,
-    lat: Optional[float] = None,
-    lng: Optional[float] = None,
-    radius_km: Optional[float] = None,
-    radius_miles: float = 75.0,
-    limit: int = 24,
-):
-    query = {"is_active": True, **PUBLIC_GUARD}
-    if country:
-        query["country"] = country
-    if category:
-        cat = await db.categories.find_one({"slug": category}, {"_id": 0})
-        if cat:
-            query["category_id"] = cat["category_id"]
-    if city:
-        query["city"] = {"$regex": city, "$options": "i"}
-    if state:
-        query["state"] = {"$regex": f"^{state}$", "$options": "i"}
-    if zip_code:
-        query["zip_code"] = zip_code
-    if verified:
-        query["verification_status"] = "approved"
-    if language:
-        query["languages"] = language
-    if latino_owned:
-        query["latino_owned"] = "yes"
-    if owner_identity:
-        query["owner_identity"] = owner_identity
-    if has_video:
-        query["video_url"] = {"$exists": True, "$ne": ""}
-    # SECTION 27 — Smart search. Expand the user term to all matching canonical
-    # services (handles "limpesa" → Limpieza, "plumber" → Plomería, etc.)
-    expanded_terms: list[str] = []
-    if q:
-        from search_synonyms import expand_query as _expand_q
-        expanded_terms = _expand_q(q)
-        regex_terms = [q] + expanded_terms
-        or_clauses = []
-        for term in regex_terms:
-            term_safe = re.escape(term)
-            or_clauses.extend([
-                {"business_name": {"$regex": term_safe, "$options": "i"}},
-                {"description":   {"$regex": term_safe, "$options": "i"}},
-                {"services":      {"$regex": term_safe, "$options": "i"}},
-            ])
-        # Also widen by category name (so "limpieza" finds Cleaning category)
-        if expanded_terms:
-            cat_docs = await db.categories.find(
-                {"$or": [
-                    {"name_es": {"$in": expanded_terms}},
-                    {"name_en": {"$in": expanded_terms}},
-                ]},
-                {"_id": 0, "category_id": 1},
-            ).to_list(20)
-            cat_ids = [c["category_id"] for c in cat_docs]
-            if cat_ids:
-                or_clauses.append({"category_id": {"$in": cat_ids}})
-        query["$or"] = or_clauses
-    # Section 18F — Proximity search ("Near me"): if lat/lng provided, fetch
-    # candidates with coordinates, compute haversine distance, filter by radius.
-    # Radius input: accept BOTH radius_miles (preferred, US default) and radius_km (back-compat).
-    use_proximity = lat is not None and lng is not None
-    effective_radius_km = radius_km if radius_km is not None else (radius_miles * 1.60934)
-    if use_proximity:
-        query["latitude"] = {"$ne": None}
-        query["longitude"] = {"$ne": None}
-    # Plan-based sort: premium > pro > basic > free, then by likes, then by rating
-    PLAN_ORDER = {"premium": 0, "pro": 1, "basic": 2, "free": 3}
-    fetch_n = limit * 4 if use_proximity else limit * 2
-    providers = await db.provider_profiles.find(query, {"_id": 0}).limit(fetch_n).to_list(fetch_n)
-    if use_proximity:
-        from math import radians, sin, cos, asin, sqrt
-        def _hav_km(lat1, lng1, lat2, lng2):
-            R = 6371.0
-            la1, lo1, la2, lo2 = map(radians, (lat1, lng1, lat2, lng2))
-            dlat = la2 - la1; dlng = lo2 - lo1
-            a = sin(dlat/2)**2 + cos(la1)*cos(la2)*sin(dlng/2)**2
-            return 2 * R * asin(sqrt(a))
-        for p in providers:
-            try:
-                dist_km = _hav_km(lat, lng, float(p["latitude"]), float(p["longitude"]))
-                p["distance_km"] = round(dist_km, 2)
-                p["distance_miles"] = round(dist_km * 0.621371, 1)
-            except Exception:
-                p["distance_km"] = 9999.0
-                p["distance_miles"] = 9999.0
-        providers = [p for p in providers if p["distance_km"] <= effective_radius_km]
-        providers.sort(key=lambda p: (p["distance_km"], PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0)))
-    else:
-        providers.sort(key=lambda p: (PLAN_ORDER.get(p.get("plan", "free"), 9), -p.get("likes_count", 0), -p.get("rating_avg", 0)))
-    providers = providers[:limit]
-    cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(100)}
-    for p in providers:
-        p["category"] = cats.get(p.get("category_id"))
-    return providers
-
-# ════════════════════════════════════════════════════════════════════
-# SECTION 27 — Smart search helpers
-# ════════════════════════════════════════════════════════════════════
-@api_router.get("/search/autocomplete")
-async def search_autocomplete(q: str = "", lang: str = "es"):
-    """Live dropdown: canonical service names matching the typed term."""
-    from search_synonyms import expand_query
-    canonicals = expand_query(q, max_results=8)
-    if not canonicals:
-        return {"q": q, "matches": []}
-    cat_docs = await db.categories.find(
-        {"$or": [{"name_es": {"$in": canonicals}}, {"name_en": {"$in": canonicals}}]},
-        {"_id": 0, "slug": 1, "name_es": 1, "name_en": 1},
-    ).to_list(50)
-    by_name = {}
-    for c in cat_docs:
-        by_name[c.get("name_es", "")] = c
-        by_name[c.get("name_en", "")] = c
-    matches = []
-    for canon in canonicals:
-        cat = by_name.get(canon)
-        matches.append({
-            "label": canon,
-            "label_en": (cat.get("name_en") if cat else canon),
-            "slug": (cat.get("slug") if cat else None),
-        })
-    return {"q": q, "matches": matches}
-
-
-@api_router.get("/search/alternatives")
-async def search_alternatives(q: str = ""):
-    """Empty-state helper: nearest service names when 0 providers matched."""
-    from search_synonyms import suggest_alternatives
-    return {"q": q, "alternatives": suggest_alternatives(q, max_results=4)}
+# ============ PROVIDERS + SEARCH ============
+# Extracted to routes/search.py — wired at the bottom of this file alongside
+# the community and auth routers. See SECTION 27 for smart-search synonyms.
 
 
 # ════════════════════════════════════════════════════════════════════
 # SECTION 30 (CAMBIO C) — Gigs / Chambas marketplace
 # ════════════════════════════════════════════════════════════════════
-# Quick one-off jobs that any client can post. Active providers in the
-# same vertical can browse, apply with a short pitch + price, and the
-# client picks the winner. Gigs auto-expire after 30 days.
-
-class GigIn(BaseModel):
-    title: str
-    description: str
-    category: str            # ES canonical (e.g. "Limpieza"), drives discovery
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    is_urgent: Optional[bool] = False
-
-class GigApplicationIn(BaseModel):
-    message: str
-    proposed_price: Optional[float] = None
-
-def _gig_public(g: dict) -> dict:
-    g = {k: v for k, v in g.items() if k not in ("_id", "expires_at_native")}
-    return g
-
-async def _fanout_new_gig_notifications(gig: dict) -> int:
-    """Section 30 — Notify nearby/in-category providers about a new chamba.
-
-    Strategy:
-      • Match providers whose primary category name matches the gig's category
-        (ES or EN, case-insensitive) AND whose city matches the gig's city.
-      • Fall back to category-only match if city is missing on the gig.
-      • Skip the gig poster and TEST_ accounts. Cap fanout at 200 to avoid
-        runaway notifications during dev.
-      • Idempotent: notification_key includes the gig_id so re-running won't
-        double-insert.
-    """
-    try:
-        gig_id = gig.get("gig_id")
-        category = (gig.get("category") or "").strip()
-        if not gig_id or not category:
-            return 0
-        # Look up category_id by ES or EN name (case-insensitive exact match)
-        cat = await db.categories.find_one(
-            {"$or": [
-                {"name_es": {"$regex": f"^{re.escape(category)}$", "$options": "i"}},
-                {"name_en": {"$regex": f"^{re.escape(category)}$", "$options": "i"}},
-            ]},
-            {"_id": 0, "category_id": 1},
-        )
-        if not cat:
-            return 0
-        match = {
-            "category_id": cat["category_id"],
-            "is_active": True,
-            "verification_status": "approved",
-            "user_id": {"$ne": gig.get("created_by")},
-            "business_name": {"$not": {"$regex": "^TEST_"}},
-        }
-        gig_city = (gig.get("city") or "").strip()
-        if gig_city:
-            match["city"] = {"$regex": f"^{re.escape(gig_city)}$", "$options": "i"}
-        targets = await db.provider_profiles.find(match, {"_id": 0, "user_id": 1}).limit(200).to_list(200)
-        if not targets:
-            return 0
-        city_label = gig_city or "tu zona"
-        title_es = f"💼 Nueva chamba en {city_label}"
-        body_es = f"{category} · {gig.get('title', '')[:80]}"
-        now_iso = datetime.now(timezone.utc).isoformat()
-        inserted = 0
-        for tgt in targets:
-            user_id = tgt.get("user_id")
-            if not user_id:
-                continue
-            key = f"{user_id}::new_gig::{gig_id}"
-            # Idempotent insert — skip if same key exists
-            existing = await db.notifications.find_one({"notification_key": key}, {"_id": 0, "notification_key": 1})
-            if existing:
-                continue
-            await db.notifications.insert_one({
-                "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
-                "notification_key": key,
-                "user_id": user_id,
-                "role": "provider",
-                "category": "gigs",
-                "title": title_es,
-                "body": body_es,
-                "cta_label": "Ver chamba",
-                "cta_url": "/empleos",
-                "icon": "trophy",
-                "priority": "high" if gig.get("is_urgent") else "medium",
-                "is_read": False,
-                "dismissed_at": None,
-                "created_at": now_iso,
-            })
-            inserted += 1
-        return inserted
-    except Exception as e:
-        logger.warning(f"_fanout_new_gig_notifications failed: {e}")
-        return 0
-
-async def _notify_gig_owner_new_applicant(gig: dict, applicant_profile: dict | None) -> bool:
-    """Section 30 — Ping the gig owner when a new provider applies."""
-    try:
-        gig_id = gig.get("gig_id")
-        owner_id = gig.get("created_by")
-        if not gig_id or not owner_id:
-            return False
-        biz = (applicant_profile or {}).get("business_name") or "Un proveedor"
-        # One notification per gig — refresh counter each time
-        key = f"{owner_id}::gig_applicant::{gig_id}"
-        count = await db.gig_applications.count_documents({"gig_id": gig_id})
-        body = f"{biz} aplicó a “{gig.get('title', '')[:60]}”" if count <= 1 else f"{count} aplicantes en tu chamba “{gig.get('title', '')[:50]}”"
-        now_iso = datetime.now(timezone.utc).isoformat()
-        existing = await db.notifications.find_one({"notification_key": key}, {"_id": 0})
-        if existing:
-            await db.notifications.update_one(
-                {"notification_key": key},
-                {"$set": {"body": body, "is_read": False, "updated_at": now_iso}},
-            )
-        else:
-            await db.notifications.insert_one({
-                "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
-                "notification_key": key,
-                "user_id": owner_id,
-                "role": "client",
-                "category": "gigs",
-                "title": "🙋 Nuevo aplicante a tu chamba",
-                "body": body,
-                "cta_label": "Ver aplicaciones",
-                "cta_url": "/empleos",
-                "icon": "inbox",
-                "priority": "high",
-                "is_read": False,
-                "dismissed_at": None,
-                "created_at": now_iso,
-            })
-        return True
-    except Exception as e:
-        logger.warning(f"_notify_gig_owner_new_applicant failed: {e}")
-        return False
-
-@api_router.get("/gigs")
-async def list_gigs(
-    category: Optional[str] = None,
-    city: Optional[str] = None,
-    state: Optional[str] = None,
-    limit: int = 24,
-):
-    q: dict = {"status": "open"}
-    if category:
-        q["category"] = {"$regex": f"^{re.escape(category)}$", "$options": "i"}
-    if city:
-        q["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
-    if state:
-        q["state"] = {"$regex": f"^{re.escape(state)}$", "$options": "i"}
-    docs = await db.gigs.find(q, {"_id": 0, "expires_at_native": 0}) \
-        .sort([("is_urgent", -1), ("created_at", -1)]) \
-        .limit(max(1, min(limit, 100))).to_list(100)
-    # add cheap counter — applications per gig
-    if docs:
-        gig_ids = [d["gig_id"] for d in docs]
-        pipe = [
-            {"$match": {"gig_id": {"$in": gig_ids}}},
-            {"$group": {"_id": "$gig_id", "count": {"$sum": 1}}},
-        ]
-        counts = {row["_id"]: row["count"] async for row in db.gig_applications.aggregate(pipe)}
-        for d in docs:
-            d["applicant_count"] = counts.get(d["gig_id"], 0)
-    return docs
-
-@api_router.get("/gigs/{gig_id}")
-async def get_gig(gig_id: str):
-    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "expires_at_native": 0})
-    if not g:
-        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
-    # Anonymize the poster identity for the public view — only show name + first letter
-    if g.get("posted_by_name"):
-        g["posted_by_display"] = g["posted_by_name"].split()[0] if " " in g["posted_by_name"] else g["posted_by_name"]
-    g["applicant_count"] = await db.gig_applications.count_documents({"gig_id": gig_id})
-    return g
-
-@api_router.post("/gigs")
-async def create_gig(payload: GigIn, request: Request, user: User = Depends(get_current_user)):
-    # Validation — keep junk out the same way we did with /api/providers in iter-27
-    title = (payload.title or "").strip()
-    desc = (payload.description or "").strip()
-    if len(title) < 6:
-        raise HTTPException(status_code=400, detail="El título debe tener al menos 6 caracteres.")
-    if len(desc) < 20:
-        raise HTTPException(status_code=400, detail="Describe la chamba con al menos 20 caracteres.")
-    if re.search(r"\b(test|qa|asdf)\b", title.lower()):
-        raise HTTPException(status_code=400, detail="Título no válido.")
-    if (payload.budget_min is not None and payload.budget_min < 0) or (payload.budget_max is not None and payload.budget_max < 0):
-        raise HTTPException(status_code=400, detail="El presupuesto no puede ser negativo.")
-    if (payload.budget_min is not None and payload.budget_max is not None
-            and payload.budget_min > payload.budget_max):
-        raise HTTPException(status_code=400, detail="El presupuesto mínimo no puede ser mayor que el máximo.")
-    now = datetime.now(timezone.utc)
-    gig_id = f"gig_{uuid.uuid4().hex[:12]}"
-    expires = now + timedelta(days=30)
-    doc = {
-        "gig_id": gig_id,
-        "title": title,
-        "description": desc,
-        "category": (payload.category or "").strip() or "Otros",
-        "budget_min": payload.budget_min,
-        "budget_max": payload.budget_max,
-        "city": (payload.city or "").strip() or None,
-        "state": (payload.state or "").strip() or None,
-        "is_urgent": bool(payload.is_urgent),
-        "status": "open",
-        "created_by": user.user_id,
-        "posted_by_name": user.name or user.email,
-        "created_at": now.isoformat(),
-        "expires_at_native": expires,
-        "expires_at": expires.isoformat(),
-    }
-    await db.gigs.insert_one(doc)
-    await audit_log(user.user_id, "gig.created", {"gig_id": gig_id, "category": doc["category"]}, request)
-    fanout = await _fanout_new_gig_notifications(doc)
-    if fanout:
-        logger.info(f"gig {gig_id}: fanout notified {fanout} providers")
-    return _gig_public(doc)
-
-@api_router.post("/gigs/{gig_id}/close")
-async def close_gig(gig_id: str, request: Request, user: User = Depends(get_current_user)):
-    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "created_by": 1, "status": 1})
-    if not g:
-        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
-    if g["created_by"] != user.user_id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="No puedes cerrar esta chamba.")
-    if g.get("status") != "open":
-        return {"ok": True, "already_closed": True}
-    await db.gigs.update_one({"gig_id": gig_id}, {"$set": {"status": "closed", "closed_at": datetime.now(timezone.utc).isoformat()}})
-    await audit_log(user.user_id, "gig.closed", {"gig_id": gig_id}, request)
-    return {"ok": True}
-
-@api_router.post("/gigs/{gig_id}/apply")
-async def apply_to_gig(gig_id: str, payload: GigApplicationIn, request: Request, user: User = Depends(get_current_user)):
-    if user.role != "provider":
-        raise HTTPException(status_code=403, detail="Solo proveedores pueden aplicar a chambas.")
-    msg = (payload.message or "").strip()
-    if len(msg) < 20:
-        raise HTTPException(status_code=400, detail="Tu mensaje debe tener al menos 20 caracteres.")
-    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "status": 1, "created_by": 1})
-    if not g:
-        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
-    if g.get("status") != "open":
-        raise HTTPException(status_code=400, detail="Esta chamba ya no está abierta.")
-    if g.get("created_by") == user.user_id:
-        raise HTTPException(status_code=400, detail="No puedes aplicar a tu propia chamba.")
-    # Find the provider's eCard so we can attach name + slug
-    profile = await db.provider_profiles.find_one(
-        {"user_id": user.user_id},
-        {"_id": 0, "provider_id": 1, "business_name": 1, "slug": 1},
-    )
-    now = datetime.now(timezone.utc).isoformat()
-    try:
-        await db.gig_applications.insert_one({
-            "application_id": f"gigapp_{uuid.uuid4().hex[:12]}",
-            "gig_id": gig_id,
-            "provider_id": user.user_id,
-            "provider_business_name": profile.get("business_name") if profile else (user.name or "Proveedor"),
-            "provider_slug": profile.get("slug") if profile else None,
-            "message": msg,
-            "proposed_price": payload.proposed_price,
-            "status": "pending",
-            "created_at": now,
-        })
-    except DuplicateKeyError:
-        raise HTTPException(status_code=400, detail="Ya aplicaste a esta chamba.")
-    await audit_log(user.user_id, "gig.application_sent", {"gig_id": gig_id}, request)
-    # Notify the gig owner (refreshes count on re-insert)
-    full_gig = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0})
-    if full_gig:
-        await _notify_gig_owner_new_applicant(full_gig, profile)
-    return {"ok": True, "applied_at": now}
-
-@api_router.get("/gigs/{gig_id}/applications")
-async def list_gig_applications(gig_id: str, user: User = Depends(get_current_user)):
-    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "created_by": 1})
-    if not g:
-        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
-    if g["created_by"] != user.user_id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo el dueño puede ver las aplicaciones.")
-    apps = await db.gig_applications.find({"gig_id": gig_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
-    return apps
-
-@api_router.get("/me/gigs")
-async def my_gigs(user: User = Depends(get_current_user)):
-    """Gigs posted by the current user."""
-    docs = await db.gigs.find({"created_by": user.user_id}, {"_id": 0, "expires_at_native": 0}).sort("created_at", -1).to_list(50)
-    return docs
-
-@api_router.get("/me/gig-applications")
-async def my_gig_applications(user: User = Depends(get_current_user)):
-    """Provider view: gigs I applied to."""
-    apps = await db.gig_applications.find({"provider_id": user.user_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    if apps:
-        gig_ids = [a["gig_id"] for a in apps]
-        gigs_by_id = {g["gig_id"]: g for g in await db.gigs.find(
-            {"gig_id": {"$in": gig_ids}}, {"_id": 0, "expires_at_native": 0}
-        ).to_list(200)}
-        for a in apps:
-            a["gig"] = gigs_by_id.get(a["gig_id"])
-    return apps
+# Extracted to routes/jobs.py — wired at the bottom of this file alongside the
+# community, auth, and search routers.
 
 
 @api_router.get("/providers/identity-counts")
@@ -1447,218 +1019,12 @@ async def providers_identity_counts(
 
 
 # ============ SEO LOCAL: CITIES + STATS PER CITY/CATEGORY ============
-@api_router.get("/seo/cities")
-async def seo_cities():
-    """Return all SEO-target cities for hub /ciudades."""
-    items = []
-    for c in SEO_CITIES:
-        count = await db.provider_profiles.count_documents({"is_active": True, "city": {"$regex": f"^{c['name']}$", "$options": "i"}, **PUBLIC_GUARD})
-        items.append({**c, "providers_count": count})
-    items.sort(key=lambda x: -x["providers_count"])
-    return {"items": items, "total": len(items)}
+# Extracted to routes/seo.py — wired at the bottom of this file. Endpoints:
+#   GET /seo/cities · /seo/sectors · /seo/city/{slug} · /seo/category/{slug}
+#   GET /seo/page/{cat}/{city} · /seo/content/{cat}/{city}
+#   GET /sitemap.xml · /robots.txt
 
-
-@api_router.get("/seo/sectors")
-async def seo_sectors():
-    """Return categories grouped by sector for hub /servicios."""
-    cats = await db.categories.find({}, {"_id": 0}).to_list(500)
-    by_sector: dict = {}
-    for c in cats:
-        s = c.get("sector", "hogar")
-        by_sector.setdefault(s, []).append(c)
-    out = []
-    for sector_key, sector_label in SECTOR_LABELS.items():
-        items = by_sector.get(sector_key, [])
-        if not items:
-            continue
-        # add provider counts per category
-        for cat in items:
-            cat["providers_count"] = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"]})
-        items.sort(key=lambda x: -x.get("providers_count", 0))
-        out.append({"sector": sector_key, "label": sector_label, "color": SECTOR_COLORS.get(sector_key, "#2F9D94"), "categories": items})
-    return {"sectors": out}
-
-
-@api_router.get("/seo/city/{city_slug}")
-async def seo_city_detail(city_slug: str):
-    """Return categories available in a given city + count per category."""
-    city = next((c for c in SEO_CITIES if c["slug"] == city_slug), None)
-    if not city:
-        raise HTTPException(status_code=404, detail="City not found")
-    pipeline = [
-        {"$match": {"is_active": True, "city": {"$regex": f"^{city['name']}$", "$options": "i"}, "is_test": {"$ne": True}}},
-        {"$group": {"_id": "$category_id", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-    ]
-    agg = await db.provider_profiles.aggregate(pipeline).to_list(500)
-    cat_ids = [a["_id"] for a in agg if a["_id"]]
-    cats = await db.categories.find({"category_id": {"$in": cat_ids}}, {"_id": 0}).to_list(500)
-    cat_map = {c["category_id"]: c for c in cats}
-    items = []
-    for a in agg:
-        c = cat_map.get(a["_id"])
-        if c:
-            items.append({**c, "providers_count": a["count"]})
-    return {"city": city, "categories": items, "total_providers": sum(a["count"] for a in agg)}
-
-
-@api_router.get("/seo/category/{category_slug}")
-async def seo_category_detail(category_slug: str):
-    """Return cities where a given category has providers."""
-    cat = await db.categories.find_one({"slug": category_slug}, {"_id": 0})
-    if not cat:
-        raise HTTPException(status_code=404, detail="Category not found")
-    items = []
-    for c in SEO_CITIES:
-        count = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{c['name']}$", "$options": "i"}, **PUBLIC_GUARD})
-        if count > 0:
-            items.append({**c, "providers_count": count})
-    items.sort(key=lambda x: -x["providers_count"])
-    return {"category": cat, "cities": items, "total_cities": len(items)}
-
-
-@api_router.get("/seo/page/{category_slug}/{city_slug}")
-async def seo_page_data(category_slug: str, city_slug: str):
-    """All data needed by the SEO landing page /servicios/{cat}/{city}."""
-    cat = await db.categories.find_one({"slug": category_slug}, {"_id": 0})
-    if not cat:
-        raise HTTPException(status_code=404, detail="Category not found")
-    city = next((c for c in SEO_CITIES if c["slug"] == city_slug), None)
-    if not city:
-        raise HTTPException(status_code=404, detail="City not found")
-    providers = await db.provider_profiles.find(
-        {"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{city['name']}$", "$options": "i"}, **PUBLIC_GUARD},
-        {"_id": 0}
-    ).limit(12).to_list(12)
-    PLAN_RANK = {"premium": 0, "pro": 1, "basic": 2, "free": 3}
-    providers.sort(key=lambda p: (-p.get("rating_count", 0), PLAN_RANK.get(p.get("plan", "free"), 9)))
-    # related: same category in other cities (top 4) + other categories in same city (top 4)
-    related_cities = []
-    for c in SEO_CITIES:
-        if c["slug"] == city_slug:
-            continue
-        cnt = await db.provider_profiles.count_documents({"is_active": True, "category_id": cat["category_id"], "city": {"$regex": f"^{c['name']}$", "$options": "i"}})
-        related_cities.append({**c, "count": cnt})
-    related_cities.sort(key=lambda x: -x["count"])
-    related_cities = [c for c in related_cities if c["count"] > 0][:4] or [{**c, "count": 0} for c in SEO_CITIES if c["slug"] != city_slug][:4]
-    # related categories
-    same_sector_cats = await db.categories.find({"sector": cat.get("sector"), "slug": {"$ne": cat["slug"]}}, {"_id": 0}).limit(4).to_list(4)
-    return {
-        "category": cat,
-        "city": city,
-        "providers": providers,
-        "related_cities": related_cities,
-        "related_categories": same_sector_cats,
-    }
-
-
-# ============ SITEMAP.XML + ROBOTS.TXT ============
-from fastapi.responses import PlainTextResponse  # Response is already imported at top
-
-@app.get("/api/sitemap.xml")
-async def sitemap():
-    base = "https://getamano.us"
-    urls = [
-        f"<url><loc>{base}/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>",
-        f"<url><loc>{base}/servicios</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>",
-        f"<url><loc>{base}/ciudades</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>",
-        f"<url><loc>{base}/plans</loc><priority>0.8</priority><changefreq>monthly</changefreq></url>",
-        f"<url><loc>{base}/comunidad</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>",
-        f"<url><loc>{base}/instalar</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>",
-        f"<url><loc>{base}/terminos</loc><priority>0.3</priority><changefreq>monthly</changefreq></url>",
-        f"<url><loc>{base}/privacidad</loc><priority>0.3</priority><changefreq>monthly</changefreq></url>",
-    ]
-    # SECTION 22 SEO category hubs — Spanish + English routes both index
-    SEO_CATEGORY_SLUGS = [
-        "cleaning", "catering", "construction", "handyman", "auto", "beauty",
-        "moving", "legal", "landscaping", "events", "tutoring", "health",
-    ]
-    for slug in SEO_CATEGORY_SLUGS:
-        urls.append(f"<url><loc>{base}/categoria/{slug}</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>")
-        urls.append(f"<url><loc>{base}/category/{slug}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
-    cats = await db.categories.find({}, {"_id": 0, "slug": 1}).to_list(500)
-    for cat in cats:
-        urls.append(f"<url><loc>{base}/servicios/{cat['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
-        for city in SEO_CITIES:
-            urls.append(f"<url><loc>{base}/servicios/{cat['slug']}/{city['slug']}</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>")
-    for city in SEO_CITIES:
-        urls.append(f"<url><loc>{base}/ciudades/{city['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
-    providers = await db.provider_profiles.find({"is_active": True, **PUBLIC_GUARD}, {"_id": 0, "slug": 1}).to_list(2000)
-    for p in providers:
-        if p.get("slug"):
-            urls.append(f"<url><loc>{base}/proveedor/{p['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
-    return Response(content=xml, media_type="application/xml")
-
-
-@app.get("/api/robots.txt", response_class=PlainTextResponse)
-async def robots():
-    return """User-agent: *
-Allow: /
-Allow: /servicios/
-Allow: /ciudades/
-Allow: /proveedor/
-Disallow: /dashboard/
-Disallow: /admin/
-Disallow: /api/
-Disallow: /login
-Disallow: /register
-
-Sitemap: https://getamano.us/sitemap.xml
-"""
-
-
-# ============ SEO CONTENT AI (cached per cat × city) ============
-@api_router.get("/seo/content/{category_slug}/{city_slug}")
-async def get_seo_content(category_slug: str, city_slug: str):
-    """Returns AI-generated unique 100-word paragraph for a (cat, city) page.
-    Cached in `seo_content_cache` collection; generates lazily on first request."""
-    cached = await db.seo_content_cache.find_one({"cat_slug": category_slug, "city_slug": city_slug}, {"_id": 0})
-    if cached and cached.get("content"):
-        return {"content": cached["content"], "generated_at": cached.get("generated_at"), "cached": True}
-
-    cat = await db.categories.find_one({"slug": category_slug}, {"_id": 0})
-    city = next((c for c in SEO_CITIES if c["slug"] == city_slug), None)
-    if not cat or not city:
-        raise HTTPException(status_code=404, detail="Not found")
-
-    prompt = (
-        f"Eres un copywriter latino para getamano, marketplace que conecta a latinos en USA con proveedores latinos verificados. "
-        f"Escribe UN ÚNICO PÁRRAFO de 90-110 palabras en español neutro sobre buscar servicios de '{cat['name_es']}' en {city['name']}, {city['state']}. "
-        f"Tono cálido, profesional, útil. Menciona que getamano conecta con proveedores latinos verificados. "
-        f"NO listas, NO emojis, NO títulos. NO inventes datos numéricos (precios, cantidades). "
-        f"Termina con un llamado sutil a explorar la lista o pedir cotización. NO menciones competidores."
-    )
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=os.environ.get("EMERGENT_LLM_KEY"),
-            session_id=f"seo_{category_slug}_{city_slug}",
-            system_message="Eres un copywriter SEO bilingüe para la comunidad latina en USA."
-        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        content = (await chat.send_message(UserMessage(text=prompt))).strip()
-        if not content:
-            raise ValueError("Empty response")
-        doc = {
-            "cat_slug": category_slug,
-            "city_slug": city_slug,
-            "content": content,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.seo_content_cache.update_one(
-            {"cat_slug": category_slug, "city_slug": city_slug},
-            {"$set": doc},
-            upsert=True,
-        )
-        return {"content": content, "generated_at": doc["generated_at"], "cached": False}
-    except Exception as e:
-        logger.warning(f"SEO AI content gen failed for {category_slug}/{city_slug}: {e}")
-        fallback = (
-            f"En getamano encontrarás proveedores latinos verificados de {cat['name_es'].lower()} "
-            f"en {city['name']}, {city['state']}. Compara reseñas reales, solicita cotización gratis en español, "
-            f"y contrata con confianza. Apoya a la comunidad mientras resuelves lo que necesitas."
-        )
-        return {"content": fallback, "generated_at": datetime.now(timezone.utc).isoformat(), "cached": False, "fallback": True}
+from fastapi.responses import PlainTextResponse  # noqa: E402,F401  — still imported by older sections
 
 
 # ============ REPORTS (Sprint 2 — bidirectional safety) ============
@@ -8987,9 +8353,13 @@ async def audit_log(actor_id: Optional[str], action: str, details: Optional[dict
 # Mount modular routers (refactor in progress)
 #   · Section 35+36+42 — community
 #   · Section 17/24    — auth (login/register/google/OTP)
+#   · Section 27       — search (smart provider search + autocomplete)
 # ════════════════════════════════════════════════════════════════════════
 from routes.community import make_router as _make_community_router  # noqa: E402
 from routes.auth import make_router as _make_auth_router  # noqa: E402
+from routes.search import make_router as _make_search_router  # noqa: E402
+from routes.jobs import make_router as _make_jobs_router  # noqa: E402
+from routes.seo import make_router as _make_seo_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9015,6 +8385,32 @@ api_router.include_router(
         send_email_via_resend=_send_email_via_resend,
         EMERGENT_AUTH_URL=EMERGENT_AUTH_URL,
         DEFAULT_COUNTRY=DEFAULT_COUNTRY,
+    )
+)
+
+api_router.include_router(
+    _make_search_router(
+        db=db,
+        PUBLIC_GUARD=PUBLIC_GUARD,
+        DEFAULT_COUNTRY=DEFAULT_COUNTRY,
+    )
+)
+
+api_router.include_router(
+    _make_jobs_router(
+        db=db,
+        audit_log=audit_log,
+        get_current_user=get_current_user,
+    )
+)
+
+api_router.include_router(
+    _make_seo_router(
+        db=db,
+        PUBLIC_GUARD=PUBLIC_GUARD,
+        SEO_CITIES=SEO_CITIES,
+        SECTOR_LABELS=SECTOR_LABELS,
+        SECTOR_COLORS=SECTOR_COLORS,
     )
 )
 

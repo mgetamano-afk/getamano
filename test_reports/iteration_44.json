@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 44 — Backend regression for the server.py refactor (search/jobs/seo extraction + get_current_user split). Built a 38-test pytest suite covering all targeted endpoints/flows in the review request. 38/38 pass. No regressions detected; the new routes/*.py modules are wired correctly, response shapes match the pre-refactor contracts, helper decomposition (proximity, text-search, validation, fan-out, sitemap, SEO content cache) behaves end-to-end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter44_refactor_regression.py",
+    "/app/test_reports/pytest/iter44_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is still ~8420 lines after extracting search/jobs/seo. Continue carving out subscriptions, messages, gallery, notifications, appointments, AI/translate — each is already self-contained and ripe for its own routes/*.py module.",
+    "_extract_session_token prioritises cookie over the Authorization: Bearer header. This is pre-existing (not a refactor regression) but is a footgun for API clients/tests that send both. Consider swapping the order so an explicit Bearer wins, or document the precedence explicitly in the helper docstring.",
+    "routes/jobs.py:336 — DuplicateKeyError handler raises HTTPException but should `raise ... from e` (B904) or the `except` is fine since HTTPException is intentional. Lint nit only.",
+    "routes/seo.py _do_seo_cities does len(SEO_CITIES) sequential count_documents calls. Same pattern in _do_seo_category_detail and _fetch_related_cities. Acceptable for SEO read-paths but consider a single $facet aggregation if cities grow beyond ~15.",
+    "routes/seo.py /api/sitemap.xml builds urls in-memory and can grow to hundreds of KB (main agent noted 581999 bytes). Consider a sitemap-index split (provider sitemap vs. SEO-page sitemap) once provider count breaches ~5k, and add Cache-Control headers since the generation cost is non-trivial.",
+    "routes/search.py _do_search_providers fetches limit*4 docs when proximity is on but applies category-id filter via _build_simple_filters BEFORE proximity trimming — perfect. Just confirm the Mongo index on (is_active, category_id, latitude, longitude) exists; otherwise the limit*4 scan can be slow as the catalog grows.",
+    "routes/search.py: lang parameter on /search/autocomplete is accepted but unused. Either wire it into the canonical→label selection or drop it from the signature."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter44_refactor_regression.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (38/38)",
+    "frontend": "n/a (not in scope)"
+  },
+  "test_credentials": "Used credentials from /app/memory/test_credentials.md — demo.client@getamano.com / client123 and demo.provider@getamano.com / provider123. Admin not needed for this scope.",
+  "seed_data_creation": "Each test creates throwaway gigs prefixed with TEST_ and closes them in fixture teardown. No persistent data leaked.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Suite file: /app/backend/tests/test_iter44_refactor_regression.py — reuse it as the canonical regression for routes/search.py, routes/jobs.py, routes/seo.py, and the get_current_user refactor. Tests are tolerant of 429 rate-limits on auth endpoints (login + forgot-password) so the suite is rerunnable without sleeps once the limiter resets. If continuing the server.py extraction, add a new TestNewModule class in the same file rather than spawning yet another iter*.py file."
+}
