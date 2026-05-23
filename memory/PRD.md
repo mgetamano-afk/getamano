@@ -275,6 +275,22 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — "Cerca de mí" chip integrado al CitySearchInput
+
+**Quick-win UX**: en lugar de un botón crosshair separado, el chip "Cerca de mí" vive ahora **dentro** del dropdown del input — accesible desde Landing hero, `/buscar`, y donde sea que use `CitySearchInput`.
+
+- `CitySearchInput.jsx`: nueva prop `onUseGeolocation` + `geoActive` + `geoLoading`. Cuando está provista, renderiza un chip premium al tope del dropdown (antes de las ciudades populares) con icon Navigation, copy contextual ("Encuentra proveedores en tu zona" / "Ubicación activa — toca para refrescar"), badge "ON" cuando geoActive.
+- `pages/Search.jsx`: removido el botón crosshair externo redundante; pasa `requestLocation` al chip + `position` al `geoActive`. Añadido `useEffect` mount que detecta `?nearme=1` y dispara `requestLocation` (luego limpia el flag de la URL).
+- `pages/Landing.jsx`: el chip navega a `/buscar?nearme=1` (con `q` si el usuario ya escribió un servicio). Cero duplicación de lógica geo — todo vive en Search.jsx.
+
+**E2E verificado (mobile 390px, geo simulado en Houston TX 29.76,-95.37):**
+- Landing: dropdown muestra chip + 5 ciudades populares ✓
+- Click "Cerca de mí" → URL pasa a `/buscar?lat=29.7604&lng=-95.3698&radius_miles=75`, `nearme=1` ya removido ✓
+- `/buscar`: dropdown muestra el chip ahora con badge "ON" e indicación "Ubicación activa — toca para refrescar" ✓
+- Radius selector "75 mi" activo automáticamente ✓
+
+**Lint**: 0 issues.
+
 ### May 23, 2026 — Public CitySearchInput rollout (`/buscar` + Landing hero)
 
 **Extiende Sección 42 al flujo cliente público:**

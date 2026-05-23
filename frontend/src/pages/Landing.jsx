@@ -97,6 +97,16 @@ export default function Landing() {
     navigate(`/buscar?${p.toString()}`);
   };
 
+  // Geolocation chip on the hero — hand the work off to /buscar via
+  // ?nearme=1 so the public search page (which already owns the
+  // useGeolocation hook + radius selector) takes over from there.
+  const handleNearMe = () => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    p.set("nearme", "1");
+    navigate(`/buscar?${p.toString()}`);
+  };
+
   // SmartServiceSearch tells us when the user picked a canonical service
   // (e.g. clicked "Limpieza" in the dropdown). Navigate to /buscar with the
   // ES label so the backend's smart search re-expands it correctly + carry
@@ -209,6 +219,7 @@ export default function Landing() {
                     }}
                     placeholder={lang === "en" ? "City or ZIP" : "Ciudad o ZIP"}
                     compact
+                    onUseGeolocation={handleNearMe}
                   />
                 </div>
                 <button type="submit" className="relative overflow-hidden btn-secondary flex items-center justify-center gap-1 w-full md:w-auto" data-testid="hero-search-submit">

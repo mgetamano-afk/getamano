@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, Loader2, X } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, X } from "lucide-react";
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
@@ -58,6 +58,19 @@ export default function Search() {
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
     // Mount-only: sentinelRef.current is set by React before this fires
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Hero "Cerca de mí" handoff — Landing pushes ?nearme=1 here and we fire
+  // requestLocation() so the browser permission prompt appears on the
+  // page that actually needs it. Strip the flag after consuming it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (params.get("nearme") !== "1") return;
+    requestLocation();
+    const next = new URLSearchParams(params);
+    next.delete("nearme");
+    setParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -211,18 +224,11 @@ export default function Search() {
                   }}
                   placeholder={t("hero.search.location")}
                   compact
+                  onUseGeolocation={() => { setCity(""); requestLocation(); }}
+                  geoActive={Boolean(position)}
+                  geoLoading={geoLoading}
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => { setCity(""); requestLocation(); }}
-                className={`flex-shrink-0 p-2.5 rounded-xl border transition ${position ? "bg-teal-600 text-white border-teal-600" : "bg-white text-teal-700 border-slate-200 hover:border-teal-500"}`}
-                title={position ? "Ubicación activa" : (lang === "en" ? "Near me" : "Cerca de mí")}
-                data-testid="search-near-me"
-                disabled={geoLoading}
-              >
-                {geoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
-              </button>
             </div>
             <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
           </form>

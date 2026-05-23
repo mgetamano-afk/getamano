@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Search, MapPin, X, Loader2 } from "lucide-react";
+import { Search, MapPin, X, Loader2, Navigation } from "lucide-react";
 import useCitySearch from "../hooks/useCitySearch";
 import { getCitiesByState } from "../data/usLocations";
 
@@ -38,6 +38,9 @@ export default function CitySearchInput({
   onChange,
   placeholder,
   compact = false,
+  onUseGeolocation,
+  geoActive = false,
+  geoLoading = false,
 }) {
   const { query, handleQueryChange, results, loading, clear, isFallback } = useCitySearch(stateName);
   const [isFocused, setIsFocused] = useState(false);
@@ -69,8 +72,17 @@ export default function CitySearchInput({
   };
 
   const showDropdown =
-    isFocused && (results.length > 0 || (query.length === 0 && popularCities.length > 0));
+    isFocused &&
+    (results.length > 0 ||
+      (query.length === 0 && (popularCities.length > 0 || onUseGeolocation)));
   const showEmpty = isFocused && query.length >= 2 && !loading && results.length === 0;
+
+  const handleGeolocationClick = () => {
+    if (!onUseGeolocation || geoLoading) return;
+    onUseGeolocation();
+    setIsFocused(false);
+    inputRef.current?.blur();
+  };
 
   return (
     <div className="relative w-full" data-testid="city-search-input">
@@ -117,6 +129,44 @@ export default function CitySearchInput({
           className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden"
           data-testid="city-search-dropdown"
         >
+          {/* Geolocation chip — shown only when no query yet, as the primary CTA */}
+          {query.length === 0 && onUseGeolocation && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); handleGeolocationClick(); }}
+              disabled={geoLoading}
+              className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left border-b border-slate-100 ${
+                geoActive
+                  ? "bg-teal-50 hover:bg-teal-100"
+                  : "hover:bg-teal-50"
+              } disabled:opacity-60`}
+              data-testid="city-near-me"
+              aria-label="Usar mi ubicación"
+            >
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: geoActive ? "#025F67" : "#E1F5EE" }}
+              >
+                {geoLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: geoActive ? "white" : "#025F67" }} />
+                ) : (
+                  <Navigation className="w-3.5 h-3.5" style={{ color: geoActive ? "white" : "#025F67" }} />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#025F67" }}>
+                  Cerca de mí
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {geoActive ? "Ubicación activa — toca para refrescar" : "Encuentra proveedores en tu zona"}
+                </p>
+              </div>
+              {geoActive && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">ON</span>
+              )}
+            </button>
+          )}
+
           {results.length > 0 && (
             <ul>
               {results.map((result, idx) => (
