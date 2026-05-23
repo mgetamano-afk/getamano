@@ -851,7 +851,7 @@ async def seed():
     # engagement signals (referrer badge on eCard + "✨ traíd@" on the reel
     # card + dashboard referral stats) all have meaningful data out of the box.
     # Idempotent: upsert keyed on a stable demo invitee user_id.
-    demo_profile = await db.provider_profiles.find_one({"slug": DEMO_SLUG}, {"_id": 0, "ref_code": 1})
+    demo_profile = await db.provider_profiles.find_one({"slug": DEMO_SLUG}, {"_id": 0, "ref_code": 1, "provider_id": 1})
     if demo_profile and demo_profile.get("ref_code"):
         await db.referrals.update_one(
             {"referred_user_id": "user_demo_invitee_001"},
@@ -866,6 +866,39 @@ async def seed():
             }},
             upsert=True,
         )
+
+    # Section 34 — Seed a 5-day active-streak so the dashboard streak widget
+    # and the public eCard "🔥 N días seguidos" badge have meaningful state
+    # on first boot. We backdate sessions over the past 5 UTC days. Idempotent
+    # via a marker doc keyed on `streak_demo_seed=true`.
+    if demo_profile and demo_profile.get("provider_id"):
+        already_seeded = await db.streaks.find_one({"user_id": prov_user_id, "streak_demo_seed": True}, {"_id": 0})
+        if not already_seeded:
+            today_utc = datetime.now(timezone.utc)
+            for offset in range(5):
+                day = today_utc - timedelta(days=offset)
+                await db.sessions.insert_one({
+                    "session_id": f"sess_demo_{offset}_{uuid.uuid4().hex[:6]}",
+                    "user_id": prov_user_id,
+                    "created_at": day.replace(hour=10, minute=0, second=0, microsecond=0).isoformat(),
+                    "ip_address": "0.0.0.0",
+                    "user_agent": "demo-seed",
+                    "demo_seed": True,
+                })
+            await db.streaks.update_one(
+                {"user_id": prov_user_id},
+                {"$set": {
+                    "user_id": prov_user_id,
+                    "provider_id": demo_profile["provider_id"],
+                    "best_days": 5,
+                    "current_days": 5,
+                    "last_active_date": today_utc.date().isoformat(),
+                    "streak_demo_seed": True,
+                    "updated_at": today_utc.isoformat(),
+                }},
+                upsert=True,
+            )
+            logger.info("Seeded 5-day demo streak for demo provider")
 
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")
@@ -5057,6 +5090,17 @@ async def _badges_for_provider(provider_id: str, user_id: str = "") -> list[dict
     if user_doc and user_doc.get("founding_member"):
         badges.append({"key": "founding_member", "label": "Founding Member", "icon": "🏆"})
 
+    # Section 34 — Activity streak (only surfaces when ≥3 alive days, see
+    # _compute_streak's public redaction). We read the cached value from the
+    # `streaks` collection to avoid duplicating the heavy aggregate inside
+    # this badge helper — it's refreshed every time the dashboard hits
+    # /api/providers/me/streak.
+    streak_doc = await db.streaks.find_one({"user_id": user_id}, {"_id": 0}) if user_id else None
+    if streak_doc:
+        sd = streak_doc.get("current_days", 0) or 0
+        if sd >= 3 and streak_doc.get("last_active_date") == datetime.now(timezone.utc).date().isoformat():
+            badges.append({"key": "streak", "label": f"{sd} días seguidos", "icon": "🔥"})
+
     return badges
 
 
@@ -5066,6 +5110,199 @@ async def get_provider_badges(provider_id: str):
     if not prof:
         raise HTTPException(status_code=404, detail="Provider not found")
     return await _badges_for_provider(provider_id, prof.get("user_id", ""))
+
+
+# ════════════════════════════════════════════════════════════════════════
+# SECTION 34 — Activity Streaks (Duolingo-style retention loop)
+# ════════════════════════════════════════════════════════════════════════
+# A streak = consecutive UTC days the provider had at least one activity
+# signal (login/session OR sent a message OR responded to a quote OR
+# applied to a gig). We allow a 1-day grace so logging in *today* OR
+# *yesterday* keeps the streak alive (handles late-night users gracefully).
+#
+# Best streak is persisted in `streaks` collection. Current streak is
+# computed on demand from the activity sources (cheap — capped 60 days
+# lookback). Updating the best record is idempotent.
+# ════════════════════════════════════════════════════════════════════════
+
+STREAK_LOOKBACK_DAYS = 60
+
+
+def _utc_date_str(dt) -> str:
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+        except Exception:
+            return ""
+    if not isinstance(dt, datetime):
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).date().isoformat()  # YYYY-MM-DD
+
+
+async def _collect_activity_dates(user_id: str, provider_id: str) -> set[str]:
+    """Return a set of UTC date strings on which the provider was active
+    in the past STREAK_LOOKBACK_DAYS. Combines sessions, sent messages,
+    quote responses, gig applications.
+    """
+    floor = (datetime.now(timezone.utc) - timedelta(days=STREAK_LOOKBACK_DAYS)).isoformat()
+    dates: set[str] = set()
+
+    # Sessions — at least one created during the day = active
+    async for d in db.sessions.find(
+        {"user_id": user_id, "created_at": {"$gte": floor}},
+        {"_id": 0, "created_at": 1},
+    ):
+        ds = _utc_date_str(d.get("created_at"))
+        if ds:
+            dates.add(ds)
+
+    # Messages sent by the provider
+    async for d in db.messages.find(
+        {"sender_id": user_id, "created_at": {"$gte": floor}},
+        {"_id": 0, "created_at": 1},
+    ):
+        ds = _utc_date_str(d.get("created_at"))
+        if ds:
+            dates.add(ds)
+
+    # Quote responses (only count days where the provider actually replied)
+    async for d in db.quote_requests.find(
+        {"provider_id": provider_id, "response_time_seconds": {"$gt": 0},
+         "responded_at": {"$gte": floor}},
+        {"_id": 0, "responded_at": 1},
+    ):
+        ds = _utc_date_str(d.get("responded_at"))
+        if ds:
+            dates.add(ds)
+
+    # Gig applications sent
+    async for d in db.gig_applications.find(
+        {"provider_id": provider_id, "created_at": {"$gte": floor}},
+        {"_id": 0, "created_at": 1},
+    ):
+        ds = _utc_date_str(d.get("created_at"))
+        if ds:
+            dates.add(ds)
+
+    return dates
+
+
+def _walk_streak(dates: set[str], today: datetime) -> tuple[int, str | None]:
+    """Given a set of YYYY-MM-DD strings and today's UTC datetime, return
+    (current_streak, last_active_date). Streak counts consecutive days
+    ending today or yesterday (1-day grace).
+    """
+    if not dates:
+        return 0, None
+    today_iso = today.date()
+    # Check anchor: today or yesterday must be present
+    anchor = None
+    if today_iso.isoformat() in dates:
+        anchor = today_iso
+    elif (today_iso - timedelta(days=1)).isoformat() in dates:
+        anchor = today_iso - timedelta(days=1)
+    if not anchor:
+        return 0, max(dates)
+    streak = 1
+    cursor = anchor - timedelta(days=1)
+    while cursor.isoformat() in dates:
+        streak += 1
+        cursor -= timedelta(days=1)
+    return streak, anchor.isoformat()
+
+
+async def _compute_streak(user_id: str, provider_id: str) -> dict:
+    """Compute current + persisted-best streak for a provider."""
+    dates = await _collect_activity_dates(user_id, provider_id)
+    now = datetime.now(timezone.utc)
+    current, last_active = _walk_streak(dates, now)
+
+    # Pull persisted best, then update if surpassed
+    rec = await db.streaks.find_one({"user_id": user_id}, {"_id": 0})
+    best = (rec or {}).get("best_days", 0)
+    best_updated = False
+    if current > best:
+        best = current
+        best_updated = True
+        await db.streaks.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "user_id": user_id,
+                "provider_id": provider_id,
+                "best_days": best,
+                "best_set_at": now.isoformat(),
+                "current_days": current,
+                "last_active_date": last_active,
+                "updated_at": now.isoformat(),
+            }},
+            upsert=True,
+        )
+    else:
+        # Keep current/last_active fresh for analytics
+        await db.streaks.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "user_id": user_id,
+                "provider_id": provider_id,
+                "current_days": current,
+                "last_active_date": last_active,
+                "updated_at": now.isoformat(),
+            }},
+            upsert=True,
+        )
+
+    # Status flag — alive (today), at_risk (yesterday only), cold (older or none)
+    today_iso = now.date().isoformat()
+    yesterday_iso = (now.date() - timedelta(days=1)).isoformat()
+    if last_active == today_iso:
+        status = "alive"
+    elif last_active == yesterday_iso:
+        status = "at_risk"
+    else:
+        status = "cold"
+
+    # Milestones (Duolingo-style)
+    next_milestone = next((m for m in (3, 7, 14, 30, 60, 90, 180, 365) if m > current), None)
+
+    return {
+        "current_days": current,
+        "best_days": best,
+        "best_updated": best_updated,
+        "last_active_date": last_active,
+        "status": status,
+        "next_milestone": next_milestone,
+        "is_demo_data": False,
+    }
+
+
+@api_router.get("/providers/me/streak")
+async def get_my_streak(user: User = Depends(get_current_user)):
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    streak = await _compute_streak(user.user_id, prof["provider_id"])
+    return streak
+
+
+@api_router.get("/providers/{provider_id}/streak")
+async def get_public_streak(provider_id: str):
+    """Public — used by eCard. Hides at_risk/cold details and only surfaces
+    `current_days` when the streak is alive (today) AND ≥ 3 days so we don't
+    spam tiny non-meaningful badges on every public profile.
+    """
+    prof = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0, "user_id": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    streak = await _compute_streak(prof["user_id"], provider_id)
+    # Public-friendly redaction
+    show_public = streak["current_days"] >= 3 and streak["status"] == "alive"
+    return {
+        "current_days": streak["current_days"] if show_public else 0,
+        "best_days": streak["best_days"],
+        "show_public_badge": show_public,
+    }
 
 
 # ─── SECTION 16C — Referrals ─────────────────────────────────────────────

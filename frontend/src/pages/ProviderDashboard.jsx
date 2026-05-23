@@ -24,6 +24,7 @@ import SubscriptionManager from "../components/SubscriptionManager";
 import ChambasNearby from "../components/ChambasNearby";
 import WeeklyDigestPreview from "../components/WeeklyDigestPreview";
 import ReferralPanel from "../components/ReferralPanel";
+import StreakWidget from "../components/StreakWidget";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -148,6 +149,8 @@ export default function ProviderDashboard() {
           unreadMessages={unread}
           newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
         />
+        <StreakWidget />
+
         <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
 
         {/* Section 30 — Chambas board CTA + nearby teaser */}
