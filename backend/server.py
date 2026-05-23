@@ -2955,7 +2955,9 @@ async def send_message(payload: MessageIn, user: User = Depends(get_current_user
     else:
         await db.conversations.update_one(
             {"conversation_id": conv["conversation_id"]},
-            {"$set": {"last_message": payload.body[:140], "last_at": now, "unread_for_provider": True}}
+            {"$set": {"last_message": payload.body[:140], "last_at": now, "unread_for_provider": True},
+             "$unset": {"client_nudge_sent_at": "", "client_nudge_delivery": "",
+                        "client_nudge_skipped_reason": "", "client_nudge_alternatives_count": ""}}
         )
     msg = {
         "message_id": f"msg_{uuid.uuid4().hex[:10]}",
@@ -5004,6 +5006,29 @@ async def _run_weekly_health_email_job():
     return {"sent": sent, "skipped": skipped, "errors": errors, "scanned": len(eligible)}
 
 
+async def _run_client_nudge_job():
+    """Send the 'no-limbo' email to clients whose conversations have been
+    sitting unanswered >24h. Runs on every scheduler tick — idempotent per
+    conversation via `client_nudge_sent_at` flag, so frequent ticks are safe."""
+    public_url = (os.environ.get("PUBLIC_URL") or "https://getamano.us").rstrip("/")
+    pending = await _find_stale_unanswered_conversations(limit=200)
+    if not pending:
+        return None
+    sent = 0
+    errors = 0
+    for conv in pending:
+        try:
+            res = await _send_client_nudge_for_conversation(conv, public_url)
+            if res.get("sent"):
+                sent += 1
+        except Exception as e:
+            logger.warning(f"[scheduler] client nudge failed for {conv.get('conversation_id')}: {e}")
+            errors += 1
+    if sent or errors:
+        logger.info(f"[scheduler] client nudge job: sent={sent} errors={errors} scanned={len(pending)}")
+    return {"sent": sent, "errors": errors, "scanned": len(pending)}
+
+
 async def _scheduler_loop():
     """Background task. Loops forever until cancelled at shutdown."""
     logger.info("[scheduler] Background scheduler started")
@@ -5020,6 +5045,10 @@ async def _scheduler_loop():
             await _run_weekly_health_email_job()
         except Exception:
             logger.exception("[scheduler] weekly health email job failed")
+        try:
+            await _run_client_nudge_job()
+        except Exception:
+            logger.exception("[scheduler] client nudge job failed")
         await asyncio.sleep(SCHEDULER_TICK_SECONDS)
 
 
@@ -5501,6 +5530,253 @@ async def admin_send_weekly_health_email(request: Request, admin: User = Depends
     skipped = sum(1 for r in results if r.get("skipped"))
     await audit_log(admin.user_id, "health_email.weekly_sent", {"sent": sent, "skipped": skipped, "total": len(results)}, request)
     return {"ok": True, "sent": sent, "skipped": skipped, "total": len(results), "results": results[:50]}
+
+
+# ════════════════════════════════════════════════════════════════════
+# Section 43C — Client "no-limbo" nudge email
+# ════════════════════════════════════════════════════════════════════
+# When a client sends a message and the provider hasn't replied for 24h, we
+# send the client a gentle email with 3 similar providers as alternatives.
+# Re-engages the lead instead of letting it die in silence.
+#
+# Tracking: each conversation gets a `client_nudge_sent_at` ISO timestamp so
+# we never spam the same lead twice for the same conversation.
+
+CLIENT_NUDGE_MIN_HOURS = 24
+CLIENT_NUDGE_MAX_HOURS = 7 * 24  # don't re-engage week-old conversations
+
+
+async def _find_similar_providers(*, exclude_provider_id: str,
+                                   category_id: Optional[str] = None,
+                                   city: Optional[str] = None,
+                                   limit: int = 3) -> list:
+    """Pivot on category + city → fall back to category-only → public-guarded."""
+    base = {
+        "is_active": True,
+        "verification_status": "approved",
+        "provider_id": {"$ne": exclude_provider_id},
+        "business_name": {"$not": {"$regex": "^TEST_"}},
+        **PUBLIC_GUARD,
+    }
+    queries = []
+    if category_id and city:
+        queries.append({**base, "category_id": category_id, "city": city})
+    if category_id:
+        queries.append({**base, "category_id": category_id})
+    queries.append(base)
+    seen = set()
+    out = []
+    for q in queries:
+        cursor = db.provider_profiles.find(
+            q,
+            {"_id": 0, "provider_id": 1, "slug": 1, "business_name": 1,
+             "logo_url": 1, "photo_url": 1, "city": 1, "rating_avg": 1,
+             "reviews_count": 1, "category_id": 1},
+        ).sort([("rating_avg", -1), ("reviews_count", -1)]).limit(limit * 2)
+        async for p in cursor:
+            if p["provider_id"] in seen:
+                continue
+            seen.add(p["provider_id"])
+            out.append(p)
+            if len(out) >= limit:
+                return out
+        if len(out) >= limit:
+            return out
+    return out
+
+
+def _build_client_nudge_email_html(*, client_name: str, provider_business: str,
+                                    last_message: str, alternatives: list,
+                                    public_url: str) -> str:
+    first_name = (client_name or "Hola").split(" ")[0] or "Hola"
+    alt_rows = ""
+    for p in alternatives:
+        rating = f"⭐ {p.get('rating_avg', 0):.1f}" if p.get("rating_avg") else "Nuevo"
+        reviews = f" ({p['reviews_count']} reseñas)" if (p.get("reviews_count") or 0) > 0 else ""
+        city = p.get("city") or ""
+        ecard_url = f"{public_url}/p/{p['slug']}"
+        logo = p.get("logo_url") or p.get("photo_url") or ""
+        logo_html = (
+            f'<img src="{logo}" alt="" width="48" height="48" '
+            f'style="border-radius:50%;object-fit:cover;display:block;border:1px solid #E2E8F0;" />'
+            if logo
+            else '<div style="width:48px;height:48px;border-radius:50%;background:#E1F5EE;color:#025F67;'
+                 'text-align:center;line-height:48px;font-size:18px;font-weight:700;">🤝</div>'
+        )
+        alt_rows += f"""
+        <tr><td style="padding:8px 0;">
+          <a href="{ecard_url}" style="text-decoration:none;color:inherit;display:block;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;">
+              <tr>
+                <td width="64" style="padding:12px 0 12px 12px;vertical-align:middle;">{logo_html}</td>
+                <td style="padding:12px;vertical-align:middle;">
+                  <div style="font-size:15px;font-weight:700;color:#0F172A;line-height:1.25;">{p.get('business_name', 'Proveedor')}</div>
+                  <div style="font-size:12px;color:#64748B;margin-top:2px;">{rating}{reviews}{(" · " + city) if city else ""}</div>
+                </td>
+                <td width="60" style="padding-right:12px;text-align:right;vertical-align:middle;">
+                  <span style="display:inline-block;background:#025F67;color:#fff;font-size:11px;font-weight:bold;padding:6px 10px;border-radius:999px;">Ver →</span>
+                </td>
+              </tr>
+            </table>
+          </a>
+        </td></tr>
+        """
+
+    safe_last = (last_message or "").replace("<", "&lt;").replace(">", "&gt;")[:200]
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9;padding:32px 12px;">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 12px 36px rgba(2,95,103,0.08);">
+
+      <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:28px 24px;">
+        <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">getamano</h1>
+        <p style="margin:4px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Te ayudamos a no quedarte esperando</p>
+      </td></tr>
+
+      <tr><td style="padding:24px 24px 8px 24px;">
+        <p style="margin:0 0 6px 0;font-size:15px;color:#475569;">Hola <strong style="color:#0F172A;">{first_name}</strong>,</p>
+        <p style="margin:0 0 16px 0;font-size:14px;color:#475569;line-height:1.6;">
+          Notamos que <strong>{provider_business}</strong> aún no ha respondido a tu mensaje.
+          A veces los proveedores están ocupados — pero <strong>no queremos dejarte esperando</strong>.
+        </p>
+        <div style="background:#F8FAFC;border-left:3px solid #2F9D94;padding:10px 14px;border-radius:8px;margin-bottom:18px;">
+          <p style="margin:0;font-size:12px;color:#94A3B8;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Tu mensaje original</p>
+          <p style="margin:4px 0 0 0;font-size:13px;color:#475569;line-height:1.5;font-style:italic;">"{safe_last}"</p>
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:0 24px 8px 24px;">
+        <p style="margin:0;font-size:14px;font-weight:700;color:#0F172A;">Mientras tanto, mira estos {len(alternatives)} proveedores latinos verificados:</p>
+      </td></tr>
+
+      <tr><td style="padding:8px 24px 16px 24px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          {alt_rows}
+        </table>
+      </td></tr>
+
+      <tr><td style="background:#F8FAFC;padding:18px 24px;text-align:center;border-top:1px solid #E2E8F0;">
+        <p style="margin:0 0 6px 0;color:#94A3B8;font-size:11px;">
+          Cada proveedor en getamano es verificado por nuestro equipo.
+        </p>
+        <p style="margin:0;color:#CBD5E1;font-size:10px;">© getamano 2026 — Latin Ventures LLC</p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+
+async def _find_stale_unanswered_conversations(limit: int = 100) -> list:
+    """Conversations where the client is waiting and the provider hasn't read
+    them between 24h and 7 days. Returns at most `limit` candidates."""
+    now = datetime.now(timezone.utc)
+    upper = (now - timedelta(hours=CLIENT_NUDGE_MIN_HOURS)).isoformat()
+    lower = (now - timedelta(hours=CLIENT_NUDGE_MAX_HOURS)).isoformat()
+    q = {
+        "unread_for_provider": True,
+        "last_at": {"$lte": upper, "$gte": lower},
+        "client_nudge_sent_at": {"$exists": False},
+        "client_name": {"$not": {"$regex": "^TEST", "$options": "i"}},
+    }
+    return await db.conversations.find(q, {"_id": 0}).sort("last_at", 1).limit(limit).to_list(limit)
+
+
+async def _send_client_nudge_for_conversation(conv: dict, public_url: str) -> dict:
+    """Sends the unanswered nudge email + flags the conversation idempotently."""
+    client = await db.users.find_one({"user_id": conv["client_id"]}, {"_id": 0, "email": 1, "name": 1, "email_verified": 1})
+    if not client or not client.get("email") or not client.get("email_verified"):
+        await db.conversations.update_one(
+            {"conversation_id": conv["conversation_id"]},
+            {"$set": {"client_nudge_sent_at": datetime.now(timezone.utc).isoformat(), "client_nudge_skipped_reason": "client_email_unverified"}},
+        )
+        return {"conversation_id": conv["conversation_id"], "sent": False, "reason": "client_email_unverified"}
+
+    provider_profile = await db.provider_profiles.find_one(
+        {"provider_id": conv["provider_id"]},
+        {"_id": 0, "category_id": 1, "city": 1, "business_name": 1, "slug": 1},
+    ) or {}
+
+    alternatives = await _find_similar_providers(
+        exclude_provider_id=conv["provider_id"],
+        category_id=provider_profile.get("category_id"),
+        city=provider_profile.get("city"),
+        limit=3,
+    )
+    if not alternatives:
+        # Don't email the client with zero alternatives — surface nothing rather than empty list.
+        await db.conversations.update_one(
+            {"conversation_id": conv["conversation_id"]},
+            {"$set": {"client_nudge_sent_at": datetime.now(timezone.utc).isoformat(), "client_nudge_skipped_reason": "no_alternatives"}},
+        )
+        return {"conversation_id": conv["conversation_id"], "sent": False, "reason": "no_alternatives"}
+
+    html = _build_client_nudge_email_html(
+        client_name=client.get("name") or "Hola",
+        provider_business=provider_profile.get("business_name") or conv.get("business_name") or "el proveedor",
+        last_message=conv.get("last_message") or conv.get("subject") or "",
+        alternatives=alternatives,
+        public_url=public_url,
+    )
+    subject = f"¿Sigues buscando? Mira estos {len(alternatives)} proveedores · getamano"
+    result = await _send_email_via_resend(client["email"], subject, html)
+    await db.conversations.update_one(
+        {"conversation_id": conv["conversation_id"]},
+        {"$set": {
+            "client_nudge_sent_at": datetime.now(timezone.utc).isoformat(),
+            "client_nudge_delivery": "sent" if result.get("sent") else "logged",
+            "client_nudge_alternatives_count": len(alternatives),
+        }},
+    )
+    return {
+        "conversation_id": conv["conversation_id"],
+        "sent": bool(result.get("sent")),
+        "alternatives_count": len(alternatives),
+        "reason": result.get("reason", "ok"),
+    }
+
+
+@api_router.post("/admin/client-nudge/send-pending")
+async def admin_send_client_nudge_pending(request: Request, admin: User = Depends(require_admin)):
+    """Fan-out the no-limbo email to every conversation where a client is waiting >24h.
+    Runs idempotently via `client_nudge_sent_at` flag on each conversation."""
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    public_url = forwarded.split("/api", 1)[0] if forwarded else os.environ.get("PUBLIC_URL", "https://getamano.us")
+    pending = await _find_stale_unanswered_conversations(limit=500)
+    results = []
+    for conv in pending:
+        try:
+            results.append(await _send_client_nudge_for_conversation(conv, public_url))
+        except Exception as e:
+            logger.warning(f"[client_nudge] failed for {conv.get('conversation_id')}: {e}")
+            results.append({"conversation_id": conv.get("conversation_id"), "sent": False, "reason": "exception"})
+    sent = sum(1 for r in results if r.get("sent"))
+    await audit_log(admin.user_id, "client_nudge.fan_out", {"sent": sent, "scanned": len(results)}, request)
+    return {"ok": True, "sent": sent, "scanned": len(results), "results": results[:50]}
+
+
+@api_router.get("/providers/me/clients-waiting")
+async def my_clients_waiting(user: User = Depends(get_current_user)):
+    """How many clients are waiting for THIS provider beyond 24h?
+    Used by the WaitingClientsBadge widget on the provider dashboard."""
+    if user.role != "provider":
+        return {"count": 0, "items": []}
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not prof:
+        return {"count": 0, "items": []}
+    upper = (datetime.now(timezone.utc) - timedelta(hours=CLIENT_NUDGE_MIN_HOURS)).isoformat()
+    waiting = await db.conversations.find(
+        {
+            "provider_id": prof["provider_id"],
+            "unread_for_provider": True,
+            "last_at": {"$lte": upper},
+            "client_name": {"$not": {"$regex": "^TEST", "$options": "i"}},
+        },
+        {"_id": 0, "conversation_id": 1, "client_name": 1, "last_message": 1, "last_at": 1},
+    ).sort("last_at", 1).limit(10).to_list(10)
+    return {"count": len(waiting), "items": waiting}
 
 
 # ─── SECTION 16B — Engagement badges ─────────────────────────────────────

@@ -275,6 +275,39 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Client "No-Limbo" Nudge System (Section 43C)
+
+**"Nunca dejamos al cliente esperando"** — cuando un cliente envía un mensaje y el proveedor no responde por 24h+, le mandamos un email gentil con 3 proveedores similares verificados como alternativa. Cierra el loop de engagement bidireccional.
+
+**Backend:**
+- Helper `_find_similar_providers(exclude_provider_id, category_id, city, limit=3)` con fallback en cascada (categoría+ciudad → categoría → guard público).
+- Template HTML `_build_client_nudge_email_html(...)`: hero teal getamano + saludo personalizado + blockquote del mensaje original ("Te recordamos lo que escribiste") + 3 alternative cards con logo + rating + ciudad + botón "Ver →" cada una.
+- `_find_stale_unanswered_conversations(limit=100)`: query MongoDB para `unread_for_provider: true` + `last_at` entre 24h y 7d atrás + `client_nudge_sent_at` no existe + filtra TEST_*.
+- `_send_client_nudge_for_conversation(conv, public_url)`: orquesta · skip si email no verificado · skip si zero alternatives (no spam vacío) · marca conversación idempotentemente con `client_nudge_sent_at` + `client_nudge_delivery` + `client_nudge_alternatives_count`.
+- **Reset automático**: cuando el cliente envía un **NUEVO** mensaje a una conv ya nudgeada, los 4 campos `client_nudge_*` se `$unset` automáticamente — el ciclo se puede repetir si vuelve a quedar en limbo.
+- Endpoints:
+  - `POST /admin/client-nudge/send-pending` — fan-out admin.
+  - `GET /providers/me/clients-waiting` — para el widget dashboard del proveedor (filtra TEST_*).
+- Scheduler job `_run_client_nudge_job` integrado al `_scheduler_loop()` — corre en cada tick (30 min), idempotente por conversación.
+
+**Frontend `WaitingClientsBadge.jsx` (~95 líneas):**
+- Card rojo/orange con ⚠️ AlertTriangle al TOPE de la columna derecha (animationDelay 40ms — antes de EcardHealth).
+- Título dinámico: "1 cliente está esperando" / "N clientes están esperando".
+- Insight: "Llevan más de 24 horas sin respuesta tuya. **Cada hora cuenta** — un cliente que espera ya está mirando otros proveedores."
+- Lista los primeros 3 con `formatHoursAgo` ("36h sin responder") + preview del último mensaje + click navega a `/messages?conv=...`.
+- Auto-hide cuando count=0 (sin ruido visual en inboxes bien atendidos).
+- Refresh cada 5 min.
+
+**E2E verificado:**
+- Demo conv "Carlos Hernández esperando 36h" → endpoint `count=1` ✓
+- Widget desktop renderiza al TOPE en rojo/orange con CTA visible ✓
+- Widget mobile en mirror con mismo estilo ✓
+- Fan-out admin: `sent=0` con `reason: no_alternatives` (dev DB sin proveedores similares) ✓
+- **Idempotencia**: re-run del fan-out → `scanned=0` (no reprocesa) ✓
+- Lint: 0 issues.
+
+**Activación producción**: cuando configures `RESEND_API_KEY` + dominio, el email se manda real. Hasta entonces queda en log dev-fallback.
+
 ### May 23, 2026 — Weekly Health Email + In-app Preview (Section 43B)
 
 **Email outbound semanal automatizado.**

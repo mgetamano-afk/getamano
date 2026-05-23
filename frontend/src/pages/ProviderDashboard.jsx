@@ -31,6 +31,7 @@ import ProviderLeftNav from "../components/ProviderLeftNav";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
 import EcardHealth from "../components/EcardHealth";
 import WeeklyHealthEmailPreview from "../components/WeeklyHealthEmailPreview";
+import WaitingClientsBadge from "../components/WaitingClientsBadge";
 import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
 import CitySearchInput from "../components/CitySearchInput";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
@@ -229,6 +230,7 @@ export default function ProviderDashboard() {
 
             {/* Mobile-only: mirror del sidebar derecho al final */}
             <div className="lg:hidden space-y-6" data-testid="provider-dashboard-mobile-sidebar-mirror">
+              <WaitingClientsBadge />
               <EcardHealth />
               <WeeklyHealthEmailPreview />
               <CouponsCard />
@@ -548,11 +550,14 @@ export default function ProviderDashboard() {
         {/* fin tabs panel (center) */}
           </section>
 
-          {/* COLUMNA DERECHA — Sidebar sticky con Salud + Recompensas + Referidos */}
+          {/* COLUMNA DERECHA — Sidebar sticky con Urgente + Salud + Recompensas + Referidos */}
           <aside
             className="hidden lg:flex lg:flex-col lg:gap-4 lg:sticky lg:top-20 lg:self-start max-h-[calc(100vh-6rem)] overflow-y-auto pr-1 [&_li]:!flex-col [&_li]:!items-stretch [&_li]:!gap-2"
             data-testid="provider-dashboard-right-sidebar"
           >
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "40ms" }}>
+              <WaitingClientsBadge />
+            </div>
             <div className="animate-fadeSlideUp" style={{ animationDelay: "80ms" }}>
               <EcardHealth />
             </div>
