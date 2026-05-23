@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Flame, Trophy, Calendar, Loader2 } from "lucide-react";
+import { Flame, Trophy, Calendar, Loader2, BellOff, Bell } from "lucide-react";
 import { api } from "../lib/api";
+import { toast } from "sonner";
 
 /**
  * StreakWidget — Section 34 (Duolingo-style retention loop).
@@ -18,15 +19,35 @@ import { api } from "../lib/api";
 export default function StreakWidget() {
   const [streak, setStreak] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [optOut, setOptOut] = useState(false);
+  const [savingPref, setSavingPref] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    api.get("/providers/me/streak")
-      .then(r => { if (alive) setStreak(r.data); })
-      .catch(() => { if (alive) setStreak(null); })
-      .finally(() => { if (alive) setLoading(false); });
+    Promise.all([
+      api.get("/providers/me/streak").then(r => r.data).catch(() => null),
+      api.get("/providers/me/streak/preferences").then(r => r.data?.opt_out).catch(() => false),
+    ]).then(([s, opt]) => {
+      if (!alive) return;
+      setStreak(s);
+      setOptOut(Boolean(opt));
+    }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
+
+  const togglePref = async () => {
+    setSavingPref(true);
+    const next = !optOut;
+    try {
+      await api.post("/providers/me/streak/preferences", { opt_out: next });
+      setOptOut(next);
+      toast.success(next ? "Recordatorios silenciados" : "Recordatorios activados");
+    } catch (_e) {
+      toast.error("No se pudo guardar la preferencia");
+    } finally {
+      setSavingPref(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -86,9 +107,23 @@ export default function StreakWidget() {
           {THEME.icon}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-1.5"
-               style={{ background: "rgba(0,0,0,0.06)", color: THEME.accent }}>
-            <Calendar className="w-3 h-3" /> Racha de actividad
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+                 style={{ background: "rgba(0,0,0,0.06)", color: THEME.accent }}>
+              <Calendar className="w-3 h-3" /> Racha de actividad
+            </div>
+            <button
+              type="button"
+              onClick={togglePref}
+              disabled={savingPref}
+              title={optOut ? "Activar recordatorios diarios" : "Silenciar recordatorios diarios"}
+              className="text-[10px] font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white/60 hover:bg-white transition disabled:opacity-50"
+              style={{ borderColor: "rgba(0,0,0,0.10)", color: THEME.accent }}
+              data-testid="streak-widget-pref-toggle"
+            >
+              {optOut ? <BellOff className="w-3 h-3" /> : <Bell className="w-3 h-3" />}
+              {optOut ? "Silenciado" : "Recuérdame"}
+            </button>
           </div>
           <h3 className="font-display font-bold text-slate-900 text-lg leading-tight" data-testid="streak-widget-title">
             {THEME.title}

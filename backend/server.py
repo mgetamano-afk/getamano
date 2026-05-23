@@ -4315,7 +4315,7 @@ async def get_notifications(user: User = Depends(get_current_user)):
     raw = await db.notifications.find(
         {
             "user_id": user.user_id,
-            "category": {"$in": ["gigs", "referrals"]},
+            "category": {"$in": ["gigs", "referrals", "streaks"]},
             "dismissed_at": None,
         },
         {"_id": 0},
@@ -5303,6 +5303,138 @@ async def get_public_streak(provider_id: str):
         "best_days": streak["best_days"],
         "show_public_badge": show_public,
     }
+
+
+# ─── Streak reminder fan-out (habit loop / 7pm local push) ─────────────
+class StreakReminderPrefIn(BaseModel):
+    opt_out: bool
+
+
+@api_router.post("/providers/me/streak/preferences")
+async def set_streak_pref(payload: StreakReminderPrefIn, user: User = Depends(get_current_user)):
+    """Lets a provider opt out of streak reminders. Idempotent."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    await db.users.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"streak_reminders_opt_out": bool(payload.opt_out)}},
+    )
+    return {"ok": True, "opt_out": bool(payload.opt_out)}
+
+
+@api_router.get("/providers/me/streak/preferences")
+async def get_streak_pref(user: User = Depends(get_current_user)):
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    u = await db.users.find_one({"user_id": user.user_id}, {"_id": 0, "streak_reminders_opt_out": 1})
+    return {"opt_out": bool((u or {}).get("streak_reminders_opt_out", False))}
+
+
+async def _enqueue_streak_reminder_for(user_id: str, provider_id: str, streak: dict) -> Optional[dict]:
+    """Queue an in-app notification + (when push channels are live) an SMS/email
+    nudge for a single provider whose streak is in danger. Idempotent per
+    user+UTC-date so re-running the fan-out doesn't double-poke.
+    """
+    days = streak.get("current_days", 0)
+    status = streak.get("status", "cold")
+    if status not in ("at_risk", "alive") or days < 3:
+        return None
+    # Skip if already entered today — alive AND last_active is today means
+    # they've already shown up, no nudge needed.
+    today_iso = datetime.now(timezone.utc).date().isoformat()
+    if status == "alive" and streak.get("last_active_date") == today_iso:
+        # Only fire 7pm reminder if env is past 7pm UTC; otherwise the user
+        # might still come back naturally. Skip when status=alive — they have
+        # the win for today.
+        return None
+
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "name": 1, "phone": 1, "streak_reminders_opt_out": 1})
+    if not user or user.get("streak_reminders_opt_out"):
+        return None
+
+    notification_key = f"{user_id}::streak_reminder::{today_iso}"
+    if await db.notifications.find_one({"notification_key": notification_key}, {"_id": 0, "notification_key": 1}):
+        return None  # already nudged today
+
+    first = (user.get("name") or "").split(" ")[0] or "Tu racha"
+    hours_left = 24 - datetime.now(timezone.utc).hour
+    title = f"🔥 Tu racha de {days} días está por expirar"
+    body = (
+        f"{first}, te quedan ~{hours_left}h para mantener tu récord. "
+        f"Entra a getamano, responde un mensaje, o aplica a una chamba."
+    )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.notifications.insert_one({
+        "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+        "notification_key": notification_key,
+        "user_id": user_id,
+        "role": "provider",
+        "category": "streaks",
+        "title": title,
+        "body": body,
+        "cta_label": "Mantener mi racha",
+        "cta_url": "/dashboard/provider#streak",
+        "icon": "trophy",
+        "priority": "high",
+        "is_read": False,
+        "dismissed_at": None,
+        "created_at": now_iso,
+    })
+
+    # Queue SMS + email so when Twilio/Resend are live they ship automatically
+    if user.get("phone"):
+        await enqueue_notification(
+            recipient_phone=user["phone"],
+            channel="sms",
+            body=f"🔥 getamano — tu racha de {days} días está por expirar. Entra hoy: https://getamano.us",
+            trigger_type=f"streak_reminder_{days}d",
+        )
+    if user.get("email"):
+        await enqueue_notification(
+            recipient_email=user["email"],
+            channel="email",
+            subject=title,
+            body=body,
+            trigger_type=f"streak_reminder_{days}d",
+        )
+
+    return {
+        "user_id": user_id,
+        "provider_id": provider_id,
+        "days": days,
+        "status": status,
+        "queued": True,
+    }
+
+
+@api_router.post("/admin/streaks/send-reminders")
+async def admin_send_streak_reminders(request: Request, admin: User = Depends(require_admin)):
+    """Daily cron entry point. Fans out streak reminders to all providers
+    whose streak is at_risk (alive yesterday only) OR alive but haven't
+    checked in today yet. Idempotent per (user, UTC date)."""
+    # Scope: providers with a streaks row + current_days >= 3 + not opted out
+    rows = await db.streaks.find(
+        {"current_days": {"$gte": 3}},
+        {"_id": 0, "user_id": 1, "provider_id": 1},
+    ).to_list(2000)
+    if not rows:
+        return {"ok": True, "queued": 0, "skipped": 0, "scanned": 0}
+    queued = 0
+    skipped = 0
+    for r in rows:
+        try:
+            streak = await _compute_streak(r["user_id"], r["provider_id"])
+            res = await _enqueue_streak_reminder_for(r["user_id"], r["provider_id"], streak)
+            if res:
+                queued += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            logger.warning(f"streak reminder failed for {r.get('user_id')}: {e}")
+            skipped += 1
+    await audit_log(admin.user_id, "streaks.reminders_sent", {"queued": queued, "skipped": skipped, "scanned": len(rows)}, request)
+    return {"ok": True, "queued": queued, "skipped": skipped, "scanned": len(rows)}
 
 
 # ─── SECTION 16C — Referrals ─────────────────────────────────────────────
