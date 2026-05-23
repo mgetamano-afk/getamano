@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import DuplicateKeyError
 import os
 import logging
 import re
@@ -601,6 +602,13 @@ async def seed():
         )
         await db.recommendations.create_index("share_token", unique=True, sparse=True)
         await db.recommendations.create_index([("created_at", -1)])
+        # SECTION 30 (CAMBIO C) — Gigs / Chambas
+        await db.gigs.create_index("status")
+        await db.gigs.create_index([("category", 1), ("status", 1), ("created_at", -1)])
+        await db.gigs.create_index([("created_by", 1), ("created_at", -1)])
+        await db.gigs.create_index("expires_at_native", expireAfterSeconds=0)
+        await db.gig_applications.create_index([("gig_id", 1), ("provider_id", 1)], unique=True)
+        await db.gig_applications.create_index([("provider_id", 1), ("created_at", -1)])
     except Exception as e:
         logger.warning(f"Index creation: {e}")
 
@@ -1082,6 +1090,191 @@ async def search_alternatives(q: str = ""):
     """Empty-state helper: nearest service names when 0 providers matched."""
     from search_synonyms import suggest_alternatives
     return {"q": q, "alternatives": suggest_alternatives(q, max_results=4)}
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 30 (CAMBIO C) — Gigs / Chambas marketplace
+# ════════════════════════════════════════════════════════════════════
+# Quick one-off jobs that any client can post. Active providers in the
+# same vertical can browse, apply with a short pitch + price, and the
+# client picks the winner. Gigs auto-expire after 30 days.
+
+class GigIn(BaseModel):
+    title: str
+    description: str
+    category: str            # ES canonical (e.g. "Limpieza"), drives discovery
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    is_urgent: Optional[bool] = False
+
+class GigApplicationIn(BaseModel):
+    message: str
+    proposed_price: Optional[float] = None
+
+def _gig_public(g: dict) -> dict:
+    g = {k: v for k, v in g.items() if k not in ("_id", "expires_at_native")}
+    return g
+
+@api_router.get("/gigs")
+async def list_gigs(
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    limit: int = 24,
+):
+    q: dict = {"status": "open"}
+    if category:
+        q["category"] = {"$regex": f"^{re.escape(category)}$", "$options": "i"}
+    if city:
+        q["city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
+    if state:
+        q["state"] = {"$regex": f"^{re.escape(state)}$", "$options": "i"}
+    docs = await db.gigs.find(q, {"_id": 0, "expires_at_native": 0}) \
+        .sort([("is_urgent", -1), ("created_at", -1)]) \
+        .limit(max(1, min(limit, 100))).to_list(100)
+    # add cheap counter — applications per gig
+    if docs:
+        gig_ids = [d["gig_id"] for d in docs]
+        pipe = [
+            {"$match": {"gig_id": {"$in": gig_ids}}},
+            {"$group": {"_id": "$gig_id", "count": {"$sum": 1}}},
+        ]
+        counts = {row["_id"]: row["count"] async for row in db.gig_applications.aggregate(pipe)}
+        for d in docs:
+            d["applicant_count"] = counts.get(d["gig_id"], 0)
+    return docs
+
+@api_router.get("/gigs/{gig_id}")
+async def get_gig(gig_id: str):
+    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "expires_at_native": 0})
+    if not g:
+        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
+    # Anonymize the poster identity for the public view — only show name + first letter
+    if g.get("posted_by_name"):
+        g["posted_by_display"] = g["posted_by_name"].split()[0] if " " in g["posted_by_name"] else g["posted_by_name"]
+    g["applicant_count"] = await db.gig_applications.count_documents({"gig_id": gig_id})
+    return g
+
+@api_router.post("/gigs")
+async def create_gig(payload: GigIn, request: Request, user: User = Depends(get_current_user)):
+    # Validation — keep junk out the same way we did with /api/providers in iter-27
+    title = (payload.title or "").strip()
+    desc = (payload.description or "").strip()
+    if len(title) < 6:
+        raise HTTPException(status_code=400, detail="El título debe tener al menos 6 caracteres.")
+    if len(desc) < 20:
+        raise HTTPException(status_code=400, detail="Describe la chamba con al menos 20 caracteres.")
+    if re.search(r"\b(test|qa|asdf)\b", title.lower()):
+        raise HTTPException(status_code=400, detail="Título no válido.")
+    if (payload.budget_min is not None and payload.budget_min < 0) or (payload.budget_max is not None and payload.budget_max < 0):
+        raise HTTPException(status_code=400, detail="El presupuesto no puede ser negativo.")
+    if (payload.budget_min is not None and payload.budget_max is not None
+            and payload.budget_min > payload.budget_max):
+        raise HTTPException(status_code=400, detail="El presupuesto mínimo no puede ser mayor que el máximo.")
+    now = datetime.now(timezone.utc)
+    gig_id = f"gig_{uuid.uuid4().hex[:12]}"
+    expires = now + timedelta(days=30)
+    doc = {
+        "gig_id": gig_id,
+        "title": title,
+        "description": desc,
+        "category": (payload.category or "").strip() or "Otros",
+        "budget_min": payload.budget_min,
+        "budget_max": payload.budget_max,
+        "city": (payload.city or "").strip() or None,
+        "state": (payload.state or "").strip() or None,
+        "is_urgent": bool(payload.is_urgent),
+        "status": "open",
+        "created_by": user.user_id,
+        "posted_by_name": user.name or user.email,
+        "created_at": now.isoformat(),
+        "expires_at_native": expires,
+        "expires_at": expires.isoformat(),
+    }
+    await db.gigs.insert_one(doc)
+    await audit_log(user.user_id, "gig.created", {"gig_id": gig_id, "category": doc["category"]}, request)
+    return _gig_public(doc)
+
+@api_router.post("/gigs/{gig_id}/close")
+async def close_gig(gig_id: str, request: Request, user: User = Depends(get_current_user)):
+    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "created_by": 1, "status": 1})
+    if not g:
+        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
+    if g["created_by"] != user.user_id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="No puedes cerrar esta chamba.")
+    if g.get("status") != "open":
+        return {"ok": True, "already_closed": True}
+    await db.gigs.update_one({"gig_id": gig_id}, {"$set": {"status": "closed", "closed_at": datetime.now(timezone.utc).isoformat()}})
+    await audit_log(user.user_id, "gig.closed", {"gig_id": gig_id}, request)
+    return {"ok": True}
+
+@api_router.post("/gigs/{gig_id}/apply")
+async def apply_to_gig(gig_id: str, payload: GigApplicationIn, request: Request, user: User = Depends(get_current_user)):
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores pueden aplicar a chambas.")
+    msg = (payload.message or "").strip()
+    if len(msg) < 20:
+        raise HTTPException(status_code=400, detail="Tu mensaje debe tener al menos 20 caracteres.")
+    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "status": 1, "created_by": 1})
+    if not g:
+        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
+    if g.get("status") != "open":
+        raise HTTPException(status_code=400, detail="Esta chamba ya no está abierta.")
+    if g.get("created_by") == user.user_id:
+        raise HTTPException(status_code=400, detail="No puedes aplicar a tu propia chamba.")
+    # Find the provider's eCard so we can attach name + slug
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "provider_id": 1, "business_name": 1, "slug": 1},
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        await db.gig_applications.insert_one({
+            "application_id": f"gigapp_{uuid.uuid4().hex[:12]}",
+            "gig_id": gig_id,
+            "provider_id": user.user_id,
+            "provider_business_name": profile.get("business_name") if profile else (user.name or "Proveedor"),
+            "provider_slug": profile.get("slug") if profile else None,
+            "message": msg,
+            "proposed_price": payload.proposed_price,
+            "status": "pending",
+            "created_at": now,
+        })
+    except DuplicateKeyError:
+        raise HTTPException(status_code=400, detail="Ya aplicaste a esta chamba.")
+    await audit_log(user.user_id, "gig.application_sent", {"gig_id": gig_id}, request)
+    return {"ok": True, "applied_at": now}
+
+@api_router.get("/gigs/{gig_id}/applications")
+async def list_gig_applications(gig_id: str, user: User = Depends(get_current_user)):
+    g = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0, "created_by": 1})
+    if not g:
+        raise HTTPException(status_code=404, detail="Chamba no encontrada.")
+    if g["created_by"] != user.user_id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo el dueño puede ver las aplicaciones.")
+    apps = await db.gig_applications.find({"gig_id": gig_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return apps
+
+@api_router.get("/me/gigs")
+async def my_gigs(user: User = Depends(get_current_user)):
+    """Gigs posted by the current user."""
+    docs = await db.gigs.find({"created_by": user.user_id}, {"_id": 0, "expires_at_native": 0}).sort("created_at", -1).to_list(50)
+    return docs
+
+@api_router.get("/me/gig-applications")
+async def my_gig_applications(user: User = Depends(get_current_user)):
+    """Provider view: gigs I applied to."""
+    apps = await db.gig_applications.find({"provider_id": user.user_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    if apps:
+        gig_ids = [a["gig_id"] for a in apps]
+        gigs_by_id = {g["gig_id"]: g for g in await db.gigs.find(
+            {"gig_id": {"$in": gig_ids}}, {"_id": 0, "expires_at_native": 0}
+        ).to_list(200)}
+        for a in apps:
+            a["gig"] = gigs_by_id.get(a["gig_id"])
+    return apps
 
 
 @api_router.get("/providers/identity-counts")

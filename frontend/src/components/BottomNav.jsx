@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Search, MessageCircle, User, Sparkles } from "lucide-react";
+import { Home, Search, MessageCircle, User, Briefcase } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
@@ -55,8 +55,12 @@ export default function BottomNav() {
     return () => { document.body.classList.remove("has-bottom-nav"); };
   }, [navVisible]);
 
+  // CAMBIO A — also hide nav on auth/onboarding screens (less friction)
+  const HIDDEN_PATHS = ["/login", "/register", "/registro", "/verificar-correo", "/verify-email"];
+
   if (!user) return null;
   if (location.pathname.startsWith("/admin")) return null;
+  if (HIDDEN_PATHS.some(p => location.pathname.startsWith(p))) return null;
   if (keyboardOpen) return null;
 
   const pathname = location.pathname;
@@ -65,16 +69,16 @@ export default function BottomNav() {
     if (path === "/dashboard") return pathname.startsWith("/dashboard");
     if (path === "/messages") return pathname.startsWith("/messages");
     if (path === "/search") return pathname.startsWith("/search") || pathname.startsWith("/buscar");
-    if (path === "/profile") return pathname.startsWith("/profile");
+    if (path === "/empleos") return pathname.startsWith("/empleos") || pathname.startsWith("/gigs");
     return pathname.startsWith(path);
   };
 
   const items = [
     { path: "/", icon: Home, label: lang === "en" ? "Home" : "Inicio", testid: "bottom-nav-home" },
     { path: "/search", icon: Search, label: lang === "en" ? "Search" : "Buscar", testid: "bottom-nav-search" },
-    { path: "/dashboard", icon: Sparkles, label: lang === "en" ? "Dashboard" : "Panel", testid: "bottom-nav-dashboard" },
+    { path: "/empleos", icon: Briefcase, label: lang === "en" ? "Gigs" : "Chambas", testid: "bottom-nav-empleos" },
     { path: "/messages", icon: MessageCircle, label: lang === "en" ? "Inbox" : "Mensajes", badge: unread, testid: "bottom-nav-messages" },
-    { path: "/profile", icon: User, label: lang === "en" ? "Profile" : "Perfil", testid: "bottom-nav-profile" },
+    { path: "/dashboard", icon: User, label: lang === "en" ? "Account" : "Mi cuenta", testid: "bottom-nav-dashboard" },
   ];
 
   return (

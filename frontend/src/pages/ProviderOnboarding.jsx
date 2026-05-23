@@ -9,6 +9,7 @@ import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2, ScanLine }
 import { toast } from "sonner";
 import BusinessCardScanner from "../components/BusinessCardScanner";
 import AIDescriptionAssistant from "../components/AIDescriptionAssistant";
+import { getRelatedCategories, normalizeCategoryKey } from "../data/categoryGroups";
 
 const STEPS = [
   { id: "plan", title: "Elige tu plan" },
@@ -52,7 +53,15 @@ export default function ProviderOnboarding() {
     });
   }, [user, authLoading, navigate]);
 
-  const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const update = (k, v) => setForm(f => {
+    // CAMBIO B — when the main category changes, clear the additional ones
+    // because the previously-selected sub-services may belong to a different
+    // vertical and would no longer be visible in the chip list.
+    if (k === "category_id" && f.additional_categories?.length) {
+      return { ...f, [k]: v, additional_categories: [] };
+    }
+    return { ...f, [k]: v };
+  });
   const updateList = (k, v) => setForm(f => ({ ...f, [k]: v.split(",").map(s => s.trim()).filter(Boolean) }));
   const updateHour = (d, v) => setForm(f => ({ ...f, hours: { ...f.hours, [d]: v } }));
 
@@ -152,21 +161,52 @@ export default function ProviderOnboarding() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Categorías adicionales (opcional)</label>
-                <div className="flex flex-wrap gap-2">
-                  {categories.filter(c => c.category_id !== form.category_id).map(c => {
-                    const active = form.additional_categories.includes(c.category_id);
-                    return (
-                      <button
-                        key={c.category_id} type="button"
-                        onClick={() => update("additional_categories", active ? form.additional_categories.filter(x => x !== c.category_id) : [...form.additional_categories, c.category_id])}
-                        className={`px-3 py-1.5 rounded-full text-sm border ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-200 text-slate-700"}`}
-                        data-testid={`onboarding-addcat-${c.slug}`}
-                      >
-                        {c.name_es}
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="text-xs text-slate-500 mb-2">Selecciona los servicios complementarios <strong>dentro de tu mismo giro</strong>.</p>
+                {(() => {
+                  const mainCat = categories.find(c => c.category_id === form.category_id);
+                  const mainKey = mainCat ? (mainCat.name_es || "") : "";
+                  const related = mainCat ? getRelatedCategories(mainKey) : [];
+                  const relatedSet = new Set(related.map(normalizeCategoryKey));
+                  // Filter the DB-known additional categories down to those whose
+                  // name_es (or name_en) matches the vertical map. If nothing maps,
+                  // fall back to showing nothing (better than showing irrelevant rubros).
+                  const allowed = related.length
+                    ? categories.filter(c => {
+                        if (c.category_id === form.category_id) return false;
+                        const es = normalizeCategoryKey(c.name_es || "");
+                        const en = normalizeCategoryKey(c.name_en || "");
+                        return relatedSet.has(es) || relatedSet.has(en);
+                      })
+                    : [];
+                  if (!form.category_id) {
+                    return <div className="text-xs text-slate-400 italic" data-testid="onboarding-addcat-empty-pick-main">Primero selecciona tu categoría principal.</div>;
+                  }
+                  if (allowed.length === 0) {
+                    return <div className="text-xs text-slate-400 italic" data-testid="onboarding-addcat-empty-no-related">No hay servicios complementarios catalogados para este giro todavía.</div>;
+                  }
+                  return (
+                    <div className="flex flex-wrap gap-2" data-testid="onboarding-addcat-list">
+                      {allowed.map(c => {
+                        const active = form.additional_categories.includes(c.category_id);
+                        return (
+                          <button
+                            key={c.category_id} type="button"
+                            onClick={() => update("additional_categories", active ? form.additional_categories.filter(x => x !== c.category_id) : [...form.additional_categories, c.category_id])}
+                            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${active ? "bg-teal-600 text-white border-teal-600" : "bg-white border-slate-200 text-slate-700 hover:border-teal-400"}`}
+                            data-testid={`onboarding-addcat-${c.slug}`}
+                          >
+                            {c.name_es}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                {form.category_id && (
+                  <div className="mt-3 rounded-xl p-3 text-xs leading-relaxed" style={{ background: "rgba(2,95,103,0.06)", border: "1px solid rgba(2,95,103,0.15)", color: "#0F4D52" }} data-testid="onboarding-addcat-note">
+                    💡 <strong>¿Tienes otro tipo de negocio diferente?</strong> Por ejemplo, si además de tu giro principal haces algo totalmente distinto, crea una <strong>segunda eCard separada</strong>. Cada perfil tiene su propia calificación y visibilidad.
+                  </div>
+                )}
               </div>
               <div>
                 <Field label="Descripción corta" value={form.description} onChange={v => update("description", v)} textarea testid="onboarding-description" />
