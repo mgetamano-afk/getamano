@@ -13,8 +13,11 @@ export default function Register() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const refCode = (params.get("ref") || "").toUpperCase().slice(0, 6) || null;
+  const langFromUrl = (params.get("lang") || "").toLowerCase();
+  const initialLanguage = langFromUrl === "en" ? "en" : langFromUrl === "es" ? "es" : "es";
   const [step, setStep] = useState(params.get("intent") ? 2 : 1);
   const [intent, setIntent] = useState(params.get("intent") || (refCode ? "provider" : "client"));
+  const [preferredLanguage, setPreferredLanguage] = useState(initialLanguage);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,8 +41,8 @@ export default function Register() {
     setLoading(true);
     try {
       const role = intentToRole(intent);
-      const user = await register({ email, password, name, role }, refCode);
-      toast.success("¡Cuenta creada! Verifica tu correo para continuar.");
+      const user = await register({ email, password, name, role, preferred_language: preferredLanguage }, refCode);
+      toast.success(preferredLanguage === "en" ? "Account created! Verify your email to continue." : "¡Cuenta creada! Verifica tu correo para continuar.");
       // Section 24: route every new account through email verification first.
       navigate(`/verificar-correo?email=${encodeURIComponent(user.email || email)}`);
     } catch (err) {
@@ -113,6 +116,29 @@ export default function Register() {
               <p className="text-slate-500 text-center mt-2">{intentOptions.find(o => o.id === intent)?.label}</p>
 
               <form onSubmit={onSubmit} className="mt-8 space-y-4" data-testid="register-form">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {preferredLanguage === "en" ? "I prefer to use Getamano in" : "Prefiero usar Getamano en"}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2" data-testid="register-language-toggle">
+                    <button
+                      type="button"
+                      onClick={() => setPreferredLanguage("es")}
+                      className={`py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition ${preferredLanguage === "es" ? "border-teal-600 bg-teal-50 text-teal-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}
+                      data-testid="register-language-es"
+                    >
+                      🇲🇽 Español
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreferredLanguage("en")}
+                      className={`py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition ${preferredLanguage === "en" ? "border-blue-600 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}
+                      data-testid="register-language-en"
+                    >
+                      🇺🇸 English
+                    </button>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">{t("auth.name")}</label>
                   <input required value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full h-12 px-4 rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none" data-testid="register-name-input" />

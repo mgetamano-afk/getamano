@@ -1,0 +1,42 @@
+{
+  "summary": "Iter40 — Section 34 Inclusive Providers landing + language toggle + bilingual badge AND Section 35.5 Redeemable Rewards (snapshot → coupons → redeem). Backend pytest 20/20 PASS on new test_iter40_inclusion_rewards.py (preferred_language persistence en/es/default+invalid 422, María bilingual badge present + es+en languages array intact, snapshot 401/403 gates, dry_run for 2026-05 returns would_create=true with coupons_created=0, real snapshot is idempotent — same code & coupon_id across reruns, invalid month format 400, María's TOP3-202605-* coupon shape (Top 3 / 50% / rank 1), rewards notification with priority='high' + notification_key='{uid}::coupon::2026-05' exists, notification_queue has email row with trigger_type=coupon_TOP3_2026-05, redeem before redeemable_from (2026-06-01) returns 400 'El cupón aún no es redimible', non-owned coupon 404, in-window injected test coupon flips to 'redeemed' + redeemed_at set + second redeem 400, expired coupon redeem auto-marks status='expired' + 400). Iter39 regression 20/20 PASS after 60s sleep. Frontend Playwright: ProviderCTASection mounted on Landing with provider-cta-latino + provider-cta-american cards and bilingual tagline (ES 'El sol sale para todos' / EN 'The sun rises for everyone' — both verified by switching language). Latino CTA → /registro?intent=provider&lang=es (ES toggle pre-selected teal-600). American CTA → /registro?intent=provider&lang=en (EN toggle pre-selected blue-600). Clicking opposite toggle flips border colour correctly. Provider dashboard mounts coupons-card with 1 coupon row showing TOP3 badge, '50% off', code TOP3-202605-0D3D80, 'Aplicar a mi plan' button. DOM order confirmed: leaderboard-widget (475px) < coupons-card (667px) < share-link-card (939px). Hero subtitle ES contains 'latinos y americanos' and EN contains 'Latino and American' — verified on both renders.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter40_inclusion_rewards.py",
+    "/app/test_reports/pytest/iter40_results.xml",
+    "/app/test_reports/pytest/iter40_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RegisterIn.preferred_language correctly typed as Optional[Literal['es','en']] — invalid values (e.g. 'fr') are rejected by Pydantic with 422 before hitting DB. user_doc stores BOTH 'language' and 'preferred_language' fields with the same value (defaults to 'es' when not provided). Verified via direct mongo lookup post-register.",
+    "_badges_for_provider correctly checks languages array for {es, en} subset before appending bilingual badge. Confirmed on María (languages=['es','en']) and badge appears in /providers/{id}/badges payload as 4th badge with key='bilingual' label='Bilingüe · Bilingual' icon='🗣️'.",
+    "Snapshot endpoint admin-gated via require_admin (returns 403 for provider, 401 for unauth). Idempotency works via existence check `db.coupons.find_one({user_id, month_key})` inside _create_coupon_for_provider — re-running for 2026-05 returns the same coupon_id+code without inserting duplicates.",
+    "Coupon redeem endpoint correctly returns 404 for non-owner (find_one filtered by both coupon_id AND user_id), 400 for already-redeemed, 400 with auto-expire on past redeemable_until, and 400 before redeemable_from with Spanish message 'El cupón aún no es redimible.' All branches confirmed by tests.",
+    "Notification + queue creation paths fire on first mint only (gated by user.email/phone presence). The 'notification_key' uses '{user_id}::coupon::{month_key}' pattern which is unique per user-per-month and prevents re-triggers on idempotent snapshot reruns (only the notifications.insert_one happens inside _create_coupon_for_provider AFTER existing-check returns None, so this is naturally idempotent — verified by tests).",
+    "Frontend ProviderCTASection cleanly switches both card titles, body copy and CTA labels via useI18n's t() — both ES ('latinos y americanos', 'El sol sale para todos') and EN ('Latino and American', 'The sun rises for everyone') verified in DOM via language switch.",
+    "Register.jsx correctly parses ?lang=es|en URL parameter and seeds preferredLanguage state. Selected button uses border-teal-600 (ES) or border-blue-600 (EN) with bg-{color}-50 + text-{color}-800 — provides clear visual selection state.",
+    "CouponsCard renders null when no coupons (clean — no empty state clutter on the dashboard). DOM-order between LeaderboardWidget and ShareLinkCard verified visually and by bounding-rect comparison."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter40_inclusion_rewards.py (new — 20 tests, 6 test classes covering RegisterIn lang persistence, bilingual badge, snapshot endpoint admin gate + dry_run + idempotency, coupon shape, notification+queue side effects, redeem ACL+state-machine flow)"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 iter40 + 20/20 iter39 regression)",
+    "frontend": "100% (Landing ProviderCTASection, both CTA navigations + URL lang preselect, register language toggle interactive state, provider dashboard CouponsCard with TOP3 50% row + code copy + redeem button + DOM ordering all confirmed)"
+  },
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123 (María, prov_10b9f21bf971, rank #1, holds TOP3-202605-0D3D80 50% coupon redeemable 2026-06-01 → 2026-07-01), demo.client@getamano.com/client123.",
+  "seed_data_creation": "Three TEST_iter40 users created via /auth/register (one per language path: en, es, default). Cleaned up in module-scoped teardown via db.users.delete_many({email:/^test_iter40_/}). Two in-memory test coupons injected directly into db.coupons for the in-window-redeem and expired-redeem branches — both cleaned up in finally blocks. NO modifications to María's demo coupon TOP3-202605-0D3D80.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 34 inclusive providers + Section 35.5 rewards are fully production-ready. María holds TOP3-202605-0D3D80 (50% off, redeemable_from=2026-06-01) → DO NOT redeem (current date 2026-01 → 400 expected). To re-run iter40: `pytest backend/tests/test_iter40_inclusion_rewards.py -v` — sleeps 65s on register rate-limit hit (3/60s on /auth/register), full run ~70s. Stripe integration on redeem is still a TODO (status flip only, no checkout). Twilio/Resend keys absent → queue rows stay 'pending' which is expected. The hero language defaults to EN if a prior session cached EN preference — i18n state is browser-persistent, not URL-bound. Iter41 should retest if any of: REWARD_TIERS thresholds change, snapshot scheduling cron added, or Stripe checkout wired into redeem endpoint.",
+  "rca_of_the_issue": "N/A — all targeted features pass end-to-end (backend pytest + Playwright). Earlier test iteration failed due to (1) DB lookup using non-lowercased email (server lowercases on insert) — fixed by using lowercase email in test data, and (2) rate-limit 429 on /auth/register (3 per 60s) — fixed by retrying once after 65s sleep on 429. No application code changes were needed."
+}

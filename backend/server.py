@@ -218,6 +218,7 @@ class RegisterIn(BaseModel):
     name: str
     phone: Optional[str] = None
     role: Role = "client"
+    preferred_language: Optional[Literal["es", "en"]] = None
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -914,7 +915,9 @@ async def register(payload: RegisterIn, response: Response, ref: Optional[str] =
         "name": payload.name,
         "phone": normalize_phone(payload.phone),
         "role": payload.role if payload.role in ("client", "provider") else "client",
-        "picture": None, "language": "es",
+        "picture": None,
+        "language": payload.preferred_language or "es",
+        "preferred_language": payload.preferred_language or "es",
         "country": DEFAULT_COUNTRY,
         "email_verified": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -4315,7 +4318,7 @@ async def get_notifications(user: User = Depends(get_current_user)):
     raw = await db.notifications.find(
         {
             "user_id": user.user_id,
-            "category": {"$in": ["gigs", "referrals", "streaks"]},
+            "category": {"$in": ["gigs", "referrals", "streaks", "rewards"]},
             "dismissed_at": None,
         },
         {"_id": 0},
@@ -5090,6 +5093,13 @@ async def _badges_for_provider(provider_id: str, user_id: str = "") -> list[dict
     if user_doc and user_doc.get("founding_member"):
         badges.append({"key": "founding_member", "label": "Founding Member", "icon": "🏆"})
 
+    # Section 34 — Bilingual badge (Spanish + English)
+    prof_doc = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0, "languages": 1}) if provider_id else None
+    if prof_doc:
+        langs = prof_doc.get("languages") or []
+        if isinstance(langs, list) and "es" in langs and "en" in langs:
+            badges.append({"key": "bilingual", "label": "Bilingüe · Bilingual", "icon": "🗣️"})
+
     # Section 34 — Activity streak (only surfaces when ≥3 alive days, see
     # _compute_streak's public redaction). We read the cached value from the
     # `streaks` collection to avoid duplicating the heavy aggregate inside
@@ -5488,7 +5498,6 @@ async def _compute_leaderboard() -> list[dict]:
 
     user_ids = [p["user_id"] for p in profs]
     provider_ids = [p["provider_id"] for p in profs]
-    user_to_prov = {p["user_id"]: p["provider_id"] for p in profs}
 
     # Referrals credited this month
     ref_agg = db.referrals.aggregate([
@@ -5657,6 +5666,319 @@ async def get_my_leaderboard_position(user: User = Depends(get_current_user)):
         "total_ranked": len(rows),
         "top_10": rows[:10],
     }
+
+
+# ════════════════════════════════════════════════════════════════════════
+# SECTION 35.5 — Redeemable Rewards (Top → coupon)
+# ════════════════════════════════════════════════════════════════════════
+# Monthly snapshot turns the prior month's top 50 into discount coupons:
+#   Top 3   → 50% off next month's subscription
+#   Top 10  → 25%
+#   Top 50  → 10%
+# Snapshots are idempotent per month. Admins can dry-run any month, and
+# providers see their available coupons on the dashboard.
+# ════════════════════════════════════════════════════════════════════════
+
+REWARD_TIERS = [
+    {"max_rank": 3, "discount_pct": 50, "label": "Top 3", "code_prefix": "TOP3"},
+    {"max_rank": 10, "discount_pct": 25, "label": "Top 10", "code_prefix": "TOP10"},
+    {"max_rank": 50, "discount_pct": 10, "label": "Top 50", "code_prefix": "TOP50"},
+]
+
+
+def _previous_month_window():
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Step back 1 second to land in the previous month
+    prev_end = month_start - timedelta(seconds=1)
+    prev_start = prev_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return prev_start, month_start
+
+
+async def _compute_leaderboard_for_window(window_start_iso: str, window_end_iso: str) -> list[dict]:
+    """Same as _compute_leaderboard but for an arbitrary window. Used by
+    snapshots so a dry-run doesn't depend on current cached state.
+    """
+    profs = await db.provider_profiles.find(
+        {
+            "is_active": True,
+            "verification_status": "approved",
+            **PUBLIC_GUARD,
+        },
+        {"_id": 0},
+    ).to_list(2000)
+    if not profs:
+        return []
+
+    user_ids = [p["user_id"] for p in profs]
+    provider_ids = [p["provider_id"] for p in profs]
+
+    refs = {r["_id"]: r["n"] async for r in db.referrals.aggregate([
+        {"$match": {"status": "credited", "credited_at": {"$gte": window_start_iso, "$lt": window_end_iso}, "referrer_user_id": {"$in": user_ids}}},
+        {"$group": {"_id": "$referrer_user_id", "n": {"$sum": 1}}},
+    ])}
+    revs = {r["_id"]: r["n"] async for r in db.reviews.aggregate([
+        {"$match": {"provider_id": {"$in": provider_ids}, "rating": {"$gte": 4}, "created_at": {"$gte": window_start_iso, "$lt": window_end_iso}, "is_hidden": {"$ne": True}}},
+        {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+    ])}
+    apps = {r["_id"]: r["n"] async for r in db.gig_applications.aggregate([
+        {"$match": {"provider_id": {"$in": provider_ids}, "created_at": {"$gte": window_start_iso, "$lt": window_end_iso}}},
+        {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+    ])}
+    fasts = {r["_id"]: r["n"] async for r in db.quote_requests.aggregate([
+        {"$match": {"provider_id": {"$in": provider_ids}, "response_time_seconds": {"$gt": 0, "$lt": 7200}, "responded_at": {"$gte": window_start_iso, "$lt": window_end_iso}}},
+        {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+    ])}
+
+    subs = await db.subscriptions.find(
+        {"user_id": {"$in": user_ids}, "status": "active", "plan": {"$in": ["basic", "pro", "premium"]}},
+        {"_id": 0, "user_id": 1, "plan": 1},
+    ).to_list(2000)
+    paid_users = {s["user_id"]: s["plan"] for s in subs}
+
+    rows = []
+    for p in profs:
+        uid = p["user_id"]
+        pid = p["provider_id"]
+        completeness = p.get("profile_completion", 0) or 0
+        is_paid = uid in paid_users
+
+        breakdown = {
+            "referrals_credited": refs.get(uid, 0),
+            "reviews_4plus": revs.get(pid, 0),
+            "gig_applications": min(apps.get(pid, 0), 30),
+            "streak_days": 0,  # not month-bound; excluded from historical windows
+            "fast_responses": min(fasts.get(pid, 0), 30),
+            "active_pro_bonus": 5 if is_paid else 0,
+            "completion_bonus": 10 if completeness >= 80 else 0,
+        }
+        score = (
+            breakdown["referrals_credited"] * 25
+            + breakdown["reviews_4plus"] * 5
+            + breakdown["gig_applications"] * 1
+            + breakdown["fast_responses"] * 3
+            + breakdown["active_pro_bonus"]
+            + breakdown["completion_bonus"]
+        )
+        if score <= 0:
+            continue
+
+        rows.append({
+            "provider_id": pid,
+            "user_id": uid,
+            "slug": p.get("slug"),
+            "business_name": p.get("business_name") or "",
+            "city": p.get("city"),
+            "score": score,
+            "breakdown": breakdown,
+        })
+    rows.sort(key=lambda r: -r["score"])
+    for i, r in enumerate(rows, start=1):
+        r["rank"] = i
+    return rows
+
+
+def _tier_for_rank(rank: int) -> Optional[dict]:
+    for tier in REWARD_TIERS:
+        if rank <= tier["max_rank"]:
+            return tier
+    return None
+
+
+async def _create_coupon_for_provider(user_id: str, rank: int, tier: dict, month_key: str) -> Optional[dict]:
+    """Create a coupon. Idempotent on (user_id, month_key)."""
+    existing = await db.coupons.find_one({"user_id": user_id, "month_key": month_key}, {"_id": 0})
+    if existing:
+        return existing
+    now = datetime.now(timezone.utc)
+    # Valid for the entire NEXT calendar month (the month *after* the snapshot)
+    parts = month_key.split("-")
+    year, month = int(parts[0]), int(parts[1])
+    # Coupon-redemption window starts the snapshot month + 1
+    redeem_start = datetime(year, month, 1, tzinfo=timezone.utc) + timedelta(days=31)
+    redeem_start = redeem_start.replace(day=1)
+    if redeem_start.month == 12:
+        redeem_end = redeem_start.replace(year=redeem_start.year + 1, month=1)
+    else:
+        redeem_end = redeem_start.replace(month=redeem_start.month + 1)
+
+    code = f"{tier['code_prefix']}-{month_key.replace('-', '')}-{uuid.uuid4().hex[:6].upper()}"
+    doc = {
+        "coupon_id": f"cpn_{uuid.uuid4().hex[:14]}",
+        "code": code,
+        "user_id": user_id,
+        "month_key": month_key,
+        "rank": rank,
+        "tier_label": tier["label"],
+        "discount_pct": tier["discount_pct"],
+        "status": "available",  # → "redeemed" → "expired"
+        "redeemable_from": redeem_start.isoformat(),
+        "redeemable_until": redeem_end.isoformat(),
+        "created_at": now.isoformat(),
+    }
+    await db.coupons.insert_one(doc)
+
+    # Push high-priority in-app notification + queue email/SMS for live channels
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1, "phone": 1})
+    if user:
+        first = (user.get("name") or "").split(" ")[0] or "compa"
+        title = f"🎁 Ganaste {tier['discount_pct']}% off — quedaste {tier['label']} en {month_key}"
+        body = (
+            f"{first}, fuiste #{rank} en el ranking de {month_key} y desbloqueaste un cupón de {tier['discount_pct']}% "
+            f"para tu próxima mensualidad. Código: {code}. Vence el último día del próximo mes."
+        )
+        await db.notifications.insert_one({
+            "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+            "notification_key": f"{user_id}::coupon::{month_key}",
+            "user_id": user_id,
+            "role": "provider",
+            "category": "rewards",
+            "title": title,
+            "body": body,
+            "cta_label": "Ver mi cupón",
+            "cta_url": "/dashboard/provider#rewards",
+            "icon": "trophy",
+            "priority": "high",
+            "is_read": False,
+            "dismissed_at": None,
+            "created_at": now.isoformat(),
+        })
+        if user.get("email"):
+            await enqueue_notification(
+                recipient_email=user["email"], channel="email",
+                subject=title,
+                body=body,
+                trigger_type=f"coupon_{tier['code_prefix']}_{month_key}",
+            )
+        if user.get("phone"):
+            await enqueue_notification(
+                recipient_phone=user["phone"], channel="sms",
+                body=f"🎁 getamano — {tier['discount_pct']}% off por quedar {tier['label']} en {month_key}. Código: {code}",
+                trigger_type=f"coupon_{tier['code_prefix']}_{month_key}",
+            )
+    return doc
+
+
+@api_router.post("/admin/leaderboard/snapshot")
+async def admin_leaderboard_snapshot(
+    request: Request,
+    admin: User = Depends(require_admin),
+    month: Optional[str] = None,
+    dry_run: bool = False,
+):
+    """Snapshot the prior calendar month's leaderboard, mint coupons.
+
+    Idempotent — re-running for the same month yields the same coupons.
+    Pass `month=YYYY-MM` to snapshot a specific window. Default = previous
+    calendar month. `dry_run=true` returns the would-be ranks/coupons
+    without persisting.
+    """
+    if month:
+        try:
+            y, m = map(int, month.split("-"))
+            window_start = datetime(y, m, 1, tzinfo=timezone.utc)
+            if m == 12:
+                window_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                window_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Formato de mes inválido (usa YYYY-MM).")
+    else:
+        window_start, window_end = _previous_month_window()
+
+    month_key = window_start.strftime("%Y-%m")
+    rows = await _compute_leaderboard_for_window(window_start.isoformat(), window_end.isoformat())
+    if not rows:
+        return {"ok": True, "month": month_key, "snapshotted": 0, "coupons_created": 0, "dry_run": dry_run, "results": []}
+
+    # Cap to top 50 — anything below doesn't earn a coupon
+    eligible = rows[:50]
+    results = []
+    created = 0
+    for r in eligible:
+        tier = _tier_for_rank(r["rank"])
+        if not tier:
+            continue
+        if dry_run:
+            results.append({
+                "user_id": r["user_id"],
+                "rank": r["rank"],
+                "score": r["score"],
+                "business_name": r["business_name"],
+                "tier": tier["label"],
+                "discount_pct": tier["discount_pct"],
+                "would_create": True,
+            })
+        else:
+            doc = await _create_coupon_for_provider(r["user_id"], r["rank"], tier, month_key)
+            if doc:
+                created += 1
+                results.append({
+                    "user_id": r["user_id"],
+                    "rank": r["rank"],
+                    "score": r["score"],
+                    "business_name": r["business_name"],
+                    "code": doc["code"],
+                    "discount_pct": doc["discount_pct"],
+                    "status": doc["status"],
+                })
+
+    if not dry_run:
+        await audit_log(admin.user_id, "leaderboard.snapshot", {"month": month_key, "coupons_created": created, "eligible": len(eligible)}, request)
+    return {
+        "ok": True,
+        "month": month_key,
+        "snapshotted": len(rows),
+        "eligible": len(eligible),
+        "coupons_created": created if not dry_run else 0,
+        "dry_run": dry_run,
+        "results": results,
+    }
+
+
+@api_router.get("/me/coupons")
+async def get_my_coupons(user: User = Depends(get_current_user)):
+    """Provider-facing list of coupons earned via leaderboard rankings."""
+    now = datetime.now(timezone.utc).isoformat()
+    items = await db.coupons.find(
+        {"user_id": user.user_id},
+        {"_id": 0},
+    ).sort("created_at", -1).limit(24).to_list(24)
+    # Auto-mark expired coupons whose window has passed
+    for c in items:
+        if c.get("status") == "available" and c.get("redeemable_until") and c["redeemable_until"] < now:
+            c["status"] = "expired"
+            await db.coupons.update_one(
+                {"coupon_id": c["coupon_id"]},
+                {"$set": {"status": "expired"}},
+            )
+    active = [c for c in items if c.get("status") == "available"]
+    return {"items": items, "active_count": len(active)}
+
+
+@api_router.post("/me/coupons/{coupon_id}/redeem")
+async def redeem_my_coupon(coupon_id: str, user: User = Depends(get_current_user), request: Request = None):
+    """Mark a coupon as redeemed. Stripe integration will plug in here once
+    keys are live — for now it's a flag flip so the dashboard reflects use.
+    """
+    c = await db.coupons.find_one({"coupon_id": coupon_id, "user_id": user.user_id}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Cupón no encontrado.")
+    if c.get("status") != "available":
+        raise HTTPException(status_code=400, detail=f"Cupón {c.get('status', 'no disponible')}.")
+    now = datetime.now(timezone.utc)
+    if c.get("redeemable_from") and now.isoformat() < c["redeemable_from"]:
+        raise HTTPException(status_code=400, detail="El cupón aún no es redimible.")
+    if c.get("redeemable_until") and now.isoformat() > c["redeemable_until"]:
+        await db.coupons.update_one({"coupon_id": coupon_id}, {"$set": {"status": "expired"}})
+        raise HTTPException(status_code=400, detail="El cupón ya expiró.")
+    await db.coupons.update_one(
+        {"coupon_id": coupon_id},
+        {"$set": {"status": "redeemed", "redeemed_at": now.isoformat()}},
+    )
+    if request:
+        await audit_log(user.user_id, "coupon.redeemed", {"coupon_id": coupon_id, "code": c.get("code")}, request)
+    return {"ok": True, "code": c.get("code"), "redeemed_at": now.isoformat()}
 
 
 # ─── SECTION 16C — Referrals ─────────────────────────────────────────────

@@ -26,6 +26,7 @@ import WeeklyDigestPreview from "../components/WeeklyDigestPreview";
 import ReferralPanel from "../components/ReferralPanel";
 import StreakWidget from "../components/StreakWidget";
 import LeaderboardWidget from "../components/LeaderboardWidget";
+import CouponsCard from "../components/CouponsCard";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -153,6 +154,8 @@ export default function ProviderDashboard() {
         <StreakWidget />
 
         <LeaderboardWidget />
+
+        <CouponsCard />
 
         <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
 

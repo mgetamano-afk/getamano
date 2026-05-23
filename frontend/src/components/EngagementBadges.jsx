@@ -26,6 +26,7 @@ const PALETTE = {
   chambero:         { bg: "rgba(234,88,12,0.12)",  color: "#C2410C", border: "rgba(234,88,12,0.35)" },
   active_applicant: { bg: "rgba(234,88,12,0.06)",  color: "#9A3412", border: "rgba(234,88,12,0.25)" },
   founding_member:  { bg: "rgba(2,95,103,0.10)",   color: "#025F67", border: "rgba(2,95,103,0.30)" },
+  bilingual:        { bg: "linear-gradient(135deg, rgba(2,95,103,0.08) 0%, rgba(30,64,175,0.08) 100%)", color: "#1E40AF", border: "rgba(30,64,175,0.30)" },
   streak:           { bg: "linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%)", color: "#9A3412", border: "rgba(234,88,12,0.45)" },
 };
 

@@ -15,6 +15,7 @@ import SmartServiceSearch from "../components/SmartServiceSearch";
 import CityAutocomplete from "../components/CityAutocomplete";
 import DownloadBadgesSection from "../components/DownloadBadgesSection";
 import FeaturedProvidersReel from "../components/FeaturedProvidersReel";
+import ProviderCTASection from "../components/ProviderCTASection";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -564,6 +565,8 @@ export default function Landing() {
 
       {/* Section 28 — Download badges + QR strip */}
       <DownloadBadgesSection />
+
+      <ProviderCTASection />
 
       <Footer />
     </div>
