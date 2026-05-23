@@ -9,6 +9,7 @@ import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
 import CityAutocomplete from "../components/CityAutocomplete";
+import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import useGeolocation from "../hooks/useGeolocation";
 import { trackSearch } from "../lib/analytics";
 
@@ -496,7 +497,18 @@ export default function Search() {
             ) : loading ? (
               <div className="text-center text-slate-500 py-12">{t("common.loading")}</div>
             ) : providers.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500" data-testid="search-no-results">{t("search.no_results")}</div>
+              <SmartSearchEmptyState
+                q={q}
+                city={city}
+                onSuggestionClick={(label) => {
+                  setQ(label);
+                  // Re-run search by updating URL params so the existing
+                  // effect re-fetches with the new term.
+                  const next = new URLSearchParams(params);
+                  next.set("q", label);
+                  setParams(next);
+                }}
+              />
             ) : (
               <div className="grid md:grid-cols-2 gap-5">
                 {providers.map(p => (

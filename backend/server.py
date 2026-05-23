@@ -965,12 +965,34 @@ async def search_providers(
         query["owner_identity"] = owner_identity
     if has_video:
         query["video_url"] = {"$exists": True, "$ne": ""}
+    # SECTION 27 — Smart search. Expand the user term to all matching canonical
+    # services (handles "limpesa" → Limpieza, "plumber" → Plomería, etc.)
+    expanded_terms: list[str] = []
     if q:
-        query["$or"] = [
-            {"business_name": {"$regex": q, "$options": "i"}},
-            {"description": {"$regex": q, "$options": "i"}},
-            {"services": {"$regex": q, "$options": "i"}},
-        ]
+        from search_synonyms import expand_query as _expand_q
+        expanded_terms = _expand_q(q)
+        regex_terms = [q] + expanded_terms
+        or_clauses = []
+        for term in regex_terms:
+            term_safe = re.escape(term)
+            or_clauses.extend([
+                {"business_name": {"$regex": term_safe, "$options": "i"}},
+                {"description":   {"$regex": term_safe, "$options": "i"}},
+                {"services":      {"$regex": term_safe, "$options": "i"}},
+            ])
+        # Also widen by category name (so "limpieza" finds Cleaning category)
+        if expanded_terms:
+            cat_docs = await db.categories.find(
+                {"$or": [
+                    {"name_es": {"$in": expanded_terms}},
+                    {"name_en": {"$in": expanded_terms}},
+                ]},
+                {"_id": 0, "category_id": 1},
+            ).to_list(20)
+            cat_ids = [c["category_id"] for c in cat_docs]
+            if cat_ids:
+                or_clauses.append({"category_id": {"$in": cat_ids}})
+        query["$or"] = or_clauses
     # Section 18F — Proximity search ("Near me"): if lat/lng provided, fetch
     # candidates with coordinates, compute haversine distance, filter by radius.
     # Radius input: accept BOTH radius_miles (preferred, US default) and radius_km (back-compat).
@@ -1008,6 +1030,42 @@ async def search_providers(
     for p in providers:
         p["category"] = cats.get(p.get("category_id"))
     return providers
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 27 — Smart search helpers
+# ════════════════════════════════════════════════════════════════════
+@api_router.get("/search/autocomplete")
+async def search_autocomplete(q: str = "", lang: str = "es"):
+    """Live dropdown: canonical service names matching the typed term."""
+    from search_synonyms import expand_query
+    canonicals = expand_query(q, max_results=8)
+    if not canonicals:
+        return {"q": q, "matches": []}
+    cat_docs = await db.categories.find(
+        {"$or": [{"name_es": {"$in": canonicals}}, {"name_en": {"$in": canonicals}}]},
+        {"_id": 0, "slug": 1, "name_es": 1, "name_en": 1},
+    ).to_list(50)
+    by_name = {}
+    for c in cat_docs:
+        by_name[c.get("name_es", "")] = c
+        by_name[c.get("name_en", "")] = c
+    matches = []
+    for canon in canonicals:
+        cat = by_name.get(canon)
+        matches.append({
+            "label": canon,
+            "label_en": (cat.get("name_en") if cat else canon),
+            "slug": (cat.get("slug") if cat else None),
+        })
+    return {"q": q, "matches": matches}
+
+
+@api_router.get("/search/alternatives")
+async def search_alternatives(q: str = ""):
+    """Empty-state helper: nearest service names when 0 providers matched."""
+    from search_synonyms import suggest_alternatives
+    return {"q": q, "alternatives": suggest_alternatives(q, max_results=4)}
+
 
 @api_router.get("/providers/identity-counts")
 async def providers_identity_counts(

@@ -11,6 +11,8 @@ import { buildFileUrl } from "../components/ImageUpload";
 import { openInstallModal } from "../components/InstallAppModal";
 import useIsPwaInstalled from "../lib/useIsPwaInstalled";
 import CategoryCard from "../components/CategoryCard";
+import SmartServiceSearch from "../components/SmartServiceSearch";
+import CityAutocomplete from "../components/CityAutocomplete";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -85,9 +87,21 @@ export default function Landing() {
   }, [categories.length]);
 
   const onSearch = (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     const p = new URLSearchParams();
     if (q) p.set("q", q);
+    if (loc) p.set("city", loc);
+    navigate(`/buscar?${p.toString()}`);
+  };
+
+  // SmartServiceSearch tells us when the user picked a canonical service
+  // (e.g. clicked "Limpieza" in the dropdown). Navigate to /buscar with the
+  // ES label so the backend's smart search re-expands it correctly + carry
+  // the slug for direct category filtering when available.
+  const onPickService = (match) => {
+    const p = new URLSearchParams();
+    p.set("q", match.label);
+    if (match.slug) p.set("category", match.slug);
     if (loc) p.set("city", loc);
     navigate(`/buscar?${p.toString()}`);
   };
@@ -172,13 +186,24 @@ export default function Landing() {
               </p>
 
               <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 transition-shadow" style={{ boxShadow: "0 0 40px rgba(255, 107, 44, 0.25)" }} data-testid="hero-search-form">
-                <div className="flex items-center gap-2 px-3 flex-1 min-w-0">
-                  <Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                  <input value={q} onChange={e => setQ(e.target.value)} placeholder="¿Qué servicio buscas?" className="w-full min-w-0 py-3 outline-none text-slate-900" data-testid="hero-search-input" />
+                <div className="flex-1 min-w-0">
+                  <SmartServiceSearch
+                    value={q}
+                    onChange={setQ}
+                    onSelect={onPickService}
+                    onSubmit={(qq) => { setQ(qq); onSearch(); }}
+                    placeholder={lang === "en" ? "What service do you need?" : "¿Qué servicio buscas?"}
+                    testid="hero-smart-search"
+                    className="[&_input]:!h-11 [&_input]:!border-0 [&_input]:!ring-0 [&_input]:!rounded-xl"
+                  />
                 </div>
-                <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[220px] min-w-0">
-                  <MapPin className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                  <input value={loc} onChange={e => setLoc(e.target.value)} placeholder="Ciudad o ZIP" className="w-full min-w-0 py-3 outline-none text-slate-900" data-testid="hero-location-input" />
+                <div className="md:max-w-[240px] min-w-0 md:border-l border-slate-200 md:pl-2">
+                  <CityAutocomplete
+                    value={loc}
+                    onChange={setLoc}
+                    placeholder={lang === "en" ? "City or ZIP" : "Ciudad o ZIP"}
+                    testid="hero-location-autocomplete"
+                  />
                 </div>
                 <button type="submit" className="relative overflow-hidden btn-secondary flex items-center justify-center gap-1 w-full md:w-auto" data-testid="hero-search-submit">
                   <span className="relative z-10">Buscar</span>

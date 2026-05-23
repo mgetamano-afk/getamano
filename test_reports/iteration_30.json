@@ -1,0 +1,39 @@
+{
+  "summary": "Section 27 (smart search: synonyms + fuzzy + bilingual) end-to-end verified. Backend pytest suite (15/15 PASS) covers /api/search/autocomplete (limpesa→Limpieza+slug=cleaning, plumer→Plomería, tax→Preparación de impuestos, quinceanera→Quinceañeras, min-2-char gating, empty + unknown + regex-meta inputs return [] with 200, response shape), /api/search/alternatives (quinceniera→Quinceañeras within Lev≤4, unknown safe), /api/providers q-expansion (limpesa finds María's Cleaning Services, plumer 200-with-list, regex-meta inputs do not 500). Frontend Playwright: hero SmartServiceSearch dropdown opens with 'Cleaning / Limpieza' for 'limpesa', ArrowDown+Enter navigates to /buscar?q=Limpieza&category=cleaning, clear-X button works, Escape closes dropdown, mobile @393×852 no horizontal overflow. Search-page empty state renders for q=quinceniera with 'Quinceañeras' did-you-mean chip; Invite CTA href = /registro?intent=provider&ref=invite&for=quinceniera; explore-all link (data-testid=empty-state-explore-all) → /buscar; clicking the chip updates URL to q=Quinceañeras and re-runs the search. Regressions clean: /, /buscar, /plans, /categoria/cleaning (still surfaces María's), /instalar, /verificar-correo, hero CityAutocomplete still fillable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SmartSearchEmptyState · Invite CTA", "issues": ["The 'Send the invite' / 'Enviar invitación' button (data-testid=empty-state-invite-cta) measures ~131×32 px on desktop. Below WCAG 2.5.5 (44×44 recommended) for the primary CTA inside the invite card. Bump vertical padding (py-2 → py-2.5/py-3) so the tap target hits ≥44 px, especially on mobile."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter30_smart_search.py",
+    "/app/test_reports/pytest/iter30_results.xml"
+  ],
+  "action_items": [
+    "Optional: increase vertical padding on empty-state-invite-cta so the touch target reaches ≥44 px (currently ~32 px tall)."
+  ],
+  "critical_code_review_comments": [
+    "search_synonyms.normalize() strips diacritics + lowercases + drops non-alphanumerics — correct foundation for misspelling/ascii-variant matching. _levenshtein() has the right early-exit for length-gap>3.",
+    "expand_query() returns up to 6 matches via 4-tier strategy (substring canonical → substring synonym → fuzzy canonical → fuzzy synonym) which gives high recall as intended. Tier ordering correctly biases exact-substring over fuzzy.",
+    "server.py:977 — re.escape(term) is correctly applied before building Mongo regex from user input, so '(' '*' '++' '.*' '[abc' '$$$' all return 200 (verified). No ReDoS / regex-injection surface.",
+    "server.py:984 — when expanded_terms is non-empty, /api/providers also widens by category name. Good: 'limpesa' surfaces the Cleaning category and any provider tagged into it (this is exactly how María's Cleaning is found).",
+    "/api/search/autocomplete: matches include {label, label_en, slug}. label_en falls back to the canonical (Spanish) name if no English category match — acceptable, but worth noting that lang=en consumers will still see Spanish labels for canonicals without a matching category row (e.g. 'Quinceañeras' has no English equivalent in the dict). Not a bug, just a documentation note.",
+    "Rate limiter still active — pytest run intentionally throttled to 150 ms between calls; consider adding a marker so future agents know to keep the cadence.",
+    "Front-end ArrowDown/Enter/Escape keyboard nav works as advertised; dropdown z-index sits above the hero CTA without clipping at 1280 px or 393 px.",
+    "No data leak — autocomplete with q='' or q='a' short-circuits to []; suggest_alternatives('') also returns [].",
+    "Minor a11y nit (not a bug): SmartServiceSearch dropdown items don't expose role='option' / aria-selected — fine for now but worth revisiting if a screen-reader audit lands."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter30_smart_search.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15 pytest)", "frontend": "100% on all assertions (6 hero + 11 empty-state + 7 regression)"},
+  "test_credentials": "Anonymous browsing was sufficient for all Section 27 surfaces. Regression touched only public pages; no auth needed.",
+  "seed_data_creation": "None. Only read-only API calls + URL navigation.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 27 smart search is shipped clean. Reusable backend suite at /app/backend/tests/test_iter30_smart_search.py — it self-throttles (0.15 s between calls) to respect the rate limiter. If you extend the SEARCH_SYNONYMS dict in /app/backend/search_synonyms.py, add one autocomplete assertion per new canonical so coverage stays honest. Only nit found: empty-state-invite-cta tap target ~32 px tall.",
+  "rca_of_the_issue": "n/a — feature verification, no bug."
+}
