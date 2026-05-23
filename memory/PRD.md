@@ -774,3 +774,63 @@ User asked: "¿quieres que active notificaciones de nueva chamba para proveedore
 - Streak insurance: 1 free "skip day" per month earned by being on Pro plan.
 - Refactor `server.py` (now ~7200 lines) into modular routers post-launch.
 
+
+### Feb 23, 2026 — Iteration 39: Section 35 Monthly Leaderboard (Public + Dashboard)
+
+**User intent:** "okmdale con eso" — confirmed the monthly leaderboard suggested in iter38 finish.
+
+**Scoring formula (transparent — providers can see exactly how to climb):**
+```
+referrals_credited * 25  +  reviews_4plus * 5  +  gig_applications * 1 (cap 30)
++ streak_days * 2 (cap 60)  +  fast_responses * 3 (cap 30)
++ active_pro_bonus (5)  +  completion_bonus (10 if profile ≥80%)
+```
+
+**Backend (`/app/backend/server.py`):**
+- New helpers:
+  - `_current_month_window()` — returns (month_start, month_end) UTC bounds.
+  - `_compute_leaderboard()` — heavy aggregate. Joins provider_profiles + 4 source collections (referrals, reviews, gig_applications, quote_requests) + streaks + subscriptions, computes score per provider, filters out 0-score and TEST_ rows, sorts by (-score, -rating, -reviews_count), assigns sequential rank, caps at 100.
+  - `_get_cached_leaderboard()` — module-level dict cache with `LEADERBOARD_TTL_SECONDS = 300` (5 min).
+- New endpoints:
+  - `GET /api/leaderboard/monthly` (public) — returns `{month, top, total_ranked, formula, caps}`. Accepts `?limit=10` (1–100) and `?category_id=`. Includes the formula + caps so the frontend can render the transparent explainer dynamically.
+  - `GET /api/leaderboard/me` (provider-only) — returns own rank/score/breakdown + `next` (the row just above) + `podium_target` (next row ≤rank 10) so the dashboard widget shows motivating gap messages.
+
+**Frontend:**
+- `components/LeaderboardWidget.jsx` (NEW, mounted on ProviderDashboard between StreakWidget and ShareLinkCard):
+  - Podium colors when rank ≤ 3 (gold/silver/bronze gradient with crown icon).
+  - For non-podium: "Sube a #N con X puntos más" motivating CTA pointing at the next podium target.
+  - Conditional breakdown chips — only shows non-zero score buckets (no `0 pts X` clutter).
+  - Mini top-3 podium row at the bottom (2nd · 1st · 3rd visually, 1st avatar slightly larger).
+  - Unranked state (no score this month yet): friendly "Aún no estás en el ranking" + tip + link to `/ranking`.
+- `pages/RankingPage.jsx` (NEW, route `/ranking` and alias `/leaderboard`):
+  - Hero with month label and sparkles badge.
+  - 3-card podium with crown/medal icons + plan badge + avatars (DiceBear fallback) + score badge.
+  - Rest of list (rank 4-100) as a clean white card with hover rows: avatar, name, rating, city, plan badge, score.
+  - Transparent **"Cómo se calcula tu puntaje"** explainer panel showing all 7 weight rows with icons + cap labels.
+  - Footer "El ranking se reinicia cada mes (UTC). Cuentas suspendidas o no verificadas no aparecen."
+- Footer now has "Ranking del mes" link (testid=`footer-ranking`).
+- App.js routes `/ranking` and `/leaderboard` both → `<RankingPage />`.
+
+**Testing:**
+- New regression `/app/backend/tests/test_iter39_leaderboard.py` — **20/20 PASS** across 6 test classes (formula correctness, caching, category filter, /me 401/403/200, demo seed integrity).
+- Combined regression iter38 = 17/17 PASS after 60s sleep for /api/auth/login rate-limit.
+- Frontend Playwright: /ranking page (podium, formula, back link, navigation to provider eCard), dashboard LeaderboardWidget with all chips + leadership msg, footer link, DOM ordering above ShareLinkCard.
+
+**Bug found + fixed mid-iteration:**
+- Testing agent flagged a latent bug in the `?category_id=` filter rank rewrite: `r = dict(r); r["rank"] = i` was a shallow copy never written back to the list. Hidden by single-row demo data but would surface as soon as a filtered subset started at non-1 original rank. **Fixed** by rebuilding the list with `rows = [{**r, "rank": i} for i, r in enumerate(rows, start=1)]`. 20/20 tests still pass.
+
+**Mocked:** No new mocks. Resend dev-fallback / Stripe unwired / Twilio log / Google Cloud 403 — unchanged.
+
+**Current demo state on María:**
+- Rank #1 in May 2026
+- Score 65 = 2 referrals × 25 (50) + 5 streak days × 2 (10) + 5 active_pro_bonus
+- Breakdown chips visible: ✨ 50 pts referidos, 🔥 10 pts racha, ✓ 5 bonus Pro
+- "🥇 ¡Estás liderando este mes!" message on the widget
+
+**Follow-up backlog:**
+- Real-time WebSocket push of rank changes so providers see their rank update without refreshing.
+- Historical leaderboard archive: `GET /api/leaderboard/monthly?month=YYYY-MM` for past months (currently always returns current month).
+- Per-state leaderboards: `?state=OK` filter.
+- Email digest "Eres #N de N en {ciudad}" (would dovetail with the weekly digest infrastructure).
+- Refactor `server.py` (now ~7400 lines) into modular routers post-launch.
+

@@ -5607,10 +5607,9 @@ async def get_monthly_leaderboard(limit: int = 10, category_id: Optional[str] = 
     rows = await _get_cached_leaderboard()
     if category_id:
         rows = [r for r in rows if r.get("category_id") == category_id]
-        # Re-assign rank within the filtered view
-        for i, r in enumerate(rows, start=1):
-            r = dict(r)  # shallow copy to avoid mutating cache
-            r["rank"] = i
+        # Re-assign rank within the filtered view (build fresh dicts so we
+        # don't mutate the module-level cache)
+        rows = [{**r, "rank": i} for i, r in enumerate(rows, start=1)]
     return {
         "month": _current_month_window()[0].strftime("%Y-%m"),
         "top": rows[: max(1, min(limit, 100))],
