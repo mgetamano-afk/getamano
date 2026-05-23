@@ -8,7 +8,7 @@ import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as M
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
-import CityAutocomplete from "../components/CityAutocomplete";
+import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import useGeolocation from "../hooks/useGeolocation";
 import { trackSearch } from "../lib/analytics";
@@ -200,13 +200,17 @@ export default function Search() {
               <SearchIcon className="w-5 h-5 text-slate-400" />
               <input value={q} onChange={e => setQ(e.target.value)} placeholder={t("hero.search.placeholder")} className="w-full py-3 outline-none bg-transparent" data-testid="search-q-input" />
             </div>
-            <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[260px] flex-1 md:flex-initial">
+            <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[280px] flex-1 md:flex-initial">
               <div className="flex-1 min-w-0">
-                <CityAutocomplete
+                <CitySearchInput
                   value={city}
-                  onSelect={({ displayName }) => { setCity(displayName); clearGeo(); }}
+                  onChange={(c, _stateName, stateAbbr) => {
+                    const display = c && stateAbbr ? `${c}, ${stateAbbr}` : c || "";
+                    setCity(display);
+                    clearGeo();
+                  }}
                   placeholder={t("hero.search.location")}
-                  testid="search-city-input"
+                  compact
                 />
               </div>
               <button

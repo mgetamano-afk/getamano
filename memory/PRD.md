@@ -275,6 +275,26 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Public CitySearchInput rollout (`/buscar` + Landing hero)
+
+**Extiende Sección 42 al flujo cliente público:**
+
+- `CitySearchInput.jsx` ampliado con:
+  - Constante `TOP_US_CITIES` (Houston/LA/Miami/NYC/Chicago) como chips por defecto cuando NO hay estado filtrado.
+  - Prop `compact` para esconder el label "Ciudades populares" cuando el input está embebido en barras de búsqueda compactas.
+- `useCitySearch.js` mejorado: `runFallback` ahora busca en TODAS las ciudades de USA cuando `stateName` está vacío, con sort que prioriza matches que empiezan con el query (Houston > Pearl Houseman).
+- `pages/Search.jsx`: reemplazado `<CityAutocomplete>` por `<CitySearchInput compact>`. Al elegir ciudad → `setCity("Houston, TX")` + `clearGeo()` + actualización de URL.
+- `pages/Landing.jsx`: mismo swap en el hero search.
+- Componente legacy `CityAutocomplete.jsx` eliminado (zero referencias restantes).
+
+**E2E verificado (Playwright)**:
+- `/buscar` mobile: 5 chips top USA al focus ✓
+- `/buscar` desktop: "Hous" → Houston, TX · "Mia" → Miami, FL · "Tul" → Tulsa, OK · "Salli" → Sallisaw, OK (pueblo Latino real) ✓
+- Click en Houston → URL contiene `?city=...` y el resultado de María aparece filtrado ✓
+- Landing hero: 5 chips top USA visibles al focus ✓
+
+**Lint**: 0 issues.
+
 ### May 23, 2026 — Sections 41 + 42 + Description History (Cmd+Z bonus)
 
 **Section 41 — 6 Mobile/Legal/UX corrections:**

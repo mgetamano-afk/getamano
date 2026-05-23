@@ -10,7 +10,7 @@
  *   { query, handleQueryChange, results, loading, clear, isFallback }
  */
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getCitiesByState } from "../data/usLocations";
+import { US_STATES, getCitiesByState } from "../data/usLocations";
 
 const STATE_ABBR_MAP = {
   "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA",
@@ -51,22 +51,43 @@ export default function useCitySearch(stateName) {
   }, []);
 
   const runFallback = useCallback((input) => {
-    if (!stateName) {
-      setResults([]);
+    const lowerInput = input.toLowerCase();
+    // Branch 1 — a state was provided: stay scoped to that state's cities.
+    if (stateName) {
+      const stateAbbr = STATE_ABBR_MAP[stateName] || stateName;
+      const cities = getCitiesByState(stateAbbr) || getCitiesByState(stateName);
+      const filtered = cities
+        .filter((c) => c.toLowerCase().includes(lowerInput))
+        .slice(0, 6)
+        .map((city) => ({
+          city,
+          state: stateName,
+          stateAbbr,
+          fullLabel: `${city}, ${stateAbbr}`,
+        }));
+      setResults(filtered);
       return;
     }
-    const stateAbbr = STATE_ABBR_MAP[stateName] || stateName;
-    const cities = getCitiesByState(stateAbbr) || getCitiesByState(stateName);
-    const filtered = cities
-      .filter((c) => c.toLowerCase().includes(input.toLowerCase()))
-      .slice(0, 6)
-      .map((city) => ({
-        city,
-        state: stateName,
-        stateAbbr,
-        fullLabel: `${city}, ${stateAbbr}`,
-      }));
-    setResults(filtered);
+    // Branch 2 — no state filter (public /buscar page): search across
+    // every city in every state, then sort matches that START with the
+    // query first so "Hous" → "Houston" shows before "Pearl Houseman".
+    const matches = [];
+    for (const state of US_STATES) {
+      for (const city of state.cities) {
+        const lc = city.toLowerCase();
+        if (lc.includes(lowerInput)) {
+          matches.push({
+            city,
+            state: state.name,
+            stateAbbr: state.abbreviation,
+            fullLabel: `${city}, ${state.abbreviation}`,
+            startsWith: lc.startsWith(lowerInput),
+          });
+        }
+      }
+    }
+    matches.sort((a, b) => (b.startsWith ? 1 : 0) - (a.startsWith ? 1 : 0));
+    setResults(matches.slice(0, 6).map(({ startsWith, ...rest }) => rest));  // eslint-disable-line no-unused-vars
   }, [stateName]);
 
   const search = useCallback((input) => {

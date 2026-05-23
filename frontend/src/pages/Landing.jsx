@@ -12,7 +12,7 @@ import { openInstallModal } from "../components/InstallAppModal";
 import useIsPwaInstalled from "../lib/useIsPwaInstalled";
 import CategoryCard from "../components/CategoryCard";
 import SmartServiceSearch from "../components/SmartServiceSearch";
-import CityAutocomplete from "../components/CityAutocomplete";
+import CitySearchInput from "../components/CitySearchInput";
 import DownloadBadgesSection from "../components/DownloadBadgesSection";
 import FeaturedProvidersReel from "../components/FeaturedProvidersReel";
 import ProviderCTASection from "../components/ProviderCTASection";
@@ -200,12 +200,15 @@ export default function Landing() {
                     className="[&_input]:!h-11 [&_input]:!border-0 [&_input]:!ring-0 [&_input]:!rounded-xl"
                   />
                 </div>
-                <div className="md:max-w-[240px] min-w-0 md:border-l border-slate-200 md:pl-2">
-                  <CityAutocomplete
+                <div className="md:max-w-[260px] min-w-0 md:border-l border-slate-200 md:pl-2">
+                  <CitySearchInput
                     value={loc}
-                    onChange={setLoc}
+                    onChange={(c, _stateName, stateAbbr) => {
+                      const display = c && stateAbbr ? `${c}, ${stateAbbr}` : c || "";
+                      setLoc(display);
+                    }}
                     placeholder={lang === "en" ? "City or ZIP" : "Ciudad o ZIP"}
-                    testid="hero-location-autocomplete"
+                    compact
                   />
                 </div>
                 <button type="submit" className="relative overflow-hidden btn-secondary flex items-center justify-center gap-1 w-full md:w-auto" data-testid="hero-search-submit">

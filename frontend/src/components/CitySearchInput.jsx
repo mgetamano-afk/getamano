@@ -3,20 +3,33 @@ import { Search, MapPin, X, Loader2 } from "lucide-react";
 import useCitySearch from "../hooks/useCitySearch";
 import { getCitiesByState } from "../data/usLocations";
 
+// Top-5 latino-population US cities, used as the chip set when the input
+// has no state filter (e.g. on the public /buscar page).
+const TOP_US_CITIES = [
+  { city: "Houston", state: "Texas", stateAbbr: "TX" },
+  { city: "Los Angeles", state: "California", stateAbbr: "CA" },
+  { city: "Miami", state: "Florida", stateAbbr: "FL" },
+  { city: "New York City", state: "New York", stateAbbr: "NY" },
+  { city: "Chicago", state: "Illinois", stateAbbr: "IL" },
+];
+
 /**
  * CitySearchInput — Section 42.
  *
  * Reemplaza el viejo `<select>` de ciudad con búsqueda inteligente:
  *  · escribe "Tul" → aparece "Tulsa, OK" (Google Places, debounced 300ms)
- *  · si no escribió nada y hay estado seleccionado → chips de ciudades populares
+ *  · si no escribió nada y hay estado seleccionado → chips de ciudades populares del estado
+ *  · si no escribió nada y NO hay estado → chips de top 5 US (Houston, LA, Miami, NYC, Chicago)
  *  · si Google Places falla → fallback al listado estático
  *
  * Props:
- *   stateFilter  string  · abreviación del estado (ej. "OK")
- *   stateName    string  · nombre completo del estado (ej. "Oklahoma")
- *   value        string  · ciudad actual
+ *   stateFilter  string?  · abreviación del estado (ej. "OK") — opcional
+ *   stateName    string?  · nombre completo (ej. "Oklahoma") — opcional
+ *   value        string   · ciudad actual
  *   onChange     (city, stateName, stateAbbr) => void
- *   placeholder  string  · opcional
+ *   placeholder  string?  · opcional
+ *   showConfirm  boolean? · si false, no renderiza el chip de confirmación (caso /buscar)
+ *   compact      boolean? · si true, oculta el label "Ciudades populares" arriba
  */
 export default function CitySearchInput({
   stateFilter,
@@ -24,12 +37,23 @@ export default function CitySearchInput({
   value,
   onChange,
   placeholder,
+  compact = false,
 }) {
   const { query, handleQueryChange, results, loading, clear, isFallback } = useCitySearch(stateName);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
 
-  const popularCities = stateFilter ? getCitiesByState(stateFilter).slice(0, 8) : [];
+  // Chips: if a state filter is provided show ciudades populares del estado,
+  // otherwise fall back to the top-5 US latino cities so the user still has
+  // a fast-path to common destinations on /buscar.
+  const popularCities = stateFilter
+    ? getCitiesByState(stateFilter)
+        .slice(0, 8)
+        .map((city) => ({ city, state: stateName || "", stateAbbr: stateFilter }))
+    : TOP_US_CITIES;
+  const popularLabel = stateFilter
+    ? `Ciudades populares${stateName ? ` en ${stateName}` : ""}`
+    : "Ciudades populares en USA";
 
   const handleSelect = (result) => {
     onChange(result.city, result.state, result.stateAbbr);
@@ -114,27 +138,29 @@ export default function CitySearchInput({
 
           {query.length === 0 && popularCities.length > 0 && (
             <div className="px-4 py-3">
-              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide mb-2">
-                Ciudades populares{stateName ? ` en ${stateName}` : ""}
-              </p>
+              {!compact && (
+                <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wide mb-2">
+                  {popularLabel}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
-                {popularCities.map((city) => (
+                {popularCities.map((entry) => (
                   <button
-                    key={city}
+                    key={`${entry.city}-${entry.stateAbbr}`}
                     type="button"
                     onMouseDown={(e) => {
                       e.preventDefault();
                       handleSelect({
-                        city,
-                        state: stateName || "",
-                        stateAbbr: stateFilter || "",
-                        fullLabel: `${city}, ${stateFilter || ""}`,
+                        city: entry.city,
+                        state: entry.state,
+                        stateAbbr: entry.stateAbbr,
+                        fullLabel: `${entry.city}, ${entry.stateAbbr}`,
                       });
                     }}
                     className="text-xs bg-slate-100 hover:bg-teal-100 hover:text-teal-700 text-slate-600 px-2.5 py-1 rounded-full transition-colors"
-                    data-testid={`city-popular-${city.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`}
+                    data-testid={`city-popular-${entry.city.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`}
                   >
-                    {city}
+                    {entry.city}{!stateFilter && entry.stateAbbr ? `, ${entry.stateAbbr}` : ""}
                   </button>
                 ))}
               </div>
