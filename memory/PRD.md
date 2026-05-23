@@ -1067,3 +1067,31 @@ Two bundled drops in one iteration:
 - Comment likes (+ reply notifications).
 - **Refactor `server.py` (~8500 lines) into modular routers — getting urgent.**
 
+
+### Feb 23, 2026 — Iteration 43: Inline Comments + getamano Stories + Pilot Refactor
+
+**User intent:** "los comentarios en las publicaciones tienen que seguir un hilo, cuando se lean tiene que ser en la misma publicacion no en una modal, la historia parece colores de instagram, agrega colores de getamano, y claro ejecuta tu sugerencia"
+
+Three bundled drops:
+
+1. **Comments INLINE in the post** — replaced CommentsModal with InlineComments component expanding within the same PostCard. Lazy-load on first expand. aria-expanded + aria-controls for a11y. Composer at the bottom with Enter-to-submit (Shift+Enter newline).
+2. **Stories ring re-styled with getamano colors** — `linear-gradient(135deg, #025F67 → #2F9D94 → #F59E0B)` (teal→amber). Out: amber-rose-purple Instagram palette.
+3. **Pilot refactor:** extracted the community module from server.py into `/app/backend/routes/community.py` (~430 lines) via a `make_router(*, db, audit_log, get_current_user, PUBLIC_GUARD)` factory function. Pattern proven and ready to extend to other modules.
+
+**Refactor result:** server.py **8539 → 8102 lines (-437)**. Zero behavior change verified by full regression suite.
+
+**Testing 100%:**
+- New `test_iter43_inline_comments_refactor.py` — 23/23 PASS.
+- Frontend Playwright: anon expand + seed comment visible inline + authed compose + Enter→optimistic+counter bump + refresh persist + inline delete + stories ring gradient assertion.
+- iter32-42 regression intact (one false fail in iter42 was rate-limit collateral, not refactor regression).
+
+**Mocked**: unchanged.
+
+**Refactor backlog (next candidates extracting from server.py with the same factory pattern):**
+- `routes/gigs.py` — `/api/gigs/*` endpoints
+- `routes/leaderboard.py` + `routes/coupons.py`
+- `routes/notifications.py`
+- `routes/referrals.py`
+- `routes/streaks.py`
+- `routes/auth.py` (largest, most coupled — last)
+
