@@ -45,6 +45,7 @@ import AdminOpsPage from "./pages/AdminOpsPage";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminCEO from "./pages/admin/AdminCEO";
 import AdminQuizFunnel from "./pages/admin/AdminQuizFunnel";
+import AdminLeadsInbox from "./pages/admin/AdminLeadsInbox";
 import AdminPricingIntelligence from "./pages/admin/AdminPricingIntelligence";
 import AdminQueue from "./pages/admin/AdminQueue";
 import AdminProviders from "./pages/admin/AdminProviders";
@@ -150,6 +151,8 @@ function AppRouter() {
       <Route path="/dashboard/admin/ops" element={<AdminOpsPage />} />
       <Route path="/admin/ceo" element={<AdminCEO />} />
       <Route path="/admin/quiz-funnel" element={<AdminQuizFunnel />} />
+      <Route path="/admin/leads" element={<AdminLeadsInbox />} />
+      <Route path="/dashboard/admin/leads" element={<AdminLeadsInbox />} />
       <Route path="/admin/pricing" element={<AdminPricingIntelligence />} />
       <Route path="/admin/queue" element={<AdminQueue />} />
       <Route path="/admin/providers" element={<AdminProviders />} />

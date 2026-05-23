@@ -619,6 +619,10 @@ async def seed():
         # Email captures for the recovery flow
         await db.lead_recoveries.create_index("email", unique=True)
         await db.lead_recoveries.create_index([("status", 1), ("created_at", -1)])
+        # Exit-intent leads (phone-based, SMS/WhatsApp manual outreach)
+        await db.exit_leads.create_index("lead_id", unique=True)
+        await db.exit_leads.create_index([("status", 1), ("created_at", -1)])
+        await db.exit_leads.create_index([("phone", 1), ("created_at", -1)])
         # Public recommendations (named endorsements with optional message + share token)
         await db.recommendations.create_index([("provider_id", 1), ("created_at", -1)])
         await db.recommendations.create_index(
@@ -8143,6 +8147,173 @@ async def admin_list_leads(status: Optional[str] = None, _user: User = Depends(r
         q["status"] = status
     leads = await db.lead_recoveries.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
     return {"items": leads, "total": len(leads)}
+
+
+# ════════════════════════════════════════════════════════════════════
+# EXIT-INTENT LEAD CAPTURE — SMS + WhatsApp manual outreach
+# ════════════════════════════════════════════════════════════════════
+# Visitor abandoning the landing → soft modal captures phone + service +
+# preferred channel. The CEO opens /admin/leads, clicks "SMS" or "WhatsApp"
+# and the native app opens with a pre-filled message. No third-party APIs
+# needed for v1 — pure manual outreach with deep links.
+
+class ExitLeadIn(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    phone: str = Field(min_length=7, max_length=30)
+    city: Optional[str] = Field(default=None, max_length=80)
+    state: Optional[str] = Field(default=None, max_length=20)
+    service: Optional[str] = Field(default=None, max_length=120)
+    preferred_channel: Literal["sms", "whatsapp"] = "whatsapp"
+    lang: Optional[Literal["es", "en"]] = "es"
+    source: Optional[str] = Field(default="exit_intent", max_length=40)
+    notes: Optional[str] = Field(default=None, max_length=400)
+
+
+class ExitLeadUpdateIn(BaseModel):
+    status: Optional[Literal["pending", "contacted", "converted", "lost"]] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+def _is_valid_phone_e164(phone: Optional[str]) -> bool:
+    if not phone:
+        return False
+    digits = re.sub(r"\D", "", phone)
+    return 10 <= len(digits) <= 15
+
+
+@api_router.post("/leads/capture")
+async def capture_exit_lead(payload: ExitLeadIn, request: Request):
+    """Public: store a lead from the exit-intent modal."""
+    phone_e164 = normalize_phone(payload.phone)
+    if not _is_valid_phone_e164(phone_e164):
+        raise HTTPException(status_code=400, detail="Número de teléfono inválido.")
+    name = payload.name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Nombre inválido.")
+    now = datetime.now(timezone.utc).isoformat()
+    ip = (request.client.host if request.client else "")
+    ua = request.headers.get("user-agent", "")[:240]
+    # Dedupe by phone + 24h window so a refresh doesn't double-insert
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    existing = await db.exit_leads.find_one(
+        {"phone": phone_e164, "created_at": {"$gte": cutoff}},
+        {"_id": 0, "lead_id": 1},
+    )
+    if existing:
+        return {"ok": True, "lead_id": existing["lead_id"], "duplicate": True}
+    doc = {
+        "lead_id": f"lead_{uuid.uuid4().hex[:12]}",
+        "name": name,
+        "phone": phone_e164,
+        "phone_display": format_phone_display(phone_e164),
+        "city": (payload.city or "").strip() or None,
+        "state": (payload.state or "").strip().upper() or None,
+        "service": (payload.service or "").strip() or None,
+        "preferred_channel": payload.preferred_channel,
+        "lang": (payload.lang or "es").lower(),
+        "source": payload.source or "exit_intent",
+        "status": "pending",
+        "notes": (payload.notes or "").strip() or None,
+        "ip": ip,
+        "user_agent": ua,
+        "contacted_at": None,
+        "converted_at": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.exit_leads.insert_one(doc)
+    return {"ok": True, "lead_id": doc["lead_id"], "duplicate": False}
+
+
+def _build_outreach_message(lead: dict) -> dict:
+    """Build the pre-filled SMS / WhatsApp message body in the lead's language."""
+    name = (lead.get("name") or "").split()[0] or ("amigo" if lead.get("lang") == "es" else "friend")
+    service = lead.get("service") or ("servicios" if lead.get("lang") == "es" else "services")
+    city = lead.get("city") or ""
+    if lead.get("lang") == "es":
+        body = (
+            f"¡Hola {name}! Soy del equipo de getamano. "
+            f"Vi que buscas {service}"
+            + (f" en {city}" if city else "")
+            + ". Tengo 3 proveedores latinos verificados que te pueden ayudar. "
+            "¿Te paso sus contactos? https://getamano.us"
+        )
+    else:
+        body = (
+            f"Hi {name}! I'm from the getamano team. "
+            f"I saw you're looking for {service}"
+            + (f" in {city}" if city else "")
+            + ". I have 3 verified Latino providers who can help. "
+            "Want me to send their contacts? https://getamano.us"
+        )
+    return {"body": body, "lang": lead.get("lang", "es")}
+
+
+def _build_deep_links(lead: dict, body: str) -> dict:
+    """Native deep links for iOS/Android SMS app and WhatsApp."""
+    from urllib.parse import quote
+    encoded = quote(body, safe="")
+    phone = lead.get("phone", "")
+    # Both iOS 15+ and Android accept `sms:+15551234567?body=...`
+    sms_link = f"sms:{phone}?body={encoded}"
+    # wa.me drops the leading +
+    wa_phone = phone.lstrip("+")
+    wa_link = f"https://wa.me/{wa_phone}?text={encoded}"
+    return {"sms_link": sms_link, "wa_link": wa_link}
+
+
+@api_router.get("/admin/leads")
+async def admin_list_exit_leads(
+    status: Optional[Literal["pending", "contacted", "converted", "lost"]] = None,
+    channel: Optional[Literal["sms", "whatsapp"]] = None,
+    _user: User = Depends(require_admin),
+):
+    """Admin inbox: list of exit-intent leads + ready-to-send deep links per row."""
+    q: dict = {}
+    if status:
+        q["status"] = status
+    if channel:
+        q["preferred_channel"] = channel
+    leads = await db.exit_leads.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
+    for lead in leads:
+        msg = _build_outreach_message(lead)
+        links = _build_deep_links(lead, msg["body"])
+        lead["message_body"] = msg["body"]
+        lead["sms_link"] = links["sms_link"]
+        lead["wa_link"] = links["wa_link"]
+    # Aggregate counters for the dashboard header
+    counts = {
+        "pending": await db.exit_leads.count_documents({"status": "pending"}),
+        "contacted": await db.exit_leads.count_documents({"status": "contacted"}),
+        "converted": await db.exit_leads.count_documents({"status": "converted"}),
+        "lost": await db.exit_leads.count_documents({"status": "lost"}),
+        "total": await db.exit_leads.count_documents({}),
+    }
+    return {"items": leads, "total": len(leads), "counts": counts}
+
+
+@api_router.patch("/admin/leads/{lead_id}")
+async def admin_update_exit_lead(lead_id: str, payload: ExitLeadUpdateIn,
+                                  admin: User = Depends(require_admin)):
+    """Admin: change status / annotate a lead."""
+    set_doc: dict = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if payload.status:
+        set_doc["status"] = payload.status
+        now = datetime.now(timezone.utc).isoformat()
+        if payload.status == "contacted":
+            set_doc["contacted_at"] = now
+        elif payload.status == "converted":
+            set_doc["converted_at"] = now
+    if payload.notes is not None:
+        set_doc["notes"] = payload.notes.strip() or None
+    if len(set_doc) == 1:  # only updated_at — nothing to do
+        raise HTTPException(status_code=400, detail="Nada que actualizar.")
+    r = await db.exit_leads.update_one({"lead_id": lead_id}, {"$set": set_doc})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Lead no encontrado.")
+    updated = await db.exit_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    await audit_log(admin.user_id, "lead.updated", {"lead_id": lead_id, "fields": list(set_doc.keys())})
+    return updated
 
 
 # ════════════════════════════════════════════════════════════════════

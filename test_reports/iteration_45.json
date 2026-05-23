@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 45 — Exit-intent lead capture + admin inbox tested end-to-end. 20/20 backend pytest cases pass. Frontend: exit-intent modal triggers via dispatched mouseleave, form submits successfully, /admin/leads renders KPI cards + 5 filter chips + 20 lead rows with WhatsApp/SMS buttons + 'Leads Inbox' sidebar entry. All deep links (sms:+1..., https://wa.me/1...) have proper format + URL-encoded body. Spanish/English message templates verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/leads — long service strings", "issues": ["A 120-char service value (no spaces) does not word-break inside the row header; overflows visually across the card width. Suggest `break-all` or truncate-with-tooltip on the service span (LeadRow). Pure cosmetic; data is still readable in the message body block below."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter45_exit_lead_capture.py",
+    "/app/test_reports/pytest/iter45_results.xml"
+  ],
+  "action_items": [
+    "Optional: improve word-break for long 'service' strings in LeadRow header (cosmetic only).",
+    "Optional: add ?source=admin telemetry on sms/wa.me deep links so the CEO can later measure click-through."
+  ],
+  "critical_code_review_comments": [
+    "POST /api/leads/capture: ExitLeadIn.phone has min_length=7 (pydantic) but the digit-count check in _is_valid_phone_e164 enforces 10–15 digits. A 7-char phone like '1234567' passes pydantic but is rejected by the custom check (returns 400). That's correct, but the inconsistency means user sees two different error formats (422 vs 400) depending on phone length. Consider standardizing to a single validator + always-400 error.",
+    "Duplicate window (24h) is keyed only on phone — if the same phone resubmits with a different name/service within 24h, the new info is silently ignored. The endpoint returns the OLD lead_id with duplicate:true but never UPDATES the existing doc with the new service/notes. CEO loses the fresher intent. Suggest: on duplicate, merge non-empty service/city/notes fields into the existing doc.",
+    "_build_deep_links: `sms:+1...?body=` works on iOS but Android historically prefers `smsto:+1...?body=` or `sms:+1...&body=`. For broad Android compatibility, consider serving sms-link that uses `&body=` when the User-Agent is Android, or providing both fields. Currently US iOS-first launch likely fine.",
+    "audit_log is only called in PATCH not on POST capture — losing observability on incoming lead source/IP for fraud analysis. Suggest add audit_log(None, 'lead.captured', {...}) inside capture_exit_lead.",
+    "exit_leads collection has no index on `phone` or `created_at` (mentioned indirectly by the 24h dedupe query that scans on both). At low volume this is fine; flag for later: `db.exit_leads.create_index([('phone',1),('created_at',-1)])`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter45_exit_lead_capture.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@getamano.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created ~8 TEST_-prefixed leads via the test suite (TEST_Lucia Garcia, TEST_DupeUser, TEST_John Smith, TEST_Playwright User, TEST_Patch_*, TEST_LongSvc, TEST_José Ñuñez). The 3 manual demo leads from main agent (Lucía Test, John Smith, Carmen R) were preserved — not touched. Admin inbox now shows ~20 leads total which is intentional.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Lead capture endpoints stable. test_iter45_exit_lead_capture.py uses a time-seeded `_unique_phone(seed)` helper to avoid the 24h-dedupe poisoning across re-runs — copy that pattern for any future tests on lead capture. The seeded TEST_ leads can be safely deleted via Mongo if cleanup needed (db.exit_leads.delete_many({'name': {'$regex': '^TEST_'}})) but main agent asked to keep them for the CEO demo.",
+  "rca of the issue": "N/A — no production bugs found. One self-resolved test issue: initial test used a hard-coded phone '4155551001' that triggered the 24h-dedupe on re-runs (test_capture_valid_payload returned duplicate:true on 2nd run). Fixed by using a time-seeded unique phone per test run. All 20 cases now stable across repeated executions."
+}
