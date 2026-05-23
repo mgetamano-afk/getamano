@@ -403,6 +403,23 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_30.json` — **15/15 backend pytest + 100% frontend (24/24 assertions)**. ZERO bugs. Lifecycle verified: 'limpesa' dropdown shows Cleaning/Limpieza → click navigates to /buscar?q=Limpieza&category=cleaning → finds María's Cleaning. 'quinceniera' empty state shows "Quinceañeras" did-you-mean chip + Invite CTA. Regex-injection safe (re.escape). Mobile @393px no overflow. Pytest suite saved at `/app/backend/tests/test_iter30_smart_search.py` with self-throttling for rate limiter. Nit fixed post-test: empty-state-invite-cta padding bumped to `py-3` + `minHeight: 44` for WCAG 2.5.5 tap target compliance.
 
+### Feb 2026 — Section 28: PWA native experience + 3 demo accounts
+**Section 28 polish:**
+- New `DownloadBadgesSection.jsx` — full-width gradient strip above footer with "Add to home screen" CTA, real QR (qrcode.react), 3 micro-benefits, iPhone/Android platform hint chips. H1 forced white inline+textShadow per defensive pattern.
+- Wired into `Landing.jsx` between hero/sections and Footer.
+- Glassmorphism header upgrade in `App.css`: `backdrop-filter: saturate(180%) blur(20px)` + `rgba(255,255,255,0.78)` (was warm beige 247,246,242,0.85). iOS-vibrancy feel on scroll.
+- `manifest.json` `background_color` → `#FFFFFF` (matches the splash screens; no dark flash on iOS PWA boot).
+- `apple-mobile-web-app-status-bar-style` → `default` (was `black-translucent` — caused content getting clipped under the Dynamic Island).
+- 14 iOS splash PNGs generated in `/public/splash/` (iPhone SE through iPhone 17 Pro Max + iPad mini/Pro). White bg + centered teal logo at 30% of short-side. `<link rel="apple-touch-startup-image">` for each device wired in `index.html`.
+- `Footer.jsx`: new social row with Instagram/Facebook/TikTok (placeholder URLs, `target=_blank` + `rel=noopener noreferrer`). 4 testids under `data-testid^=footer-social-`.
+
+**3 demo accounts (idempotent seed on startup):**
+- `admin@getamano.com / admin123` — admin, full CEO dashboards (/admin, /admin/ceo, etc. + /dashboard/admin/* aliases)
+- `demo.provider@getamano.com / provider123` — provider, María's Cleaning Services (calendar active, public eCard at /services/maria-cleaning-services-sallisaw-ok)
+- `demo.client@getamano.com / client123` — client (Carlos Demo, email_verified=true, skips OTP gate)
+
+**Testing:** `iteration_31.json` — **19/19 backend pytest + 100% frontend on 10 assertion blocks**. ZERO bugs. All 14 splash PNGs reachable. Client login redirects to /dashboard/client (no OTP loop). Glassmorphism backdrop-filter verified via `getComputedStyle`. Footer social anchors security-best-practice (`rel=noopener noreferrer`). Suite at `/app/backend/tests/test_iter31_section28.py` covers 3 demo logins + DB email_verified check + manifest + all 14 splash assets.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)
