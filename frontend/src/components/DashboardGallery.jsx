@@ -5,6 +5,7 @@ import { GalleryUpload, buildFileUrl } from "./ImageUpload";
 import { Pin, GripVertical, Trash2, Image as ImageIcon, Sparkles, Tag } from "lucide-react";
 import { toast } from "sonner";
 import ProviderVideoUpload from "./ProviderVideoUpload";
+import GalleryTips from "./GalleryTips";
 
 const PLAN_LABEL = { free: "Gratis", basic: "Básico", pro: "Pro", premium: "Premium" };
 
@@ -138,6 +139,9 @@ export default function DashboardGallery({ profile, setProfile }) {
           </div>
         </div>
       )}
+
+      {/* Onboarding tips — auto-hide once 3+ photos uploaded */}
+      <GalleryTips currentCount={sorted.length} minPhotos={3} />
 
       {sorted.length ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="gallery-items-grid">

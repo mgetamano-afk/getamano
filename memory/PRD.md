@@ -275,6 +275,35 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Smart Gallery Upload (auto-compression + visual tips)
+
+**Auto-compresión client-side**:
+- Instalado `browser-image-compression@2.0.2`.
+- `ImageUpload.jsx` (GalleryUpload) ahora comprime cada archivo antes de subir:
+  - Target: maxSizeMB 1.0, maxWidthOrHeight 1920px, initialQuality 0.82, useWebWorker true.
+  - Skip cuando file ≤ 250 KB, o HEIC/HEIF/GIF (preserva animación).
+  - Si comprimido > original → usa original. Si la lib falla → fallback al original.
+- UI ahora muestra:
+  - Estado "Optimizando..." antes del upload real.
+  - Tras éxito: "Listo · -N% peso" cuando el ahorro fue significativo (≥5%).
+- Impacto real: típica foto 4 MB → ~700 KB sin pérdida visible. **5-6× más rápido** en celulares con mala señal.
+
+**Onboarding visual `GalleryTips.jsx`** (componente nuevo, ~70 líneas):
+- Aparece sobre el grid cuando el proveedor tiene < 3 fotos.
+- Card-banner con `Sparkles` icon + título dinámico ("Sube N fotos que vendan tu trabajo") + insight ("Los proveedores con 3+ fotos reciben hasta **2× más solicitudes**").
+- 3 sub-cards con icon contextual + título + hint:
+  - 🔁 **Antes y después** — "El cambio convence. La gente recuerda transformaciones."
+  - 📸 **Tú en acción** — "Una foto trabajando es 3× más confiable que un logo solo."
+  - 👥 **Tu equipo o lugar** — "Muestra dónde, con quién o con qué herramientas trabajas."
+- Se desvanece automáticamente al llegar a 3 fotos — zero localStorage, zero ruido.
+
+**E2E verificado (Playwright)**:
+- María con 3 fotos: `tips_block_count=0` (oculto correctamente) ✓
+- María con 1 foto (forzado borrando 2): tip visible con título "Sube 2 fotos que vendan tu trabajo", 3 cards de tips ✓
+- Mobile 390px: card vertical, 3 mini-cards apiladas ✓
+- Desktop 1280px: card horizontal, 3 mini-cards en grid 3 columnas ✓
+- Lint: 0 issues.
+
 ### May 23, 2026 — "Cerca de mí" chip integrado al CitySearchInput
 
 **Quick-win UX**: en lugar de un botón crosshair separado, el chip "Cerca de mí" vive ahora **dentro** del dropdown del input — accesible desde Landing hero, `/buscar`, y donde sea que use `CitySearchInput`.

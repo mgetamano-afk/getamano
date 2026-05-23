@@ -2,12 +2,39 @@ import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { Upload, Loader2, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import imageCompression from "browser-image-compression";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 export const ACCEPTED_IMAGE_MIME = "image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif";
-export const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB (post-compression cap)
 export const MAX_BATCH_FILES = 20;
+
+// Auto-compression settings — used by GalleryUpload to keep gallery uploads
+// snappy even on weak 3G/LTE links. ~1 MB target + 1920px longest edge gives
+// images that still look great on retina displays. WebWorker keeps the UI thread free.
+const COMPRESSION_OPTS = {
+  maxSizeMB: 1.0,
+  maxWidthOrHeight: 1920,
+  useWebWorker: true,
+  initialQuality: 0.82,
+};
+
+// HEIC / HEIF and tiny images already under target → skip compression altogether.
+const COMPRESSION_SKIP_BYTES = 250 * 1024; // 250 KB
+
+async function compressIfNeeded(file) {
+  if (file.size <= COMPRESSION_SKIP_BYTES) return file;
+  if (file.type === "image/heic" || file.type === "image/heif") return file;
+  if (file.type === "image/gif") return file; // never compress GIFs — preserves animation
+  try {
+    const compressed = await imageCompression(file, COMPRESSION_OPTS);
+    // Only swap if compression actually helped — otherwise return the original.
+    return compressed.size < file.size ? compressed : file;
+  } catch {
+    return file; // compression failed → fall back to original
+  }
+}
 
 export function buildFileUrl(pathOrUrl) {
   if (!pathOrUrl) return "";
@@ -117,10 +144,25 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
         failCount++;
         continue;
       }
-      setItems(prev => prev.map((it, idx) => idx === i ? { ...it, status: "uploading" } : it));
+      setItems(prev => prev.map((it, idx) => idx === i ? { ...it, status: "compressing" } : it));
+      let uploadFile = file;
+      try {
+        uploadFile = await compressIfNeeded(file);
+      } catch {
+        uploadFile = file;
+      }
+      // If compression got rid of >30% we surface the saving in the UI
+      const compressedSize = uploadFile.size;
+      const savedPct = file.size > 0 ? Math.max(0, Math.round((1 - compressedSize / file.size) * 100)) : 0;
+      setItems(prev => prev.map((it, idx) => idx === i ? {
+        ...it,
+        status: "uploading",
+        compressedSize,
+        savedPct: savedPct > 5 ? savedPct : 0,
+      } : it));
       try {
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("file", uploadFile, file.name);
         const { data } = await api.post("/upload", fd, {
           headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (e) => {
@@ -187,14 +229,20 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
               }}>
                 {it.status === "done" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                 {it.status === "error" && <AlertCircle className="w-4 h-4 text-red-600" />}
-                {it.status === "uploading" && <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />}
+                {(it.status === "uploading" || it.status === "compressing") && <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />}
                 {it.status === "pending" && <span className="text-xs text-slate-400">{idx + 1}</span>}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
                   <span className="text-xs font-medium text-slate-700 truncate">{it.name}</span>
                   <span className="text-xs text-slate-400 ml-2 flex-shrink-0">
-                    {it.status === "error" ? it.error : it.status === "done" ? "Listo" : `${it.progress}%`}
+                    {it.status === "error"
+                      ? it.error
+                      : it.status === "done"
+                        ? (it.savedPct > 0 ? `Listo · -${it.savedPct}% peso` : "Listo")
+                        : it.status === "compressing"
+                          ? "Optimizando..."
+                          : `${it.progress}%`}
                   </span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
