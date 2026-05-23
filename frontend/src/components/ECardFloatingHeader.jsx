@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Heart, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
+import { useAuth } from "../contexts/AuthContext";
 
 /**
  * ECardFloatingHeader — Section 32.
@@ -14,19 +15,26 @@ import { api } from "../lib/api";
  */
 export default function ECardFloatingHeader({ provider, lang = "es" }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(provider?.likes_count || 0);
   const [busy, setBusy] = useState(false);
 
   // Read persisted like state for this slug (matches LikeButton convention)
-  useState(() => {
-    if (typeof window === "undefined") return;
-    const persisted = localStorage.getItem(`liked_${provider?.slug}`);
-    if (persisted === "true") setLiked(true);
+  useEffect(() => {
+    if (typeof window === "undefined" || !provider?.slug) return;
+    try {
+      const persisted = localStorage.getItem(`liked_${provider.slug}`);
+      if (persisted === "true") setLiked(true);
+    } catch (_e) { /* localStorage unavailable */ }
   }, [provider?.slug]);
 
   const toggleLike = async () => {
     if (!provider?.provider_id || busy) return;
+    if (!user) {
+      toast.info(lang === "en" ? "Sign in to like this eCard" : "Inicia sesión para dar me gusta");
+      return;
+    }
     setBusy(true);
     const newLiked = !liked;
     setLiked(newLiked);

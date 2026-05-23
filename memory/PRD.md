@@ -531,3 +531,44 @@ User asked: "¿quieres que active notificaciones de nueva chamba para proveedore
 - Geographic radius matching (Haversine) instead of city-string exact match — backend already has `geocode` + `city_coordinates` seeded; future iter can swap to `radius_km <= 50`.
 - Provider opt-out preference for gig notifications (currently always-on).
 
+
+### Feb 23, 2026 — Iteration 34: Section 32 eCard redesign + Weekly Gig Digest
+
+**User intent:**
+- A=a — Build weekly gig digest with `RESEND_API_KEY` dev-fallback (logs to backend stderr until real key arrives).
+- B=b — Redesign eCard following Section 32 spec but adapted to getamano's existing light palette (Alabaster #F7F6F2 + teal #025F67) instead of the prompt's literal dark mode, to keep visual consistency with the rest of the app.
+
+**Frontend (`/app/frontend/src/...`):**
+- `components/ECardFloatingHeader.jsx` (new): sticky top bar on `/services/{slug}` with Back / Like / Share buttons. Like persists to localStorage + calls `/api/providers/{id}/like` (skips with toast for anonymous users). Share uses `navigator.share` with clipboard fallback. Frosted-glass backdrop blur.
+- `components/ShareECardBlock.jsx` (new): dedicated bottom card. URL preview row + Copy button, then 3-button grid: Native share / QR / NFC. QR opens a modal with `QRCodeSVG` (teal foreground). NFC uses `NDEFReader` API with graceful fallback (info toast + copy link) when unsupported.
+- `components/WeeklyDigestPreview.jsx` (new): provider dashboard widget. Fetches `/api/providers/me/weekly-digest`, hides itself silently when no matching gigs. Shows badge + title + up to 3 gigs (urgent pill, budget, city) + CTA to `/empleos`.
+- `components/WhatsAppButton.jsx`: added `variant="primary"` mode (full-width green CTA with longer label "Enviar mensaje por WhatsApp"). Default `variant="compact"` preserves the old behavior elsewhere.
+- `pages/ProviderECard.jsx`: replaced top back-link with `<ECardFloatingHeader />`. Replaced 6-button grid with: (1) primary WhatsApp full-width green CTA (or "Enviar mensaje" fallback when no phone), (2) 2x2 secondary grid (Call / Chat / Quote / Book or Services), (3) tertiary pills row (Recommend / Map / View eCard). Added `<ShareECardBlock />` at the bottom right before `<Footer />`.
+- `pages/ProviderDashboard.jsx`: mounted `<WeeklyDigestPreview />` below `<ChambasNearby />` and above `<MarketPulseCard />`.
+
+**Backend (`/app/backend/server.py`):**
+- New `_compute_provider_weekly_digest(user_id)`: matches gigs from the past 7 days where `category` regex matches the provider's `category.name_es | name_en` AND `city` matches (case-insensitive). Skips poster (`created_by != user_id`). Returns up to 5 gigs + `total_count`, provider name from `users.name` (first word), business_name, category_name, city/state.
+- New `_build_weekly_digest_html(digest, public_url)`: returns `(subject, html)`. Branded Alabaster background, teal gradient header card, gig rows with urgent pill, teal "Ver todas las chambas →" CTA.
+- New `_send_weekly_digest_to_provider(user_id, public_url)`: composes + sends via existing `_send_email_via_resend` (which already log-falls-back when `RESEND_API_KEY` is unset).
+- New `GET /api/providers/me/weekly-digest`: provider-only preview. Returns `{available: false, reason: 'no_matching_gigs'}` when nothing matches. Otherwise the digest dict.
+- New `POST /api/admin/digest/send-weekly`: admin-only fan-out. Iterates all active+approved providers (excludes `business_name` starting with `TEST_`), capped at 500, returns `{ok, sent, skipped, total, results[]}`. Audits to `audit_logs` as `digest.weekly_sent`.
+
+**Testing (iteration_34):**
+- Backend: 9/9 new tests + 19/19 regression (iter32 + iter33) = **28/28 PASS** combined.
+- Frontend: all new test-ids render correctly. Login → ProviderDashboard shows digest widget with real data (3 items + CTA). /services/{slug} renders the floating header, primary WhatsApp CTA, 2x2 grid, and ShareECardBlock at the bottom. QR modal opens with SVG. NFC gracefully no-ops on non-supporting browsers.
+- Dev-fallback confirmed: `/var/log/supervisor/backend.err.log` contains the line `[EMAIL DEV-FALLBACK] To=demo.provider@getamano.com | Subject=💼 4 nuevas chambas de Limpieza esta semana en Sallisaw` when admin endpoint is triggered. `sent=false, reason=no_api_key`.
+- Post-test fix: `ECardFloatingHeader.jsx` had a `useState` typo where `useEffect` was meant. Fixed + added `useAuth` guard so anonymous like clicks show an info toast instead of silently 401'ing.
+
+**Mocked / pending real credentials:**
+- Resend API key — dev-fallback active.
+- Stripe, Twilio — not wired.
+- Google Translation/Vision — still 403 awaiting GCP enable.
+
+**Follow-up backlog:**
+- Wire `RESEND_API_KEY` + verified domain so weekly digest actually ships (admin endpoint and HTML are ready).
+- Schedule weekly digest cron (e.g., cron job in supervisor: every Monday 9am UTC) once real Resend is live.
+- Make `/providers/{id}/like` accept an intended state instead of being a pure server-side toggle, to avoid double-click de-sync between client UI and DB.
+- Detail page per gig: `/empleos/:gig_id` (currently CTA always lands on the board).
+- Provider opt-out preference for digest + notification emails (`db.providers.notification_prefs`).
+- Geographic-radius matching (Haversine ≤50km) for both fanout AND digest, replacing case-insensitive city string match.
+
