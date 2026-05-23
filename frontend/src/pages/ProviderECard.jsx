@@ -57,8 +57,23 @@ export default function ProviderECard() {
     }).finally(() => setLoading(false));
   }, [slug]);
 
+  // Section 46 — Credit the referrer if visitor arrived via ?ref={slug}.
+  // sessionStorage dedup: only one count per (referrer, browser tab) — keeps it
+  // honest without blocking page render.
   // Resolve ?via=share_token → "Recommended by [name]" hero banner
   const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (!ref || !p) return;
+    if (ref === p.slug) return; // never self-credit
+    try {
+      const key = `gm_ref_seen_${ref}_${p.slug}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch (_e) { /* private mode → still fire once */ }
+    api.post("/providers/track-share-view", { ref }).catch(() => {});
+  }, [searchParams, p]);
+
   useEffect(() => {
     const token = searchParams.get("via");
     if (!token) { setRefBy(null); return; }

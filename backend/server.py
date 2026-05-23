@@ -639,6 +639,12 @@ async def seed():
         await db.gigs.create_index("expires_at_native", expireAfterSeconds=0)
         await db.gig_applications.create_index([("gig_id", 1), ("provider_id", 1)], unique=True)
         await db.gig_applications.create_index([("provider_id", 1), ("created_at", -1)])
+        # SECTION 46 — Viral share tracking
+        # share_events: append-only log of provider WhatsApp/Email/QR shares
+        await db.share_events.create_index([("provider_user_id", 1), ("created_at", -1)])
+        # share_view_dedup: 24h TTL collection that prevents counter inflation
+        await db.share_view_dedup.create_index([("referrer_slug", 1), ("ip", 1)], unique=True)
+        await db.share_view_dedup.create_index("expires_at_native", expireAfterSeconds=0)
     except Exception as e:
         logger.warning(f"Index creation: {e}")
 
@@ -8147,6 +8153,116 @@ async def admin_list_leads(status: Optional[str] = None, _user: User = Depends(r
         q["status"] = status
     leads = await db.lead_recoveries.find(q, {"_id": 0}).sort("created_at", -1).limit(500).to_list(500)
     return {"items": leads, "total": len(leads)}
+
+
+# ════════════════════════════════════════════════════════════════════
+# SECTION 46 — VIRAL SHARE TRACKING (WhatsApp/Email/QR/Native)
+# ════════════════════════════════════════════════════════════════════
+# Provider clicks "Compartir" → we increment denormalised counters on their
+# profile + append an event row. Anonymous visitors who land on an eCard via
+# ?ref={slug} count as a "referred view" for the referrer (1 per ip / 24h).
+#
+# Performance contract:
+#   · provider_profiles.share_count + referred_view_count are denormalised so
+#     the dashboard GET /me reads them with zero extra queries.
+#   · share_events is append-only with one composite index — used only by the
+#     stats endpoint, not on hot paths.
+#   · share_view_dedup is a TTL collection (24h) that auto-purges itself, so
+#     the marketplace can never be flooded by refresh-spam.
+
+class ShareEventIn(BaseModel):
+    channel: Literal["whatsapp", "email", "qr", "native", "copy"]
+
+
+class TrackShareViewIn(BaseModel):
+    ref: str = Field(min_length=2, max_length=120)
+
+
+@api_router.post("/providers/me/share-event")
+async def track_provider_share_event(payload: ShareEventIn, request: Request,
+                                      user: User = Depends(get_current_user)):
+    """Fire-and-forget: provider just shared their eCard. Bumps counters."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores pueden registrar shares.")
+    profile = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "slug": 1})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    await db.share_events.insert_one({
+        "event_id": f"shev_{uuid.uuid4().hex[:12]}",
+        "provider_user_id": user.user_id,
+        "provider_slug": profile.get("slug"),
+        "channel": payload.channel,
+        "created_at": now_iso,
+    })
+    await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {
+            "$inc": {"share_count": 1, f"share_channels.{payload.channel}": 1},
+            "$set": {"last_share_at": now_iso},
+        },
+    )
+    return {"ok": True}
+
+
+@api_router.post("/providers/track-share-view")
+async def track_share_view(payload: TrackShareViewIn, request: Request):
+    """Public: visitor landed on an eCard via ?ref={referrer_slug}.
+
+    Idempotent per (referrer_slug, ip) for 24h via TTL collection so refresh-spam
+    cannot inflate viral KPIs. Returns 200 with `counted: bool`.
+    """
+    ref_slug = (payload.ref or "").strip().lower()
+    if not ref_slug:
+        return {"ok": True, "counted": False}
+    # Honor X-Forwarded-For (real client IP behind K8s ingress) — fall back to
+    # the direct socket address only when the proxy header is absent.
+    xff = request.headers.get("x-forwarded-for", "")
+    real_ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "anon")
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=24)
+    try:
+        await db.share_view_dedup.insert_one({
+            "referrer_slug": ref_slug,
+            "ip": real_ip,
+            "created_at": now.isoformat(),
+            "expires_at_native": expires_at,
+        })
+    except DuplicateKeyError:
+        return {"ok": True, "counted": False, "reason": "deduped_24h"}
+    r = await db.provider_profiles.update_one(
+        {"slug": ref_slug, "is_active": True},
+        {"$inc": {"referred_view_count": 1}, "$set": {"last_referred_view_at": now.isoformat()}},
+    )
+    return {"ok": True, "counted": r.modified_count == 1}
+
+
+@api_router.get("/providers/me/share-stats")
+async def get_my_share_stats(user: User = Depends(get_current_user)):
+    """Provider-facing viral KPI card payload."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "share_count": 1, "referred_view_count": 1, "last_share_at": 1,
+         "share_channels": 1, "slug": 1},
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil.")
+    # Last 7 share events for the dashboard timeline
+    recent = await db.share_events.find(
+        {"provider_user_id": user.user_id},
+        {"_id": 0, "channel": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(7).to_list(7)
+    return {
+        "slug": profile.get("slug"),
+        "share_count": int(profile.get("share_count") or 0),
+        "referred_view_count": int(profile.get("referred_view_count") or 0),
+        "last_share_at": profile.get("last_share_at"),
+        "share_channels": profile.get("share_channels") or {},
+        "recent_events": recent,
+    }
 
 
 # ════════════════════════════════════════════════════════════════════

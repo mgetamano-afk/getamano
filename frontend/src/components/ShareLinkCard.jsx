@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "../lib/api";
 
 /**
  * ShareLinkCard — Premium "share your eCard" card for the provider dashboard.
  * Generates short alias /p/{slug}, copy, WhatsApp, Email, QR download, native share.
+ *
+ * Section 46 — every share appends ?ref={slug} so the public eCard view can
+ * credit the referrer. Each click also fires a fire-and-forget
+ * POST /providers/me/share-event for the dashboard viral KPI card.
  */
 export default function ShareLinkCard({ slug, businessName }) {
   const [copied, setCopied] = useState(false);
@@ -12,20 +17,28 @@ export default function ShareLinkCard({ slug, businessName }) {
 
   if (!slug) return null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  // Friendly short alias
-  const shortUrl = `${origin}/p/${slug}`;
-  // Canonical SEO URL
+  // Friendly short alias + ?ref so referred views can be credited
+  const refParam = `?ref=${encodeURIComponent(slug)}`;
+  const shortUrl = `${origin}/p/${slug}${refParam}`;
+  // Canonical SEO URL (kept clean for the "Ver mi eCard" preview)
   const fullUrl = `${origin}/services/${slug}`;
-  const displayUrl = shortUrl.replace(/^https?:\/\//, "");
+  const displayUrl = shortUrl.replace(/^https?:\/\//, "").replace(refParam, "");
 
-  const shareText = `Conoce ${businessName} en getamano · Servicio latino verificado · ${shortUrl}`;
+  // Persuasive Spanish message — first-person, concrete, link last.
+  const shareText = `¡Hola! Te dejo mi eCard de ${businessName} en getamano · servicio latino verificado 🌟\n\n${shortUrl}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=10&data=${encodeURIComponent(shortUrl)}&color=0F172A&bgcolor=FFFFFF`;
+
+  // Fire-and-forget: we never block the share UX on the analytics ping.
+  const _trackShare = (channel) => {
+    api.post("/providers/me/share-event", { channel }).catch(() => { /* swallow */ });
+  };
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(shortUrl);
       setCopied(true);
       toast.success("¡Enlace copiado!");
+      _trackShare("copy");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("No se pudo copiar");
@@ -34,16 +47,21 @@ export default function ShareLinkCard({ slug, businessName }) {
 
   const shareWA = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
+    _trackShare("whatsapp");
   };
 
   const shareEmail = () => {
     window.location.href = `mailto:?subject=${encodeURIComponent(`Mi negocio en getamano · ${businessName}`)}&body=${encodeURIComponent(shareText)}`;
+    _trackShare("email");
   };
 
   const nativeShare = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: businessName, text: shareText, url: shortUrl }); return; }
-      catch (e) {
+      try {
+        await navigator.share({ title: businessName, text: shareText, url: shortUrl });
+        _trackShare("native");
+        return;
+      } catch (e) {
         // User cancelled share (AbortError) is expected — only log unexpected errors
         if (e?.name !== "AbortError") console.error("native share failed", e);
       }
@@ -55,6 +73,7 @@ export default function ShareLinkCard({ slug, businessName }) {
     const a = document.createElement("a");
     a.href = qrSrc; a.download = `${slug}-qr.png`; a.target = "_blank";
     document.body.appendChild(a); a.click(); a.remove();
+    _trackShare("qr");
     toast.success("Descargando código QR");
   };
 

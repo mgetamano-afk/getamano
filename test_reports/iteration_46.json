@@ -1,0 +1,38 @@
+{
+  "summary": "Iter 46 — viral share tracking for provider eCards. Backend: 17/17 pytest pass on /providers/me/share-event, /providers/track-share-view, /providers/me/share-stats (auth, RBAC, 422 validation, IP-based 24h dedupe, self-ref behavior, unknown-slug counted:false, blank ref short-circuit, denormalised counter persistence, recent_events sort order + 7-cap + no _id leak). Frontend: ShareLinkCard + ShareStatsCard both render on /dashboard; displayed URL is clean (no ?ref) but WhatsApp window.open URL carries ?ref=<slug>; share-event POSTs fired for whatsapp/email/qr; ShareStatsCard renders 6 shares, 9 views, 1.5x multiplier, 4 channel chips (whatsapp/qr/email/copy); anonymous ?ref=<unknown> on public eCard fires POST /providers/track-share-view; reload is deduped via sessionStorage; self-ref (?ref=<own slug>) is correctly skipped.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ProviderDashboard", "issues": ["React hydration warning observed in console: '<span> cannot be a child of <option>' (pre-existing, unrelated to Section 46 — likely from a <Select> component elsewhere)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter46_share_tracking.py",
+    "/app/test_reports/pytest/iter46.xml"
+  ],
+  "action_items": [
+    "(non-blocking) Investigate the unrelated hydration warning '<span> cannot be a child of <option>' surfaced on /dashboard load — probably in a different Select component, not in ShareStatsCard/ShareLinkCard."
+  ],
+  "critical_code_review_comments": [
+    "share-event endpoint uses two consecutive DB writes (insert_one share_events + update_one provider_profiles) — both awaited sequentially. For low-volume share clicks this is fine; if it ever becomes a hot path consider asyncio.gather() to halve latency.",
+    "track-share-view: DuplicateKeyError path returns counted:false but does NOT delete the (possibly stale) dedup row — fine because TTL handles cleanup, just noting.",
+    "In ShareLinkCard.copy(), if navigator.clipboard.writeText throws (permission denied / non-secure context) the _trackShare('copy') never fires — current behavior is correct (don't count failed shares) but worth documenting.",
+    "nativeShare() falls back to copy() when navigator.share is unavailable — if the clipboard then fails too, the user gets no toast confirmation. Edge case, not user-facing in production HTTPS.",
+    "server.py is 8734 lines — exceeds the 700-line guideline. Tracked for a future refactor; out of scope for this iteration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter46_share_tracking.py (NEW — 17 tests)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (all 8 flows validated)"},
+  "test_credentials": "demo.provider@getamano.com / provider123; admin@getamano.com / admin123",
+  "seed_data_creation": "Test uses unique referrer slugs (test_iter46_<ms>) + IP octets 203.0.113.x to avoid 24h-TTL collisions across reruns. demo.provider counters increment naturally — assertions use before/after deltas, not absolute values.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 46 viral share tracking is GREEN end-to-end. Indexes seeded at startup: share_events(provider_user_id+created_at desc), share_view_dedup(referrer_slug+ip unique) + TTL on expires_at_native. demo.provider profile post-iter46 has share_count≈8, referred_view_count≈8+ (depends on test runs). Use test_config.DEMO_SLUG to resolve the demo provider slug from env.",
+  "rca of the issue": "No bugs found in this iteration. The earlier ProviderECard.jsx 'searchParams used before declaration' was already fixed by main agent before testing began (per agent_to_agent_context_note)."
+}
