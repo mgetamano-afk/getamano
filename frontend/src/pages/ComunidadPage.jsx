@@ -713,24 +713,32 @@ function RightSidebar() {
 }
 
 // ─── Main page ──────────────────────────────────────────────────────────
-export default function ComunidadPage() {
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50" data-testid="comunidad-page">
-      <Header />
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        <div className="flex gap-0">
-          <LeftNav />
-          <div className="flex-1 min-w-0 max-w-2xl mx-auto">
+export default function ComunidadPage({ embedded = false }) {
+  const body = (
+    <main className={`flex-1 ${embedded ? "" : "max-w-7xl mx-auto"} px-4 sm:px-6 lg:px-8 py-6 w-full`}>
+      <div className="flex gap-0">
+        {!embedded && <LeftNav />}
+        <div className="flex-1 min-w-0 max-w-2xl mx-auto">
+          {!embedded && (
             <header className="mb-5">
               <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Comunidad</h1>
               <p className="text-sm text-slate-500 mt-1">Lo que está pasando en la comunidad latina en USA — ahora mismo.</p>
             </header>
-            <StoriesRow />
-            <PostFeed />
-          </div>
-          <RightSidebar />
+          )}
+          <StoriesRow />
+          <PostFeed />
         </div>
-      </main>
+        {!embedded && <RightSidebar />}
+      </div>
+    </main>
+  );
+  if (embedded) {
+    return <div className="tab-content-enter" data-testid="comunidad-feed-embedded">{body}</div>;
+  }
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-50" data-testid="comunidad-page">
+      <Header />
+      {body}
       <Footer />
     </div>
   );

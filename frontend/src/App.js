@@ -34,6 +34,9 @@ import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
 import RankingPage from "./pages/RankingPage";
+import ComunidadLayout from "./components/ComunidadLayout";
+import ComunidadExplorar from "./pages/ComunidadExplorar";
+import QuickActionsFAB from "./components/QuickActionsFAB";
 
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -105,10 +108,26 @@ function AppRouter() {
       <Route path="/proveedor/:slug" element={<ProviderECard />} />
       <Route path="/provider/:slug" element={<ProviderECard />} />
       <Route path="/p/:slug" element={<ProviderECard />} />
-      <Route path="/comunidad" element={<ComunidadPage />} />
-      <Route path="/community" element={<ComunidadPage />} />
       <Route path="/wall" element={<Community />} />
-      <Route path="/comunidad/wall" element={<Community />} />
+
+      {/* Section 39 — Persistent /comunidad layout with sticky tab bar.
+          The wrapper ComunidadLayout mounts once and the active sub-route
+          renders into its <Outlet />. Window scroll position is remembered
+          per sub-path so swapping tabs feels app-native. */}
+      <Route path="/comunidad" element={<ComunidadLayout />}>
+        <Route index element={<ComunidadPage embedded />} />
+        <Route path="explorar" element={<ComunidadExplorar />} />
+        <Route path="chambas" element={<EmpleosPage embedded />} />
+        <Route path="ranking" element={<RankingPage embedded />} />
+        <Route path="wall-of-fame" element={<Community embedded />} />
+      </Route>
+      <Route path="/community" element={<ComunidadLayout />}>
+        <Route index element={<ComunidadPage embedded />} />
+        <Route path="explorar" element={<ComunidadExplorar />} />
+        <Route path="chambas" element={<EmpleosPage embedded />} />
+        <Route path="ranking" element={<RankingPage embedded />} />
+        <Route path="wall-of-fame" element={<Community embedded />} />
+      </Route>
 
       {/* Zone 3: Provider + Client Dashboards */}
       <Route path="/dashboard" element={<DashboardRouter />} />
@@ -181,6 +200,7 @@ function App() {
                 <AppRouter />
               </RouteErrorBoundary>
               <BottomNav />
+              <QuickActionsFAB />
             </BrowserRouter>
           </PwaInstallProvider>
         </AuthProvider>

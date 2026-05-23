@@ -70,7 +70,7 @@ function Tile({ item }) {
   return <div data-testid={`wall-tile-${item.milestone_id}`}>{inner}</div>;
 }
 
-export default function Community() {
+export default function Community({ embedded = false }) {
   const [data, setData] = useState({ items: [], stats: { total_unlocked: 0, total_providers: 0 } });
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -92,8 +92,8 @@ export default function Community() {
   const top = data.stats || {};
 
   return (
-    <div className="min-h-screen bg-neutral-50 overflow-x-hidden">
-      <Header />
+    <div className={embedded ? "tab-content-enter overflow-x-hidden" : "min-h-screen bg-neutral-50 overflow-x-hidden"} data-testid={embedded ? "wall-embedded" : undefined}>
+      {!embedded && <Header />}
       <main className="pb-16" data-testid="community-page">
         {/* HERO */}
         <section className="relative overflow-hidden">
@@ -259,7 +259,7 @@ export default function Community() {
           </div>
         </section>
       </main>
-      <Footer />
+      {!embedded && <Footer />}
     </div>
   );
 }

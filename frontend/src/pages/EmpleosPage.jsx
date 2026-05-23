@@ -314,7 +314,7 @@ function PostGigModal({ onClose, onSuccess, lang }) {
   );
 }
 
-export default function EmpleosPage() {
+export default function EmpleosPage({ embedded = false }) {
   const { user } = useAuth();
   const { lang } = useI18n();
   const navigate = useNavigate();
@@ -380,9 +380,9 @@ export default function EmpleosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <Header />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+    <div className={embedded ? "tab-content-enter" : "min-h-screen bg-neutral-50"} data-testid={embedded ? "empleos-embedded" : undefined}>
+      {!embedded && <Header />}
+      <main className={`${embedded ? "" : "max-w-5xl mx-auto"} px-4 sm:px-6 lg:px-8 ${embedded ? "py-4" : "py-8 sm:py-12"}`}>
         {/* Header strip */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
@@ -455,7 +455,7 @@ export default function EmpleosPage() {
           )}
         </div>
       </main>
-      <Footer />
+      {!embedded && <Footer />}
 
       {showPost && <PostGigModal onClose={() => setShowPost(false)} onSuccess={() => { setShowPost(false); load(); }} lang={lang} />}
       {applyTarget && <ApplyGigModal gig={applyTarget} onClose={() => setApplyTarget(null)} onSuccess={() => { setApplyTarget(null); load(); }} lang={lang} />}

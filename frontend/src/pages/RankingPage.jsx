@@ -14,7 +14,7 @@ import { getDicebearAvatar } from "../lib/avatar";
  *   • Numbered list rows 4-100 with score + breakdown chips on hover
  *   • Transparent formula explainer panel ("Cómo se calcula")
  */
-export default function RankingPage() {
+export default function RankingPage({ embedded = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,12 +32,14 @@ export default function RankingPage() {
   const rest = data?.top?.slice(3) || [];
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50" data-testid="ranking-page">
-      <Header />
-      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-teal-700 mb-4" data-testid="ranking-back">
-          <ChevronLeft className="w-4 h-4" /> Inicio
-        </Link>
+    <div className={embedded ? "tab-content-enter" : "min-h-screen flex flex-col bg-slate-50"} data-testid={embedded ? "ranking-embedded" : "ranking-page"}>
+      {!embedded && <Header />}
+      <main className={`flex-1 ${embedded ? "" : "max-w-5xl mx-auto"} px-4 sm:px-6 lg:px-8 ${embedded ? "py-4" : "py-8"} w-full`}>
+        {!embedded && (
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-teal-700 mb-4" data-testid="ranking-back">
+            <ChevronLeft className="w-4 h-4" /> Inicio
+          </Link>
+        )}
 
         {/* Hero */}
         <div className="text-center mb-8">
@@ -154,7 +156,7 @@ export default function RankingPage() {
           </div>
         )}
       </main>
-      <Footer />
+      {!embedded && <Footer />}
     </div>
   );
 }
