@@ -12,6 +12,8 @@ import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe
 import WhatsAppButton from "../components/WhatsAppButton";
 import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
+import ECardFloatingHeader from "../components/ECardFloatingHeader";
+import ShareECardBlock from "../components/ShareECardBlock";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
@@ -128,9 +130,8 @@ export default function ProviderECard() {
     <div className="min-h-screen bg-neutral-50">
       <Header />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10" data-testid="provider-ecard">
-        <Link to="/search" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600 mb-4" data-testid="ecard-back-link">
-          <ChevronLeft className="w-4 h-4" /> {t("common.back")}
-        </Link>
+        {/* Section 32 — Floating header with back / like / share */}
+        <ECardFloatingHeader provider={p} lang={lang} />
 
         {/* "Recomendado por X" hero banner — appears when arriving via ?via=share_token */}
         {refBy && (
@@ -197,42 +198,68 @@ export default function ProviderECard() {
               </div>
             </div>
 
-            {/* Action buttons */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-6 gap-2">
-              {p.phone && (
-                <a href={`tel:${p.phone}`} onClick={trackClick} className="btn-primary justify-center flex items-center gap-1 text-sm" data-testid="ecard-call-button">
-                  <Phone className="w-4 h-4" /> {t("provider.call")}
-                </a>
-              )}
-              {p.phone && <WhatsAppButton phone={p.phone} businessName={p.business_name} testid="ecard-whatsapp-button" />}
-              <button onClick={() => { setShowMessage(true); setMode("message"); }} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-message-button">
-                <MessageSquare className="w-4 h-4" /> {t("provider.message")}
-              </button>
-              <button onClick={() => setShowQuote(true)} className="btn-secondary justify-center flex items-center gap-1 text-sm" data-testid="ecard-quote-button">
-                <FileText className="w-4 h-4" /> {lang === "en" ? "Request quote" : "Pedir cotización"}
-              </button>
-              {p.calendar_active && (
-                <button onClick={() => setShowBooking(true)} className="btn-primary justify-center flex items-center gap-1 text-sm bg-teal-600 hover:bg-teal-700 border-teal-600" data-testid="ecard-book-button">
-                  <Calendar className="w-4 h-4" /> {lang === "en" ? "Book appointment" : "Reservar cita"}
+            {/* Section 32 — Primary CTA: WhatsApp full-width green */}
+            <div className="mt-6 space-y-2.5">
+              {p.phone ? (
+                <WhatsAppButton phone={p.phone} businessName={p.business_name} testid="ecard-whatsapp-button" variant="primary" />
+              ) : (
+                <button
+                  onClick={() => { setShowMessage(true); setMode("message"); }}
+                  className="w-full flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3.5 px-6 rounded-2xl transition active:scale-[0.98] shadow-md"
+                  data-testid="ecard-message-primary-button"
+                >
+                  <MessageSquare className="w-5 h-5" /> {lang === "en" ? "Send message" : "Enviar mensaje"}
                 </button>
               )}
-              <button
-                onClick={() => setShowRecommend(true)}
-                className="btn-secondary justify-center flex items-center gap-1 text-sm border-red-200 hover:bg-red-50"
-                style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", color: "#B91C1C" }}
-                data-testid="ecard-recommend-button"
-              >
-                <Heart className="w-4 h-4 fill-red-500" />
-                {lang === "en" ? "I recommend" : "Lo/la recomiendo"}
-              </button>
-              {!p.is_home_based && p.city && (
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-map-button">
-                  <MapPin className="w-4 h-4" /> {t("provider.map")}
-                </a>
-              )}
-              <button onClick={() => setShowECardModal(true)} className="btn-outline justify-center flex items-center gap-1 text-sm" data-testid="ecard-view-button">
-                <CreditCard className="w-4 h-4" /> {lang === "en" ? "View my eCard" : "Ver mi eCard"}
-              </button>
+
+              {/* 2x2 grid of secondary CTAs */}
+              <div className="grid grid-cols-2 gap-2" data-testid="ecard-secondary-cta-grid">
+                {p.phone && (
+                  <a href={`tel:${p.phone}`} onClick={trackClick} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-call-button">
+                    <Phone className="w-4 h-4 text-teal-700" /> {t("provider.call")}
+                  </a>
+                )}
+                <button onClick={() => { setShowMessage(true); setMode("message"); }} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-message-button">
+                  <MessageSquare className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Chat" : "Mensaje"}
+                </button>
+                <button onClick={() => setShowQuote(true)} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-quote-button">
+                  <FileText className="w-4 h-4 text-amber-600" /> {lang === "en" ? "Quote" : "Cotizar"}
+                </button>
+                {p.calendar_active ? (
+                  <button onClick={() => setShowBooking(true)} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-book-button">
+                    <Calendar className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Book" : "Reservar"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => document.querySelector('[data-testid="ecard-gallery"], [data-testid="ecard-rates"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm"
+                    data-testid="ecard-services-button"
+                  >
+                    <Sparkles className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Services" : "Servicios"}
+                  </button>
+                )}
+              </div>
+
+              {/* Tertiary actions — recommend + map + view eCard */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  onClick={() => setShowRecommend(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 hover:bg-red-50 transition"
+                  style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", color: "#B91C1C" }}
+                  data-testid="ecard-recommend-button"
+                >
+                  <Heart className="w-3.5 h-3.5 fill-red-500" />
+                  {lang === "en" ? "I recommend" : "Lo/la recomiendo"}
+                </button>
+                {!p.is_home_based && p.city && (
+                  <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700 transition" data-testid="ecard-map-button">
+                    <MapPin className="w-3.5 h-3.5" /> {t("provider.map")}
+                  </a>
+                )}
+                <button onClick={() => setShowECardModal(true)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700 transition" data-testid="ecard-view-button">
+                  <CreditCard className="w-3.5 h-3.5" /> {lang === "en" ? "View eCard" : "Ver eCard"}
+                </button>
+              </div>
             </div>
             <button onClick={addFavorite} className="mt-2 text-sm text-slate-500 hover:text-orange-500 flex items-center gap-1" data-testid="ecard-favorite-button">
               <Heart className="w-4 h-4" /> {lang === "en" ? "Save to favorites" : "Guardar en favoritos"}
@@ -405,6 +432,11 @@ export default function ProviderECard() {
               )}
             </div>
           </aside>
+        </div>
+
+        {/* Section 32 — Share this eCard (link / QR / NFC) at the bottom */}
+        <div className="mt-8" data-testid="ecard-share-block-wrap">
+          <ShareECardBlock provider={p} lang={lang} />
         </div>
 
         {/* Message / Quote modal */}

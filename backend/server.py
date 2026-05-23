@@ -2480,6 +2480,56 @@ async def admin_audit_log(limit: int = 100, _: User = Depends(require_admin)):
         log["admin"] = admins.get(log["admin_id"])
     return logs
 
+# ============ WEEKLY GIG DIGEST ENDPOINTS ============
+@api_router.get("/providers/me/weekly-digest")
+async def get_my_weekly_digest(user: User = Depends(get_current_user)):
+    """Provider preview — what the digest will look like *right now*."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores tienen digest semanal.")
+    digest = await _compute_provider_weekly_digest(user.user_id)
+    if not digest:
+        return {"available": False, "reason": "no_matching_gigs"}
+    # Strip the email + user_id from the public-facing preview
+    digest.pop("email", None)
+    digest.pop("user_id", None)
+    digest["available"] = True
+    return digest
+
+@api_router.post("/admin/digest/send-weekly")
+async def admin_send_weekly_digest(request: Request, admin: User = Depends(require_admin)):
+    """Fan out the weekly gig digest to all eligible verified providers.
+
+    Eligibility: active + approved + has category_id + has city + has email.
+    Returns the per-provider send result so admin can audit. When
+    RESEND_API_KEY is not set we still iterate but the email goes to backend
+    logs only (dev-fallback) — useful for staging dry runs.
+    """
+    # Pick the public URL from the request — falls back to env if needed
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    public_url = forwarded.split("/api", 1)[0] if forwarded else os.environ.get("PUBLIC_URL", "https://getamano.us")
+    eligible = await db.provider_profiles.find(
+        {
+            "is_active": True,
+            "verification_status": "approved",
+            "category_id": {"$exists": True, "$ne": None},
+            "city": {"$exists": True, "$ne": None},
+            "business_name": {"$not": {"$regex": "^TEST_"}},
+        },
+        {"_id": 0, "user_id": 1},
+    ).limit(500).to_list(500)
+    results = []
+    for prof in eligible:
+        try:
+            res = await _send_weekly_digest_to_provider(prof["user_id"], public_url)
+            results.append(res)
+        except Exception as e:
+            logger.warning(f"weekly digest failed for {prof.get('user_id')}: {e}")
+            results.append({"user_id": prof.get("user_id"), "sent": False, "reason": "exception"})
+    sent = sum(1 for r in results if r.get("sent"))
+    skipped = sum(1 for r in results if r.get("skipped"))
+    await audit_log(admin.user_id, "digest.weekly_sent", {"sent": sent, "skipped": skipped, "total": len(results)}, request)
+    return {"ok": True, "sent": sent, "skipped": skipped, "total": len(results), "results": results[:50]}
+
 # ============ ADMIN: PROVIDER EDIT (override) ============
 @api_router.patch("/admin/providers/{provider_id}")
 async def admin_edit_provider(provider_id: str, payload: AdminProviderEditIn, admin: User = Depends(require_admin)):
@@ -5544,6 +5594,165 @@ async def _consume_resend_cooldown(email: str) -> Optional[int]:
     if elapsed < OTP_RESEND_COOLDOWN_SECONDS:
         return int(OTP_RESEND_COOLDOWN_SECONDS - elapsed)
     return None
+
+# ════════════════════════════════════════════════════════════════════════
+# WEEKLY GIG DIGEST (post-Section 30 follow-up)
+# ════════════════════════════════════════════════════════════════════════
+# Aggregates the past 7 days of gigs that match each provider's category +
+# city and ships a curated email digest. Dev-fallback logs to stderr when
+# RESEND_API_KEY is not set (same convention as the OTP flow).
+# ════════════════════════════════════════════════════════════════════════
+
+async def _compute_provider_weekly_digest(user_id: str) -> Optional[dict]:
+    """Return a dict ready to render in HTML, or None when no gigs match.
+
+    Output shape:
+      {
+        "provider_name": "Carmen",
+        "business_name": "María Cleaning",
+        "city": "Sallisaw",
+        "state": "OK",
+        "category_name": "Limpieza",
+        "gigs": [ {gig_id, title, budget_label, city, is_urgent, created_at}, ... up to 5 ],
+        "total_count": int,
+      }
+    """
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user_id, "is_active": True, "verification_status": "approved"},
+        {"_id": 0, "category_id": 1, "city": 1, "state": 1, "business_name": 1, "user_id": 1},
+    )
+    if not profile or not profile.get("category_id") or not profile.get("city"):
+        return None
+    cat = await db.categories.find_one({"category_id": profile["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+    if not cat:
+        return None
+    cat_names = [n for n in (cat.get("name_es"), cat.get("name_en")) if n]
+    one_week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    cat_regex = f"^({'|'.join(re.escape(n) for n in cat_names)})$"
+    q = {
+        "status": "open",
+        "city": {"$regex": f"^{re.escape(profile['city'])}$", "$options": "i"},
+        "category": {"$regex": cat_regex, "$options": "i"},
+        "created_at": {"$gte": one_week_ago},
+        "created_by": {"$ne": user_id},
+    }
+    total = await db.gigs.count_documents(q)
+    if total == 0:
+        return None
+    rows = await db.gigs.find(q, {"_id": 0, "expires_at_native": 0}).sort("created_at", -1).limit(5).to_list(5)
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "name": 1, "email": 1})
+    out_gigs = []
+    for g in rows:
+        budget_min = g.get("budget_min")
+        budget_max = g.get("budget_max")
+        if budget_min is not None and budget_max is not None:
+            budget_label = f"${int(budget_min)}–${int(budget_max)}"
+        elif budget_min is not None:
+            budget_label = f"desde ${int(budget_min)}"
+        elif budget_max is not None:
+            budget_label = f"hasta ${int(budget_max)}"
+        else:
+            budget_label = "Presupuesto abierto"
+        out_gigs.append({
+            "gig_id": g.get("gig_id"),
+            "title": g.get("title", ""),
+            "description": (g.get("description") or "")[:160],
+            "budget_label": budget_label,
+            "city": g.get("city"),
+            "state": g.get("state"),
+            "is_urgent": bool(g.get("is_urgent")),
+            "created_at": g.get("created_at"),
+        })
+    return {
+        "user_id": user_id,
+        "email": (user_doc or {}).get("email"),
+        "provider_name": ((user_doc or {}).get("name") or "").split(" ")[0] or "Compañer@",
+        "business_name": profile.get("business_name") or "",
+        "city": profile.get("city"),
+        "state": profile.get("state"),
+        "category_name": cat.get("name_es") or cat.get("name_en"),
+        "gigs": out_gigs,
+        "total_count": total,
+    }
+
+def _build_weekly_digest_html(digest: dict, public_url: str) -> tuple[str, str]:
+    """Return (subject, html). Branded with getamano gradient + teal CTA."""
+    name = digest["provider_name"]
+    city = digest["city"] or "tu zona"
+    cat = digest["category_name"] or "tu categoría"
+    total = digest["total_count"]
+    subject = f"💼 {total} nueva{'s' if total != 1 else ''} chamba{'s' if total != 1 else ''} de {cat} esta semana en {city}"
+    rows_html = []
+    for g in digest["gigs"]:
+        urgent_pill = (
+            '<span style="display:inline-block;padding:2px 8px;border-radius:9999px;background:#FFEDD5;color:#C2410C;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;margin-left:6px;">URGENTE</span>'
+            if g.get("is_urgent") else ""
+        )
+        loc = f"{g.get('city','')}{', ' + g['state'] if g.get('state') else ''}"
+        gig_url = f"{public_url.rstrip('/')}/empleos"
+        rows_html.append(f"""
+          <tr><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;">
+            <a href="{gig_url}" style="text-decoration:none;color:inherit;display:block;">
+              <p style="margin:0 0 4px 0;color:#0F172A;font-size:15px;font-weight:700;line-height:1.3;">{g['title']}{urgent_pill}</p>
+              <p style="margin:0 0 6px 0;color:#475569;font-size:13px;line-height:1.5;">{g['description']}</p>
+              <p style="margin:0;color:#025F67;font-size:13px;font-weight:600;">{g['budget_label']} · {loc}</p>
+            </a>
+          </td></tr>
+        """)
+    rows_block = "\n".join(rows_html)
+    cta_url = f"{public_url.rstrip('/')}/empleos"
+    extra_count = max(total - len(digest["gigs"]), 0)
+    extra_html = (
+        f'<p style="margin:8px 0 0 0;color:#64748B;font-size:13px;">Y {extra_count} más en el tablero.</p>'
+        if extra_count > 0 else ""
+    )
+    html = f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8" /></head>
+<body style="margin:0;padding:0;background:#F7F6F2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F6F2;padding:24px 12px;">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+      <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:32px 32px 20px;">
+        <p style="margin:0;color:rgba(255,255,255,0.85);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:700;">getamano · Resumen semanal</p>
+        <h1 style="margin:8px 0 0 0;color:#FFFFFF;font-size:24px;font-weight:800;line-height:1.2;">Hola, {name} 👋</h1>
+        <p style="margin:6px 0 0 0;color:#FFFFFF;font-size:15px;line-height:1.5;opacity:0.95;">Estas son las chambas de <strong>{cat}</strong> que aparecieron esta semana cerca de ti en <strong>{city}</strong>:</p>
+      </td></tr>
+      <tr><td style="padding:8px 32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          {rows_block}
+        </table>
+        {extra_html}
+        <div style="margin-top:24px;text-align:center;">
+          <a href="{cta_url}" style="display:inline-block;padding:14px 32px;background:#025F67;color:#FFFFFF;text-decoration:none;font-weight:700;font-size:15px;border-radius:9999px;">Ver todas las chambas →</a>
+        </div>
+      </td></tr>
+      <tr><td style="background:#F8FAFC;padding:18px 32px;text-align:center;border-top:1px solid #E2E8F0;">
+        <p style="margin:0 0 6px 0;color:#475569;font-size:13px;">Aplica a las que te interesen — tu reputación en getamano viaja con cada aplicación.</p>
+        <p style="margin:0;color:#94A3B8;font-size:11px;">© getamano 2026 · Recibes este correo porque tu eCard está activa. <a href="{cta_url}" style="color:#94A3B8;text-decoration:underline;">Gestiona preferencias</a></p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+    return subject, html
+
+async def _send_weekly_digest_to_provider(user_id: str, public_url: str) -> dict:
+    """Compute + send digest for a single provider. Returns status dict."""
+    digest = await _compute_provider_weekly_digest(user_id)
+    if not digest:
+        return {"user_id": user_id, "skipped": True, "reason": "no_matching_gigs"}
+    if not digest.get("email"):
+        return {"user_id": user_id, "skipped": True, "reason": "no_email"}
+    subject, html = _build_weekly_digest_html(digest, public_url)
+    result = await _send_email_via_resend(digest["email"], subject, html)
+    return {
+        "user_id": user_id,
+        "email": digest["email"],
+        "subject": subject,
+        "gigs_count": digest["total_count"],
+        "sent": result.get("sent", False),
+        "reason": result.get("reason"),
+    }
 
 @api_router.post("/auth/send-otp")
 async def send_otp(payload: SendOtpIn):

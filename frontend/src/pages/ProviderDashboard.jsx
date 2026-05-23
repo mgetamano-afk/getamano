@@ -22,6 +22,7 @@ import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
 import SubscriptionManager from "../components/SubscriptionManager";
 import ChambasNearby from "../components/ChambasNearby";
+import WeeklyDigestPreview from "../components/WeeklyDigestPreview";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -178,6 +179,8 @@ export default function ProviderDashboard() {
         </div>
 
         <ChambasNearby city={profile.city} role="provider" limit={3} />
+
+        <WeeklyDigestPreview />
 
         <MarketPulseCard />
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">

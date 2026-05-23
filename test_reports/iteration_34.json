@@ -1,0 +1,61 @@
+{
+  "summary": "Iter34 — Section 32 eCard redesign + Weekly Gig Digest. Backend: 9/9 new tests + 19/19 iter32+iter33 regression tests all PASS. Frontend: all new testids render, login → dashboard digest preview works (3 items, CTA→/empleos), floating header sticky with Back/Like/Share, ShareECardBlock with Copy/Share/QR/NFC at bottom, QR modal opens with SVG, NFC gracefully no-ops in Chromium. /empleos route working with TEST_iter32 gigs visible.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ECardFloatingHeader",
+        "issue": "useState(() => {...}, [provider?.slug]) — useState was used where useEffect is intended. The dependency array is ignored, so the localStorage-persisted like state is only read at initial mount when provider is still null. Net effect: header like state does not reflect prior likes after provider fetch. (Click → API toggle still works.)",
+        "selector": "[data-testid='ecard-fh-like']",
+        "priority": "LOW"
+      },
+      {
+        "component": "ECardFloatingHeader",
+        "issue": "Anonymous users clicking Like trigger /api/providers/{id}/like which returns 401; the optimistic UI is silently reverted with no toast/error feedback. Consider showing 'Sign in to like' toast.",
+        "selector": "[data-testid='ecard-fh-like']",
+        "priority": "LOW"
+      },
+      {
+        "component": "ShareECardBlock",
+        "issue": "Copy-link button correctly shows 'Could not copy' error toast when clipboard API is unavailable (e.g., insecure context / Playwright). Behavior is correct, just FYI.",
+        "selector": "[data-testid='ecard-share-copy']",
+        "priority": "INFO"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "code_review_comments": [
+    "ProviderECard.jsx: backend POST /providers/{id}/like is a pure server-side toggle that ignores the {liked:true|false} body sent by ECardFloatingHeader. The frontend assumes the body is honored. Currently safe because both states toggle, but if the user double-clicks fast the local state and server state can de-sync. Consider making the API idempotent (accept desired state) OR have the header use the returned {liked} value as source of truth.",
+    "WeeklyDigestPreview translates 'category_name' as-is which is fine for Spanish, but for English locale the backend already sends Spanish category names (e.g., 'Limpieza'). If you want true bilingual copy, the digest endpoint should return both name_es and name_en.",
+    "server.py: /admin/digest/send-weekly excludes TEST_-prefixed business_name from the eligible set (good) but does not exclude email-bounced or unsubscribed providers. Add an unsubscribe/email-suppression check before going live with Resend.",
+    "ECardFloatingHeader.jsx uses useState as if it were useEffect (line ~22). Replace with useEffect to actually pick up provider.slug changes."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter34_digest_and_ecard.py",
+    "/app/test_reports/pytest/iter34_results.xml",
+    "/app/test_reports/pytest/iter34_regression.xml"
+  ],
+  "action_items": [
+    "(optional, low priority) Fix useState→useEffect typo in /app/frontend/src/components/ECardFloatingHeader.jsx so the persisted like state is picked up after provider load.",
+    "(optional) Show login prompt toast when anonymous users click the floating-header like button (currently silently reverts).",
+    "(optional, future) Have backend /providers/{id}/like accept an intended state rather than being a server-side toggle so the floating header can avoid de-sync on rapid clicks."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter34_digest_and_ecard.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9 + 19/19 regression)", "frontend": "100% (all testids render, login + dashboard + /empleos verified)"},
+  "test_credentials": "Used demo provider (demo.provider@getamano.com / provider123) and admin (admin@getamano.com / admin123); confirmed login API returns 200. Demo client login also confirmed.",
+  "seed_data_creation": "No new seeds created. Confirmed digest pulls existing TEST_iter32* Sallisaw+Limpieza gigs (total_count=3 in dashboard preview at test time).",
+  "mocked_apis_acknowledged": [
+    "Resend email — dev-fallback: confirmed '[EMAIL DEV-FALLBACK]' line in /var/log/supervisor/backend.err.log containing the 💼 Limpieza/Sallisaw subject when admin triggers send-weekly. sent=false reason=no_api_key in response.",
+    "Stripe, Twilio, Google Translate/Vision still off — not relevant to this iteration."
+  ],
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression suite for digest lives in /app/backend/tests/test_iter34_digest_and_ecard.py. Frontend: provider eCard slug is 'maria-cleaning-services-sallisaw-ok'. Weekly digest widget only renders when /api/providers/me/weekly-digest returns available=true (zero-state hides itself silently). All Section 32 testids verified: ecard-floating-header, ecard-fh-back, ecard-fh-like, ecard-fh-share, ecard-whatsapp-button, ecard-secondary-cta-grid (+children ecard-call-button/ecard-message-button/ecard-quote-button/ecard-book-button), ecard-share-block, ecard-share-copy, ecard-share-native, ecard-share-qr, ecard-share-qr-modal, ecard-share-qr-svg, ecard-share-nfc, weekly-digest-preview, weekly-digest-title, weekly-digest-cta, weekly-digest-item-*. iter32 + iter33 backend suites still 100% green.",
+  "rca_of_the_issue": "N/A — no blocking bugs found. Two minor code-quality nits noted (useState misuse in ECardFloatingHeader; anonymous like silent revert) are non-blocking."
+}
