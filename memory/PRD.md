@@ -618,3 +618,57 @@ User asked: "¿quieres que active notificaciones de nueva chamba para proveedore
 - Referee CSV export per referrer for analytics.
 - Detect and reward via subscription payment (status=paid) in addition to verification, so non-pro referees still trigger the bonus when they pay.
 
+
+### Feb 23, 2026 — Iteration 36: Section 33 Featured Providers Reel + Engagement Badges
+
+**User intent:** "Megusta esa idea que tienes" (the gamification badges suggestion from iter35 finish) + "trabaj con ella y trabaja con este promt" (Section 33 reel prompt) + "si es necesario, agrega tambien en las ecard del reel, referido, que sea vea mas ese engachment" (surface referrals inside the reel cards too).
+
+**Backend (`/app/backend/server.py`):**
+- New `GET /api/providers/featured-reel`. Strategy:
+  - Merges `db.subscriptions` (status=active, plan in [basic, pro, premium]) with the legacy `provider_profiles.plan` field used by founding-member promo codes. Subscription wins precedence.
+  - Excludes free plan, TEST_-prefixed names, suspended/unverified.
+  - Per provider returns: provider_id, slug, business_name, photo_url, main_category, category_slug, city/state, rating, reviews_count, likes_count, is_online (session within last 7 days), verified, plan, referrals_credited.
+  - Sort: tier (premium first → pro → basic), then rating desc, then reviews_count desc. Cap 20.
+- Extended `_badges_for_provider` (used by `GET /api/providers/{id}/badges`) with 5 new engagement keys for gamification:
+  - `referrer` — 1–2 credited referrals → "N traíd@/traídos"
+  - `top_referrer` — 3+ → "Top Referrer · N"
+  - `active_applicant` — 2–4 gig applications in 30d → "N chambas"
+  - `chambero` — 5+ gig applications → "Chamber@ del mes"
+  - `founding_member` — `users.founding_member=true`
+- Demo seed: added a stable `ref_demo_seed_001` credited referral on María's user so the engagement signals (reel badge "✨ 1 traíd@", eCard badge, dashboard stats) all show meaningful data on first boot. Idempotent via `$setOnInsert` on `user_demo_invitee_001`.
+
+**Frontend (`/app/frontend/src/...`):**
+- `lib/avatar.js` (NEW) — `getDicebearAvatar(name)` returns an SVG URL to DiceBear's avataaars endpoint, used as a fallback when the provider has no real photo.
+- `components/FeaturedProvidersReel.jsx` (NEW, ~340 lines):
+  - Horizontal slider with `scroll-snap-type: x mandatory`, 6 rotating cover gradients, plan badge ("★ Pro" for premium, "✓ Plus" for pro, "Activo" for basic), online dot, ✅ Verificado pill, ⭐ rating with review count, city/state, **"✨ N traíd@/traídos" referral pill** (the engagement signal the user explicitly asked to surface here).
+  - Auto-scroll every 3.5s; pauses on user interaction and resumes after 8s of inactivity.
+  - Active-dot indicator (max 8 dots).
+  - Like button: ♥/♡ toggle with **12 red spark particles** + heart pop animation on like-only (not unlike). Optimistic counter update. Persists to localStorage `getamano_likes` for anonymous users; calls `POST /api/providers/{id}/like` server-side when signed in (with rollback on failure). Anonymous nudge toast "Inicia sesión para sincronizar tus favoritos" shown once per session.
+  - Conversion sub-link → /plans: "¿Eres proveedor? Aparece aquí desde $10/mes →".
+  - Returns null when no paid providers exist (silent zero-state).
+  - All sub-testids exposed for testing: `featured-reel-section`, `featured-reel-slider`, `featured-reel-see-all`, `featured-reel-upgrade-link`, `reel-card-{id}`, `reel-card-plan-{id}`, `reel-card-online-{id}`, `reel-card-referrals-{id}`, `reel-card-like-{id}`, `reel-card-likes-{id}`.
+- `components/EngagementBadges.jsx` (NEW) — fetches `/api/providers/{id}/badges` and renders colorful pill row with distinct palette per badge key. Silent zero-state. Mounts on `ProviderECard` below the description (testid=`engagement-badges`).
+- `pages/Landing.jsx` mounts `<FeaturedProvidersReel />` between the hero/ticker section and the existing CATEGORY SLIDER.
+
+**Testing:**
+- New regression `/app/backend/tests/test_iter36_featured_reel.py` — **13/13 PASS**:
+  - Schema (no `_id` leak, all required fields present)
+  - Paid-plan filter (free excluded)
+  - Plan tier sort (premium → pro → basic)
+  - Rating desc within same tier
+  - Cap 20
+  - Demo provider has plan=pro and referrals_credited >= 1
+  - 404 on unknown provider badges
+  - Referrer badge with correct count
+- Frontend Playwright: all reel testids verified, like interaction toggles ♡→♥ with localStorage write + optimistic counter + aria-pressed update, spark style tag injected, anon-toast appears once per session. EngagementBadges container renders with referrer pill on ProviderECard.
+- Combined regression: iter32+iter33+iter36 = 28/28 PASS confirmed manually post-cleanup.
+
+**Mocked:** Resend dev-fallback, Stripe unwired, Twilio log, Google Cloud Translation/Vision 403.
+
+**Follow-up backlog (post iter-36):**
+- Add real Stripe webhook → flip subscription status active/cancelled in real-time → reel auto-updates.
+- More plan-tier-only perks (e.g., 1 free push-notification campaign per month, downloadable QR cards for premium).
+- A/B test the "Aparece aquí desde $10/mes" sub-link copy.
+- "Boost" UI: providers on basic+pro can spend monthly boosts to jump the reel sort temporarily.
+- Refactor `server.py` (~6900 lines now) into modular routers post-launch.
+

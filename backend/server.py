@@ -847,6 +847,26 @@ async def seed():
         })
         logger.info("Seeded demo client: %s", DEMO_CLIENT_EMAIL)
 
+    # Section 33 — Seed a credited referral on the demo provider so the
+    # engagement signals (referrer badge on eCard + "✨ traíd@" on the reel
+    # card + dashboard referral stats) all have meaningful data out of the box.
+    # Idempotent: upsert keyed on a stable demo invitee user_id.
+    demo_profile = await db.provider_profiles.find_one({"slug": DEMO_SLUG}, {"_id": 0, "ref_code": 1})
+    if demo_profile and demo_profile.get("ref_code"):
+        await db.referrals.update_one(
+            {"referred_user_id": "user_demo_invitee_001"},
+            {"$setOnInsert": {
+                "referral_id": "ref_demo_seed_001",
+                "referrer_user_id": prov_user_id,
+                "referred_user_id": "user_demo_invitee_001",
+                "ref_code": demo_profile["ref_code"],
+                "status": "credited",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "credited_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")
 async def register(payload: RegisterIn, response: Response, ref: Optional[str] = None):
