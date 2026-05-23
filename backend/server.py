@@ -5125,7 +5125,7 @@ async def get_provider_badges(provider_id: str):
 # lookback). Updating the best record is idempotent.
 # ════════════════════════════════════════════════════════════════════════
 
-STREAK_LOOKBACK_DAYS = 60
+STREAK_LOOKBACK_DAYS = 400  # cap is wide enough to cover the 365-day milestone
 
 
 def _utc_date_str(dt) -> str:

@@ -672,3 +672,55 @@ User asked: "¿quieres que active notificaciones de nueva chamba para proveedore
 - "Boost" UI: providers on basic+pro can spend monthly boosts to jump the reel sort temporarily.
 - Refactor `server.py` (~6900 lines now) into modular routers post-launch.
 
+
+### Feb 23, 2026 — Iteration 37: Section 34 Activity Streaks (Duolingo-style retention loop)
+
+**User intent:** "si dale con esa y despues reviso toda tu creacion" — confirmed the streaks suggestion from iter36 finish. Build a daily-habit loop so providers come back every day.
+
+**Mechanics:**
+- A streak = consecutive UTC days with at least one of: login session, message sent, quote response with `responded_at`, gig application.
+- **1-day grace window**: streak stays "alive" if last activity was today OR yesterday (handles late-night users + timezone wiggle).
+- Statuses: `alive` (today) · `at_risk` (yesterday only) · `cold` (older or empty).
+- **Best record persists** in new `streaks` collection (monotonic — never decreases).
+- **Milestone ladder** Duolingo-style: 3, 7, 14, 30, 60, 90, 180, 365 days. `next_milestone` field tells UI how many days to next badge.
+- `STREAK_LOOKBACK_DAYS = 400` (covers the 365-day milestone — bumped from 60 per testing agent code review).
+
+**Backend (`/app/backend/server.py`):**
+- New helpers: `_utc_date_str`, `_collect_activity_dates`, `_walk_streak`, `_compute_streak` (~150 lines).
+- New endpoints:
+  - `GET /api/providers/me/streak` (auth) — full state for dashboard widget.
+  - `GET /api/providers/{provider_id}/streak` (public) — redacted: only exposes `{current_days, best_days, show_public_badge}` and zeroes `current_days` unless streak is alive AND >= 3 days (avoid spamming tiny badges on every public profile).
+- `_badges_for_provider` extended with `streak` key that surfaces only when the cached streak doc shows `current_days >= 3` AND `last_active_date == today UTC`.
+- **Demo seed** on backend startup: 5 daily sessions for demo provider + matching `streaks` doc (`current_days=5, best_days=5, status='alive'`). Idempotent via `streak_demo_seed=true` marker on the streaks document.
+
+**Frontend (`/app/frontend/src/...`):**
+- `components/StreakWidget.jsx` (NEW) — provider dashboard widget mounted ABOVE `ShareLinkCard` (top of dashboard, prime real estate). Three visual states:
+  - `alive`: amber gradient with 🔥, big title "N días seguidos 🔥", subtitle "Próxima meta: 7 días · 2 para llegar", visual progress bar to next milestone (testid `streak-widget-progress`), récord chip "Récord: N días" (testid `streak-widget-best`), "Nuevo récord 🏆" chip when current ≥ best.
+  - `at_risk`: yellow with "Tu racha de N días está en riesgo · Entra hoy para no perderla".
+  - `cold`: subdued teal "Empieza tu racha hoy · Responde una chamba, contesta un mensaje, o aplica a un trabajo".
+- `components/EngagementBadges.jsx` extended with `streak` palette (amber gradient) — the 🔥 badge now also appears on the public eCard.
+
+**Testing:**
+- New regression `/app/backend/tests/test_iter37_streaks.py` — **14/14 PASS** across 4 test classes:
+  - Provider /streak: 200 OK with current=5/best=5/status=alive/next_milestone=7, 401 unauth, 404 non-provider.
+  - Public /streak: returns redacted shape, no status/last_active_date/next_milestone leaks, 404 unknown.
+  - 🔥 badge surfaces only when current >= 3 AND alive.
+  - Monotonicity (best never decreases) + idempotency (5 GETs stable).
+- Combined regression: iter32+33+34+35+36+37 = **70+ tests, all green** (split across two runs to avoid /api/auth/login 5/60s rate-limit — same long-standing platform limit since iter35).
+- Frontend Playwright: above-fold ordering verified (streak widget at y=279, share-card below at y=474), all testids resolve, "Nuevo récord 🏆" chip visible because current=best, progress bar renders.
+
+**Mocked:** No new mocks. Resend dev-fallback, Stripe/Twilio unwired, Google Cloud Translation/Vision 403 — unchanged.
+
+**Notes from testing agent code review:**
+- `_walk_streak` correctly handles the 1-day grace (today first, yesterday fallback).
+- `_compute_streak` is idempotent — only writes `best_set_at` when current surpasses best.
+- Public endpoint correctly redacts — no information leaks beyond the 3 declared public fields.
+- Frontend gracefully degrades to `null` on 404 (non-provider sessions don't show broken widgets).
+
+**Follow-up backlog:**
+- Push notification at 7pm local time: "🔥 Tu racha de N días — entra hoy antes de que termine" (queued via existing `db.notification_queue`, fires when Twilio/Resend are wired).
+- Streak-related rewards: every 30-day milestone unlocks a free week of Pro for current paid subscribers.
+- Calendar heatmap of activity (à la GitHub contributions) inside the StreakWidget when current ≥ 7 days.
+- Leaderboard "Top 10 chamberos del mes por racha" → drives competition.
+- Refactor `server.py` (now ~7100 lines) into modular routers post-launch.
+
