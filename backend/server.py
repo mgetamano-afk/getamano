@@ -5437,6 +5437,229 @@ async def admin_send_streak_reminders(request: Request, admin: User = Depends(re
     return {"ok": True, "queued": queued, "skipped": skipped, "scanned": len(rows)}
 
 
+# ════════════════════════════════════════════════════════════════════════
+# SECTION 35 — Monthly Leaderboard (transparent ranking, public)
+# ════════════════════════════════════════════════════════════════════════
+# Composite score per provider for the current calendar month (UTC).
+# Formula is intentionally transparent so providers know what to improve:
+#
+#   referrals_credited * 25
+# + reviews_4plus      * 5
+# + gig_applications   * 1    (cap 30)
+# + streak_days        * 2    (cap 60)
+# + fast_responses     * 3    (cap 30)   ← quote responses < 2h
+# + active_pro_bonus   = 5    (if active paid subscription)
+# + completion_bonus   = 10   (if profile_completion >= 80)
+# ════════════════════════════════════════════════════════════════════════
+
+LEADERBOARD_CACHE = {"data": None, "computed_at": None}
+LEADERBOARD_TTL_SECONDS = 300  # 5 minutes
+
+
+def _current_month_window():
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if now.month == 12:
+        next_month = month_start.replace(year=now.year + 1, month=1)
+    else:
+        next_month = month_start.replace(month=now.month + 1)
+    return month_start, next_month
+
+
+async def _compute_leaderboard() -> list[dict]:
+    """Heavy aggregate. Computes the composite score for every eligible
+    provider, sorts desc, returns up to 100 rows. Each row has full
+    breakdown so the frontend can show the formula clearly.
+    """
+    month_start, month_end = _current_month_window()
+    month_start_iso = month_start.isoformat()
+    month_end_iso = month_end.isoformat()
+
+    profs = await db.provider_profiles.find(
+        {
+            "is_active": True,
+            "verification_status": "approved",
+            **PUBLIC_GUARD,
+        },
+        {"_id": 0},
+    ).to_list(2000)
+    if not profs:
+        return []
+
+    user_ids = [p["user_id"] for p in profs]
+    provider_ids = [p["provider_id"] for p in profs]
+    user_to_prov = {p["user_id"]: p["provider_id"] for p in profs}
+
+    # Referrals credited this month
+    ref_agg = db.referrals.aggregate([
+        {"$match": {"status": "credited", "credited_at": {"$gte": month_start_iso, "$lt": month_end_iso}, "referrer_user_id": {"$in": user_ids}}},
+        {"$group": {"_id": "$referrer_user_id", "n": {"$sum": 1}}},
+    ])
+    refs = {row["_id"]: row["n"] async for row in ref_agg}
+
+    # Reviews 4+ stars this month
+    rev_agg = db.reviews.aggregate([
+        {"$match": {"provider_id": {"$in": provider_ids}, "rating": {"$gte": 4}, "created_at": {"$gte": month_start_iso, "$lt": month_end_iso}, "is_hidden": {"$ne": True}}},
+        {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+    ])
+    revs = {row["_id"]: row["n"] async for row in rev_agg}
+
+    # Gig applications this month (capped at 30)
+    app_agg = db.gig_applications.aggregate([
+        {"$match": {"provider_id": {"$in": provider_ids}, "created_at": {"$gte": month_start_iso, "$lt": month_end_iso}}},
+        {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+    ])
+    apps = {row["_id"]: row["n"] async for row in app_agg}
+
+    # Fast responses (< 2h) this month
+    fast_agg = db.quote_requests.aggregate([
+        {"$match": {"provider_id": {"$in": provider_ids}, "response_time_seconds": {"$gt": 0, "$lt": 7200}, "responded_at": {"$gte": month_start_iso, "$lt": month_end_iso}}},
+        {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+    ])
+    fasts = {row["_id"]: row["n"] async for row in fast_agg}
+
+    # Active streaks
+    streaks_docs = await db.streaks.find(
+        {"user_id": {"$in": user_ids}},
+        {"_id": 0, "user_id": 1, "current_days": 1, "last_active_date": 1},
+    ).to_list(2000)
+    today_iso = datetime.now(timezone.utc).date().isoformat()
+    streaks = {}
+    for sd in streaks_docs:
+        if sd.get("last_active_date") in (today_iso, (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()):
+            streaks[sd["user_id"]] = sd.get("current_days", 0)
+
+    # Active paid subscriptions
+    subs = await db.subscriptions.find(
+        {"user_id": {"$in": user_ids}, "status": "active", "plan": {"$in": ["basic", "pro", "premium"]}},
+        {"_id": 0, "user_id": 1, "plan": 1},
+    ).to_list(2000)
+    paid_users = {s["user_id"]: s["plan"] for s in subs}
+
+    rows = []
+    for p in profs:
+        uid = p["user_id"]
+        pid = p["provider_id"]
+        completeness = p.get("profile_completion", 0) or 0
+        is_paid = uid in paid_users
+
+        breakdown = {
+            "referrals_credited": refs.get(uid, 0),
+            "reviews_4plus": revs.get(pid, 0),
+            "gig_applications": min(apps.get(pid, 0), 30),
+            "streak_days": min(streaks.get(uid, 0), 60),
+            "fast_responses": min(fasts.get(pid, 0), 30),
+            "active_pro_bonus": 5 if is_paid else 0,
+            "completion_bonus": 10 if completeness >= 80 else 0,
+        }
+        score = (
+            breakdown["referrals_credited"] * 25
+            + breakdown["reviews_4plus"] * 5
+            + breakdown["gig_applications"] * 1
+            + breakdown["streak_days"] * 2
+            + breakdown["fast_responses"] * 3
+            + breakdown["active_pro_bonus"]
+            + breakdown["completion_bonus"]
+        )
+        if score <= 0:
+            continue
+
+        rows.append({
+            "provider_id": pid,
+            "user_id": uid,
+            "slug": p.get("slug"),
+            "business_name": p.get("business_name") or "",
+            "photo_url": p.get("logo_url") or p.get("photo_url"),
+            "city": p.get("city"),
+            "state": p.get("state"),
+            "category_id": p.get("category_id"),
+            "rating": round(p.get("rating_avg") or 0, 1),
+            "reviews_count": p.get("reviews_count") or 0,
+            "plan": paid_users.get(uid, "free"),
+            "score": score,
+            "breakdown": breakdown,
+        })
+
+    rows.sort(key=lambda r: (-r["score"], -(r["rating"] or 0), -(r["reviews_count"] or 0)))
+    # Assign rank
+    for i, r in enumerate(rows, start=1):
+        r["rank"] = i
+    return rows[:100]
+
+
+async def _get_cached_leaderboard() -> list[dict]:
+    now = datetime.now(timezone.utc)
+    if (
+        LEADERBOARD_CACHE["data"] is not None
+        and LEADERBOARD_CACHE["computed_at"] is not None
+        and (now - LEADERBOARD_CACHE["computed_at"]).total_seconds() < LEADERBOARD_TTL_SECONDS
+    ):
+        return LEADERBOARD_CACHE["data"]
+    data = await _compute_leaderboard()
+    LEADERBOARD_CACHE["data"] = data
+    LEADERBOARD_CACHE["computed_at"] = now
+    return data
+
+
+@api_router.get("/leaderboard/monthly")
+async def get_monthly_leaderboard(limit: int = 10, category_id: Optional[str] = None):
+    """Public — top providers for the current calendar month."""
+    rows = await _get_cached_leaderboard()
+    if category_id:
+        rows = [r for r in rows if r.get("category_id") == category_id]
+        # Re-assign rank within the filtered view
+        for i, r in enumerate(rows, start=1):
+            r = dict(r)  # shallow copy to avoid mutating cache
+            r["rank"] = i
+    return {
+        "month": _current_month_window()[0].strftime("%Y-%m"),
+        "top": rows[: max(1, min(limit, 100))],
+        "total_ranked": len(rows),
+        "formula": {
+            "referrals_credited": 25,
+            "reviews_4plus": 5,
+            "gig_applications": 1,
+            "streak_days": 2,
+            "fast_responses": 3,
+            "active_pro_bonus": 5,
+            "completion_bonus": 10,
+        },
+        "caps": {"gig_applications": 30, "streak_days": 60, "fast_responses": 30},
+    }
+
+
+@api_router.get("/leaderboard/me")
+async def get_my_leaderboard_position(user: User = Depends(get_current_user)):
+    """Provider-only — returns own rank, score, breakdown, and gap to the
+    next podium slot so the dashboard widget can render a motivating
+    'Sube a #10 con 3 chambas más' style nudge.
+    """
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    rows = await _get_cached_leaderboard()
+    me = next((r for r in rows if r["user_id"] == user.user_id), None)
+    if not me:
+        return {
+            "ranked": False,
+            "reason": "no_score_this_month",
+            "month": _current_month_window()[0].strftime("%Y-%m"),
+            "top_10": rows[:10],
+            "total_ranked": len(rows),
+        }
+    # Gap calculations
+    next_slot = next((r for r in rows if r["rank"] < me["rank"]), None)
+    podium_target = next((r for r in rows if r["rank"] <= 10 and r["rank"] < me["rank"]), None)
+    return {
+        "ranked": True,
+        "month": _current_month_window()[0].strftime("%Y-%m"),
+        "me": me,
+        "next": next_slot,
+        "podium_target": podium_target,
+        "total_ranked": len(rows),
+        "top_10": rows[:10],
+    }
+
+
 # ─── SECTION 16C — Referrals ─────────────────────────────────────────────
 @api_router.get("/providers/me/referrals")
 async def my_referrals(user: User = Depends(get_current_user)):

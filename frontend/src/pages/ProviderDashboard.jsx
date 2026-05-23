@@ -25,6 +25,7 @@ import ChambasNearby from "../components/ChambasNearby";
 import WeeklyDigestPreview from "../components/WeeklyDigestPreview";
 import ReferralPanel from "../components/ReferralPanel";
 import StreakWidget from "../components/StreakWidget";
+import LeaderboardWidget from "../components/LeaderboardWidget";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -150,6 +151,8 @@ export default function ProviderDashboard() {
           newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
         />
         <StreakWidget />
+
+        <LeaderboardWidget />
 
         <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
 

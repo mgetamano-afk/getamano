@@ -32,6 +32,7 @@ import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
+import RankingPage from "./pages/RankingPage";
 
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -86,6 +87,10 @@ function AppRouter() {
       {/* Section 30 — Gigs / Chambas board (public + auth-aware) */}
       <Route path="/empleos" element={<EmpleosPage />} />
       <Route path="/gigs" element={<EmpleosPage />} />
+
+      {/* Section 35 — Public monthly leaderboard */}
+      <Route path="/ranking" element={<RankingPage />} />
+      <Route path="/leaderboard" element={<RankingPage />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />
