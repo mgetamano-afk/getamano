@@ -834,3 +834,76 @@ referrals_credited * 25  +  reviews_4plus * 5  +  gig_applications * 1 (cap 30)
 - Email digest "Eres #N de N en {ciudad}" (would dovetail with the weekly digest infrastructure).
 - Refactor `server.py` (now ~7400 lines) into modular routers post-launch.
 
+
+### Feb 23, 2026 — Iteration 40: Section 34 (Inclusion) + Section 35.5 (Redeemable Rewards) — bundled
+
+**User intent:** "Si, ayudame con esto, pero tambien quiero que me ejecutes ese promt, tu elige la secuencia de ejecucion." Two features bundled: (A) the Section 34 prompt for "Proveedores Inclusivos" (Latino + American providers) and (B) my suggested redeemable rewards on top of the leaderboard. **My sequencing choice: inclusion first (funnel impact), then rewards (builds on existing leaderboard infrastructure).**
+
+### Part A — Section 34: Proveedores Inclusivos
+
+**Backend (`/app/backend/server.py`):**
+- `RegisterIn` now accepts `preferred_language: Optional[Literal["es", "en"]] = None`. The `/auth/register` user_doc persists both `language` and `preferred_language` (defaults to "es" when missing).
+- `_badges_for_provider` extended with a `bilingual` badge `{key:"bilingual", label:"Bilingüe · Bilingual", icon:"🗣️"}` triggered when the provider profile's `languages` array contains BOTH "es" and "en". Demo provider María has this badge automatically.
+
+**Frontend:**
+- `I18nContext.jsx` hero subtitles rewritten for both ES and EN to mention "latinos y americanos" / "Latino and American" so the public hero immediately signals inclusion.
+- `components/ProviderCTASection.jsx` (NEW) — mounted on Landing between DownloadBadgesSection and Footer:
+  - Two side-by-side cards:
+    - 🇲🇽 Latino (teal gradient): "Eres latino y ofreces un servicio" → `/registro?intent=provider&lang=es`
+    - 🇺🇸 American (sky blue gradient): "You're American and serve Latino families" → `/registro?intent=provider&lang=en`
+  - Unifying tagline at the bottom: "El sol sale para todos" (ES) / "The sun rises for everyone" (EN).
+- `pages/Register.jsx` — parses `?lang=es|en` from the URL → seeds the `preferredLanguage` state → renders a 2-button toggle (testid=`register-language-toggle`) right above the name field. The toggle stores the user's preferred language in the API call. Selected button has teal-600 border (ES) or blue-600 border (EN) with matching tinted background.
+- `components/EngagementBadges.jsx` palette extended with a `bilingual` entry (teal→blue gradient) so the new badge renders on public eCards.
+
+### Part B — Section 35.5: Redeemable Rewards
+
+**Reward tiers (transparent, public on /ranking and visible in dashboard):**
+- 🥇 **Top 3** of the month → **50% off** next month's subscription (`TOP3-YYYYMM-XXXXXX` codes)
+- 🥈 **Top 10** → **25% off** (`TOP10-` codes)
+- 🥉 **Top 50** → **10% off** (`TOP50-` codes)
+
+**Backend (`/app/backend/server.py`):**
+- New `REWARD_TIERS` constant + `_tier_for_rank` helper.
+- New `_compute_leaderboard_for_window(start_iso, end_iso)` — reusable historical window scorer (the live `_compute_leaderboard` is unchanged; this one accepts arbitrary window so snapshots can run for any month).
+- New `_create_coupon_for_provider(user_id, rank, tier, month_key)` — idempotent. Creates a coupon doc with `redeemable_from = first of next month`, `redeemable_until = first of month-after-next`. Fires high-priority `category=rewards` notification + queues SMS+email rows in `notification_queue` (will ship when Twilio/Resend keys arrive).
+- `POST /api/admin/leaderboard/snapshot` — admin-only. Body params `month?=YYYY-MM` (default = previous calendar month) + `dry_run?=false`. Returns `{ok, month, snapshotted, eligible, coupons_created, dry_run, results[]}`. Idempotent per (user, month_key) so re-running is safe.
+- `GET /api/me/coupons` — returns `{items[], active_count}`. Auto-flips expired coupons to `status="expired"` on each fetch.
+- `POST /api/me/coupons/{id}/redeem` — flips status to `redeemed` (Stripe integration plugs in here later). Enforces: 404 for non-owner, 400 if not available, 400 before `redeemable_from` with message "El cupón aún no es redimible.", 400 + auto-expire after `redeemable_until`.
+
+**Frontend:**
+- `components/CouponsCard.jsx` (NEW) — mounted on ProviderDashboard between `<LeaderboardWidget />` and `<ShareLinkCard />`. Lists each coupon with:
+  - Tier emoji (🥇/🥈/🥉) + tier label badge + month_key
+  - "50% / 25% / 10% off tu próxima mensualidad" (testid=`coupon-discount-{id}`)
+  - Monospace clickable code (testid=`coupon-code-{id}`, click copies to clipboard + toast)
+  - "Válido hasta {date}" expiry chip
+  - "✓ Aplicar a mi plan" button (testid=`coupon-redeem-{id}`) — disabled while redeeming
+  - Status badges: ✅ Redimido (green) / Expirado (slate) on past coupons
+  - Renders null when no coupons exist (no empty-state clutter)
+- Notification merge in `GET /api/notifications` now includes `category="rewards"` alongside gigs/referrals/streaks.
+
+**Demo state seeded automatically:** María holds 1 active coupon `TOP3-202605-0D3D80` (50% off, redeemable 2026-06-01 → 2026-07-01) from the manual snapshot test.
+
+**Testing:**
+- New regression `/app/backend/tests/test_iter40_inclusion_rewards.py` — **20/20 PASS** across 6 test classes covering:
+  - RegisterIn `preferred_language` persistence (en/es/default/invalid 422)
+  - Bilingual badge on María's eCard + `languages` array unchanged
+  - Snapshot endpoint 401/403/400 (invalid month format)/dry_run/idempotency
+  - Coupon shape + redemption ACL + state machine (404 non-owner, 400 not available, 400 before window, 400 + auto-expire after window, redeemed flag flip)
+  - Notification + queue side effects (high-priority `rewards` notification + email queue row with `trigger_type=coupon_TOP3_2026-05`)
+- iter39 regression = **20/20 PASS** after 60s sleep for /auth/register rate-limit (platform constraint).
+- Frontend Playwright: ProviderCTASection on Landing, both CTA navigations preserving `?lang=` param, Register language toggle border colour transitions, Provider dashboard CouponsCard with TOP3 row + code copy interaction + DOM ordering between leaderboard-widget (475px) and share-link-card (939px) confirmed.
+
+**Notes from testing agent code review (no bugs — observations):**
+- Snapshot idempotency lives in `_create_coupon_for_provider` via `db.coupons.find_one({user_id, month_key})` existence check — re-runs return the same `coupon_id+code` without insert.
+- Notification key `{user_id}::coupon::{month_key}` is naturally idempotent since `insert_one` only fires when the existence-check returns None.
+- Pydantic Literal correctly rejects invalid `preferred_language` values with 422 before hitting DB.
+
+**Mocked:** Stripe redeem flow is **flag-only for now** (status flips to `redeemed`, no actual checkout discount yet — wires in cleanly once Stripe keys land). Twilio SMS + Resend email queue stays `pending`. Google Cloud Translation/Vision still 403.
+
+**Follow-up backlog:**
+- Wire Stripe checkout to consume the `redeemed` flag → apply real % discount via Stripe Coupon API.
+- Schedule monthly snapshot cron (1st of each month at 06:00 UTC) calling `POST /api/admin/leaderboard/snapshot` with no month param (defaults to prior calendar month).
+- Public landing badge "🏆 Top 3 Mayo 2026" on the eCard when the provider held a podium spot in any historical month (drives social proof + viral effect).
+- Tiered ranking-aware nudge in the StreakWidget: "Mantén tu racha y termina Top 3 este mes para ganar 50% off el próximo".
+- Refactor `server.py` (now ~7600 lines) into modular routers post-launch.
+
