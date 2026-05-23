@@ -14,6 +14,7 @@ import LikeButton from "../components/LikeButton";
 import ECardModal from "../components/ECardModal";
 import ECardFloatingHeader from "../components/ECardFloatingHeader";
 import ShareECardBlock from "../components/ShareECardBlock";
+import EngagementBadges from "../components/EngagementBadges";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
@@ -187,6 +188,10 @@ export default function ProviderECard() {
                   {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800 font-medium"><Star className="w-3.5 h-3.5 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)} ({p.rating_count})</span>}
                 </div>
                 {p.description && <p className="mt-4 text-slate-700 leading-relaxed">{p.description}</p>}
+
+                {/* Section 33 — Engagement & gamification badges */}
+                <EngagementBadges providerId={p.provider_id} />
+
                 {p.recommendations_count > 0 && (
                   <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-semibold" data-testid="ecard-recommendations-badge">
                     <Heart className="w-3 h-3 fill-red-500" /> {p.recommendations_count} {lang === "en" ? "recommend" + (p.recommendations_count === 1 ? "s" : "") + " this pro" : `recomendaci${p.recommendations_count === 1 ? "ón" : "ones"}`}

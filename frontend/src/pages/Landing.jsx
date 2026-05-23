@@ -14,6 +14,7 @@ import CategoryCard from "../components/CategoryCard";
 import SmartServiceSearch from "../components/SmartServiceSearch";
 import CityAutocomplete from "../components/CityAutocomplete";
 import DownloadBadgesSection from "../components/DownloadBadgesSection";
+import FeaturedProvidersReel from "../components/FeaturedProvidersReel";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -293,6 +294,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* SECTION 33 — Featured paid providers reel */}
+      <FeaturedProvidersReel />
 
       {/* CATEGORY SLIDER */}
       <section className="bg-white py-16 md:py-24">

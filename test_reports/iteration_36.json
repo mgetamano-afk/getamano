@@ -1,0 +1,45 @@
+{
+  "summary": "Iter36 — Section 33 Featured Providers Reel + Engagement Badges. Backend pytest 13/13 PASS for new test_iter36_featured_reel.py (schema, paid-plan filter, sort by tier+rating, cap=20, no _id leak, demo provider on plan=pro with referrals_credited>=1, 404 on unknown provider badges, referrer badge with count). Frontend Playwright: all critical testids verified — featured-reel-section, slider, see-all (→/search), upgrade-link (→/plans), reel-card-{id} for demo provider, plan badge ('✓ Plus' for pro), referrals badge ('2 traídos'), likes counter, like button click toggles ♡→♥, persists localStorage 'getamano_likes', optimistic counter goes 3→4, aria-pressed=true, spark style tag injected, anon toast 'Inicia sesión para sincronizar tus favoritos' appears. ProviderECard EngagementBadges container renders with badge-referrer pill (amber). Regression iter32/33/34/35 backend: 39 pass + 1 fail + 3 errors in single run, BUT all 4 errors/failure are caused by /api/auth/login 429 rate-limit (5/60s) when running suites back-to-back — known issue documented in iter35. Re-ran test_iter35_referrals.py alone after 70s sleep → 15/15 PASS confirming no actual regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login", "issue": "Rate-limit (5/60s) causes 429 when running multiple module-scoped pytest files back-to-back. Same minor issue surfaced in iter35; recommend test-account allowlist or higher cap. Not an iter36 regression — iter35 suite passes 15/15 when run alone."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter36_featured_reel.py",
+    "/app/test_reports/pytest/iter36_results.xml",
+    "/app/test_reports/pytest/iter36_regression.xml"
+  ],
+  "action_items": [
+    "(Optional, repeated from iter35) Add data-testid='share-ecard-block' to ShareECardBlock root for stable selector — currently only locatable via heading text.",
+    "(Optional, repeated from iter35) Add test-account allowlist on /api/auth/login rate-limiter so back-to-back pytest suites don't trip 429."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/providers/featured-reel correctly merges active subscriptions + legacy provider_profiles.plan and dedupes via user_to_plan dict (line 1961 only writes if not present, so subscription wins over legacy — correct precedence).",
+    "Sort uses (PLAN_TIER, -rating, -reviews_count) which produces premium>pro>basic and high-rating first — matches spec.",
+    "Online detection uses ISO-string comparison on sessions.created_at which works because timestamps are stored as ISO 8601 with consistent timezone — verified by curl.",
+    "MongoDB _id is properly projected away (`{_id: 0}`) in all aggregations & finds — verified test_no_mongo_id_leaks passes.",
+    "_badges_for_provider correctly tiers referrer (1-2) vs top_referrer (3+) and chambero (5+) vs active_applicant (2-4); singular/plural for 'traíd@'/'traídos' matches the frontend pluralization in ReelCard.",
+    "FeaturedProvidersReel returns null when providers.length === 0 — verified the loading skeleton transitions properly and there's no empty section header.",
+    "Like button is anon-friendly: localStorage only when !user, server-side POST when signed in. The optimistic counter update + rollback on backend failure is the right pattern.",
+    "Spark/heart animation only fires on LIKE (not unlike) per spec — `if (!isLiked && likeBtnRef.current)` guard is correct.",
+    "Anon toast nudge gated by sessionStorage('reel_like_nudged') so it only shows once per session — matches spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter36_featured_reel.py (new — 13 tests)"
+  ],
+  "success_rate": {"backend": "100% (13/13 new + 15/15 iter35 regression when isolated)", "frontend": "100% (all reel + engagement-badges testids verified + like interaction + anon nudge)"},
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123 (María, plan=pro, referrals_credited=2 after iter35+36 seeding), demo.client@getamano.com/client123",
+  "seed_data_creation": "No new seed data created by iter36 tests — all read-only against existing state. Note: demo provider's referrals_credited counter advanced from 1→2 during this run because iter35 regression tests created a fresh test_iter35_invitee email and credited it. Visible in reel referrals badge ('2 traídos') and engagement badges.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 33 Featured Reel is fully working end-to-end. Demo provider María is currently the only paid-plan provider (subscription plan=pro), so the reel renders just 1 card — that's expected. If more paid providers are added later, sort order should be premium-first then pro then basic per PLAN_TIER. Like button stores anon likes in localStorage 'getamano_likes' (JSON array of provider_ids). Engagement badges referrer/top_referrer pluralize 'traíd@'/'traídos'. To re-run regression: pytest backend/tests/test_iter32_*.py backend/tests/test_iter33_*.py backend/tests/test_iter34_*.py backend/tests/test_iter35_*.py — but pause 60s between suites to avoid /api/auth/login 429.",
+  "rca_of_the_issue": "N/A — no bugs found. All iter36 backend + frontend flows pass first attempt."
+}

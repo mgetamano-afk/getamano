@@ -1928,6 +1928,105 @@ async def featured_providers():
         p["category"] = cats.get(p.get("category_id"))
     return providers
 
+# ─── SECTION 33 — Featured Providers Reel (paid plans only) ───────────────
+# Returns the up-to-20 paid providers (basic/pro/premium → mapped as base/plus/pro
+# in the frontend prompt vocabulary) for the landing-page slider. Free plan
+# providers are excluded by design — this is the visibility benefit of paying.
+@api_router.get("/providers/featured-reel")
+async def featured_reel():
+    """Featured reel for landing page. Paid plans only, sorted by tier+rating.
+
+    Plan tier mapping (DB → reel-friendly):
+      premium ($25) → tier 1  (label "★ Pro")
+      pro     ($15) → tier 2  (label "✓ Plus")
+      basic   ($10) → tier 3  (label "Activo")
+      free          → excluded
+    """
+    PLAN_TIER = {"premium": 1, "pro": 2, "basic": 3}
+    PAID_PLANS = list(PLAN_TIER.keys())
+
+    # First, look at active subscriptions
+    paid_subs = await db.subscriptions.find(
+        {"plan": {"$in": PAID_PLANS}, "status": "active"},
+        {"_id": 0, "user_id": 1, "plan": 1},
+    ).to_list(500)
+    user_to_plan = {s["user_id"]: s["plan"] for s in paid_subs}
+
+    # Also include legacy `plan` field on provider_profiles (founding members)
+    legacy = await db.provider_profiles.find(
+        {"plan": {"$in": PAID_PLANS}, "is_active": True, "verification_status": "approved", **PUBLIC_GUARD},
+        {"_id": 0, "user_id": 1, "plan": 1},
+    ).to_list(500)
+    for prof in legacy:
+        if prof["user_id"] not in user_to_plan:
+            user_to_plan[prof["user_id"]] = prof["plan"]
+
+    if not user_to_plan:
+        return []
+
+    # Pull full provider profiles for those users
+    profs = await db.provider_profiles.find(
+        {
+            "user_id": {"$in": list(user_to_plan.keys())},
+            "is_active": True,
+            "verification_status": "approved",
+            **PUBLIC_GUARD,
+        },
+        {"_id": 0},
+    ).to_list(500)
+
+    cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(200)}
+
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    # Precompute referrals credited per referrer (gamification engagement signal)
+    ref_pipeline = [
+        {"$match": {"status": "credited", "referrer_user_id": {"$in": list(user_to_plan.keys())}}},
+        {"$group": {"_id": "$referrer_user_id", "n": {"$sum": 1}}},
+    ]
+    ref_counts = {}
+    async for d in db.referrals.aggregate(ref_pipeline):
+        ref_counts[d["_id"]] = d.get("n", 0)
+
+    # Online detection — anyone with a session created in the past 7 days
+    active_user_ids = set()
+    async for d in db.sessions.find(
+        {"user_id": {"$in": list(user_to_plan.keys())}, "created_at": {"$gte": week_ago}},
+        {"_id": 0, "user_id": 1},
+    ):
+        active_user_ids.add(d["user_id"])
+
+    out = []
+    for p in profs:
+        plan = user_to_plan.get(p["user_id"], "basic")
+        cat = cats.get(p.get("category_id"))
+        out.append({
+            "provider_id": p.get("provider_id"),
+            "user_id": p.get("user_id"),
+            "slug": p.get("slug"),
+            "business_name": p.get("business_name"),
+            "photo_url": p.get("logo_url") or p.get("photo_url"),
+            "main_category": (cat or {}).get("name_es") or p.get("category_name", ""),
+            "category_slug": (cat or {}).get("slug"),
+            "city": p.get("city"),
+            "state": p.get("state"),
+            "rating": round(p.get("rating_avg") or 0, 1),
+            "reviews_count": p.get("reviews_count") or 0,
+            "likes_count": p.get("likes_count") or 0,
+            "is_online": p["user_id"] in active_user_ids,
+            "verified": p.get("verification_status") == "approved",
+            "plan": plan,
+            "referrals_credited": ref_counts.get(p["user_id"], 0),
+        })
+
+    # Sort: plan tier ascending, then rating descending, then reviews descending
+    out.sort(key=lambda x: (
+        PLAN_TIER.get(x["plan"], 99),
+        -(x["rating"] or 0),
+        -(x["reviews_count"] or 0),
+    ))
+    return out[:20]
+
 @api_router.get("/providers/by-slug/{slug}")
 async def get_provider_by_slug(slug: str):
     p = await db.provider_profiles.find_one({"slug": slug}, {"_id": 0})
@@ -4917,6 +5016,27 @@ async def _badges_for_provider(provider_id: str, user_id: str = "") -> list[dict
     qcount = await db.quote_requests.count_documents({"provider_id": provider_id, "created_at": {"$gte": month_ago}})
     if qcount >= 5:
         badges.append({"key": "in_demand", "label": "Muy solicitado", "icon": "🔥"})
+
+    # Section 33 — Gamification engagement badges
+    # Top Referrer: 3+ referrals that reached "credited" status
+    referral_count = await db.referrals.count_documents({"referrer_user_id": user_id, "status": "credited"}) if user_id else 0
+    if referral_count >= 3:
+        badges.append({"key": "top_referrer", "label": f"Top Referrer · {referral_count}", "icon": "✨"})
+    elif referral_count >= 1:
+        badges.append({"key": "referrer", "label": f"{referral_count} traíd{'os' if referral_count != 1 else 'o'}", "icon": "✨"})
+
+    # Chambero: 5+ gig applications in the last 30 days
+    gig_apps = await db.gig_applications.count_documents({"provider_id": provider_id, "created_at": {"$gte": month_ago}})
+    if gig_apps >= 5:
+        badges.append({"key": "chambero", "label": "Chamber@ del mes", "icon": "💼"})
+    elif gig_apps >= 2:
+        badges.append({"key": "active_applicant", "label": f"{gig_apps} chambas", "icon": "💼"})
+
+    # Founding member
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "founding_member": 1}) if user_id else None
+    if user_doc and user_doc.get("founding_member"):
+        badges.append({"key": "founding_member", "label": "Founding Member", "icon": "🏆"})
+
     return badges
 
 
