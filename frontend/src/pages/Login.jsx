@@ -56,7 +56,12 @@ export default function Login() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="login-password">{t("auth.password")}</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-700" htmlFor="login-password">{t("auth.password")}</label>
+                <Link to="/forgot-password" className="text-xs text-teal-700 hover:underline" data-testid="login-forgot-link">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
               <input
                 type="password" required value={password} onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"

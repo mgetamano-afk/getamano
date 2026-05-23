@@ -275,6 +275,51 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Password Recovery + Bulk Provider Onboarding + Latency Dashboard (Sec 44)
+
+**3 features grandes en una pasada coordinada.**
+
+**1. Password Recovery (`routes/auth.py`):**
+- `POST /auth/forgot-password` — accepta `{email, locale}`. Genera token `secrets.token_urlsafe(32)`, lo hashea con bcrypt (jamás se guarda plaintext), TTL 60 minutos, cooldown 60s entre re-requests, no-leak en respuesta (siempre 200 incluso si el email no existe).
+- `POST /auth/reset-password` — accepta `{token, new_password}`. Itera los registros no usados ni expirados y verifica con bcrypt. Min 8 chars. Tras éxito: actualiza `password_hash`, marca `used_at`, e **invalida todas las sesiones activas** del usuario (`user_sessions.delete_many`).
+- Template HTML branded con CTA gradiente teal + fallback link visible.
+- Dev fallback: log el reset URL completo cuando `RESEND_API_KEY` no está.
+
+**2. Bulk Provider Onboarding (`/admin/providers/bulk-create`):**
+- Pydantic `BulkProviderRow` y `BulkProvidersIn`.
+- Max 50 proveedores por lote, idempotente por email (skip duplicados).
+- Crea `users` con `role: provider, needs_activation: true, created_by_admin: <admin_id>` + `provider_profiles` con `verification_status: pending` + slug único auto-generado (`_generate_unique_slug`).
+- Genera `temp_password` legible (sin `0OoIl1`) — devuelto en respuesta para CEO copy-paste.
+- Si `send_activation_email=true`: crea registro en `password_resets` con `is_activation: true` (TTL 14 días) y envía email "¡Bienvenido a getamano!" con CTA "Activar mi cuenta →" que apunta a `/reset-password?token=...&activate=1`.
+
+**3. Response-Latency Dashboard (`/admin/latency-dashboard`):**
+- Window 30 días, filtra TEST_*.
+- Por cada conversación inspecciona `messages` y mide minutos entre el primer mensaje del cliente y la primera respuesta del proveedor.
+- Buckets: `< 2h` / `2–24h` / `> 24h` / `sin respuesta aún`.
+- Top 10 worst providers (≥3 convs) con `slow_rate %` y mediana de respuesta.
+- Mediana global para alerta operativa.
+
+**Frontend (4 nuevos archivos, 1 modificado):**
+- `pages/ForgotPasswordPage.jsx` — formulario con estado success "¡Listo!" + fallback "Revisa tu Spam".
+- `pages/ResetPasswordPage.jsx` — soporta `?activate=1` flag (cambia título a "Activa tu cuenta"), validación real-time (≥8 chars, match), eye toggle, success → auto-redirect a /login en 2.5s.
+- `pages/AdminOpsPage.jsx` — 2 tabs (Onboarding masivo + Latencia). Bulk form con add/remove rows, copy-to-clipboard de password + activation URL, link a eCard pública post-creación.
+- `pages/Login.jsx` — añadido link "¿Olvidaste tu contraseña?" junto al label de password.
+- Rutas en `App.js`: `/forgot-password`, `/reset-password`, `/admin/ops`, `/dashboard/admin/ops`.
+
+**E2E verificado (Playwright + curl)**:
+- Forgot+reset: unknown email no leak ✓ · forgot → token → reset → login con nuevo pwd ✓ · old sessions invalidadas ✓
+- Bulk: 2 proveedores creados con slug único + activation_url ✓ · idempotente (re-run → skipped=1) ✓
+- Latency: agrega 30d, buckets correctos, worst_providers limit 10 ✓
+- Frontend: 5 screenshots muestran flujos completos ✓
+- Lint: 0 issues en 5 archivos frontend + 0 nuevos en backend.
+
+**Para los 15 proveedores reales (instrucciones para el CEO):**
+1. Inicia sesión como `admin@getamano.com`.
+2. Ve a `/admin/ops` (link desde panel admin).
+3. Llena cada fila con los datos de la tarjeta de presentación: email tipo `prove01@getamano.com`, nombre del dueño, nombre del negocio, ciudad, estado, categoría, descripción.
+4. **Mientras `RESEND_API_KEY` no esté configurada**: tras crear el lote, copia la `activation_url` de cada uno y compártela manualmente (WhatsApp / SMS).
+5. Cuando configures Resend, el correo de "Activa tu cuenta" se envía automáticamente al crear el lote — ese link permite a cada proveedor cambiar la contraseña y luego ir a su dashboard donde puede actualizar su correo a uno propio.
+
 ### May 23, 2026 — Client "No-Limbo" Nudge System (Section 43C)
 
 **"Nunca dejamos al cliente esperando"** — cuando un cliente envía un mensaje y el proveedor no responde por 24h+, le mandamos un email gentil con 3 proveedores similares verificados como alternativa. Cierra el loop de engagement bidireccional.

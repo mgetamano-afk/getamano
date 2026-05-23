@@ -23,6 +23,7 @@ runtime closure variables like RegisterIn/LoginIn must be evaluated eagerly.
 
 import asyncio as _asyncio
 import logging
+import os
 import secrets as _secrets
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -57,6 +58,22 @@ class SendOtpIn(BaseModel):
 class VerifyOtpIn(BaseModel):
     email: str
     code: str
+
+
+# Password reset (Section 44)
+PASSWORD_RESET_TTL_MINUTES = 60
+PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = 60
+PASSWORD_MIN_LENGTH = 8
+
+
+class ForgotPasswordIn(BaseModel):
+    email: str
+    locale: Optional[str] = "es"
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    new_password: str
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -108,6 +125,51 @@ def _otp_email_html(code: str, locale: str = "es") -> str:
 
 def _set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie("session_token", token, **_COOKIE_DEFAULTS)
+
+
+def _password_reset_email_html(reset_url: str, locale: str = "es") -> str:
+    """Branded HTML email — uses inline CSS only for max client compatibility."""
+    is_en = locale.startswith("en")
+    title = "Reset your password" if is_en else "Restablece tu contraseña"
+    intro = (
+        "Click the button below to set a new password. The link expires in 60 minutes."
+        if is_en
+        else "Haz clic en el botón para crear una nueva contraseña. El enlace caduca en 60 minutos."
+    )
+    cta = "Set new password" if is_en else "Crear nueva contraseña"
+    note = (
+        "If you didn't request this, ignore this email — your password stays the same."
+        if is_en
+        else "Si no solicitaste este cambio, ignora este correo — tu contraseña seguirá igual."
+    )
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc;padding:40px 20px;">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.06);">
+      <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:32px 28px;text-align:center;">
+        <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">getamano</h1>
+        <p style="margin:6px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">{("Latino marketplace USA" if is_en else "Marketplace latino en USA")}</p>
+      </td></tr>
+      <tr><td style="padding:36px 32px 8px 32px;">
+        <h2 style="margin:0 0 12px 0;color:#0F172A;font-size:20px;font-weight:700;">{title}</h2>
+        <p style="margin:0 0 28px 0;color:#475569;font-size:15px;line-height:1.55;">{intro}</p>
+        <div style="text-align:center;margin:0 0 24px 0;">
+          <a href="{reset_url}" style="display:inline-block;background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:bold;font-size:15px;">{cta} →</a>
+        </div>
+        <p style="margin:0 0 8px 0;color:#94A3B8;font-size:12px;text-align:center;">
+          {("Or copy this link:" if is_en else "O copia este enlace:")}<br/>
+          <span style="color:#64748B;font-size:11px;word-break:break-all;">{reset_url}</span>
+        </p>
+        <p style="margin:24px 0 0 0;color:#94A3B8;font-size:13px;line-height:1.5;">{note}</p>
+      </td></tr>
+      <tr><td style="background:#F8FAFC;padding:18px 32px;text-align:center;border-top:1px solid #E2E8F0;">
+        <p style="margin:0;color:#94A3B8;font-size:12px;">© getamano 2026 — Latin Ventures LLC</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
 
 
 def _hydrate_user_doc(user_doc: dict) -> dict:
@@ -318,6 +380,109 @@ async def _do_email_verified(deps, user) -> dict:
     return {"email": u.get("email") if u else None, "email_verified": bool(u and u.get("email_verified"))}
 
 
+# ─── Password reset (Section 44) ───────────────────────────────────────
+
+async def _resolve_public_url(request: Request) -> str:
+    """Best-effort detection of the public URL the frontend was loaded from,
+    falling back to env when called from a background job."""
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    if forwarded.startswith("http"):
+        return forwarded.split("/api", 1)[0].rstrip("/")
+    return (os.environ.get("PUBLIC_URL") or "https://getamano.us").rstrip("/")
+
+
+async def _do_forgot_password(deps, payload: ForgotPasswordIn, request: Request) -> dict:
+    email = (payload.email or "").strip().lower()
+    if not _is_valid_email_shape(email):
+        raise HTTPException(status_code=400, detail="Email no válido.")
+    user_doc = await deps.db.users.find_one({"email": email}, {"_id": 0, "user_id": 1, "name": 1})
+    # Don't leak which emails exist — always respond OK.
+    if not user_doc:
+        await _asyncio.sleep(0.4)
+        return {"ok": True}
+    # Throttle re-requests
+    last = await deps.db.password_resets.find_one({"email": email}, {"_id": 0, "created_at": 1})
+    if last:
+        try:
+            prev = datetime.fromisoformat(last["created_at"])
+            elapsed = (datetime.now(timezone.utc) - prev).total_seconds()
+            if elapsed < PASSWORD_RESET_RESEND_COOLDOWN_SECONDS:
+                wait = int(PASSWORD_RESET_RESEND_COOLDOWN_SECONDS - elapsed)
+                raise HTTPException(status_code=429, detail=f"Espera {wait} segundos antes de pedir otro enlace.")
+        except (KeyError, ValueError):
+            pass
+
+    raw_token = _secrets.token_urlsafe(32)
+    token_hash = deps.hash_password(raw_token)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=PASSWORD_RESET_TTL_MINUTES)
+    await deps.db.password_resets.update_one(
+        {"email": email},
+        {"$set": {
+            "email": email,
+            "user_id": user_doc["user_id"],
+            "token_hash": token_hash,
+            "expires_at": expires_at.isoformat(),
+            "expires_at_native": expires_at,  # for TTL index, if present
+            "created_at": now.isoformat(),
+            "used_at": None,
+        }},
+        upsert=True,
+    )
+
+    public_url = await _resolve_public_url(request)
+    reset_url = f"{public_url}/reset-password?token={raw_token}"
+    locale = (payload.locale or "es").lower()
+    subject = "Restablece tu contraseña · getamano" if locale.startswith("es") else "Reset your password · getamano"
+    html = _password_reset_email_html(reset_url, locale)
+    delivery = await deps.send_email_via_resend(email, subject, html)
+    # In dev fallback mode, surface the raw link so the founder can test without Resend.
+    if not delivery.get("sent"):
+        logger.warning("[PASSWORD-RESET DEV-FALLBACK] %s -> %s", email, reset_url)
+    return {"ok": True}
+
+
+async def _do_reset_password(deps, payload: ResetPasswordIn) -> dict:
+    raw_token = (payload.token or "").strip()
+    new_password = payload.new_password or ""
+    if not raw_token or len(raw_token) < 16:
+        raise HTTPException(status_code=400, detail="Token inválido.")
+    if len(new_password) < PASSWORD_MIN_LENGTH:
+        raise HTTPException(status_code=400, detail=f"La contraseña debe tener al menos {PASSWORD_MIN_LENGTH} caracteres.")
+
+    # Search across all unexpired records — we hash-compare against each since
+    # the token itself is never stored in plaintext.
+    now = datetime.now(timezone.utc)
+    candidates = await deps.db.password_resets.find(
+        {"used_at": None}, {"_id": 0},
+    ).limit(50).to_list(50)
+    record = None
+    for rec in candidates:
+        try:
+            if datetime.fromisoformat(rec["expires_at"]) < now:
+                continue
+        except (KeyError, ValueError):
+            continue
+        if deps.verify_password(raw_token, rec["token_hash"]):
+            record = rec
+            break
+    if not record:
+        raise HTTPException(status_code=400, detail="El enlace expiró o ya fue usado. Solicita uno nuevo.")
+
+    new_hash = deps.hash_password(new_password)
+    await deps.db.users.update_one(
+        {"user_id": record["user_id"]},
+        {"$set": {"password_hash": new_hash, "password_changed_at": now.isoformat()}},
+    )
+    await deps.db.password_resets.update_one(
+        {"email": record["email"]},
+        {"$set": {"used_at": now.isoformat()}},
+    )
+    # Invalidate every active session so the old password truly stops working.
+    await deps.db.user_sessions.delete_many({"user_id": record["user_id"]})
+    return {"ok": True, "email": record["email"]}
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Router factory — just wires the deps and registers each endpoint.
 # Cyclomatic complexity ≈ 9 (one closure per route, no branching).
@@ -385,5 +550,13 @@ def make_router(
     @router.get("/auth/me/email-verified")
     async def is_email_verified(user=Depends(get_current_user)):
         return await _do_email_verified(deps, user)
+
+    @router.post("/auth/forgot-password")
+    async def forgot_password(payload: ForgotPasswordIn, request: Request):
+        return await _do_forgot_password(deps, payload, request)
+
+    @router.post("/auth/reset-password")
+    async def reset_password(payload: ResetPasswordIn):
+        return await _do_reset_password(deps, payload)
 
     return router

@@ -37,6 +37,9 @@ import RankingPage from "./pages/RankingPage";
 import ComunidadLayout from "./components/ComunidadLayout";
 import ComunidadExplorar from "./pages/ComunidadExplorar";
 import QuickActionsFAB from "./components/QuickActionsFAB";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AdminOpsPage from "./pages/AdminOpsPage";
 
 // Admin Zone 4
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -98,6 +101,8 @@ function AppRouter() {
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/register" element={<Register />} />
       <Route path="/registro" element={<Register />} />
 
@@ -141,6 +146,8 @@ function AppRouter() {
 
       {/* Zone 4: Admin (separate dark layout) */}
       <Route path="/admin" element={<AdminOverview />} />
+      <Route path="/admin/ops" element={<AdminOpsPage />} />
+      <Route path="/dashboard/admin/ops" element={<AdminOpsPage />} />
       <Route path="/admin/ceo" element={<AdminCEO />} />
       <Route path="/admin/quiz-funnel" element={<AdminQuizFunnel />} />
       <Route path="/admin/pricing" element={<AdminPricingIntelligence />} />

@@ -7,6 +7,8 @@ from pymongo.errors import DuplicateKeyError
 import os
 import logging
 import re
+import secrets
+import string
 import uuid
 import bcrypt
 import jwt
@@ -5503,6 +5505,299 @@ async def my_health_email_preview(user: User = Depends(get_current_user)):
     if not data:
         return {"available": False, "reason": "ineligible"}
     return {"available": True, **data}
+
+
+# ════════════════════════════════════════════════════════════════════
+# Section 44 — Admin bulk provider onboarding
+# ════════════════════════════════════════════════════════════════════
+
+class BulkProviderRow(BaseModel):
+    email: str
+    name: str
+    business_name: str
+    phone: Optional[str] = None
+    category_id: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    description: Optional[str] = None
+    website: Optional[str] = None
+
+
+class BulkProvidersIn(BaseModel):
+    providers: List[BulkProviderRow]
+    send_activation_email: bool = True
+
+
+def _generate_temp_password(length: int = 12) -> str:
+    """Readable temporary password (no ambiguous chars) for CEO copy-paste."""
+    alphabet = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    alphabet = "".join(c for c in alphabet if c not in "0OoIl1")
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+async def _generate_unique_slug(business_name: str, city: str, state: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", (business_name or "negocio").lower()).strip("-")[:40]
+    if city:
+        base += "-" + re.sub(r"[^a-z0-9]+", "-", city.lower()).strip("-")[:20]
+    if state:
+        base += "-" + state.lower()
+    base = re.sub(r"-+", "-", base).strip("-") or "negocio"
+    slug = base
+    n = 1
+    while await db.provider_profiles.find_one({"slug": slug}, {"_id": 1}):
+        n += 1
+        slug = f"{base}-{n}"
+    return slug
+
+
+def _bulk_activation_email_html(*, business_name: str, activation_url: str) -> str:
+    safe_name = business_name or "tu negocio"
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc;padding:40px 20px;">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:540px;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.06);">
+      <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:32px 28px;">
+        <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">¡Bienvenido a getamano!</h1>
+        <p style="margin:6px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Tu eCard ya está lista para ti</p>
+      </td></tr>
+      <tr><td style="padding:28px 28px 8px 28px;">
+        <p style="margin:0 0 12px 0;font-size:15px;color:#475569;line-height:1.55;">
+          Hola, somos el equipo de getamano. Conocimos tu negocio <strong style="color:#025F67;">{safe_name}</strong> y nos encantó —
+          tanto que ya te dejamos una eCard creada con tus datos básicos.
+        </p>
+        <p style="margin:0 0 20px 0;font-size:15px;color:#475569;line-height:1.55;">
+          Para tomar el control de tu cuenta, sólo crea tu contraseña. Después podrás cambiar tu correo, completar tu perfil, subir fotos y empezar a recibir clientes.
+        </p>
+        <div style="text-align:center;margin:18px 0;">
+          <a href="{activation_url}" style="display:inline-block;background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);color:#fff;text-decoration:none;padding:14px 32px;border-radius:999px;font-weight:bold;font-size:15px;">Activar mi cuenta →</a>
+        </div>
+        <p style="margin:18px 0 0 0;color:#94A3B8;font-size:12px;text-align:center;">
+          O copia este enlace en tu navegador:<br/>
+          <span style="color:#64748B;font-size:11px;word-break:break-all;">{activation_url}</span>
+        </p>
+        <p style="margin:24px 0 0 0;color:#94A3B8;font-size:12px;line-height:1.5;">
+          El enlace es válido por 14 días. Si no fuiste tú, ignora este correo.
+        </p>
+      </td></tr>
+      <tr><td style="background:#F8FAFC;padding:18px 28px;text-align:center;border-top:1px solid #E2E8F0;">
+        <p style="margin:0;color:#94A3B8;font-size:11px;">© getamano 2026 — Latin Ventures LLC</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+
+@api_router.post("/admin/providers/bulk-create")
+async def admin_bulk_create_providers(payload: BulkProvidersIn, request: Request, admin: User = Depends(require_admin)):
+    """Create multiple provider accounts from business-card-style data."""
+    if not payload.providers:
+        raise HTTPException(status_code=400, detail="No providers in payload.")
+    if len(payload.providers) > 50:
+        raise HTTPException(status_code=400, detail="Máximo 50 proveedores por lote.")
+
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    public_url = forwarded.split("/api", 1)[0] if forwarded else os.environ.get("PUBLIC_URL", "https://getamano.us")
+
+    results = []
+    for row in payload.providers:
+        try:
+            email = (row.email or "").strip().lower()
+            if "@" not in email or "." not in email:
+                results.append({"email": row.email, "status": "error", "reason": "invalid_email"})
+                continue
+            existing = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
+            if existing:
+                results.append({"email": email, "status": "skipped", "reason": "already_exists", "user_id": existing["user_id"]})
+                continue
+
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            temp_password = _generate_temp_password()
+            phone_norm = normalize_phone(row.phone) if row.phone else None
+            await db.users.insert_one({
+                "user_id": user_id,
+                "email": email,
+                "password_hash": hash_password(temp_password),
+                "name": row.name,
+                "phone": phone_norm,
+                "role": "provider",
+                "picture": None,
+                "language": "es",
+                "preferred_language": "es",
+                "country": DEFAULT_COUNTRY,
+                "email_verified": False,
+                "created_by_admin": admin.user_id,
+                "needs_activation": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
+            provider_id = f"prov_{uuid.uuid4().hex[:12]}"
+            slug = await _generate_unique_slug(row.business_name or row.name, row.city or "", row.state or "")
+            await db.provider_profiles.insert_one({
+                "provider_id": provider_id,
+                "user_id": user_id,
+                "business_name": row.business_name or row.name,
+                "slug": slug,
+                "category_id": row.category_id,
+                "phone": phone_norm,
+                "city": row.city,
+                "state": row.state,
+                "description": row.description,
+                "website": row.website,
+                "is_active": True,
+                "verification_status": "pending",
+                "created_by_admin": admin.user_id,
+                "additional_categories": [],
+                "languages": [],
+                "service_areas": [],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
+            activation_url = None
+            if payload.send_activation_email:
+                raw_token = secrets.token_urlsafe(32)
+                token_hash = hash_password(raw_token)
+                expires_at = datetime.now(timezone.utc) + timedelta(days=14)
+                await db.password_resets.update_one(
+                    {"email": email},
+                    {"$set": {
+                        "email": email,
+                        "user_id": user_id,
+                        "token_hash": token_hash,
+                        "expires_at": expires_at.isoformat(),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "used_at": None,
+                        "is_activation": True,
+                    }},
+                    upsert=True,
+                )
+                activation_url = f"{public_url}/reset-password?token={raw_token}&activate=1"
+                subject = "Activa tu cuenta · getamano"
+                html = _bulk_activation_email_html(business_name=row.business_name or row.name,
+                                                   activation_url=activation_url)
+                await _send_email_via_resend(email, subject, html)
+
+            results.append({
+                "email": email,
+                "status": "created",
+                "user_id": user_id,
+                "provider_id": provider_id,
+                "slug": slug,
+                "temp_password": temp_password,
+                "activation_url": activation_url,
+            })
+        except Exception as e:
+            logger.exception(f"bulk create failed for {row.email}: {e}")
+            results.append({"email": row.email, "status": "error", "reason": str(e)[:80]})
+
+    created = sum(1 for r in results if r.get("status") == "created")
+    skipped = sum(1 for r in results if r.get("status") == "skipped")
+    errors = sum(1 for r in results if r.get("status") == "error")
+    await audit_log(admin.user_id, "admin.providers.bulk_created",
+                    {"created": created, "skipped": skipped, "errors": errors, "total": len(results)}, request)
+    return {"ok": True, "created": created, "skipped": skipped, "errors": errors, "results": results}
+
+
+# ════════════════════════════════════════════════════════════════════
+# Section 44B — Admin Response-Latency Dashboard
+# ════════════════════════════════════════════════════════════════════
+
+@api_router.get("/admin/latency-dashboard")
+async def admin_latency_dashboard(_: User = Depends(require_admin)):
+    """How fast are providers responding? Buckets conversations <2h / <24h / >24h."""
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    convs = await db.conversations.find(
+        {
+            "created_at": {"$gte": thirty_days_ago},
+            "client_name": {"$not": {"$regex": "^TEST", "$options": "i"}},
+        },
+        {"_id": 0, "conversation_id": 1, "provider_id": 1, "created_at": 1,
+         "last_at": 1, "unread_for_provider": 1, "business_name": 1},
+    ).limit(5000).to_list(5000)
+
+    fast = mid = slow = pending = 0
+    latency_samples: list = []
+    per_provider: dict = {}
+    for conv in convs:
+        cid = conv["conversation_id"]
+        msgs = await db.messages.find(
+            {"conversation_id": cid},
+            {"_id": 0, "sender_role": 1, "created_at": 1, "from_user_id": 1, "to_user_id": 1},
+        ).sort("created_at", 1).limit(20).to_list(20)
+        if not msgs:
+            continue
+        first_client_msg = next((m for m in msgs if (m.get("sender_role") or "").lower() == "client"), None)
+        if not first_client_msg:
+            continue
+        first_client_at = first_client_msg.get("created_at")
+        first_reply = next((m for m in msgs if m.get("created_at") and m["created_at"] > first_client_at
+                            and (m.get("sender_role") or "").lower() == "provider"), None)
+        prov_id = conv.get("provider_id") or "unknown"
+        bucket = per_provider.setdefault(prov_id, {"provider_id": prov_id,
+                                                    "business_name": conv.get("business_name") or "",
+                                                    "total": 0, "fast": 0, "mid": 0, "slow": 0, "pending": 0,
+                                                    "median_minutes": None, "_lat_samples": []})
+        bucket["total"] += 1
+        if not first_reply:
+            if conv.get("unread_for_provider"):
+                slow += 1
+                bucket["slow"] += 1
+            else:
+                pending += 1
+                bucket["pending"] += 1
+            continue
+        try:
+            t0 = datetime.fromisoformat(first_client_at.replace("Z", "+00:00"))
+            t1 = datetime.fromisoformat(first_reply["created_at"].replace("Z", "+00:00"))
+        except Exception:
+            continue
+        minutes = (t1 - t0).total_seconds() / 60.0
+        latency_samples.append(minutes)
+        bucket["_lat_samples"].append(minutes)
+        if minutes < 120:
+            fast += 1
+            bucket["fast"] += 1
+        elif minutes < 1440:
+            mid += 1
+            bucket["mid"] += 1
+        else:
+            slow += 1
+            bucket["slow"] += 1
+
+    def _median(arr):
+        if not arr:
+            return None
+        arr = sorted(arr)
+        n = len(arr)
+        return arr[n // 2] if n % 2 else (arr[n // 2 - 1] + arr[n // 2]) / 2
+
+    for bucket in per_provider.values():
+        bucket["median_minutes"] = _median(bucket.pop("_lat_samples"))
+
+    worst = [
+        {**b, "slow_rate": round((b["slow"] / b["total"]) * 100, 1)}
+        for b in per_provider.values() if b["total"] >= 3
+    ]
+    worst.sort(key=lambda b: (-b["slow_rate"], -b["total"]))
+    worst = worst[:10]
+
+    total = fast + mid + slow + pending
+    overall_median = _median(latency_samples)
+    return {
+        "window_days": 30,
+        "total_conversations": total,
+        "buckets": {
+            "fast_under_2h":   {"count": fast, "pct": round(fast / total * 100, 1) if total else 0},
+            "mid_under_24h":   {"count": mid,  "pct": round(mid  / total * 100, 1) if total else 0},
+            "slow_over_24h":   {"count": slow, "pct": round(slow / total * 100, 1) if total else 0},
+            "no_reply_yet":    {"count": pending, "pct": round(pending / total * 100, 1) if total else 0},
+        },
+        "overall_median_minutes": overall_median,
+        "worst_providers": worst,
+        "providers_evaluated": len(per_provider),
+    }
 
 
 @api_router.post("/admin/health-email/send-weekly")
