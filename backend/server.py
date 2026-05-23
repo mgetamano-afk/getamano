@@ -569,6 +569,12 @@ async def seed():
         await db.translation_cache.create_index("expires_at", expireAfterSeconds=0)
         await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
         await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
+        # Section 35/36 — community feed indexes
+        await db.community_posts.create_index([("created_at", -1)])
+        await db.community_posts.create_index("user_id")
+        await db.post_likes.create_index([("post_id", 1), ("user_id", 1)], unique=True)
+        await db.provider_follows.create_index([("follower_user_id", 1), ("provider_user_id", 1)], unique=True)
+        await db.provider_follows.create_index("provider_user_id")
         await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
         await db.provider_rates.create_index([("category_id", 1), ("city", 1), ("country", 1)])
         await db.provider_rates.create_index([("provider_id", 1), ("is_active", 1)])
@@ -900,6 +906,34 @@ async def seed():
                 upsert=True,
             )
             logger.info("Seeded 5-day demo streak for demo provider")
+
+    # Section 35/36 — Seed 2 demo community posts for María so /comunidad has
+    # meaningful content on first boot. Idempotent via stable post_ids.
+    if demo_profile and demo_profile.get("provider_id"):
+        seeds = [
+            {
+                "post_id": "post_demo_seed_001",
+                "user_id": prov_user_id,
+                "content": "¡Hola comunidad! 👋 Soy María de María's Cleaning Services en Sallisaw, OK. Llevo 8 años limpiando casas latinas con muchísimo cariño. Si necesitan ayuda, escríbanme — siempre traigo mis propios productos y descuento del 10% para primeras visitas. ✨",
+                "image_url": None,
+                "likes_count": 12,
+                "comments_count": 0,
+                "is_hidden": False,
+                "created_at": (datetime.now(timezone.utc) - timedelta(hours=4)).isoformat(),
+            },
+            {
+                "post_id": "post_demo_seed_002",
+                "user_id": prov_user_id,
+                "content": "Tip de la semana: para mantener la cocina sin grasa, usa bicarbonato + vinagre + agua tibia. Funciona mejor que cualquier producto comercial y es seguro para los niños. ¡Cuéntenme sus trucos! 🧽",
+                "image_url": None,
+                "likes_count": 8,
+                "comments_count": 0,
+                "is_hidden": False,
+                "created_at": (datetime.now(timezone.utc) - timedelta(days=1, hours=2)).isoformat(),
+            },
+        ]
+        for s in seeds:
+            await db.community_posts.update_one({"post_id": s["post_id"]}, {"$setOnInsert": s}, upsert=True)
 
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")
@@ -3964,6 +3998,316 @@ async def wall_of_fame(limit: int = 50):
             by_tier[it["tier"]] += 1
     return {"items": items, "stats": {"total_unlocked": total_unlocked, "total_providers": total_providers, "by_tier": by_tier}}
 
+
+# ════════════════════════════════════════════════════════════════════════
+# SECTION 35 + 36 — Community Social Feed (posts · stories · follows)
+# ════════════════════════════════════════════════════════════════════════
+# A Twitter/Threads-style feed for providers + clients to share updates,
+# follow each other, and discover trending categories. Mobile-first feed
+# + 3-column desktop layout built on the same backend.
+# Collections introduced: `community_posts`, `post_likes`, `provider_follows`.
+# ════════════════════════════════════════════════════════════════════════
+
+POST_MAX_LEN = 500
+POST_MIN_LEN = 4
+
+
+class NewPostIn(BaseModel):
+    content: str = Field(..., min_length=POST_MIN_LEN, max_length=POST_MAX_LEN)
+    image_url: Optional[str] = None
+
+
+async def _hydrate_posts(posts: list[dict], current_user_id: Optional[str] = None) -> list[dict]:
+    """Attach author info + my-like flag + my-follow flag to each post."""
+    if not posts:
+        return []
+    author_ids = list({p["user_id"] for p in posts if p.get("user_id")})
+    users = {u["user_id"]: u for u in await db.users.find(
+        {"user_id": {"$in": author_ids}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "role": 1},
+    ).to_list(500)}
+    profs = {p["user_id"]: p for p in await db.provider_profiles.find(
+        {"user_id": {"$in": author_ids}, "is_active": True, "verification_status": "approved"},
+        {"_id": 0, "user_id": 1, "slug": 1, "business_name": 1, "logo_url": 1, "photo_url": 1, "city": 1, "state": 1, "provider_id": 1, "languages": 1, "category_id": 1},
+    ).to_list(500)}
+    my_likes = set()
+    my_follows = set()
+    if current_user_id:
+        my_likes = {lk["post_id"] async for lk in db.post_likes.find(
+            {"user_id": current_user_id, "post_id": {"$in": [p["post_id"] for p in posts]}},
+            {"_id": 0, "post_id": 1},
+        )}
+        my_follows = {f["provider_user_id"] async for f in db.provider_follows.find(
+            {"follower_user_id": current_user_id},
+            {"_id": 0, "provider_user_id": 1},
+        )}
+    for p in posts:
+        u = users.get(p["user_id"], {})
+        prof = profs.get(p["user_id"])
+        p["author"] = {
+            "user_id": p["user_id"],
+            "name": u.get("name", "Usuario"),
+            "picture": u.get("picture") or (prof.get("logo_url") or prof.get("photo_url") if prof else None),
+            "role": u.get("role", "client"),
+            "slug": prof.get("slug") if prof else None,
+            "business_name": prof.get("business_name") if prof else None,
+            "city": prof.get("city") if prof else None,
+            "state": prof.get("state") if prof else None,
+            "is_provider": bool(prof),
+        }
+        p["liked_by_me"] = p["post_id"] in my_likes
+        if prof:
+            p["author"]["followed_by_me"] = prof["user_id"] in my_follows
+    return posts
+
+
+@api_router.get("/community/posts")
+async def list_posts(limit: int = 20, before: Optional[str] = None):
+    """Paginated community feed. `before=ISO` returns posts older than that."""
+    limit = max(1, min(limit, 50))
+    q = {"is_hidden": {"$ne": True}}
+    if before:
+        q["created_at"] = {"$lt": before}
+    rows = await db.community_posts.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    # Try to attach my-like info opportunistically using header auth
+    current_user_id = None
+    rows = await _hydrate_posts(rows, current_user_id)
+    return {"items": rows, "next_before": rows[-1]["created_at"] if len(rows) == limit else None}
+
+
+@api_router.get("/community/posts/feed")
+async def list_posts_authenticated(limit: int = 20, before: Optional[str] = None, user: User = Depends(get_current_user)):
+    """Authenticated feed — includes liked_by_me + followed_by_me flags."""
+    limit = max(1, min(limit, 50))
+    q = {"is_hidden": {"$ne": True}}
+    if before:
+        q["created_at"] = {"$lt": before}
+    rows = await db.community_posts.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    rows = await _hydrate_posts(rows, user.user_id)
+    return {"items": rows, "next_before": rows[-1]["created_at"] if len(rows) == limit else None}
+
+
+@api_router.post("/community/posts")
+async def create_post(payload: NewPostIn, request: Request, user: User = Depends(get_current_user)):
+    """Create a new community post. Anti-spam: max 5 posts per 10 minutes."""
+    ten_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    recent = await db.community_posts.count_documents({"user_id": user.user_id, "created_at": {"$gte": ten_min_ago}})
+    if recent >= 5:
+        raise HTTPException(status_code=429, detail="Has publicado 5 veces en los últimos 10 minutos. Espera un momento.")
+    now = datetime.now(timezone.utc)
+    post_id = f"post_{uuid.uuid4().hex[:14]}"
+    doc = {
+        "post_id": post_id,
+        "user_id": user.user_id,
+        "content": payload.content.strip(),
+        "image_url": payload.image_url,
+        "likes_count": 0,
+        "comments_count": 0,
+        "is_hidden": False,
+        "created_at": now.isoformat(),
+    }
+    await db.community_posts.insert_one(doc)
+    doc.pop("_id", None)  # strip ObjectId before JSON serialization
+    await audit_log(user.user_id, "community.post_created", {"post_id": post_id}, request)
+    hydrated = await _hydrate_posts([doc], user.user_id)
+    return hydrated[0] if hydrated else doc
+
+
+@api_router.post("/community/posts/{post_id}/like")
+async def toggle_post_like(post_id: str, user: User = Depends(get_current_user)):
+    """Toggle a like on a community post. Idempotent."""
+    post = await db.community_posts.find_one({"post_id": post_id}, {"_id": 0, "post_id": 1, "user_id": 1})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado.")
+    existing = await db.post_likes.find_one({"post_id": post_id, "user_id": user.user_id}, {"_id": 0})
+    if existing:
+        await db.post_likes.delete_one({"post_id": post_id, "user_id": user.user_id})
+        await db.community_posts.update_one({"post_id": post_id}, {"$inc": {"likes_count": -1}})
+        return {"liked": False}
+    await db.post_likes.insert_one({
+        "post_id": post_id,
+        "user_id": user.user_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.community_posts.update_one({"post_id": post_id}, {"$inc": {"likes_count": 1}})
+    return {"liked": True}
+
+
+@api_router.delete("/community/posts/{post_id}")
+async def delete_post(post_id: str, request: Request, user: User = Depends(get_current_user)):
+    """Soft-delete own post (or any post if admin)."""
+    post = await db.community_posts.find_one({"post_id": post_id}, {"_id": 0})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado.")
+    if post["user_id"] != user.user_id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="No puedes eliminar este post.")
+    await db.community_posts.update_one({"post_id": post_id}, {"$set": {"is_hidden": True}})
+    await audit_log(user.user_id, "community.post_deleted", {"post_id": post_id}, request)
+    return {"ok": True}
+
+
+@api_router.get("/community/stories")
+async def community_stories():
+    """Providers who posted in the last 24h — used for the Instagram-style
+    stories row at the top of the feed.
+    """
+    one_day_ago = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    cursor = db.community_posts.aggregate([
+        {"$match": {"created_at": {"$gte": one_day_ago}, "is_hidden": {"$ne": True}}},
+        {"$sort": {"created_at": -1}},
+        {"$group": {"_id": "$user_id", "last_post_at": {"$first": "$created_at"}}},
+        {"$limit": 20},
+    ])
+    user_ids = []
+    user_to_last = {}
+    async for row in cursor:
+        user_ids.append(row["_id"])
+        user_to_last[row["_id"]] = row["last_post_at"]
+    if not user_ids:
+        return []
+    profs = await db.provider_profiles.find(
+        {"user_id": {"$in": user_ids}, "is_active": True, "verification_status": "approved", **PUBLIC_GUARD},
+        {"_id": 0, "user_id": 1, "slug": 1, "business_name": 1, "logo_url": 1, "photo_url": 1, "city": 1, "state": 1, "provider_id": 1},
+    ).to_list(50)
+    users = {u["user_id"]: u for u in await db.users.find(
+        {"user_id": {"$in": user_ids}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1},
+    ).to_list(50)}
+    out = []
+    for p in profs:
+        u = users.get(p["user_id"], {})
+        out.append({
+            "user_id": p["user_id"],
+            "slug": p["slug"],
+            "business_name": p.get("business_name") or u.get("name", "Proveedor"),
+            "picture": p.get("logo_url") or p.get("photo_url") or u.get("picture"),
+            "city": p.get("city"),
+            "last_post_at": user_to_last.get(p["user_id"]),
+        })
+    out.sort(key=lambda s: s.get("last_post_at") or "", reverse=True)
+    return out
+
+
+@api_router.get("/community/suggested")
+async def community_suggested(user: User = Depends(get_current_user)):
+    """Suggested providers for the right sidebar. Excludes already-followed."""
+    followed = {f["provider_user_id"] async for f in db.provider_follows.find(
+        {"follower_user_id": user.user_id},
+        {"_id": 0, "provider_user_id": 1},
+    )}
+    followed.add(user.user_id)  # never suggest oneself
+    profs = await db.provider_profiles.find(
+        {
+            "is_active": True,
+            "verification_status": "approved",
+            "user_id": {"$nin": list(followed)},
+            **PUBLIC_GUARD,
+        },
+        {"_id": 0, "provider_id": 1, "user_id": 1, "slug": 1, "business_name": 1, "logo_url": 1, "photo_url": 1, "city": 1, "rating_avg": 1, "reviews_count": 1, "category_id": 1, "plan": 1},
+    ).sort([("rating_avg", -1), ("reviews_count", -1)]).limit(8).to_list(8)
+    cats = {c["category_id"]: c for c in await db.categories.find({}, {"_id": 0}).to_list(200)}
+    for p in profs:
+        cat = cats.get(p.get("category_id"))
+        p["main_category"] = (cat or {}).get("name_es") or ""
+    return profs
+
+
+@api_router.post("/community/follows/{provider_user_id}")
+async def follow_provider(provider_user_id: str, user: User = Depends(get_current_user)):
+    """Follow a provider. Idempotent."""
+    if provider_user_id == user.user_id:
+        raise HTTPException(status_code=400, detail="No puedes seguirte a ti mismo.")
+    target = await db.provider_profiles.find_one({"user_id": provider_user_id}, {"_id": 0, "provider_id": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
+    existing = await db.provider_follows.find_one(
+        {"follower_user_id": user.user_id, "provider_user_id": provider_user_id},
+        {"_id": 0},
+    )
+    if existing:
+        return {"following": True}
+    await db.provider_follows.insert_one({
+        "follow_id": f"flw_{uuid.uuid4().hex[:14]}",
+        "follower_user_id": user.user_id,
+        "provider_user_id": provider_user_id,
+        "provider_id": target["provider_id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"following": True}
+
+
+@api_router.delete("/community/follows/{provider_user_id}")
+async def unfollow_provider(provider_user_id: str, user: User = Depends(get_current_user)):
+    """Unfollow a provider. Idempotent."""
+    await db.provider_follows.delete_one(
+        {"follower_user_id": user.user_id, "provider_user_id": provider_user_id},
+    )
+    return {"following": False}
+
+
+@api_router.get("/community/me/follows")
+async def my_follows(user: User = Depends(get_current_user)):
+    """My set of followed provider_user_ids — used by the frontend to render
+    Follow/Following buttons consistently."""
+    rows = await db.provider_follows.find(
+        {"follower_user_id": user.user_id},
+        {"_id": 0, "provider_user_id": 1},
+    ).limit(500).to_list(500)
+    return {"items": [r["provider_user_id"] for r in rows], "count": len(rows)}
+
+
+@api_router.get("/community/trending")
+async def community_trending():
+    """Trending categories today — counts providers with activity in last 7d
+    and falls back to top-active overall when no daily signal exists.
+    """
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    # Count posts per category-of-author in the past week
+    cursor = db.community_posts.aggregate([
+        {"$match": {"created_at": {"$gte": week_ago}, "is_hidden": {"$ne": True}}},
+        {"$lookup": {"from": "provider_profiles", "localField": "user_id", "foreignField": "user_id", "as": "prof"}},
+        {"$unwind": "$prof"},
+        {"$group": {"_id": "$prof.category_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 6},
+    ])
+    cat_counts = []
+    async for row in cursor:
+        if row["_id"]:
+            cat_counts.append({"category_id": row["_id"], "count": row["count"]})
+    # Fallback: top 6 categories by active provider count
+    if not cat_counts:
+        fallback = db.provider_profiles.aggregate([
+            {"$match": {"is_active": True, "verification_status": "approved", **PUBLIC_GUARD}},
+            {"$group": {"_id": "$category_id", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 6},
+        ])
+        async for row in fallback:
+            if row["_id"]:
+                cat_counts.append({"category_id": row["_id"], "count": row["count"]})
+    if not cat_counts:
+        return []
+    cats = {c["category_id"]: c async for c in db.categories.find(
+        {"category_id": {"$in": [c["category_id"] for c in cat_counts]}},
+        {"_id": 0},
+    )}
+    out = []
+    for c in cat_counts:
+        cat = cats.get(c["category_id"])
+        if not cat:
+            continue
+        out.append({
+            "category_id": c["category_id"],
+            "name_es": cat.get("name_es"),
+            "name_en": cat.get("name_en"),
+            "slug": cat.get("slug"),
+            "icon": cat.get("icon") or "🔧",
+            "count": c["count"],
+        })
+    return out
+
+
 @api_router.get("/public/stats")
 async def public_stats():
     # BUG-05: real stats with TEST data excluded
@@ -4916,6 +5260,188 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+
+import asyncio
+# ════════════════════════════════════════════════════════════════════════
+# Periodic jobs that the platform needs to run on its own:
+#   • Monthly leaderboard snapshot (1st of month, after 06:00 UTC)
+#   • Daily streak reminders (after 19:00 UTC)
+# State persisted in `scheduler_state` collection keyed by job_name so we
+# never double-run within the same window even if the backend restarts.
+# Loops every 30 minutes — light enough to be a no-op when off-schedule.
+# ════════════════════════════════════════════════════════════════════════
+
+SCHEDULER_TICK_SECONDS = 1800  # 30 minutes
+
+
+async def _job_should_run(job_name: str, since_iso: str) -> bool:
+    """Return True if the job hasn't run since `since_iso`."""
+    rec = await db.scheduler_state.find_one({"job_name": job_name}, {"_id": 0, "last_run_at": 1})
+    if not rec or not rec.get("last_run_at"):
+        return True
+    return rec["last_run_at"] < since_iso
+
+
+async def _job_mark_done(job_name: str, payload: dict | None = None):
+    await db.scheduler_state.update_one(
+        {"job_name": job_name},
+        {"$set": {
+            "job_name": job_name,
+            "last_run_at": datetime.now(timezone.utc).isoformat(),
+            "last_result": payload or {},
+        }},
+        upsert=True,
+    )
+
+
+async def _run_monthly_snapshot_job():
+    """Runs the leaderboard snapshot for the previous calendar month.
+    Runs on the 1st of each month after 06:00 UTC. Skipped if already done
+    this month per scheduler_state.
+    """
+    now = datetime.now(timezone.utc)
+    if now.day != 1 or now.hour < 6:
+        return None
+    # Window key — won't re-run within the same calendar month
+    month_window_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    if not await _job_should_run("monthly_leaderboard_snapshot", month_window_start):
+        return None
+    window_start, window_end = _previous_month_window()
+    month_key = window_start.strftime("%Y-%m")
+    rows = await _compute_leaderboard_for_window(window_start.isoformat(), window_end.isoformat())
+    if not rows:
+        await _job_mark_done("monthly_leaderboard_snapshot", {"month": month_key, "snapshotted": 0, "coupons_created": 0})
+        return {"month": month_key, "snapshotted": 0, "coupons_created": 0}
+    eligible = rows[:50]
+    created = 0
+    for r in eligible:
+        tier = _tier_for_rank(r["rank"])
+        if not tier:
+            continue
+        doc = await _create_coupon_for_provider(r["user_id"], r["rank"], tier, month_key)
+        if doc:
+            created += 1
+    await _job_mark_done("monthly_leaderboard_snapshot", {"month": month_key, "snapshotted": len(rows), "coupons_created": created})
+    logger.info(f"[scheduler] Monthly snapshot complete: month={month_key} snapshotted={len(rows)} coupons_created={created}")
+    return {"month": month_key, "snapshotted": len(rows), "coupons_created": created}
+
+
+async def _run_daily_streak_reminders_job():
+    """Runs the streak reminder fan-out once per UTC day after 19:00 UTC."""
+    now = datetime.now(timezone.utc)
+    if now.hour < 19:
+        return None
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    if not await _job_should_run("daily_streak_reminders", today_start):
+        return None
+    rows_streaks = await db.streaks.find(
+        {"current_days": {"$gte": 3}},
+        {"_id": 0, "user_id": 1, "provider_id": 1},
+    ).to_list(2000)
+    queued = 0
+    skipped = 0
+    for r in rows_streaks:
+        try:
+            streak = await _compute_streak(r["user_id"], r["provider_id"])
+            res = await _enqueue_streak_reminder_for(r["user_id"], r["provider_id"], streak)
+            if res:
+                queued += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            logger.warning(f"[scheduler] streak reminder failed for {r.get('user_id')}: {e}")
+            skipped += 1
+    await _job_mark_done("daily_streak_reminders", {"queued": queued, "skipped": skipped, "scanned": len(rows_streaks)})
+    logger.info(f"[scheduler] Daily streak reminders: queued={queued} skipped={skipped} scanned={len(rows_streaks)}")
+    return {"queued": queued, "skipped": skipped, "scanned": len(rows_streaks)}
+
+
+async def _scheduler_loop():
+    """Background task. Loops forever until cancelled at shutdown."""
+    logger.info("[scheduler] Background scheduler started")
+    while True:
+        try:
+            await _run_monthly_snapshot_job()
+        except Exception:
+            logger.exception("[scheduler] monthly snapshot job failed")
+        try:
+            await _run_daily_streak_reminders_job()
+        except Exception:
+            logger.exception("[scheduler] daily streak reminders job failed")
+        await asyncio.sleep(SCHEDULER_TICK_SECONDS)
+
+
+_scheduler_task = None
+
+
+@app.on_event("startup")
+async def _start_scheduler():
+    global _scheduler_task
+    if _scheduler_task is None:
+        _scheduler_task = asyncio.create_task(_scheduler_loop())
+
+
+@app.on_event("shutdown")
+async def _stop_scheduler():
+    global _scheduler_task
+    if _scheduler_task:
+        _scheduler_task.cancel()
+        _scheduler_task = None
+
+
+@api_router.get("/admin/scheduler/status")
+async def admin_scheduler_status(_: User = Depends(require_admin)):
+    """Inspect the in-process scheduler state."""
+    rows = await db.scheduler_state.find({}, {"_id": 0}).to_list(20)
+    return {
+        "running": _scheduler_task is not None and not _scheduler_task.done() if _scheduler_task else False,
+        "tick_seconds": SCHEDULER_TICK_SECONDS,
+        "jobs": rows,
+    }
+
+
+@api_router.post("/admin/scheduler/run-now")
+async def admin_scheduler_run_now(job: str, admin: User = Depends(require_admin), request: Request = None):
+    """Force-run a scheduled job NOW, bypassing the time-of-day checks. Useful
+    for E2E testing and demoing automation to the CEO without waiting for the
+    1st of the month or 7pm UTC.
+    """
+    if job == "monthly_leaderboard_snapshot":
+        window_start, window_end = _previous_month_window()
+        month_key = window_start.strftime("%Y-%m")
+        rows = await _compute_leaderboard_for_window(window_start.isoformat(), window_end.isoformat())
+        eligible = rows[:50]
+        created = 0
+        for r in eligible:
+            tier = _tier_for_rank(r["rank"])
+            if tier:
+                doc = await _create_coupon_for_provider(r["user_id"], r["rank"], tier, month_key)
+                if doc:
+                    created += 1
+        await _job_mark_done("monthly_leaderboard_snapshot", {"month": month_key, "snapshotted": len(rows), "coupons_created": created, "forced": True})
+        if request:
+            await audit_log(admin.user_id, "scheduler.force_run", {"job": job, "month": month_key, "coupons_created": created}, request)
+        return {"ok": True, "job": job, "month": month_key, "snapshotted": len(rows), "coupons_created": created}
+    elif job == "daily_streak_reminders":
+        rows_streaks = await db.streaks.find({"current_days": {"$gte": 3}}, {"_id": 0, "user_id": 1, "provider_id": 1}).to_list(2000)
+        queued = 0
+        skipped = 0
+        for r in rows_streaks:
+            try:
+                streak = await _compute_streak(r["user_id"], r["provider_id"])
+                res = await _enqueue_streak_reminder_for(r["user_id"], r["provider_id"], streak)
+                if res:
+                    queued += 1
+                else:
+                    skipped += 1
+            except Exception:
+                skipped += 1
+        await _job_mark_done("daily_streak_reminders", {"queued": queued, "skipped": skipped, "forced": True})
+        if request:
+            await audit_log(admin.user_id, "scheduler.force_run", {"job": job, "queued": queued}, request)
+        return {"ok": True, "job": job, "queued": queued, "skipped": skipped, "scanned": len(rows_streaks)}
+    raise HTTPException(status_code=400, detail=f"Unknown job '{job}'. Valid: monthly_leaderboard_snapshot, daily_streak_reminders")
 
 
 # ════════════════════════════════════════════════════════════════════

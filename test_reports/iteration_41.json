@@ -1,0 +1,53 @@
+{
+  "summary": "Iter41 — Section 35+36 Community Social Feed + In-process Scheduler. Backend pytest 26/26 PASS on new test_iter41_community_scheduler.py (public posts feed with demo seed verified for María with is_provider=true + slug + business_name + city, authenticated /feed requires auth + carries liked_by_me flag, create-post 422 too-short + 422 too-long + 200 happy path + DB persistence verified via GET, like toggle idempotent with $inc counter going 0→1→0 + 404 on unknown, delete 404 + 403 cross-user + soft-hide owner, stories returns María slug, suggested 401 anon + provider list ≤8, me/follows 401 anon, follow self→400, follow unknown→404, follow toggle round-trip with me/follows reflection, trending returns Limpieza category, scheduler status 403 non-admin + 200 admin with running:true tick:1800, run-now invalid→400 'Unknown job', daily_streak_reminders fan-out, monthly_leaderboard_snapshot idempotent at DB level). Iter40 regression 20/20 PASS after cleanup. Frontend Playwright: /comunidad anon shows 3-col layout (leftnav with 5 nav items, center feed with stories+anon CTA+2 María posts each with ✓ Verificado badge+Sallisaw OK location+12 and 8 likes, right sidebar with Tendencias/Limpieza 2 + about box). Authenticated client: textarea+counter (60/500)+Publicar all visible, post submission prepends new card with own-post red delete icon (trash) visible, like toggle works optimistically 12→13→12. Sugeridos sidebar shows providers with Seguir buttons. /wall and /comunidad/wall both render the legacy Wall of Fame (Community.jsx) — backward-compat routes confirmed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/community/posts", "issue": "FIXED: doc dict was mutated by motor's insert_one (added _id ObjectId), then passed to _hydrate_posts and returned — caused 500 'ObjectId is not iterable / vars() missing __dict__' on JSON serialization. Applied fix: doc.pop('_id', None) right after insert_one."},
+      {"endpoint": "POST /api/admin/scheduler/run-now?job=monthly_leaderboard_snapshot", "issue": "Minor reporting bug: `coupons_created` counter over-counts on idempotent re-runs. `_create_coupon_for_provider` returns the existing doc (correct, DB-idempotent), but the caller does `if doc: created += 1` so every idempotent run reports `coupons_created>=1` even when no new coupon was inserted. DB state remains idempotent (no duplicates). Recommend: make _create_coupon_for_provider return None when existing, or add a created flag."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Anon /comunidad", "issue": "Page fires /community/posts/feed, /community/suggested, /community/me/follows on mount when there's no session, producing 401s in browser console (silently caught). Guard these fetches with `if (user)` to keep DevTools clean.", "affected_selectors": ["[data-testid='comunidad-page']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter41_community_scheduler.py",
+    "/app/test_reports/pytest/iter41_results.xml",
+    "/app/test_reports/pytest/iter41_iter40_regression.xml"
+  ],
+  "action_items": [
+    "(optional) Fix `coupons_created` counter to only increment on genuinely-new coupon inserts (DB is already idempotent, this is just reporting)",
+    "(optional) Frontend: skip auth-gated /feed, /suggested, /me/follows fetches when !user to silence 401 console errors on anon /comunidad",
+    "(optional) Backend: GET /community/posts could also accept session cookie opportunistically to populate liked_by_me for logged-in users on the public endpoint (currently always false there; logged-in client must use /feed which works)",
+    "Demo-data hygiene: a leftover TEST_ profile 'Iter35 Limpieza 1779517319' appears in /community/suggested (Sugeridos sidebar). The /community/suggested endpoint does NOT filter TEST_* business_names like _wall does. Recommend either delete the legacy iter35 seed or add a TEST_ prefix guard to /community/suggested."
+  ],
+  "critical_code_review_comments": [
+    "ROOT CAUSE of 500 on create-post: motor's `insert_one(doc)` injects `_id: ObjectId(...)` into the caller's dict in place. The endpoint then passed this same `doc` to `_hydrate_posts` and returned it. FastAPI's jsonable_encoder choked on the ObjectId. Pattern to avoid project-wide: always `doc.pop('_id', None)` after any insert when you reuse the dict in a response. Applied fix on line ~4110 of server.py.",
+    "Scheduler tests confirmed: SCHEDULER_TICK_SECONDS=1800, _scheduler_task started at startup, force-run endpoint bypasses time guard correctly, scheduler_state.upsert tracks last_run_at + last_result + forced flag, audit_log fires for force-run.",
+    "_hydrate_posts correctly attaches author{name,picture,role,slug,business_name,city,state,is_provider} + liked_by_me + author.followed_by_me. Tested both anon (everything false/null where applicable) and authenticated (flags accurate).",
+    "Rate-limit `5 posts per 10 minutes` works as advertised (test_create + test_like exhaust the client quota fast — required test refactor to use provider session for owner-delete to keep client quota for create+like). The rate-limit counter does NOT filter is_hidden, so soft-deleted posts still count against quota (acceptable design but worth documenting).",
+    "Delete endpoint is properly ACL'd: owner OR admin can delete, others get 403, unknown post → 404. Soft-delete sets is_hidden=true; list_posts filter `{is_hidden: {$ne: true}}` correctly hides them.",
+    "Follow endpoints are idempotent (POST twice = still following:true, DELETE twice = still following:false). Self-follow blocked with Spanish message. Unknown provider 404.",
+    "Trending endpoint uses last-7d window with $lookup to provider_profiles (so requires María's recent post → category Limpieza shows up). Falls back to top-active categories when no signal — verified by test.",
+    "/comunidad route swap correctly serves NEW ComunidadPage; legacy Wall of Fame preserved at /wall AND /comunidad/wall — both verified by Playwright (Wall of Fame text/Muro indicators visible)."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (1-line fix: doc.pop('_id', None) after community_posts.insert_one to prevent ObjectId leak into response — line ~4110)",
+    "/app/backend/tests/test_iter41_community_scheduler.py (new — 26 tests across 9 test classes)"
+  ],
+  "success_rate": {
+    "backend": "100% (26/26 iter41 + 20/20 iter40 regression)",
+    "frontend": "100% (anon 3-col layout, authenticated create/like/delete round-trip, /wall + /comunidad/wall backward-compat all verified)"
+  },
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123 (María, prov_10b9f21bf971), demo.client@getamano.com/client123",
+  "seed_data_creation": "Tests create TEST_iter41-prefixed posts via /community/posts (cleaned up via direct mongo delete_many({content:/^TEST_iter41/}) — also runs once before final regression to avoid 5/10min rate-limit). Force-run of monthly_leaderboard_snapshot creates a Dec-2025 coupon for María during testing → cleaned via db.coupons.delete_many({month_key:'2025-12'}) at end. María's TOP3-202605-0D3D80 demo coupon NOT touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 35+36 community feed + in-process scheduler are production-ready. (1) The create-post ObjectId bug was real and fixed in this iteration — be aware that motor's insert_one() mutates the dict; any endpoint that inserts and re-uses the same dict in a response needs `doc.pop('_id', None)`. (2) Rate-limit on create-post is 5/10min/user and counts soft-deleted posts too. (3) /comunidad now serves ComunidadPage; Wall of Fame is at /wall + /comunidad/wall. (4) Scheduler force-run is the test backdoor — pass ?job=monthly_leaderboard_snapshot|daily_streak_reminders; invalid → 400. (5) Idempotency: monthly snapshot is idempotent at DB level but `coupons_created` over-counts on re-runs (cosmetic). (6) Demo seed has 2 María posts post_demo_seed_001 + 002 — DO NOT delete. (7) For follow-flow tests, María is the canonical follow target. (8) Suggested endpoint still includes a stale Iter35 TEST_* profile — should be cleaned from db or filtered by /community/suggested. Run via: `REACT_APP_BACKEND_URL=... pytest backend/tests/test_iter41_community_scheduler.py -v` (~34s, cleanup helper above if rate-limited).",
+  "rca_of_the_issue": "Initial 5 test failures all rooted in a single bug: POST /api/community/posts returned 500 due to MongoDB ObjectId leaking into the response. Root cause: `await db.community_posts.insert_one(doc)` mutates the original dict in place — motor adds `_id: ObjectId(...)`. The endpoint then passed the same `doc` to `_hydrate_posts([doc], ...)` and returned the hydrated copy that still carried the `_id`. FastAPI's jsonable_encoder threw 'ObjectId is not iterable / vars() argument must have __dict__'. Cascading failures: test_create_success, test_like (depends on create), test_delete_others_post (depends on provider create), test_owner_can_delete (depends on create). FIX: added `doc.pop('_id', None)` immediately after insert_one — single-line change, verified by 26/26 green run + iter40 regression 20/20 green. Secondary minor finding: `coupons_created` over-counts on idempotent monthly-snapshot re-runs (reporting only, DB stays idempotent)."
+}
