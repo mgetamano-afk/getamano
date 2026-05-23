@@ -11,7 +11,7 @@
         <meta name="color-scheme" content="light" />
         <!-- iOS PWA support (Apple ignores manifest.json — needs its own tags) -->
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="getamano" />
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/apple-touch-icon-180.png" />
@@ -35,6 +35,21 @@
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
         <!-- Section 18B/C — Google Maps Places library (loaded async, used by CityAutocomplete). -->
         <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAr9l0fMyvrRxeLTZ4q91Jkl5XJLeIS9RQ&libraries=places&v=weekly&loading=async" async defer></script>
+        <!-- Section 28 — iOS PWA splash screens (white bg + centered logo) -->
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-se.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-6-7-8.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-xr-11.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-x-xs-11pro.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-12-13-14.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-15-16.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-17.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-xs-max-11pro-max.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-12pro-max.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-14pro-max.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-iphone-17-pro-max.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-ipad-mini.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-ipad-pro-11.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" />
+        <link rel="apple-touch-startup-image" href="/splash/splash-ipad-pro-12.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
         <title>getamano — Marketplace latino en USA</title>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
     </head>

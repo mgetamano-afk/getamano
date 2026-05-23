@@ -822,6 +822,23 @@ async def seed():
         await db.provider_profiles.update_one({"slug": DEMO_SLUG}, {"$set": demo_set})
         logger.info("Demo provider profile refreshed")
 
+    # Section 28 — Demo client (so testers can verify the client experience)
+    DEMO_CLIENT_EMAIL = "demo.client@getamano.com"
+    if not await db.users.find_one({"email": DEMO_CLIENT_EMAIL}):
+        await db.users.insert_one({
+            "user_id": f"user_{uuid.uuid4().hex[:12]}",
+            "email": DEMO_CLIENT_EMAIL,
+            "password_hash": hash_password("client123"),
+            "name": "Carlos Demo",
+            "role": "client",
+            "picture": None,
+            "language": "es",
+            "country": DEFAULT_COUNTRY,
+            "email_verified": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info("Seeded demo client: %s", DEMO_CLIENT_EMAIL)
+
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")
 async def register(payload: RegisterIn, response: Response, ref: Optional[str] = None):

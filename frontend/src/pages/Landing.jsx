@@ -13,6 +13,7 @@ import useIsPwaInstalled from "../lib/useIsPwaInstalled";
 import CategoryCard from "../components/CategoryCard";
 import SmartServiceSearch from "../components/SmartServiceSearch";
 import CityAutocomplete from "../components/CityAutocomplete";
+import DownloadBadgesSection from "../components/DownloadBadgesSection";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -556,6 +557,9 @@ export default function Landing() {
           ))}
         </div>
       </section>
+
+      {/* Section 28 — Download badges + QR strip */}
+      <DownloadBadgesSection />
 
       <Footer />
     </div>

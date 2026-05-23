@@ -1,6 +1,13 @@
 import { Link } from "react-router-dom";
 import { useI18n } from "../contexts/I18nContext";
-import { Mail, MapPin } from "lucide-react";
+import { Mail, MapPin, Instagram, Facebook, Music2 } from "lucide-react";
+
+const SOCIAL_LINKS = [
+  // Section 28 — placeholder URLs; update when accounts go live.
+  { name: "Instagram", href: "https://instagram.com/getamano", Icon: Instagram, testid: "footer-social-instagram" },
+  { name: "Facebook",  href: "https://facebook.com/getamano",  Icon: Facebook,  testid: "footer-social-facebook" },
+  { name: "TikTok",    href: "https://tiktok.com/@getamano",   Icon: Music2,    testid: "footer-social-tiktok" },
+];
 
 export default function Footer() {
   const { t } = useI18n();
@@ -18,6 +25,24 @@ export default function Footer() {
           <div className="mt-4 flex items-center gap-4 text-sm text-slate-400">
             <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> USA</span>
             <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getamano.us</span>
+          </div>
+
+          {/* Section 28 — Social icons row */}
+          <div className="mt-5 flex items-center gap-3" data-testid="footer-social-row">
+            <span className="text-xs uppercase font-semibold tracking-wider text-slate-500">Síguenos</span>
+            {SOCIAL_LINKS.map(({ name, href, Icon, testid }) => (
+              <a
+                key={name}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={name}
+                className="w-9 h-9 rounded-full inline-flex items-center justify-center text-slate-400 hover:text-white transition border border-slate-700 hover:border-teal-500 hover:bg-teal-500/10"
+                data-testid={testid}
+              >
+                <Icon className="w-4 h-4" />
+              </a>
+            ))}
           </div>
         </div>
         <div>

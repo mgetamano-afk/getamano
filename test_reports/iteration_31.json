@@ -1,0 +1,34 @@
+{
+  "summary": "Section 28 — PWA polish + 3 demo accounts: ALL acceptance criteria pass. Backend pytest 19/19 (test_iter31_section28.py): (a) Login OK for all 3 demos — admin@getamano.com/admin123 → role=admin, demo.provider@getamano.com/provider123 → role=provider, demo.client@getamano.com/client123 → role=client, each returns a user object + session_token cookie. (b) New demo.client seeded fresh in Mongo with role=client, name='Carlos Demo', email_verified=true (verified directly against users collection — the /api/auth/login response intentionally omits the email_verified field so we asserted at the DB layer). (c) /manifest.json 200 with background_color='#FFFFFF' (was #F7F6F2). (d) All 14 /splash/splash-*.png assets return 200 + image/png. Frontend Playwright: DownloadBadgesSection renders BEFORE <footer> on /, all 5 testids present (download-badges-section, download-section-title, download-section-install, download-section-learn-more, download-qr-block, download-platform-hints) — H1 computed color = rgb(255,255,255) on the teal gradient (transparent-text bug confirmed fixed). QR SVG renders inside download-qr-block. Two platform hint chips ('iPhone — Safari', 'Android — Chrome / Edge') present. Clicking download-section-install opens [data-testid=install-app-modal] with the same QR. Footer social row: 4 elements with data-testid^=footer-social- (1 row container + Instagram/Facebook/TikTok). All 3 anchors have target=_blank rel='noopener noreferrer' and the placeholder URLs. .glass-header computed backdrop-filter='saturate(1.8) blur(20px)', background='rgba(255, 255, 255, 0.78)' — content visible through it after scroll. index.html serves exactly 14 <link rel='apple-touch-startup-image'> tags and <meta apple-mobile-web-app-status-bar-style content='default'>. Client login E2E: filled demo.client@getamano.com/client123 → landed on /dashboard/client with toast 'Welcome to getamano' and 'Hola, Carlos Demo' — did NOT redirect to /verificar-correo. Regression: /plans h1='Plans for providers' renders; /buscar?q=limpesa returns 1 card (result-card-maria-cleaning-services-sallisaw-ok); admin login + /admin and /dashboard/admin both reachable; BottomNav correctly absent on /admin.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter31_section28.py",
+    "/app/test_reports/pytest/iter31_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DownloadBadgesSection.jsx h2 fix is correct — applies both Tailwind `text-white` and inline style={color:'#FFFFFF'} so any global CSS that previously set color:transparent on .text-gradient or similar won't bleed through. Same defensive pattern as the iter-25 category hub fix.",
+    "Footer social row uses target='_blank' with rel='noopener noreferrer' — security best practice respected. Placeholder URLs (instagram.com/getamano, facebook.com/getamano, tiktok.com/@getamano) currently 404 in the real world; harmless for staging but flag for launch checklist.",
+    "manifest.json background_color #FFFFFF + apple-mobile-web-app-status-bar-style=default + 14 apple-touch-startup-image links + white-bg splash PNGs gives a clean native-app boot experience on iOS (no more dark flash). Consider also setting <meta name='theme-color' content='#FFFFFF' media='(prefers-color-scheme: light)'> to match.",
+    "Demo client seed (server.py ~line 819) is idempotent (skips if email already exists) and sets email_verified=true so OTP gate is bypassed. Verified in Mongo: doc present, role=client, name='Carlos Demo', email_verified=True. Good.",
+    "Login API response (POST /api/auth/login) does NOT expose `email_verified` in the user payload. Not a bug per se (FE relies on a separate /api/auth/me or the redirect logic on the server side), but worth documenting because the review_request's bullet ‘should NOT redirect to /verificar-correo’ has to be validated via the redirect itself (which we did — lands on /dashboard/client). If FE ever needs to gate UI on this field it'll have to call a second endpoint.",
+    "QRCodeSVG uses window.location.origin at render time — correctly produces a QR that matches whichever environment serves the page (staging vs prod). No hardcoded URL.",
+    ".glass-header now uses backdrop-filter: saturate(1.8) blur(20px) + rgba(255,255,255,0.78). On Safari this requires -webkit-backdrop-filter for older versions; modern Safari (16+) supports unprefixed. If you still want iOS 14/15 coverage, add the -webkit- prefix.",
+    "Splash filename convention is inconsistent (some use 'splash-iphone-14pro-max.png' without hyphen between '14' and 'pro', others use 'splash-iphone-17-pro-max.png' with hyphen). All 14 files load 200 because index.html references them exactly as named on disk — but the inconsistency makes maintenance error-prone."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter31_section28.py (new — 19 tests: 3 demo logins + DB email_verified check + manifest + 14 splash assets)"
+  ],
+  "success_rate": {"backend": "100% (19/19 pytest)", "frontend": "100% on all 10 assertion blocks (landing section, H1 color, modal, social row, header glass, startup-image count, client login redirect, plans, smart search, admin BottomNav hide)"},
+  "test_credentials": "From /app/memory/test_credentials.md — all 3 valid: admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123.",
+  "seed_data_creation": "None created by tests. Verified that backend startup seed inserted demo.client@getamano.com (Carlos Demo, role=client, email_verified=true) idempotently.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 28 ships clean — no action items. Reusable backend suite at /app/backend/tests/test_iter31_section28.py covers all 3 demo logins (status + role + cookie/token), demo-client email_verified at DB level, manifest.json background_color, and all 14 splash PNGs. If future sprints add more demo accounts, extend the DEMOS list. If you re-flow the seed (e.g. drop the users collection), the backend auto-reseeds on supervisor restart — verified this iter. Test self-throttles only 0.2s per call so it's fast; rate limiter didn't block.",
+  "rca_of_the_issue": "n/a — feature verification, no bug."
+}
