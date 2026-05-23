@@ -572,3 +572,49 @@ User asked: "¿quieres que active notificaciones de nueva chamba para proveedore
 - Provider opt-out preference for digest + notification emails (`db.providers.notification_prefs`).
 - Geographic-radius matching (Haversine ≤50km) for both fanout AND digest, replacing case-insensitive city string match.
 
+
+### Feb 23, 2026 — Iteration 35: Referral program ("Trae a un amigo Pro")
+
+**User intent:** "si construyelo" — activate the referral suggestion from the previous iteration finish summary.
+
+**Reward model:**
+- Both referrer AND invitee receive **30 days of free Pro** the moment the invitee gets verified (admin sets `verification_status="approved"`).
+- Credit is stored as `users.pro_referral_until` ISO timestamp. Stacks on top of existing bonuses (if user already has X days remaining, X+30 days).
+- Idempotent: re-approving the same provider does NOT double-credit (the referral row's `status` flips to `credited` and the trigger short-circuits).
+
+**Backend (`/app/backend/server.py`):**
+- Pre-existing skeleton (`_track_referral_signup`, `_gen_ref_code`, `GET /providers/me/referrals`) was preserved + extended.
+- New `_grant_referral_reward(referred_user_id)` — extends `pro_referral_until` on both parties, marks referral `credited`, inserts a high-priority `category=referrals` notification for each side (`notification_key='{uid}::referral_reward::{referral_id}'`).
+- New `GET /api/referral/preview/{code}` — public. Returns `{valid:true, code, referrer_name, business_name, city, slug}` for valid codes. Returns `{valid:false}` (NOT 404) for unknown codes to avoid enumeration leak. 400 for malformed.
+- New `POST /api/providers/me/referral/invite` — provider-only. Body `{email, note?}`. Generates branded HTML email and sends via `_send_email_via_resend` (dev-fallback when `RESEND_API_KEY` absent). Refuses 400 if email already registered, 429 if same `(referrer, email)` within 24h. Always stores tracking row in `referral_invites` collection regardless of send success.
+- New `GET /api/me/referral-credit` — returns `{active, until, days_remaining}`. Active when `pro_referral_until > now`.
+- Reward hook wired into `admin_verify` endpoint — when status becomes `approved`, calls `_grant_referral_reward` non-blockingly.
+- `GET /api/notifications` ad-hoc merge now includes `category=referrals` alongside `gigs`.
+
+**Frontend (`/app/frontend/src/...`):**
+- `contexts/AuthContext.jsx` `register(payload, ref?)` — appends `?ref=CODE` to register call when present.
+- `pages/Register.jsx` reads `?ref=` from URL → fetches `/api/referral/preview/{code}` → renders orange banner `data-testid=register-ref-banner` showing referrer's name + business + bonus message. Banner silently hidden when code is invalid. Intent defaults to "provider" when ref is present.
+- `components/ReferralPanel.jsx` (NEW) — provider dashboard widget showing:
+  - Active-bonus green banner when `referral-credit` reports `active:true` (X days remaining).
+  - Share URL row with **Copy / Share native / QR modal** buttons.
+  - 3-card stats grid: Referidos (invited) / Verificados (credited) / Meses ganados.
+  - Inline invite form with email + 300-char note + Submit. Surfaces toast for sent/registered/duplicate.
+  - QR modal uses `QRCodeSVG` from `qrcode.react` (already installed).
+- `pages/ProviderDashboard.jsx` mounts `<ReferralPanel />` between `<WeeklyDigestPreview />` and `<MarketPulseCard />`.
+
+**Testing:**
+- New regression `/app/backend/tests/test_iter35_referrals.py` — **15/15 PASS**.
+- Frontend Playwright: 100% all testids verified (`register-ref-banner`, `referral-panel`, `referral-panel-title`, `referral-share-url`, `referral-copy-button`, `referral-share-button`, `referral-qr-button`, `referral-qr-modal`, `referral-qr-svg`, `referral-stat-invited`, `referral-stat-credited`, `referral-stat-months`, `referral-invite-email`, `referral-invite-note`, `referral-invite-submit`, `referral-active-bonus`).
+- Combined regression: iter32+iter33+iter34+iter35 = **43/43 PASS**.
+- E2E lifecycle verified: register w/ `?ref=GRY9J9` → admin approves → both users get 29 days credit → notification 🎉 lands in bell → dashboard banner shows correct days remaining.
+- Dev-fallback confirmed in `/var/log/supervisor/backend.err.log`: `[EMAIL DEV-FALLBACK] To=... | Subject=💸 María te invitó a getamano — primer mes Pro gratis | (set RESEND_API_KEY to send for real)`.
+
+**Mocked:** Resend (dev-fallback ready to flip live when API key arrives). Stripe/Twilio/Google Translation+Vision unchanged.
+
+**Follow-up backlog:**
+- Real subscription extension: when Stripe is wired, redeem `pro_referral_until` as a coupon at checkout instead of (or in addition to) the standalone Pro-credit window.
+- Provider preference to opt-out of being referred (privacy edge case).
+- Tiered rewards: "Bring 3 verified providers → get 6 months Pro" (current system is flat 1mo per referral).
+- Referee CSV export per referrer for analytics.
+- Detect and reward via subscription payment (status=paid) in addition to verification, so non-pro referees still trigger the bonus when they pay.
+
