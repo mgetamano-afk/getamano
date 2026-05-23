@@ -724,3 +724,53 @@ User asked: "¿quieres que active notificaciones de nueva chamba para proveedore
 - Leaderboard "Top 10 chamberos del mes por racha" → drives competition.
 - Refactor `server.py` (now ~7100 lines) into modular routers post-launch.
 
+
+### Feb 23, 2026 — Iteration 38: Section 34.5 Streak Reminder Fan-out (Daily Habit Loop)
+
+**User intent:** "dale" — activate the daily 7pm streak reminder suggested in iter37 finish summary.
+
+**What ships:**
+- **Backend daily fan-out endpoint** `POST /api/admin/streaks/send-reminders` (cron-able). Scans `db.streaks` where `current_days >= 3`, recomputes each, queues a reminder for any provider whose status is `at_risk` (yesterday only) OR `alive_but_not_today`. Returns `{ok, queued, skipped, scanned}` + audit log entry `streaks.reminders_sent`.
+- **Provider opt-out preference** persisted on `users.streak_reminders_opt_out`. New endpoints:
+  - `GET /api/providers/me/streak/preferences` → `{opt_out: bool}` (default false)
+  - `POST /api/providers/me/streak/preferences` body `{opt_out: bool}` (idempotent)
+- **Skip logic** (3 rules):
+  1. `current_days < 3` → too small to nudge.
+  2. `status == 'alive'` AND `last_active_date == today` → already won today.
+  3. `user.streak_reminders_opt_out == true` → respect mute.
+- **Idempotency**: `notification_key = "{uid}::streak_reminder::{today_utc_iso}"` — exactly one nudge per (user, UTC date). Re-running the cron is safe.
+- **Multi-channel queue**: each queued reminder writes:
+  - 📱 In-app notification (`category=streaks`, priority=high, title "🔥 Tu racha de N días está por expirar", body with first name + hours-remaining + CTA, `cta_url=/dashboard/provider#streak`).
+  - 📲 SMS row in `notification_queue` if `user.phone` (channel=sms, `trigger_type=streak_reminder_Nd`).
+  - 📧 Email row if `user.email`.
+- The SMS/email rows stay `pending` until Twilio/Resend credentials are wired — they flip to `sent` automatically the moment real keys arrive.
+- `GET /api/notifications` ad-hoc merge now includes `category='streaks'` alongside `gigs` and `referrals`.
+
+**Frontend (`/app/frontend/src/components/StreakWidget.jsx`):**
+- New pref toggle in the widget header row (testid=`streak-widget-pref-toggle`):
+  - Default: "🔔 Recuérdame" (Bell icon).
+  - When muted: "🔕 Silenciado" (BellOff icon).
+- Click → toggles backend pref with toast "Recordatorios silenciados" / "Recordatorios activados".
+- Both `/streak` and `/streak/preferences` fetched in parallel via `Promise.all` for snappy single render.
+
+**Testing:**
+- New regression `/app/backend/tests/test_iter38_streak_reminders.py` — **17/17 PASS** across 4 test classes.
+- Combined regression: iter37 = 14/14 PASS (after 60s sleep for /api/auth/login rate-limit, same long-standing platform constraint).
+- Synthetic test user pattern with backdated `created_at` sessions on real calendar days so `_collect_activity_dates` picks them up. Demo provider's seed untouched (verified by `TestDemoSeedIntact` at end of module).
+
+**Code review notes from testing agent (no bugs — observations only):**
+- `_enqueue_streak_reminder_for` correctly enforces all 3 skip rules with separate test coverage.
+- `_compute_streak` persists `current_days`/`last_active_date` on every call so the admin scan's `$gte:3` filter never goes stale.
+- Audit log fires on every admin fan-out with `{queued, skipped, scanned}` payload.
+- Hours-remaining calc `24 - utc_hour` is naive vs locale-aware 7pm timezone (acceptable for v1, future enhancement).
+
+**Operational notes:**
+- To enable the daily cron: schedule a job hitting `POST /api/admin/streaks/send-reminders` once per day (recommended at 19:00 UTC since most US Latino users are in PT/MT/CT/ET — covers 12pm–3pm local which is when activity is highest). When supervisor or external scheduler is set up, the body just needs a valid admin session cookie.
+- Demo provider remains alive at 5 days after the fan-out test (synthetic test user used instead).
+
+**Follow-up backlog:**
+- Locale-aware 7pm scheduling (needs user.timezone field per provider).
+- Tiered nudge intensity: 3-day streak → friendly nudge · 14-day → "no rompas tu récord" · 30+ → aggressive "X días sin perder, NO falles hoy".
+- Streak insurance: 1 free "skip day" per month earned by being on Pro plan.
+- Refactor `server.py` (now ~7200 lines) into modular routers post-launch.
+
