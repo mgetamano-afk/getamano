@@ -30,6 +30,7 @@ import CouponsCard from "../components/CouponsCard";
 import ProviderLeftNav from "../components/ProviderLeftNav";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
 import EcardHealth from "../components/EcardHealth";
+import WeeklyHealthEmailPreview from "../components/WeeklyHealthEmailPreview";
 import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
 import CitySearchInput from "../components/CitySearchInput";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
@@ -229,6 +230,7 @@ export default function ProviderDashboard() {
             {/* Mobile-only: mirror del sidebar derecho al final */}
             <div className="lg:hidden space-y-6" data-testid="provider-dashboard-mobile-sidebar-mirror">
               <EcardHealth />
+              <WeeklyHealthEmailPreview />
               <CouponsCard />
               <ReferralPanel />
             </div>
@@ -554,10 +556,13 @@ export default function ProviderDashboard() {
             <div className="animate-fadeSlideUp" style={{ animationDelay: "80ms" }}>
               <EcardHealth />
             </div>
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "160ms" }}>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "140ms" }}>
+              <WeeklyHealthEmailPreview />
+            </div>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "200ms" }}>
               <CouponsCard />
             </div>
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "240ms" }}>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "260ms" }}>
               <ReferralPanel />
             </div>
           </aside>

@@ -275,6 +275,40 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Weekly Health Email + In-app Preview (Section 43B)
+
+**Email outbound semanal automatizado.**
+
+**Backend (3 endpoints + helper compartido):**
+- `_build_health_items(profile)` extraída de `/providers/me/health` para reusarla desde el email loop sin duplicar lógica.
+- `_build_health_email_html(...)` — template HTML inline-CSS con:
+  - Hero gradiente teal getamano + saludo personalizado.
+  - **Ring conic-gradient SVG-less** con score color-coded (verde ≥90, teal ≥70, amber ≥50, red <50).
+  - **Tu próximo paso** card teal con label + impact + points badge + CTA "Completar ahora →" que linkea al deep_link específico.
+  - **3 stats**: vistas / contactos / reseñas (views + contact_clicks + reviews_count del perfil).
+  - Estado perfect: 🏆 banner verde cuando score=100 (no se envía email igual — skip por `score >= 100`).
+  - Footer "Latin Ventures LLC · getamano 2026".
+- `_gather_health_email_data(user_id)` — eligibilidad: perfil + email + email_verified. None si no aplica.
+- `_send_health_email_to_provider(user_id, public_url)` — usa `_send_email_via_resend` (dev-fallback hasta tener RESEND_API_KEY).
+- `GET /providers/me/health-email/preview` — proveedor ve qué le llegará.
+- `POST /admin/health-email/send-weekly` — fan-out admin (skip TEST_*, skip score=100).
+- Scheduler job `weekly_health_email` integrado a `_scheduler_loop()`: cada lunes ≥10am UTC, idempotente vía `_job_should_run/_job_mark_done` con `scheduler_state[week_start_iso]`.
+
+**Frontend `WeeklyHealthEmailPreview.jsx` (~95 líneas):**
+- Card colapsible "📧 Lunes te llega tu resumen · Cada lunes 10am a {email}".
+- Al expandir: 3 stats compactos + repite el "Tu próximo paso" del checklist + disclaimer "Solo te enviamos el resumen mientras haya algo que sumar."
+- Skip render si: loading / no available / score=100 (consistente con el backend, evita ruido visual).
+- Integrado en Provider Dashboard: debajo de EcardHealth en columna derecha (desktop) + en mobile mirror.
+
+**E2E verificado:**
+- `GET /providers/me/health-email/preview` María: `available=True, email=..., business="María's...", score=95, week_views=359, week_contacts=40, week_reviews=0, n_items=10` ✓
+- `POST /admin/health-email/send-weekly` (con sólo María en el scope test_*): `sent=0, skipped=0, total=1, reason="no_api_key"` ✓ (esperado en dev sin RESEND_API_KEY)
+- Widget desktop: aparece colapsado debajo de EcardHealth ✓
+- Widget mobile: layout vertical apilado limpio en el sidebar mirror ✓
+- Lint: 0 issues frontend, 0 nuevos issues backend (sólo nits cosméticos pre-existentes).
+
+**Activación en producción**: tan pronto como `RESEND_API_KEY` + dominio verificado se configuren en `.env`, el job empieza a correr automáticamente cada lunes a las 10am UTC sin más código.
+
 ### May 23, 2026 — eCard Health Checklist (Section 43)
 
 **Dashboard de salud gamificado para proveedores.**

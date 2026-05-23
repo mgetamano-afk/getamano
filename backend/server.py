@@ -4966,6 +4966,44 @@ async def _run_daily_streak_reminders_job():
     return {"queued": queued, "skipped": skipped, "scanned": len(rows_streaks)}
 
 
+async def _run_weekly_health_email_job():
+    """Fan-out the weekly eCard health email every Monday after 10:00 UTC.
+    Skipped if already done this week per scheduler_state."""
+    now = datetime.now(timezone.utc)
+    if now.weekday() != 0 or now.hour < 10:
+        return None
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    if not await _job_should_run("weekly_health_email", week_start):
+        return None
+    public_url = (os.environ.get("PUBLIC_URL") or "https://getamano.us").rstrip("/")
+    eligible = await db.provider_profiles.find(
+        {
+            "is_active": True,
+            "verification_status": "approved",
+            "business_name": {"$not": {"$regex": "^TEST_"}},
+        },
+        {"_id": 0, "user_id": 1},
+    ).limit(2000).to_list(2000)
+    sent = skipped = errors = 0
+    for prof in eligible:
+        try:
+            res = await _send_health_email_to_provider(prof["user_id"], public_url)
+            if res.get("sent"):
+                sent += 1
+            elif res.get("skipped"):
+                skipped += 1
+            else:
+                errors += 1
+        except Exception as e:
+            logger.warning(f"[scheduler] weekly health email failed for {prof.get('user_id')}: {e}")
+            errors += 1
+    await _job_mark_done("weekly_health_email", {
+        "sent": sent, "skipped": skipped, "errors": errors, "scanned": len(eligible),
+    })
+    logger.info(f"[scheduler] Weekly health email: sent={sent} skipped={skipped} errors={errors} scanned={len(eligible)}")
+    return {"sent": sent, "skipped": skipped, "errors": errors, "scanned": len(eligible)}
+
+
 async def _scheduler_loop():
     """Background task. Loops forever until cancelled at shutdown."""
     logger.info("[scheduler] Background scheduler started")
@@ -4978,6 +5016,10 @@ async def _scheduler_loop():
             await _run_daily_streak_reminders_job()
         except Exception:
             logger.exception("[scheduler] daily streak reminders job failed")
+        try:
+            await _run_weekly_health_email_job()
+        except Exception:
+            logger.exception("[scheduler] weekly health email job failed")
         await asyncio.sleep(SCHEDULER_TICK_SECONDS)
 
 
@@ -5198,16 +5240,10 @@ _HEALTH_DECORATIONS = {
 }
 
 
-@api_router.get("/providers/me/health")
-async def my_ecard_health(user: User = Depends(get_current_user)):
-    """Full eCard checklist used by EcardHealth widget on the provider dashboard."""
-    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
-    if not prof:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    has_rates = await db.provider_rates.count_documents({"provider_id": prof.get("provider_id")}) > 0
-    prof["_has_rates"] = has_rates
-
-    # Replicate _completion_for's per-field evaluation so we can label each item.
+def _build_health_items(profile: dict) -> dict:
+    """Pure-function eCard health checklist builder used by both the
+    /providers/me/health endpoint and the weekly outbound email.
+    Expects `profile["_has_rates"]` already populated by the caller."""
     rules = [
         ("logo_url", "Foto de perfil", 10, "/dashboard/provider?tab=perfil"),
         ("description", "Descripción del negocio", 15, "/dashboard/provider?tab=perfil"),
@@ -5220,18 +5256,17 @@ async def my_ecard_health(user: User = Depends(get_current_user)):
         ("calendar_active", "Calendario activo", 10, "/dashboard/provider?tab=calendario"),
         ("rating_count", "Primera reseña", 5, "/dashboard/provider?tab=resenas"),
     ]
-    items = []
-    score = 0
+    items, score = [], 0
     for field, label, pts, deep in rules:
-        v = prof.get(field)
+        v = profile.get(field)
         if field == "gallery":
             done = bool(v and len(v) > 0)
         elif field == "service_areas":
             done = bool(v and len(v) > 0)
         elif field == "rates":
-            done = bool(prof.get("_has_rates"))
+            done = bool(profile.get("_has_rates"))
         elif field == "calendar_active":
-            done = bool(prof.get("calendar_active"))
+            done = bool(profile.get("calendar_active"))
         elif field == "rating_count":
             done = (v or 0) > 0
         else:
@@ -5240,16 +5275,11 @@ async def my_ecard_health(user: User = Depends(get_current_user)):
         if done:
             score += pts
         items.append({
-            "key": field,
-            "label": label,
-            "points": pts,
-            "deep_link": deep,
+            "key": field, "label": label, "points": pts, "deep_link": deep,
             "status": "done" if done else "missing",
-            "icon": icon,
-            "severity": severity,
+            "icon": icon, "severity": severity,
             "impact": impact if not done else "",
         })
-    # Sort missing critical/high first, then by points — pushes biggest leaks to the top.
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     items.sort(key=lambda it: (
         0 if it["status"] == "missing" else 1,
@@ -5257,6 +5287,220 @@ async def my_ecard_health(user: User = Depends(get_current_user)):
         -it["points"],
     ))
     return {"score": score, "items": items}
+
+
+@api_router.get("/providers/me/health")
+async def my_ecard_health(user: User = Depends(get_current_user)):
+    """Full eCard checklist used by EcardHealth widget on the provider dashboard."""
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    has_rates = await db.provider_rates.count_documents({"provider_id": prof.get("provider_id")}) > 0
+    prof["_has_rates"] = has_rates
+    return _build_health_items(prof)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Section 43B — Weekly "Tu eCard esta semana" outbound email
+# ════════════════════════════════════════════════════════════════════
+# Sent every Monday 10am UTC to providers with score < 100 AND a verified
+# email. Pulls the same health checklist used by the on-screen widget, plus
+# the rolling-7-day delta of profile views, contact_clicks, and reviews.
+# Idempotent: scheduler_state job_key "weekly_health_email" tracks last run.
+
+def _build_health_email_html(*, business_name: str, score: int, items: list,
+                             week_views: int, week_contacts: int,
+                             week_reviews: int, public_url: str,
+                             dashboard_url: str) -> str:
+    first_name = (business_name or "Proveedor").split(" ")[0]
+    missing = [it for it in items if it["status"] == "missing"]
+    next_item = missing[0] if missing else None
+    next_block = ""
+    if next_item:
+        next_block = f"""
+        <tr><td style="padding: 16px 24px;">
+          <div style="background:#F0FAF9;border:1px solid #9FE1CB;border-radius:12px;padding:16px;">
+            <p style="margin:0 0 4px 0;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;color:#025F67;">Tu próximo paso</p>
+            <p style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:#0F172A;">{next_item['label']} <span style="display:inline-block;background:#025F67;color:#fff;border-radius:999px;padding:2px 8px;font-size:11px;margin-left:4px;">+{next_item['points']}</span></p>
+            <p style="margin:0 0 12px 0;font-size:13px;line-height:1.45;color:#475569;">{next_item['impact'] or ''}</p>
+            <a href="{public_url}{next_item['deep_link']}" style="display:inline-block;background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);color:#fff;text-decoration:none;font-weight:bold;font-size:14px;padding:10px 18px;border-radius:999px;">Completar ahora →</a>
+          </div>
+        </td></tr>
+        """
+    perfect_block = "" if next_item else """
+        <tr><td style="padding:16px 24px;">
+          <div style="background:#ECFDF5;border:1px solid #6EE7B7;border-radius:12px;padding:16px;text-align:center;">
+            <p style="margin:0;font-size:16px;font-weight:700;color:#065F46;">🏆 ¡Tu eCard está perfecta!</p>
+            <p style="margin:6px 0 0 0;font-size:13px;color:#047857;">Cada reseña nueva sube tu visibilidad en búsqueda.</p>
+          </div>
+        </td></tr>
+    """
+    stats_block = f"""
+        <tr><td style="padding:0 24px 8px 24px;">
+          <p style="margin:0 0 8px 0;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;color:#94A3B8;">Tu eCard esta semana</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td width="33%" style="text-align:center;padding:10px 4px;background:#F8FAFC;border-radius:10px;">
+                <div style="font-size:22px;font-weight:800;color:#0F172A;line-height:1;">{week_views}</div>
+                <div style="font-size:11px;color:#64748B;margin-top:4px;">vistas</div>
+              </td>
+              <td width="6"></td>
+              <td width="33%" style="text-align:center;padding:10px 4px;background:#F8FAFC;border-radius:10px;">
+                <div style="font-size:22px;font-weight:800;color:#0F172A;line-height:1;">{week_contacts}</div>
+                <div style="font-size:11px;color:#64748B;margin-top:4px;">contactos</div>
+              </td>
+              <td width="6"></td>
+              <td width="33%" style="text-align:center;padding:10px 4px;background:#F8FAFC;border-radius:10px;">
+                <div style="font-size:22px;font-weight:800;color:#0F172A;line-height:1;">{week_reviews}</div>
+                <div style="font-size:11px;color:#64748B;margin-top:4px;">reseñas</div>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+    """
+    ring_pct = max(0, min(100, score))
+    ring_color = "#1D9E75" if ring_pct >= 90 else "#2F9D94" if ring_pct >= 70 else "#F59E0B" if ring_pct >= 50 else "#EF4444"
+
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9;padding:32px 12px;">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:540px;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 12px 36px rgba(2,95,103,0.08);">
+      <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:28px 24px;text-align:left;">
+        <h1 style="margin:0;color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">getamano</h1>
+        <p style="margin:4px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Tu eCard esta semana</p>
+      </td></tr>
+
+      <tr><td style="padding:24px 24px 8px 24px;">
+        <p style="margin:0 0 4px 0;font-size:15px;color:#475569;">Hola <strong style="color:#0F172A;">{first_name}</strong>,</p>
+        <p style="margin:0 0 16px 0;font-size:14px;color:#475569;line-height:1.55;">
+          Aquí va tu mini-resumen — los proveedores con perfil completo reciben hasta 2× más solicitudes.
+        </p>
+
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr>
+            <td width="80" style="vertical-align:top;">
+              <div style="width:72px;height:72px;border-radius:50%;background:conic-gradient({ring_color} {ring_pct}%,#F1F5F9 0);display:flex;align-items:center;justify-content:center;position:relative;">
+                <div style="background:#fff;border-radius:50%;width:54px;height:54px;text-align:center;line-height:54px;">
+                  <span style="font-size:18px;font-weight:800;color:#0F172A;">{score}</span>
+                </div>
+              </div>
+            </td>
+            <td style="padding-left:14px;vertical-align:middle;">
+              <p style="margin:0;font-size:16px;font-weight:700;color:#0F172A;">Salud de tu eCard: <span style="color:{ring_color};">{score}/100</span></p>
+              <p style="margin:4px 0 0 0;font-size:13px;color:#64748B;">
+                {len([i for i in items if i['status']=='done'])}/{len(items)} elementos listos.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+
+      {stats_block}
+      {next_block}
+      {perfect_block}
+
+      <tr><td style="padding:16px 24px 24px 24px;text-align:center;">
+        <a href="{dashboard_url}" style="display:inline-block;background:#0F172A;color:#fff;text-decoration:none;font-weight:600;font-size:13px;padding:10px 20px;border-radius:999px;">Abrir mi panel completo</a>
+      </td></tr>
+
+      <tr><td style="background:#F8FAFC;padding:18px 24px;text-align:center;border-top:1px solid #E2E8F0;">
+        <p style="margin:0 0 4px 0;color:#94A3B8;font-size:11px;">
+          Te enviamos este resumen porque eres proveedor verificado en getamano.
+        </p>
+        <p style="margin:0;color:#CBD5E1;font-size:10px;">
+          © getamano 2026 — Latin Ventures LLC
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+
+async def _gather_health_email_data(user_id: str) -> Optional[dict]:
+    """Return the payload needed to render and send a weekly health email, or
+    None when the provider is ineligible (no profile / no email / no email_verified)."""
+    prof = await db.provider_profiles.find_one({"user_id": user_id}, {"_id": 0})
+    if not prof:
+        return None
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "email_verified": 1})
+    if not user or not user.get("email") or not user.get("email_verified"):
+        return None
+    has_rates = await db.provider_rates.count_documents({"provider_id": prof.get("provider_id")}) > 0
+    prof["_has_rates"] = has_rates
+    health = _build_health_items(prof)
+    return {
+        "email": user["email"],
+        "business_name": prof.get("business_name") or user.get("name") or "Proveedor",
+        "score": health["score"],
+        "items": health["items"],
+        "week_views": prof.get("views") or 0,
+        "week_contacts": prof.get("contact_clicks") or 0,
+        "week_reviews": prof.get("reviews_count") or 0,
+    }
+
+
+async def _send_health_email_to_provider(user_id: str, public_url: str) -> dict:
+    data = await _gather_health_email_data(user_id)
+    if not data:
+        return {"user_id": user_id, "sent": False, "skipped": True, "reason": "ineligible"}
+    # Skip providers whose eCard is already perfect — no nudge needed.
+    if data["score"] >= 100:
+        return {"user_id": user_id, "sent": False, "skipped": True, "reason": "score_perfect"}
+    dashboard_url = f"{public_url}/dashboard/provider"
+    html = _build_health_email_html(
+        business_name=data["business_name"],
+        score=data["score"],
+        items=data["items"],
+        week_views=data["week_views"],
+        week_contacts=data["week_contacts"],
+        week_reviews=data["week_reviews"],
+        public_url=public_url,
+        dashboard_url=dashboard_url,
+    )
+    subject = "Tu eCard esta semana · getamano"
+    result = await _send_email_via_resend(data["email"], subject, html)
+    return {"user_id": user_id, "sent": bool(result.get("sent")),
+            "skipped": False, "reason": result.get("reason", "ok")}
+
+
+@api_router.get("/providers/me/health-email/preview")
+async def my_health_email_preview(user: User = Depends(get_current_user)):
+    """Provider preview — returns the email payload so the dashboard can show what will be sent."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores reciben este resumen.")
+    data = await _gather_health_email_data(user.user_id)
+    if not data:
+        return {"available": False, "reason": "ineligible"}
+    return {"available": True, **data}
+
+
+@api_router.post("/admin/health-email/send-weekly")
+async def admin_send_weekly_health_email(request: Request, admin: User = Depends(require_admin)):
+    """Fan-out the weekly eCard health email to every eligible provider.
+    Eligible = active + approved + has email_verified user + score < 100."""
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    public_url = forwarded.split("/api", 1)[0] if forwarded else os.environ.get("PUBLIC_URL", "https://getamano.us")
+    eligible = await db.provider_profiles.find(
+        {
+            "is_active": True,
+            "verification_status": "approved",
+            "business_name": {"$not": {"$regex": "^TEST_"}},
+        },
+        {"_id": 0, "user_id": 1},
+    ).limit(500).to_list(500)
+    results = []
+    for prof in eligible:
+        try:
+            results.append(await _send_health_email_to_provider(prof["user_id"], public_url))
+        except Exception as e:
+            logger.warning(f"health email failed for {prof.get('user_id')}: {e}")
+            results.append({"user_id": prof.get("user_id"), "sent": False, "skipped": False, "reason": "exception"})
+    sent = sum(1 for r in results if r.get("sent"))
+    skipped = sum(1 for r in results if r.get("skipped"))
+    await audit_log(admin.user_id, "health_email.weekly_sent", {"sent": sent, "skipped": skipped, "total": len(results)}, request)
+    return {"ok": True, "sent": sent, "skipped": skipped, "total": len(results), "results": results[:50]}
 
 
 # ─── SECTION 16B — Engagement badges ─────────────────────────────────────
