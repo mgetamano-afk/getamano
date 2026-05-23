@@ -1,22 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import Header from "../components/Header";
-import { Search as SearchIcon, Store, Briefcase } from "lucide-react";
+import { Search as SearchIcon, Store, Briefcase, Gift } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "../lib/api";
 
 export default function Register() {
   const { register } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const refCode = (params.get("ref") || "").toUpperCase().slice(0, 6) || null;
   const [step, setStep] = useState(params.get("intent") ? 2 : 1);
-  const [intent, setIntent] = useState(params.get("intent") || "client");
+  const [intent, setIntent] = useState(params.get("intent") || (refCode ? "provider" : "client"));
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refPreview, setRefPreview] = useState(null);
+
+  // Section 33 — fetch referrer banner data
+  useEffect(() => {
+    if (!refCode) return;
+    let alive = true;
+    api.get(`/referral/preview/${refCode}`)
+      .then(r => { if (alive && r.data?.valid) setRefPreview(r.data); })
+      .catch(() => { /* silent — invalid codes won't render */ });
+    return () => { alive = false; };
+  }, [refCode]);
 
   const intentToRole = (i) => (i === "provider" || i === "existing" ? "provider" : "client");
 
@@ -25,11 +38,9 @@ export default function Register() {
     setLoading(true);
     try {
       const role = intentToRole(intent);
-      const user = await register({ email, password, name, role });
+      const user = await register({ email, password, name, role }, refCode);
       toast.success("¡Cuenta creada! Verifica tu correo para continuar.");
       // Section 24: route every new account through email verification first.
-      // The verify page reads `?email=` so the user can confirm even if they
-      // get logged out before completing the OTP flow.
       navigate(`/verificar-correo?email=${encodeURIComponent(user.email || email)}`);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Error");
@@ -42,6 +53,7 @@ export default function Register() {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
     const redirectUrl = window.location.origin + "/dashboard";
     sessionStorage.setItem("tx_intent", intent);
+    if (refCode) sessionStorage.setItem("tx_ref", refCode);
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
@@ -55,7 +67,25 @@ export default function Register() {
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       <Header />
       <main className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+        <div className="w-full max-w-lg">
+          {refPreview && (
+            <div
+              className="rounded-2xl mb-4 p-4 flex items-start gap-3"
+              style={{ background: "linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)", border: "1px solid #FED7AA" }}
+              data-testid="register-ref-banner"
+            >
+              <Gift className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: "#C2410C" }} />
+              <div className="min-w-0">
+                <p className="font-semibold text-amber-900 text-sm leading-tight">
+                  Te invita <span className="font-bold">{refPreview.referrer_name}</span> · <span className="opacity-80">{refPreview.business_name}</span>
+                </p>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  🎁 Crea tu cuenta y al verificarte recibes <strong>1 mes gratis Pro</strong> — y {refPreview.referrer_name} también lo gana. Win-win.
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <img src="/getamano-logo-mark.png" alt="getamano" className="w-16 h-16 mx-auto mb-3 object-contain" />
           {step === 1 ? (
             <>
@@ -124,6 +154,7 @@ export default function Register() {
               </div>
             </>
           )}
+          </div>
         </div>
       </main>
     </div>

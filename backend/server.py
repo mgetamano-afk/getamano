@@ -2101,6 +2101,15 @@ async def admin_verify(provider_id: str, payload: VerificationActionIn, admin: U
                      "pending": "Tu perfil está pendiente de revisión."}.get(payload.status, f"Estado actualizado: {payload.status}")
             send_sms(prov_user["phone"], f"[getamano] {label}", event=f"verify_{payload.status}")
 
+        # SECTION 16C+ — On approval, trigger referral reward (idempotent)
+        if payload.status == "approved":
+            try:
+                reward = await _grant_referral_reward(provider["user_id"])
+                if reward:
+                    logger.info(f"referral reward granted for {provider['user_id']}: {reward}")
+            except Exception:
+                logger.exception("referral reward grant failed (non-blocking)")
+
     return {"ok": True}
 
 @api_router.get("/admin/stats")
@@ -4154,7 +4163,7 @@ async def get_notifications(user: User = Depends(get_current_user)):
     raw = await db.notifications.find(
         {
             "user_id": user.user_id,
-            "category": "gigs",
+            "category": {"$in": ["gigs", "referrals"]},
             "dismissed_at": None,
         },
         {"_id": 0},
@@ -4973,6 +4982,251 @@ async def _track_referral_signup(referred_user_id: str, ref_code: str) -> None:
         "status": "registered",  # → "paid" when subscription pays → "credited" when month applied
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
+
+
+async def _grant_referral_reward(referred_user_id: str) -> Optional[dict]:
+    """Trigger when a provider gets verified. Credits both the referrer and the
+    invitee with 30 days of free Pro by extending their `pro_referral_until`
+    timestamps. Idempotent: marks the referral as `credited` so it can't fire
+    twice for the same invitee.
+    """
+    referral = await db.referrals.find_one(
+        {"referred_user_id": referred_user_id},
+        {"_id": 0},
+    )
+    if not referral:
+        return None
+    if referral.get("status") == "credited":
+        return None  # already rewarded
+    now = datetime.now(timezone.utc)
+    bonus_until = (now + timedelta(days=30)).isoformat()
+
+    async def _extend(user_id: str) -> str:
+        u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "pro_referral_until": 1, "email": 1, "name": 1})
+        if not u:
+            return ""
+        # If user already has bonus time, stack on top of the latest
+        current = u.get("pro_referral_until")
+        if current:
+            try:
+                current_dt = datetime.fromisoformat(current)
+                if current_dt > now:
+                    new_until = (current_dt + timedelta(days=30)).isoformat()
+                else:
+                    new_until = bonus_until
+            except Exception:
+                new_until = bonus_until
+        else:
+            new_until = bonus_until
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"pro_referral_until": new_until}},
+        )
+        return new_until
+
+    referrer_until = await _extend(referral["referrer_user_id"])
+    invitee_until = await _extend(referred_user_id)
+
+    await db.referrals.update_one(
+        {"referral_id": referral["referral_id"]},
+        {"$set": {
+            "status": "credited",
+            "credited_at": now.isoformat(),
+            "referrer_pro_until": referrer_until,
+            "invitee_pro_until": invitee_until,
+        }},
+    )
+
+    # In-app notifications for both
+    invitee_name = ""
+    invitee_user = await db.users.find_one({"user_id": referred_user_id}, {"_id": 0, "name": 1})
+    if invitee_user:
+        invitee_name = (invitee_user.get("name") or "").split(" ")[0] or "tu referido"
+    referrer_name = ""
+    referrer_user = await db.users.find_one({"user_id": referral["referrer_user_id"]}, {"_id": 0, "name": 1})
+    if referrer_user:
+        referrer_name = (referrer_user.get("name") or "").split(" ")[0] or "tu compa"
+    now_iso = now.isoformat()
+    referral_id = referral["referral_id"]
+
+    for uid, title, body in [
+        (referral["referrer_user_id"],
+         "🎉 ¡Ganaste 1 mes gratis Pro!",
+         f"{invitee_name} se verificó usando tu link de referido. ¡Disfruta tu mes gratis!"),
+        (referred_user_id,
+         "🎁 Te regalamos 1 mes Pro gratis",
+         f"Como llegaste por la invitación de {referrer_name}, ¡tu primer mes Pro va por la casa!"),
+    ]:
+        key = f"{uid}::referral_reward::{referral_id}"
+        existing = await db.notifications.find_one({"notification_key": key}, {"_id": 0})
+        if existing:
+            continue
+        await db.notifications.insert_one({
+            "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+            "notification_key": key,
+            "user_id": uid,
+            "role": "provider",
+            "category": "referrals",
+            "title": title,
+            "body": body,
+            "cta_label": "Ver invitaciones",
+            "cta_url": "/dashboard/provider#referrals",
+            "icon": "trophy",
+            "priority": "high",
+            "is_read": False,
+            "dismissed_at": None,
+            "created_at": now_iso,
+        })
+
+    return {
+        "referral_id": referral_id,
+        "referrer_user_id": referral["referrer_user_id"],
+        "referred_user_id": referred_user_id,
+        "referrer_pro_until": referrer_until,
+        "invitee_pro_until": invitee_until,
+    }
+
+
+@api_router.get("/referral/preview/{code}")
+async def referral_preview(code: str):
+    """Public — used by the landing page when ?ref=CODE is in the URL.
+
+    Returns the referrer's first name + business name so we can render a
+    welcome banner. Returns 404 only when the code is malformed; an unknown
+    code returns {valid: false} so the landing page can silently hide the
+    banner without leaking which codes exist.
+    """
+    code = (code or "").strip().upper()
+    if len(code) != 6 or not code.isalnum():
+        raise HTTPException(status_code=400, detail="Código inválido.")
+    prof = await db.provider_profiles.find_one(
+        {"ref_code": code},
+        {"_id": 0, "user_id": 1, "business_name": 1, "city": 1, "slug": 1},
+    )
+    if not prof:
+        return {"valid": False}
+    user = await db.users.find_one({"user_id": prof["user_id"]}, {"_id": 0, "name": 1})
+    name = ""
+    if user:
+        name = (user.get("name") or "").split(" ")[0]
+    return {
+        "valid": True,
+        "code": code,
+        "referrer_name": name or "Un proveedor",
+        "business_name": prof.get("business_name") or "",
+        "city": prof.get("city"),
+        "slug": prof.get("slug"),
+    }
+
+
+class ReferralInviteIn(BaseModel):
+    email: EmailStr
+    note: Optional[str] = Field(None, max_length=300)
+
+
+@api_router.post("/providers/me/referral/invite")
+async def referral_invite(payload: ReferralInviteIn, request: Request, user: User = Depends(get_current_user)):
+    """Send a personal invitation email to a friend with the referrer's
+    unique link pre-attached. Dev-fallback logs to backend stderr until
+    RESEND_API_KEY is set. Stores the invite for tracking.
+    """
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores pueden invitar.")
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "ref_code": 1, "business_name": 1})
+    if not prof:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado.")
+    code = prof.get("ref_code")
+    if not code:
+        # backfill
+        for _ in range(8):
+            cand = _gen_ref_code()
+            ex = await db.provider_profiles.find_one({"ref_code": cand}, {"_id": 0})
+            if not ex:
+                code = cand
+                break
+        await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": {"ref_code": code}})
+    target = payload.email.lower().strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="Email requerido.")
+    # Don't allow inviting an already-registered user
+    if await db.users.find_one({"email": target}, {"_id": 0, "user_id": 1}):
+        raise HTTPException(status_code=400, detail="Esa persona ya tiene cuenta en getamano.")
+    # Rate-limit one invite per (referrer, email) per 24h
+    one_day_ago = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    recent = await db.referral_invites.find_one(
+        {"referrer_user_id": user.user_id, "invited_email": target, "created_at": {"$gte": one_day_ago}},
+        {"_id": 0},
+    )
+    if recent:
+        raise HTTPException(status_code=429, detail="Ya enviaste una invitación a esta persona en las últimas 24 horas.")
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    public_url = forwarded.split("/api", 1)[0] if forwarded else "https://getamano.us"
+    invite_url = f"{public_url.rstrip('/')}/registro?ref={code}&intent=provider"
+    name_first = (await db.users.find_one({"user_id": user.user_id}, {"_id": 0, "name": 1}) or {}).get("name", "").split(" ")[0] or "Tu compa"
+    biz = prof.get("business_name") or "su negocio"
+    subject = f"💸 {name_first} te invitó a getamano — primer mes Pro gratis"
+    body_html = f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#F7F6F2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F7F6F2;padding:24px 12px;"><tr><td align="center">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+    <tr><td style="background:linear-gradient(135deg,#025F67 0%,#2F9D94 100%);padding:36px 32px 24px;">
+      <p style="margin:0;color:rgba(255,255,255,0.85);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:700;">Invitación personal</p>
+      <h1 style="margin:8px 0 0 0;color:#FFFFFF;font-size:26px;font-weight:800;line-height:1.2;">{name_first} cree que getamano es para ti.</h1>
+    </td></tr>
+    <tr><td style="padding:24px 32px;">
+      <p style="margin:0 0 12px 0;color:#0F172A;font-size:16px;line-height:1.6;">Hola 👋</p>
+      <p style="margin:0 0 12px 0;color:#475569;font-size:15px;line-height:1.6;">
+        <strong>{name_first}</strong> ({biz}) te está invitando a unirte a <strong>getamano</strong>, el marketplace donde la comunidad latina en EE.UU. encuentra y contrata proveedores verificados.
+      </p>
+      <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:14px;padding:14px 18px;margin:18px 0;">
+        <p style="margin:0;color:#9A3412;font-size:14px;font-weight:700;">🎁 Bono por usar este link:</p>
+        <p style="margin:6px 0 0 0;color:#7C2D12;font-size:13px;line-height:1.5;">Cuando verifiquemos tu perfil, recibes <strong>1 mes gratis Pro</strong> — y {name_first} también lo recibe. Ganan los dos.</p>
+      </div>
+      <p style="margin:0 0 16px 0;color:#475569;font-size:14px;line-height:1.6;">{(payload.note or '').strip()}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{invite_url}" style="display:inline-block;padding:14px 32px;background:#025F67;color:#FFFFFF;text-decoration:none;font-weight:700;font-size:15px;border-radius:9999px;">Crear mi cuenta gratis →</a>
+      </div>
+      <p style="margin:0;color:#94A3B8;font-size:12px;text-align:center;">O copia este enlace: <span style="color:#025F67;">{invite_url}</span></p>
+    </td></tr>
+    <tr><td style="background:#F8FAFC;padding:18px 32px;text-align:center;border-top:1px solid #E2E8F0;">
+      <p style="margin:0;color:#94A3B8;font-size:11px;">© getamano 2026 · Hecho con cariño para la comunidad latina.</p>
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>"""
+    result = await _send_email_via_resend(target, subject, body_html)
+    # Track the invite
+    await db.referral_invites.insert_one({
+        "invite_id": f"inv_{uuid.uuid4().hex[:14]}",
+        "referrer_user_id": user.user_id,
+        "ref_code": code,
+        "invited_email": target,
+        "note": (payload.note or "")[:300],
+        "sent": result.get("sent", False),
+        "reason": result.get("reason"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await audit_log(user.user_id, "referral.invite_sent", {"email": target, "code": code, "sent": result.get("sent", False)}, request)
+    return {"ok": True, "sent": result.get("sent", False), "reason": result.get("reason"), "share_url": invite_url}
+
+
+@api_router.get("/me/referral-credit")
+async def get_my_referral_credit(user: User = Depends(get_current_user)):
+    """Returns how many days of free Pro the user has remaining from referrals."""
+    u = await db.users.find_one({"user_id": user.user_id}, {"_id": 0, "pro_referral_until": 1})
+    until = (u or {}).get("pro_referral_until")
+    if not until:
+        return {"active": False, "until": None, "days_remaining": 0}
+    try:
+        until_dt = datetime.fromisoformat(until)
+    except Exception:
+        return {"active": False, "until": None, "days_remaining": 0}
+    now = datetime.now(timezone.utc)
+    if until_dt <= now:
+        return {"active": False, "until": until, "days_remaining": 0}
+    days = max(0, int((until_dt - now).total_seconds() // 86400))
+    return {"active": True, "until": until, "days_remaining": days}
 
 
 # ─── SECTION 13G + 14E — Conversations, messages, appointments (in-app, no Realtime) ───

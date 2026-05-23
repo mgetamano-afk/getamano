@@ -34,8 +34,9 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const register = async (payload) => {
-    const { data } = await api.post("/auth/register", payload);
+  const register = async (payload, ref = null) => {
+    const url = ref ? `/auth/register?ref=${encodeURIComponent(ref)}` : "/auth/register";
+    const { data } = await api.post(url, payload);
     setUser(data.user);
     return data.user;
   };
