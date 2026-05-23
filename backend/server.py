@@ -5800,6 +5800,146 @@ async def admin_latency_dashboard(_: User = Depends(require_admin)):
     }
 
 
+# ════════════════════════════════════════════════════════════════════
+# Section 44C — Admin Provider Activation Tracking
+# ════════════════════════════════════════════════════════════════════
+# Visibility on the bulk-onboarding funnel: which providers we created have
+# not yet claimed their account? The CEO can resend the activation link with
+# one click for stale ones.
+
+@api_router.get("/admin/providers/activation-status")
+async def admin_providers_activation_status(_: User = Depends(require_admin)):
+    """Return every provider created via the admin pipeline + their current state."""
+    users = await db.users.find(
+        {"role": "provider", "created_by_admin": {"$exists": True}},
+        {"_id": 0, "user_id": 1, "email": 1, "name": 1, "created_at": 1,
+         "password_changed_at": 1, "email_verified": 1, "last_login_at": 1,
+         "needs_activation": 1},
+    ).sort("created_at", -1).limit(500).to_list(500)
+    if not users:
+        return {"total": 0, "items": [], "summary": {"pending": 0, "activated": 0, "stale": 0}}
+
+    user_ids = [u["user_id"] for u in users]
+    emails = [u["email"] for u in users]
+    profiles_by_user = {p["user_id"]: p for p in await db.provider_profiles.find(
+        {"user_id": {"$in": user_ids}},
+        {"_id": 0, "user_id": 1, "provider_id": 1, "business_name": 1, "slug": 1, "city": 1, "state": 1},
+    ).to_list(500)}
+
+    # The most recent password_reset row per email tells us whether an
+    # activation link is still pending OR was already consumed.
+    reset_rows = await db.password_resets.find(
+        {"email": {"$in": emails}},
+        {"_id": 0, "email": 1, "expires_at": 1, "used_at": 1, "created_at": 1, "is_activation": 1},
+    ).to_list(500)
+    reset_by_email = {}
+    for r in reset_rows:
+        prev = reset_by_email.get(r["email"])
+        if not prev or (r.get("created_at") or "") > (prev.get("created_at") or ""):
+            reset_by_email[r["email"]] = r
+
+    now = datetime.now(timezone.utc)
+    items = []
+    summary = {"pending": 0, "activated": 0, "stale": 0}
+    for u in users:
+        prof = profiles_by_user.get(u["user_id"], {})
+        reset = reset_by_email.get(u["email"], {})
+        try:
+            created = datetime.fromisoformat(u.get("created_at", "").replace("Z", "+00:00"))
+        except Exception:
+            created = now
+        days_since = max(0, (now - created).days)
+
+        activated = bool(u.get("password_changed_at") or u.get("last_login_at"))
+        token_still_valid = False
+        if reset and not reset.get("used_at"):
+            try:
+                token_still_valid = datetime.fromisoformat(reset["expires_at"]) > now
+            except Exception:
+                token_still_valid = False
+
+        if activated:
+            status = "activated"
+            summary["activated"] += 1
+        elif days_since >= 3:
+            status = "stale"
+            summary["stale"] += 1
+        else:
+            status = "pending"
+            summary["pending"] += 1
+
+        items.append({
+            "user_id": u["user_id"],
+            "email": u["email"],
+            "name": u.get("name", ""),
+            "business_name": prof.get("business_name", ""),
+            "slug": prof.get("slug"),
+            "city": prof.get("city"),
+            "state": prof.get("state"),
+            "created_at": u.get("created_at"),
+            "days_since": days_since,
+            "status": status,
+            "password_changed_at": u.get("password_changed_at"),
+            "last_login_at": u.get("last_login_at"),
+            "email_verified": bool(u.get("email_verified")),
+            "activation_link_pending": token_still_valid,
+        })
+
+    return {"total": len(items), "items": items, "summary": summary}
+
+
+@api_router.post("/admin/providers/{user_id}/resend-activation")
+async def admin_resend_activation(user_id: str, request: Request, admin: User = Depends(require_admin)):
+    """Regenerate the activation token + re-send the email (or return the URL
+    so the CEO can copy it manually if Resend isn't configured)."""
+    user_doc = await db.users.find_one(
+        {"user_id": user_id, "role": "provider"},
+        {"_id": 0, "email": 1, "name": 1, "password_changed_at": 1, "last_login_at": 1},
+    )
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
+    if user_doc.get("password_changed_at") or user_doc.get("last_login_at"):
+        raise HTTPException(status_code=400, detail="Este proveedor ya activó su cuenta.")
+
+    profile = await db.provider_profiles.find_one({"user_id": user_id}, {"_id": 0, "business_name": 1}) or {}
+
+    forwarded = request.headers.get("origin") or request.headers.get("referer") or ""
+    public_url = forwarded.split("/api", 1)[0] if forwarded else os.environ.get("PUBLIC_URL", "https://getamano.us")
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hash_password(raw_token)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=14)
+    await db.password_resets.update_one(
+        {"email": user_doc["email"]},
+        {"$set": {
+            "email": user_doc["email"],
+            "user_id": user_id,
+            "token_hash": token_hash,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "used_at": None,
+            "is_activation": True,
+        }},
+        upsert=True,
+    )
+    activation_url = f"{public_url}/reset-password?token={raw_token}&activate=1"
+    subject = "Activa tu cuenta · getamano"
+    html = _bulk_activation_email_html(
+        business_name=profile.get("business_name") or user_doc.get("name") or "tu negocio",
+        activation_url=activation_url,
+    )
+    delivery = await _send_email_via_resend(user_doc["email"], subject, html)
+    await audit_log(admin.user_id, "admin.providers.resend_activation",
+                    {"user_id": user_id, "email": user_doc["email"], "delivery_sent": bool(delivery.get("sent"))},
+                    request)
+    return {
+        "ok": True,
+        "email": user_doc["email"],
+        "activation_url": activation_url,
+        "delivery": "sent" if delivery.get("sent") else "logged",
+    }
+
+
 @api_router.post("/admin/health-email/send-weekly")
 async def admin_send_weekly_health_email(request: Request, admin: User = Depends(require_admin)):
     """Fan-out the weekly eCard health email to every eligible provider.

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Users, Plus, Trash2, Copy, Check, AlertTriangle, ChevronLeft,
-  Clock, Zap, TrendingDown, Activity,
+  Clock, Zap, TrendingDown, Activity, UserCheck, Mail, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
