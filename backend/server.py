@@ -575,6 +575,9 @@ async def seed():
         await db.post_likes.create_index([("post_id", 1), ("user_id", 1)], unique=True)
         await db.provider_follows.create_index([("follower_user_id", 1), ("provider_user_id", 1)], unique=True)
         await db.provider_follows.create_index("provider_user_id")
+        # Comments
+        await db.community_comments.create_index([("post_id", 1), ("created_at", 1)])
+        await db.community_comments.create_index("user_id")
         await db.quote_requests.create_index([("country", 1), ("category_id", 1), ("city", 1)])
         await db.provider_rates.create_index([("category_id", 1), ("city", 1), ("country", 1)])
         await db.provider_rates.create_index([("provider_id", 1), ("is_active", 1)])
@@ -4309,6 +4312,125 @@ async def community_trending():
     return out
 
 
+# ─── Comments (threaded replies on community posts) ──────────────────────
+COMMENT_MIN_LEN = 1
+COMMENT_MAX_LEN = 300
+
+
+class NewCommentIn(BaseModel):
+    content: str = Field(..., min_length=COMMENT_MIN_LEN, max_length=COMMENT_MAX_LEN)
+
+
+async def _hydrate_comments(comments: list[dict]) -> list[dict]:
+    """Attach a compact author object to each comment row."""
+    if not comments:
+        return []
+    author_ids = list({c["user_id"] for c in comments if c.get("user_id")})
+    users = {u["user_id"]: u for u in await db.users.find(
+        {"user_id": {"$in": author_ids}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "role": 1},
+    ).to_list(500)}
+    profs = {p["user_id"]: p for p in await db.provider_profiles.find(
+        {"user_id": {"$in": author_ids}, "is_active": True, "verification_status": "approved"},
+        {"_id": 0, "user_id": 1, "slug": 1, "business_name": 1, "logo_url": 1, "photo_url": 1},
+    ).to_list(500)}
+    for c in comments:
+        u = users.get(c["user_id"], {})
+        prof = profs.get(c["user_id"])
+        c["author"] = {
+            "user_id": c["user_id"],
+            "name": u.get("name", "Usuario"),
+            "picture": (prof.get("logo_url") or prof.get("photo_url") if prof else None) or u.get("picture"),
+            "slug": prof.get("slug") if prof else None,
+            "business_name": prof.get("business_name") if prof else None,
+            "is_provider": bool(prof),
+        }
+    return comments
+
+
+@api_router.get("/community/posts/{post_id}/comments")
+async def list_comments(post_id: str, limit: int = 30, before: Optional[str] = None):
+    """Public — paginated comment thread for a post (oldest-last cursor)."""
+    limit = max(1, min(limit, 100))
+    post = await db.community_posts.find_one({"post_id": post_id, "is_hidden": {"$ne": True}}, {"_id": 0, "post_id": 1})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado.")
+    q = {"post_id": post_id, "is_hidden": {"$ne": True}}
+    if before:
+        q["created_at"] = {"$gt": before}
+    rows = await db.community_comments.find(q, {"_id": 0}).sort("created_at", 1).limit(limit).to_list(limit)
+    rows = await _hydrate_comments(rows)
+    total = await db.community_comments.count_documents({"post_id": post_id, "is_hidden": {"$ne": True}})
+    return {"items": rows, "total": total, "next_after": rows[-1]["created_at"] if len(rows) == limit else None}
+
+
+@api_router.post("/community/posts/{post_id}/comments")
+async def create_comment(post_id: str, payload: NewCommentIn, request: Request, user: User = Depends(get_current_user)):
+    """Create a new comment. Soft anti-spam: 10 comments per 5 min per user."""
+    post = await db.community_posts.find_one({"post_id": post_id, "is_hidden": {"$ne": True}}, {"_id": 0, "post_id": 1, "user_id": 1})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado.")
+    five_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    recent = await db.community_comments.count_documents({"user_id": user.user_id, "created_at": {"$gte": five_min_ago}})
+    if recent >= 10:
+        raise HTTPException(status_code=429, detail="Has comentado mucho en los últimos minutos. Espera un momento.")
+    now = datetime.now(timezone.utc)
+    comment_id = f"cmt_{uuid.uuid4().hex[:14]}"
+    doc = {
+        "comment_id": comment_id,
+        "post_id": post_id,
+        "user_id": user.user_id,
+        "content": payload.content.strip(),
+        "is_hidden": False,
+        "created_at": now.isoformat(),
+    }
+    await db.community_comments.insert_one(doc)
+    doc.pop("_id", None)
+    await db.community_posts.update_one({"post_id": post_id}, {"$inc": {"comments_count": 1}})
+    await audit_log(user.user_id, "community.comment_created", {"post_id": post_id, "comment_id": comment_id}, request)
+
+    # Notify post owner (if not commenting on own post)
+    if post["user_id"] != user.user_id:
+        post_owner = post["user_id"]
+        first = (await db.users.find_one({"user_id": user.user_id}, {"_id": 0, "name": 1}) or {}).get("name", "Alguien").split(" ")[0] or "Alguien"
+        await db.notifications.insert_one({
+            "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+            "notification_key": f"{post_owner}::comment::{comment_id}",
+            "user_id": post_owner,
+            "role": "provider",
+            "category": "community",
+            "title": f"💬 {first} comentó tu post",
+            "body": payload.content.strip()[:120],
+            "cta_label": "Ver comentario",
+            "cta_url": "/comunidad",
+            "icon": "inbox",
+            "priority": "medium",
+            "is_read": False,
+            "dismissed_at": None,
+            "created_at": now.isoformat(),
+        })
+
+    hydrated = await _hydrate_comments([doc])
+    return hydrated[0] if hydrated else doc
+
+
+@api_router.delete("/community/comments/{comment_id}")
+async def delete_comment(comment_id: str, request: Request, user: User = Depends(get_current_user)):
+    """Soft-delete a comment. Owner OR admin."""
+    c = await db.community_comments.find_one({"comment_id": comment_id}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="Comentario no encontrado.")
+    if c["user_id"] != user.user_id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="No puedes eliminar este comentario.")
+    if c.get("is_hidden"):
+        return {"ok": True, "already_hidden": True}
+    await db.community_comments.update_one({"comment_id": comment_id}, {"$set": {"is_hidden": True}})
+    await db.community_posts.update_one({"post_id": c["post_id"]}, {"$inc": {"comments_count": -1}})
+    await audit_log(user.user_id, "community.comment_deleted", {"comment_id": comment_id, "post_id": c["post_id"]}, request)
+    return {"ok": True}
+
+
+
 @api_router.get("/public/stats")
 async def public_stats():
     # BUG-05: real stats with TEST data excluded
@@ -4663,7 +4785,7 @@ async def get_notifications(user: User = Depends(get_current_user)):
     raw = await db.notifications.find(
         {
             "user_id": user.user_id,
-            "category": {"$in": ["gigs", "referrals", "streaks", "rewards"]},
+            "category": {"$in": ["gigs", "referrals", "streaks", "rewards", "community"]},
             "dismissed_at": None,
         },
         {"_id": 0},

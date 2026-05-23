@@ -1,0 +1,51 @@
+{
+  "summary": "Iter42 comments + image upload sprint testing. Backend: 16/17 new tests PASS for comments CRUD, notification creation, /api/upload validation, and notifications category merge. iter41 regression 26/26 still PASSES. One backend-impacting bug found: image-only post path is broken because frontend sends content='📷' (Python len=1) which violates server POST_MIN_LEN=4. Frontend UI partial verification: modal opens via data-testid, body scroll lock applied, anon login link appears for guests, seed Carlos Demo comment visible in modal, close button restores scroll. Could not fully exercise authenticated send/delete flows in Playwright due to intermittent login form submission (cookie occasionally not set after click) — backend confirms create/delete works.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/community/posts",
+        "issue": "Image-only post path: frontend NewPostBox sends content='📷' (single codepoint, len=1) when textarea empty + image attached, but Pydantic POST_MIN_LEN=4 returns 422 'String should have at least 4 characters'. Either reduce min_length conditionally when image_url is present, or change the frontend placeholder to 4 chars (e.g. '📷 . ').",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "NewPost image-only submission",
+        "issue": "Frontend sends 'content: content.trim() || \"📷\"' but backend rejects with 422. User sees 'String should have at least 4 characters' toast and image is lost. See ComunidadPage.jsx line 125.",
+        "affected_selectors": ["comunidad-newpost-submit", "comunidad-newpost-file-input"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter42_comments_images.py",
+    "/app/test_reports/pytest/iter42_results.xml"
+  ],
+  "action_items": [
+    "Fix image-only post: either change ComunidadPage.jsx line 125 to a 4-char placeholder (e.g., '📷.  ' or 'foto') OR change backend POST_MIN_LEN handling to allow short content when image_url present.",
+    "(Optional) Add data-testid hooks on toast messages to make file validation toasts assertable from Playwright."
+  ],
+  "critical_code_review_comments": [
+    "ComunidadPage.jsx line 125: '📷' is len=1 in Python, will always fail POST_MIN_LEN=4. Use a 4-char placeholder OR send when textarea has content (current code uses '|| \"📷\"').",
+    "_hydrate_comments correctly excludes mongo _id and produces clean author payload — good.",
+    "Notification creation uses notification_key='{owner}::comment::{cid}' which is unique → no duplicate notif risk on retries. Good.",
+    "DELETE /api/community/comments/{id}: re-decrement protection is missing if already hidden (currently returns early with already_hidden=True before decrement — correct). Good."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter42_comments_images.py (new)"
+  ],
+  "success_rate": {
+    "backend": "94% (16/17 new, 26/26 iter41 regression)",
+    "frontend": "~70% (modal opens, scroll lock, anon UI, seed comment visible; auth send/delete not fully verified via Playwright due to flaky login submit)"
+  },
+  "test_credentials": "Used from /app/memory/test_credentials.md: admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123. All valid.",
+  "seed_data_creation": "Tests created and cleaned up several TEST_iter42 comments on post_demo_seed_001. After test run: seed post comments_count should be back to its baseline (~1 from Carlos seed). One self-comment by María on a temp post was created and cleaned up. NOTE: my Playwright run also created 'TEST_iter42_UI comment via Enter' that was deleted via API afterwards, but earlier runs may have left a stray. Verified via API: comments_count on post_demo_seed_001 = 2 by end.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend comments + notifications + uploads endpoints are SOLID. The ONLY known bug is the image-only post '📷' placeholder (1 char) vs POST_MIN_LEN=4 — easy frontend fix. For Playwright login of this app: use page.locator('[data-testid=\"login-submit\"]').click() (NOT page.click with force=True — the force=True bypasses the React click handler and form does not submit). After Playwright login, wait ~5s, then verify session_token cookie exists before continuing. UI testids all working: comunidad-newpost-image-button, comunidad-newpost-file-input, comunidad-newpost-preview, comunidad-newpost-remove-image, comunidad-post-comments-{id}, comunidad-post-comments-count-{id}, comments-modal, comments-modal-close, comments-modal-list, comments-modal-input, comments-modal-send, comments-modal-anon-login.",
+  "rca_of_the_issue": "Image-only post bug RCA: ComunidadPage.jsx submitPost(): body = { content: content.trim() || '📷', image_url }. Backend NewPostIn requires content min_length=4. Python str length of single emoji '📷' (U+1F4F7) is 1, not 4 (this is correct Python behavior for BMP+SMP codepoints). Pydantic min_length validates against len(str). Result: 422 from backend whenever user uploads image without typing text. Mitigation options: (A) change frontend default to 'foto' or '📷 .' (4 chars), (B) backend: relax min_length when image_url present, (C) override min_length to 1 if NewPostIn migrates to model_validator. Recommended: (A) — simplest, no API contract change."
+}
