@@ -29,6 +29,7 @@ import LeaderboardWidget from "../components/LeaderboardWidget";
 import CouponsCard from "../components/CouponsCard";
 import ProviderLeftNav from "../components/ProviderLeftNav";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
+import EcardHealth from "../components/EcardHealth";
 import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
 import CitySearchInput from "../components/CitySearchInput";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
@@ -227,6 +228,7 @@ export default function ProviderDashboard() {
 
             {/* Mobile-only: mirror del sidebar derecho al final */}
             <div className="lg:hidden space-y-6" data-testid="provider-dashboard-mobile-sidebar-mirror">
+              <EcardHealth />
               <CouponsCard />
               <ReferralPanel />
             </div>
@@ -544,15 +546,18 @@ export default function ProviderDashboard() {
         {/* fin tabs panel (center) */}
           </section>
 
-          {/* COLUMNA DERECHA — Sidebar sticky con Recompensas + Referidos */}
+          {/* COLUMNA DERECHA — Sidebar sticky con Salud + Recompensas + Referidos */}
           <aside
             className="hidden lg:flex lg:flex-col lg:gap-4 lg:sticky lg:top-20 lg:self-start max-h-[calc(100vh-6rem)] overflow-y-auto pr-1 [&_li]:!flex-col [&_li]:!items-stretch [&_li]:!gap-2"
             data-testid="provider-dashboard-right-sidebar"
           >
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "120ms" }}>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "80ms" }}>
+              <EcardHealth />
+            </div>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "160ms" }}>
               <CouponsCard />
             </div>
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "200ms" }}>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "240ms" }}>
               <ReferralPanel />
             </div>
           </aside>

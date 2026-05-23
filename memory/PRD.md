@@ -275,6 +275,35 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — eCard Health Checklist (Section 43)
+
+**Dashboard de salud gamificado para proveedores.**
+
+**Backend:**
+- Nuevo endpoint `GET /providers/me/health` (junto a `/providers/me/completion` existente).
+- Devuelve `{score, items[]}` donde cada `item = {key, label, points, deep_link, status: 'done'|'missing', icon, severity, impact}`.
+- Decoraciones por campo: icon · severity (critical/high/medium/low) · impact message ("Una eCard sin fotos pierde 70% de leads", "Tu primera reseña dispara conversión 3×", etc.).
+- Items ordenados: missing primero, luego por severity (critical→low), luego por points DESC — empuja los biggest leaks al tope.
+
+**Frontend `EcardHealth.jsx` (componente nuevo, ~220 líneas):**
+- **Ring SVG animado** (transición 0.8s) con color dinámico por score: ≥90 verde · ≥70 teal · ≥50 amber · <50 red.
+- **"Tu próximo paso"** card destacado teal con icon + label + points badge + impact message — el next-best-action visible.
+- **Checklist completa** con strikethrough + opacity-60 en los completados, items pendientes en negrita con chevron derecha.
+- **Trofeo** + mensaje cuando llega a 100%: "¡Tu eCard está perfecta! Cada vez que llegue una reseña nueva, tu visibilidad sube."
+- Click en cualquier item → `navigate(deep_link)` directo a `/dashboard/provider?tab={perfil|galeria|tarifas|calendario|resenas}`.
+
+**Integración Provider Dashboard:**
+- **Desktop**: pinned al TOPE de la columna derecha sticky (encima de CouponsCard y ReferralPanel) con `animationDelay: 80ms`.
+- **Mobile**: en el sidebar mirror al final del centro (encima de CouponsCard).
+
+**E2E verificado (Playwright)**:
+- María 95/100 ✓ · Tu próximo paso "Primera reseña +5" + impact "Tu primera reseña dispara conversión 3×." ✓
+- 9 items completados con strikethrough, 1 missing destacado arriba ✓
+- Click en "Tu próximo paso" → URL contiene `?tab=resenas` ✓
+- Desktop: ring grande, card horizontal elegante ✓
+- Mobile: ring compacto, layout vertical apilado ✓
+- Lint: 0 issues en 3 archivos modificados.
+
 ### May 23, 2026 — Smart Gallery Upload (auto-compression + visual tips)
 
 **Auto-compresión client-side**:

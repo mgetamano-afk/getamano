@@ -5178,6 +5178,87 @@ async def my_completion(user: User = Depends(get_current_user)):
     return _completion_for(prof)
 
 
+# Section 43 — eCard health checklist endpoint.
+# Returns the COMPLETE checklist (each rule with status: 'done' | 'missing'),
+# decorated with an icon + an impact_message so the frontend can render a
+# gamified setup widget. Built on top of _completion_for's rule list to
+# stay DRY.
+
+_HEALTH_DECORATIONS = {
+    "logo_url":        ("image",      "critical", "Sin logo, pierdes 60% de reconocimiento de marca."),
+    "description":     ("text",       "critical", "Una descripción vacía baja un 70% el click-through."),
+    "category_id":     ("tag",        "critical", "Sin categoría, no apareces en búsquedas."),
+    "service_areas":   ("map",        "high",     "Define tus zonas — clientes filtran por ciudad."),
+    "phone":           ("phone",      "critical", "Tu teléfono es el canal de contacto #1 de los latinos."),
+    "hours":           ("clock",      "medium",   "Sin horario, clientes no saben cuándo escribirte."),
+    "gallery":         ("camera",     "critical", "Una eCard sin fotos pierde 70% de leads."),
+    "rates":           ("dollar",     "high",     "Tarifas referenciales aumentan 40% la confianza."),
+    "calendar_active": ("calendar",   "medium",   "Calendario activo + 35% más bookings directos."),
+    "rating_count":    ("star",       "high",     "Tu primera reseña dispara conversión 3×."),
+}
+
+
+@api_router.get("/providers/me/health")
+async def my_ecard_health(user: User = Depends(get_current_user)):
+    """Full eCard checklist used by EcardHealth widget on the provider dashboard."""
+    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not prof:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    has_rates = await db.provider_rates.count_documents({"provider_id": prof.get("provider_id")}) > 0
+    prof["_has_rates"] = has_rates
+
+    # Replicate _completion_for's per-field evaluation so we can label each item.
+    rules = [
+        ("logo_url", "Foto de perfil", 10, "/dashboard/provider?tab=perfil"),
+        ("description", "Descripción del negocio", 15, "/dashboard/provider?tab=perfil"),
+        ("category_id", "Categoría de servicio", 10, "/dashboard/provider?tab=perfil"),
+        ("service_areas", "Zonas de cobertura", 10, "/dashboard/provider?tab=perfil"),
+        ("phone", "Número de teléfono", 10, "/dashboard/provider?tab=perfil"),
+        ("hours", "Horario de atención", 10, "/dashboard/provider?tab=perfil"),
+        ("gallery", "Fotos en la galería", 10, "/dashboard/provider?tab=galeria"),
+        ("rates", "Tarifas referenciales", 10, "/dashboard/provider?tab=tarifas"),
+        ("calendar_active", "Calendario activo", 10, "/dashboard/provider?tab=calendario"),
+        ("rating_count", "Primera reseña", 5, "/dashboard/provider?tab=resenas"),
+    ]
+    items = []
+    score = 0
+    for field, label, pts, deep in rules:
+        v = prof.get(field)
+        if field == "gallery":
+            done = bool(v and len(v) > 0)
+        elif field == "service_areas":
+            done = bool(v and len(v) > 0)
+        elif field == "rates":
+            done = bool(prof.get("_has_rates"))
+        elif field == "calendar_active":
+            done = bool(prof.get("calendar_active"))
+        elif field == "rating_count":
+            done = (v or 0) > 0
+        else:
+            done = bool(v) and (not isinstance(v, str) or v.strip())
+        icon, severity, impact = _HEALTH_DECORATIONS.get(field, ("dot", "low", ""))
+        if done:
+            score += pts
+        items.append({
+            "key": field,
+            "label": label,
+            "points": pts,
+            "deep_link": deep,
+            "status": "done" if done else "missing",
+            "icon": icon,
+            "severity": severity,
+            "impact": impact if not done else "",
+        })
+    # Sort missing critical/high first, then by points — pushes biggest leaks to the top.
+    severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    items.sort(key=lambda it: (
+        0 if it["status"] == "missing" else 1,
+        severity_order.get(it["severity"], 4),
+        -it["points"],
+    ))
+    return {"score": score, "items": items}
+
+
 # ─── SECTION 16B — Engagement badges ─────────────────────────────────────
 async def _badges_for_provider(provider_id: str, user_id: str = "") -> list[dict]:
     """Compute live badges. Cheap enough to call per provider in listing endpoints.
