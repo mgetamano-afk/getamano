@@ -498,3 +498,36 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 - AI-powered gig matching (suggest top 3 providers per posted chamba)
 - Lead recovery quiz funnel iteration v2
 
+
+### Feb 23, 2026 — Iteration 33: Gig notification fan-out
+
+User asked: "¿quieres que active notificaciones de nueva chamba para proveedores cercanos? SI"
+
+**Backend** (`/app/backend/server.py`):
+- New `_fanout_new_gig_notifications(gig)` helper. Strategy:
+  - Resolves `gig.category` → `category_id` via `categories.name_es` / `name_en` case-insensitive regex.
+  - Finds active, approved, non-TEST providers with that `category_id` AND case-insensitive city match (falls back to category-only when gig has no city).
+  - Skips the gig poster (`user_id != created_by`).
+  - Caps fan-out at 200 providers per gig (dev guardrail).
+  - Inserts one notification per matched provider with `notification_key = "{user_id}::new_gig::{gig_id}"` for idempotency.
+  - Priority is `high` when `is_urgent=true`, else `medium`. Icon = `trophy`, CTA = `/empleos`.
+- New `_notify_gig_owner_new_applicant(gig, applicant_profile)` — pings the gig owner when a provider applies. Single notification per gig (key includes gig_id); body refreshes the applicant count if more arrive.
+- Wired into `POST /api/gigs` (after audit_log) and `POST /api/gigs/{id}/apply` (after audit_log).
+- `GET /api/notifications` now merges ad-hoc DB notifications (`category=gigs`) alongside the rule-engine output. Dedupes by `notification_key`. Same sort key + unread count.
+
+**Behavior verified E2E (curl):**
+- Client posted Limpieza/Sallisaw gig → demo provider (María Cleaning, same city + category) got `💼 Nueva chamba en Sallisaw — Limpieza · {title}` with priority=high. ✓
+- Provider applied with 200-char message → gig owner (client) got `🙋 Nuevo aplicante a tu chamba — María's Cleaning Services aplicó a "{title}"` with priority=high. ✓
+- Idempotency: second GET /notifications returned the same single notification (no duplicate). ✓
+- Poster did NOT receive their own gig fan-out. ✓
+
+**Testing:**
+- New regression suite `/app/backend/tests/test_iter33_gig_notifications.py` — 4/4 pass.
+- iter32 regression intact (19/19 combined: 15 iter32 + 4 iter33).
+- Existing `NotificationBell.jsx` already supports `trophy` + `inbox` icons used here — no frontend changes; the bell will auto-show the new notifications on next 60s poll.
+
+**Follow-up backlog:**
+- Push channels via Twilio SMS / Resend email (already have `enqueue_notification` scaffolding wired into `db.notification_queue`). Activate when credentials provided.
+- Geographic radius matching (Haversine) instead of city-string exact match — backend already has `geocode` + `city_coordinates` seeded; future iter can swap to `radius_km <= 50`.
+- Provider opt-out preference for gig notifications (currently always-on).
+

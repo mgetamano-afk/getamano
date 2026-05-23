@@ -1117,6 +1117,123 @@ def _gig_public(g: dict) -> dict:
     g = {k: v for k, v in g.items() if k not in ("_id", "expires_at_native")}
     return g
 
+async def _fanout_new_gig_notifications(gig: dict) -> int:
+    """Section 30 — Notify nearby/in-category providers about a new chamba.
+
+    Strategy:
+      • Match providers whose primary category name matches the gig's category
+        (ES or EN, case-insensitive) AND whose city matches the gig's city.
+      • Fall back to category-only match if city is missing on the gig.
+      • Skip the gig poster and TEST_ accounts. Cap fanout at 200 to avoid
+        runaway notifications during dev.
+      • Idempotent: notification_key includes the gig_id so re-running won't
+        double-insert.
+    """
+    try:
+        gig_id = gig.get("gig_id")
+        category = (gig.get("category") or "").strip()
+        if not gig_id or not category:
+            return 0
+        # Look up category_id by ES or EN name (case-insensitive exact match)
+        cat = await db.categories.find_one(
+            {"$or": [
+                {"name_es": {"$regex": f"^{re.escape(category)}$", "$options": "i"}},
+                {"name_en": {"$regex": f"^{re.escape(category)}$", "$options": "i"}},
+            ]},
+            {"_id": 0, "category_id": 1},
+        )
+        if not cat:
+            return 0
+        match = {
+            "category_id": cat["category_id"],
+            "is_active": True,
+            "verification_status": "approved",
+            "user_id": {"$ne": gig.get("created_by")},
+            "business_name": {"$not": {"$regex": "^TEST_"}},
+        }
+        gig_city = (gig.get("city") or "").strip()
+        if gig_city:
+            match["city"] = {"$regex": f"^{re.escape(gig_city)}$", "$options": "i"}
+        targets = await db.provider_profiles.find(match, {"_id": 0, "user_id": 1}).limit(200).to_list(200)
+        if not targets:
+            return 0
+        city_label = gig_city or "tu zona"
+        title_es = f"💼 Nueva chamba en {city_label}"
+        body_es = f"{category} · {gig.get('title', '')[:80]}"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        inserted = 0
+        for tgt in targets:
+            user_id = tgt.get("user_id")
+            if not user_id:
+                continue
+            key = f"{user_id}::new_gig::{gig_id}"
+            # Idempotent insert — skip if same key exists
+            existing = await db.notifications.find_one({"notification_key": key}, {"_id": 0, "notification_key": 1})
+            if existing:
+                continue
+            await db.notifications.insert_one({
+                "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+                "notification_key": key,
+                "user_id": user_id,
+                "role": "provider",
+                "category": "gigs",
+                "title": title_es,
+                "body": body_es,
+                "cta_label": "Ver chamba",
+                "cta_url": "/empleos",
+                "icon": "trophy",
+                "priority": "high" if gig.get("is_urgent") else "medium",
+                "is_read": False,
+                "dismissed_at": None,
+                "created_at": now_iso,
+            })
+            inserted += 1
+        return inserted
+    except Exception as e:
+        logger.warning(f"_fanout_new_gig_notifications failed: {e}")
+        return 0
+
+async def _notify_gig_owner_new_applicant(gig: dict, applicant_profile: dict | None) -> bool:
+    """Section 30 — Ping the gig owner when a new provider applies."""
+    try:
+        gig_id = gig.get("gig_id")
+        owner_id = gig.get("created_by")
+        if not gig_id or not owner_id:
+            return False
+        biz = (applicant_profile or {}).get("business_name") or "Un proveedor"
+        # One notification per gig — refresh counter each time
+        key = f"{owner_id}::gig_applicant::{gig_id}"
+        count = await db.gig_applications.count_documents({"gig_id": gig_id})
+        body = f"{biz} aplicó a “{gig.get('title', '')[:60]}”" if count <= 1 else f"{count} aplicantes en tu chamba “{gig.get('title', '')[:50]}”"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        existing = await db.notifications.find_one({"notification_key": key}, {"_id": 0})
+        if existing:
+            await db.notifications.update_one(
+                {"notification_key": key},
+                {"$set": {"body": body, "is_read": False, "updated_at": now_iso}},
+            )
+        else:
+            await db.notifications.insert_one({
+                "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+                "notification_key": key,
+                "user_id": owner_id,
+                "role": "client",
+                "category": "gigs",
+                "title": "🙋 Nuevo aplicante a tu chamba",
+                "body": body,
+                "cta_label": "Ver aplicaciones",
+                "cta_url": "/empleos",
+                "icon": "inbox",
+                "priority": "high",
+                "is_read": False,
+                "dismissed_at": None,
+                "created_at": now_iso,
+            })
+        return True
+    except Exception as e:
+        logger.warning(f"_notify_gig_owner_new_applicant failed: {e}")
+        return False
+
 @api_router.get("/gigs")
 async def list_gigs(
     category: Optional[str] = None,
@@ -1195,6 +1312,9 @@ async def create_gig(payload: GigIn, request: Request, user: User = Depends(get_
     }
     await db.gigs.insert_one(doc)
     await audit_log(user.user_id, "gig.created", {"gig_id": gig_id, "category": doc["category"]}, request)
+    fanout = await _fanout_new_gig_notifications(doc)
+    if fanout:
+        logger.info(f"gig {gig_id}: fanout notified {fanout} providers")
     return _gig_public(doc)
 
 @api_router.post("/gigs/{gig_id}/close")
@@ -1245,6 +1365,10 @@ async def apply_to_gig(gig_id: str, payload: GigApplicationIn, request: Request,
     except DuplicateKeyError:
         raise HTTPException(status_code=400, detail="Ya aplicaste a esta chamba.")
     await audit_log(user.user_id, "gig.application_sent", {"gig_id": gig_id}, request)
+    # Notify the gig owner (refreshes count on re-insert)
+    full_gig = await db.gigs.find_one({"gig_id": gig_id}, {"_id": 0})
+    if full_gig:
+        await _notify_gig_owner_new_applicant(full_gig, profile)
     return {"ok": True, "applied_at": now}
 
 @api_router.get("/gigs/{gig_id}/applications")
@@ -3974,6 +4098,23 @@ async def _compute_notifications_for_user(user: User) -> list[dict]:
 @api_router.get("/notifications")
 async def get_notifications(user: User = Depends(get_current_user)):
     notes = await _compute_notifications_for_user(user)
+    # Section 30 — also include ad-hoc inserted notifications (gig fanout,
+    # gig applicant alerts) which don't come from the rule engine.
+    seen_keys = {n.get("notification_key") for n in notes if n.get("notification_key")}
+    raw = await db.notifications.find(
+        {
+            "user_id": user.user_id,
+            "category": "gigs",
+            "dismissed_at": None,
+        },
+        {"_id": 0},
+    ).sort("created_at", -1).limit(50).to_list(50)
+    for r in raw:
+        if r.get("notification_key") in seen_keys:
+            continue
+        notes.append(r)
+    # Re-sort merged list
+    notes.sort(key=lambda x: (PRIO_NUMERIC.get(x.get("priority", "medium"), 1), x.get("is_read", False), -1 * (datetime.fromisoformat(x["created_at"].replace("Z", "+00:00")).timestamp() if x.get("created_at") else 0)))
     unread = sum(1 for n in notes if not n.get("is_read"))
     return {"items": notes, "unread_count": unread}
 
