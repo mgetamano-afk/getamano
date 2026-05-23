@@ -4201,6 +4201,7 @@ async def community_suggested(user: User = Depends(get_current_user)):
             "is_active": True,
             "verification_status": "approved",
             "user_id": {"$nin": list(followed)},
+            "business_name": {"$not": {"$regex": "^TEST_"}},
             **PUBLIC_GUARD,
         },
         {"_id": 0, "provider_id": 1, "user_id": 1, "slug": 1, "business_name": 1, "logo_url": 1, "photo_url": 1, "city": 1, "rating_avg": 1, "reviews_count": 1, "category_id": 1, "plan": 1},
@@ -6312,10 +6313,13 @@ def _tier_for_rank(rank: int) -> Optional[dict]:
 
 
 async def _create_coupon_for_provider(user_id: str, rank: int, tier: dict, month_key: str) -> Optional[dict]:
-    """Create a coupon. Idempotent on (user_id, month_key)."""
+    """Create a coupon. Idempotent on (user_id, month_key). Returns the new
+    doc on FIRST insert; returns None when a coupon already existed (so
+    callers can count only genuinely-new coupons in their reports).
+    """
     existing = await db.coupons.find_one({"user_id": user_id, "month_key": month_key}, {"_id": 0})
     if existing:
-        return existing
+        return None
     now = datetime.now(timezone.utc)
     # Valid for the entire NEXT calendar month (the month *after* the snapshot)
     parts = month_key.split("-")

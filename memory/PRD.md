@@ -907,3 +907,96 @@ referrals_credited * 25  +  reviews_4plus * 5  +  gig_applications * 1 (cap 30)
 - Tiered ranking-aware nudge in the StreakWidget: "Mantén tu racha y termina Top 3 este mes para ganar 50% off el próximo".
 - Refactor `server.py` (now ~7600 lines) into modular routers post-launch.
 
+
+### Feb 23, 2026 — Iteration 41: Section 35+36 Community Social Feed + In-Process Scheduler 🎯 CEO MILESTONE
+
+**User intent:** "Tengo un reto para ti esto nos dara un antes y un despues de lo que realmente somos es muy importante para el CEO, ejecuta este promt y despues trabajas con la automatizacion que me comentaste."
+
+Two bundled drops in one iteration:
+- (A) **Sections 35 + 36 — Community Social Feed** (Twitter/Threads-style with 3-column desktop layout at `/comunidad`)
+- (B) **In-Process Scheduler** (replaces the manual cron the user was going to set up — runs monthly leaderboard snapshot + daily streak reminders automatically inside the FastAPI process, no supervisor changes needed)
+
+### Part A — Community Social Feed
+
+**Backend (`/app/backend/server.py`):**
+- 3 new MongoDB collections: `community_posts`, `post_likes`, `provider_follows` with indexes (compound unique on follows + post_likes; descending on created_at for feed; user_id for author lookups).
+- 9 new endpoints under `/api/community/*`:
+  - `GET /community/posts` (public) — paginated feed with `next_before` cursor + hydrated author info.
+  - `GET /community/posts/feed` (auth) — same shape but carries `liked_by_me` + `followed_by_me` flags.
+  - `POST /community/posts` (auth) — anti-spam: 5 posts per 10 minutes per user → 429.
+  - `POST /community/posts/{id}/like` — idempotent toggle, `$inc`'s the post counter.
+  - `DELETE /community/posts/{id}` — owner OR admin only; soft-delete (`is_hidden=true`).
+  - `GET /community/stories` — providers who posted in last 24h (Instagram-style story ring).
+  - `GET /community/suggested` (auth) — top providers user doesn't follow; filters TEST_* names + already-followed + self.
+  - `POST /community/follows/{provider_user_id}` + `DELETE` — toggle follow; 400 on self, 404 on unknown.
+  - `GET /community/me/follows` — set of followed user_ids for client-side state hydration.
+  - `GET /community/trending` — top 6 categories by post count in last 7d, with fallback to top-active provider count.
+- Helper `_hydrate_posts(posts, current_user_id)` enriches each post with full author info (name, picture, slug, business_name, city, state, is_provider, role) + liked_by_me + followed_by_me flags.
+- Demo seed: 2 posts by María on startup (`post_demo_seed_001` + `post_demo_seed_002`) — idempotent via `$setOnInsert`.
+
+**Frontend (`/app/frontend/src/pages/ComunidadPage.jsx`) — single ~500-line module that contains:**
+- `StoriesRow` — horizontal scroll of providers with gradient ring avatar (orange/rose/purple Instagram-style).
+- `NewPostBox` — auth-gated, 4-500 char textarea + counter + Publicar button. Anon shows login CTA.
+- `PostCard` — avatar, ✓ Verificado pill for providers, relative time, city, content, like (with optimistic counter + aria-pressed + ♥ fill), share (native Web Share + clipboard fallback), delete (own posts only). Disabled comment button with "próximamente" tooltip.
+- `PostFeed` — fetches `/feed` or `/posts` (depending on auth), infinite scroll via `next_before` cursor. Empty state ("Sé el primero en publicar"). Optimistic like updates with rollback on error.
+- `LeftNav` — desktop-only (≥lg). Vertical nav: Comunidad · Explorar · Chambas · Ranking · Wall of Fame · (Mi dashboard for providers).
+- `RightSidebar` — desktop-only (≥xl). Trending categories + Sugeridos (Follow/Following toggle with optimistic + rollback) + "¿Por qué Getamano?" mini-card.
+- Layout: 3-column on ≥1280px (`lg` leftnav + center feed + `xl` rightsidebar). Center column max-w-2xl mx-auto. Falls back gracefully to 1-column on mobile/tablet.
+
+**Routing changes** (preserves backward compat):
+- `/comunidad` and `/community` → NEW ComunidadPage (social feed).
+- `/wall` and `/comunidad/wall` → legacy Community.jsx (Wall of Fame, untouched).
+
+### Part B — In-Process Scheduler
+
+**The user wanted me to wire the cron. Supervisor configs are read-only in this env, so I built an in-process scheduler instead — same outcome, zero infra friction.**
+
+- New `scheduler_state` MongoDB collection persists `last_run_at` + `last_result` per job_name.
+- `_scheduler_loop()` background coroutine started via `asyncio.create_task` on FastAPI startup, ticks every `SCHEDULER_TICK_SECONDS = 1800` (30 minutes).
+- Two jobs:
+  - `monthly_leaderboard_snapshot` — fires on the 1st of each UTC month after 06:00. Snapshots the *previous* calendar month, mints coupons (Top 3 / 10 / 50). Idempotent at DB level via `_create_coupon_for_provider` (which now returns `None` on duplicate insert — fixed reporting over-count flagged by testing agent).
+  - `daily_streak_reminders` — fires once per UTC day after 19:00. Fans out reminders to providers with `current_days >= 3` whose streak is `at_risk`. Idempotent via `notification_key = "{uid}::streak_reminder::{today_utc_iso}"`.
+- `GET /api/admin/scheduler/status` returns `{running, tick_seconds, jobs[]}` with per-job last_run_at + last_result.
+- `POST /api/admin/scheduler/run-now?job=<job_name>` — admin force-run that bypasses the time-of-day guard. Returns the same result shape the cron would produce. Invalid job → 400. Audits to `scheduler.force_run`.
+
+### Bug fixes during testing
+
+- **Critical (auto-fixed by testing agent):** `POST /community/posts` was returning 500 due to MongoDB ObjectId leaking into response. Root cause: motor's `insert_one(doc)` mutates the input dict in place, then we re-used the same dict in `_hydrate_posts` + return. **Fix:** `doc.pop("_id", None)` immediately after insert. Single-line change.
+- **Cosmetic:** `_create_coupon_for_provider` was returning the existing doc on duplicates, causing `coupons_created` counter to over-count on idempotent re-runs. **Fix:** return `None` on dup so callers count only genuine inserts. DB stayed idempotent throughout.
+- **Hygiene:** Deleted 1 stale `Iter3X` test profile + 2 leftover `TEST_*` profiles. Also added `business_name: {$not: {$regex: "^TEST_"}}` guard to `/community/suggested`.
+- **UI polish:** Trending category icon now only renders when it looks like an emoji (filters out raw Lucide names like "Sparkles" stored in old category records).
+
+### Testing
+
+- **NEW** `/app/backend/tests/test_iter41_community_scheduler.py` — **26/26 PASS** across 9 test classes:
+  - Public posts feed (anon shape, hydration, demo seed presence)
+  - Auth /feed (liked_by_me + followed_by_me flags)
+  - Create-post happy path + 422 too-short / too-long + DB persistence
+  - Like toggle + 404 unknown
+  - Delete ACL (owner, cross-user 403, admin override) + soft-hide visible-from-list
+  - Stories (María visible)
+  - Suggested (anon 401, signed-in returns ≤8)
+  - Follow toggle (round-trip, self 400, unknown 404)
+  - Trending (Limpieza visible)
+  - Scheduler status (403 non-admin, 200 admin running:true)
+  - Run-now (invalid 400, snapshot, streak reminders)
+- **iter40 regression** = 20/20 PASS after 60s rate-limit sleep.
+- **Frontend Playwright**: anon 3-col layout fully verified, auth client create+like+delete round-trip, /wall + /comunidad/wall backward-compat both serve Wall of Fame correctly.
+
+### Mocked / Pending
+
+- Image upload UI in NewPostBox — backend accepts `image_url` but no upload widget yet. Future iteration.
+- Comment thread endpoint — UI button intentionally disabled with "próximamente" tooltip. Future iteration.
+- Stripe redeem still flag-only (will plug in real coupon via Stripe Coupon API once keys arrive).
+- Twilio SMS + Resend email reminders queued in `notification_queue` waiting for real credentials.
+
+### Follow-up backlog
+
+- Comment threads (`POST /community/posts/{id}/comments` + `GET .../comments?limit`).
+- Image upload pipeline (multipart → S3 or local storage → return `image_url` for NewPostBox).
+- Mention `@business-name` auto-link in post content.
+- Hashtag indexing for trending discovery.
+- Push notifications for follows + likes once Twilio/Resend land.
+- Per-user feed (followed-only filter) toggle.
+- Refactor `server.py` (now ~8400 lines) into modular routers — getting urgent.
+
