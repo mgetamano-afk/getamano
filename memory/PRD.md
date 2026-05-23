@@ -275,6 +275,45 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Sections 41 + 42 + Description History (Cmd+Z bonus)
+
+**Section 41 — 6 Mobile/Legal/UX corrections:**
+
+1. ✅ **Legal footer en menú hamburguesa** (Facebook-style): bloque al final del drawer mobile con "Esta aplicación opera bajo **Latin Ventures LLC**. Todos los derechos reservados © 2026" + 4 links (Términos, Privacidad, Cookies, Reseñas) + version line.
+
+2. ✅ **Smart nav** (hide-on-scroll-down, show-on-scroll-up):
+   - Hook `useSmartNav.js` con threshold ±6/4px y RAF debounce.
+   - Aplicado a `Header.jsx` (sticky+transform), `ComunidadLayout.jsx` tabbar (fixed+transform) y `BottomNav.jsx` (fixed+translateY).
+   - Verificado E2E: header `transform: translate(0,-57)` en scroll-down → `translate(0,0)` en scroll-up.
+
+3. ⏭️ **Contraste** (postponed — backlog): el prompt cubría muchas áreas (badges hero, breadcrumbs, URL dashboard). Sin un ticket bug específico, queda como tarea de refinamiento visual.
+
+4. ✅ **Icons emoji map**: nuevo `data/categoryIcons.js` con `categoryEmoji(iconString, nameEs)` que mapea los 23 lucide names del backend a emojis confiables. `ComunidadExplorar.jsx` ahora renderiza 🧹🏗️🔧🚗✂️🚚⚖️🎉🌿📚💪🐾💻👗🕊️ — ya no "Sparkles" literal.
+
+5. ✅ **US states + cities database**: `data/usLocations.js` (51 states, ~250 ciudades con énfasis en mercados latinos). El Provider Dashboard ahora tiene `<select>` ordenado (Tier 1: TX/CA/FL/NY/IL/AZ/NM/CO/NV/NJ primero).
+
+6. ✅ **Comunidad tab persistente**: labels compactados en mobile (`shortLabel: 'HoF'`), `gap-0.5 px-1.5 py-2.5` + `flex-col` icon+label apilados. Los 5 tabs ahora caben en 390px sin scroll. Verificado: en `/comunidad/wall-of-fame` el tab "Comunidad" sigue visible.
+
+**Section 42 — Google Places Autocomplete:**
+- Hook `useCitySearch.js`: usa `window.google.maps.places.AutocompleteService` con `types:["(cities)"]` + `componentRestrictions:{country:"us"}`, debounce 300ms, fallback automático al listado estático si Maps no carga en 2s.
+- Componente `CitySearchInput.jsx` (~140 líneas):
+  - Estado idle: input con placeholder dinámico ("Busca ciudad o pueblo en Oklahoma...").
+  - Focus sin texto: muestra 8 chips de ciudades populares del estado seleccionado.
+  - Escribir 2+ chars: dropdown con hasta 6 resultados de Places.
+  - Sin coincidencias: "No encontramos 'XYZ' — prueba con otro nombre".
+  - Fallback offline visible con etiqueta amber.
+- Integrado en `ProviderDashboard.jsx` reemplazando los dos `<Field>` planos.
+- Confirmation chip teal "📍 Sallisaw, OK · Cambiar" tras seleccionar.
+
+**Bonus — Description draft history (Cmd+Z infinito):**
+- `DescriptionFieldWithAI.jsx` extendido con localStorage history (last 3 borradores).
+- Snapshot automático cada vez que se llama al AI (anterior + nuevo).
+- Botón "Historial (N)" al lado del botón AI; panel expandible muestra cada borrador con preview de 3 líneas, timestamp localizado, y botón "Usar esta" para revertir.
+- Al revertir, el valor actual también se guarda → puedes rollback infinito.
+- Cero servidor: 100% localStorage, no requiere endpoint.
+
+**Lint frontend**: 0 issues en los 9 archivos creados/modificados.
+
 ### May 23, 2026 — AI-Powered Description Draft (Section 40 Bonus)
 
 **Backend:**

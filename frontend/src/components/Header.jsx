@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
 import NotificationBell from "./NotificationBell";
+import useSmartNav from "../hooks/useSmartNav";
 import { trackLanguageSwitch } from "../lib/analytics";
 
 export default function Header() {
@@ -14,6 +15,7 @@ export default function Header() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const navVisible = useSmartNav();
 
   useEffect(() => {
     if (!user) { setUnread(0); return; }
@@ -36,7 +38,10 @@ export default function Header() {
   };
 
   return (
-    <header className="glass-header sticky top-0 z-50" style={{ paddingTop: "var(--safe-top, 0px)" }}>
+    <header
+      className={`glass-header sticky top-0 z-50 transition-transform duration-300 ease-in-out ${navVisible || open ? "translate-y-0" : "-translate-y-full"}`}
+      style={{ paddingTop: "var(--safe-top, 0px)" }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 md:h-20">
           <Link to="/" className="flex items-center gap-2 min-w-0" data-testid="header-logo-link" aria-label="getamano home">
@@ -161,6 +166,21 @@ export default function Header() {
                 </button>
               </div>
             )}
+
+            {/* Section 41/1 — Legal footer (Facebook-style) */}
+            <div className="px-5 pt-4 pb-1 border-t border-slate-100 mt-2">
+              <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
+                Esta aplicación opera bajo{" "}
+                <span className="font-semibold text-slate-500">Latin Ventures LLC</span>. Todos los derechos reservados © {new Date().getFullYear()}.
+              </p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1" data-testid="mobile-menu-legal-links">
+                <Link to="/terminos" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Términos</Link>
+                <Link to="/privacidad" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Privacidad</Link>
+                <Link to="/cookies" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Cookies</Link>
+                <Link to="/politica-resenas" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Reseñas</Link>
+              </div>
+              <p className="text-[10px] text-slate-300 mt-2">getamano v2.0 · Powered by Latin Ventures LLC</p>
+            </div>
           </div>
         </>,
         document.body

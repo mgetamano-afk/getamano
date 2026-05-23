@@ -4,6 +4,7 @@ import { Home, Search, MessageCircle, User, Briefcase } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
+import useSmartNav from "../hooks/useSmartNav";
 
 /**
  * BottomNav — mobile-only sticky bottom navigation.
@@ -24,6 +25,7 @@ export default function BottomNav() {
   const location = useLocation();
   const [unread, setUnread] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const smartVisible = useSmartNav();
 
   // Refresh unread badge whenever path changes (lightweight)
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200"
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 transition-transform duration-300 ease-in-out ${smartVisible ? "translate-y-0" : "translate-y-full"}`}
       style={{ paddingBottom: "var(--safe-bottom, 0px)" }}
       data-testid="bottom-nav"
       aria-label="Mobile navigation"

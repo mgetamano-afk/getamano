@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Compass, ArrowRight, MapPin } from "lucide-react";
 import { api } from "../lib/api";
+import { categoryEmoji } from "../data/categoryIcons";
 
 /**
  * ComunidadExplorar — Section 39 sub-route.
@@ -61,7 +62,7 @@ export default function ComunidadExplorar() {
               >
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg mb-2"
                      style={{ background: "#E1F5EE", color: "#025F67" }}>
-                  {c.icon || "🛠️"}
+                  {categoryEmoji(c.icon, c.name_es)}
                 </div>
                 <h3 className="font-display font-semibold text-sm text-slate-900 leading-tight">
                   {c.name_es}

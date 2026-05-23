@@ -30,7 +30,9 @@ import CouponsCard from "../components/CouponsCard";
 import ProviderLeftNav from "../components/ProviderLeftNav";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
 import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
+import CitySearchInput from "../components/CitySearchInput";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
+import { US_STATES, getStateByAbbr } from "../data/usLocations";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -362,8 +364,39 @@ export default function ProviderDashboard() {
                   {!form.is_home_based && (
                     <>
                       <Field label="Dirección" value={form.address} onChange={v => update("address", v)} testid="form-address" />
-                      <Field label="Ciudad" value={form.city} onChange={v => update("city", v)} testid="form-city" />
-                      <Field label="Estado" value={form.state} onChange={v => update("state", v)} testid="form-state" />
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Estado</label>
+                        <select
+                          value={form.state || ""}
+                          onChange={(e) => { update("state", e.target.value); if (e.target.value !== form.state) update("city", ""); }}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+                          data-testid="form-state"
+                        >
+                          <option value="">Selecciona un estado</option>
+                          {US_STATES.map((s) => (
+                            <option key={s.abbreviation} value={s.abbreviation}>{s.name} ({s.abbreviation})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Ciudad o pueblo</label>
+                        <CitySearchInput
+                          stateFilter={form.state}
+                          stateName={getStateByAbbr(form.state)?.name || ""}
+                          value={form.city}
+                          onChange={(city, _state, stateAbbr) => {
+                            update("city", city);
+                            if (stateAbbr && stateAbbr !== form.state) update("state", stateAbbr);
+                          }}
+                        />
+                        {form.city && form.state && (
+                          <div className="flex items-center gap-2 mt-2 bg-teal-50 border border-teal-100 rounded-lg px-3 py-1.5" data-testid="location-confirmation">
+                            <span className="text-sm">📍</span>
+                            <span className="text-xs text-teal-700 font-medium">{form.city}, {form.state}</span>
+                            <button type="button" onClick={() => update("city", "")} className="ml-auto text-teal-400 hover:text-teal-600 text-[11px] underline">Cambiar</button>
+                          </div>
+                        )}
+                      </div>
                       <Field label="ZIP" value={form.zip_code} onChange={v => update("zip_code", v)} testid="form-zip" />
                     </>
                   )}

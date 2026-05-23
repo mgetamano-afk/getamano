@@ -2,24 +2,27 @@ import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Globe, Compass, Briefcase, Trophy, Award } from "lucide-react";
 import Header from "./Header";
+import useSmartNav from "../hooks/useSmartNav";
 
 /**
- * ComunidadLayout — Section 39.
+ * ComunidadLayout — Section 39 + 41/Correction #2 + 41/Correction #6.
  *
  * Persistent wrapper around all /comunidad sub-routes. Renders the global
- * Header once at the top, a sticky teal tab bar with 5 tabs immediately
- * below, and the active sub-route via <Outlet />. The tab bar never
- * unmounts while the user is anywhere inside /comunidad/*.
+ * Header once at the top, a fixed teal tab bar immediately below with the
+ * 5 tabs (Comunidad · Explorar · Chambas · Ranking · Hall of Fame), and
+ * the active sub-route via <Outlet />.
  *
- * Scroll position is remembered per pathname so switching back and forth
- * between Comunidad and Ranking restores the user's previous position.
+ * Section 41 changes:
+ *  · Tab bar hides on scroll-down + reappears on scroll-up (useSmartNav).
+ *  · Labels compacted on mobile so all 5 tabs fit on an iPhone 13/14 (390px)
+ *    without horizontal scroll — keeps "Comunidad" always visible.
  */
 const COMUNIDAD_TABS = [
-  { id: "feed", label: "Comunidad", Icon: Globe, path: "/comunidad" },
-  { id: "explorar", label: "Explorar", Icon: Compass, path: "/comunidad/explorar" },
-  { id: "chambas", label: "Chambas", Icon: Briefcase, path: "/comunidad/chambas" },
-  { id: "ranking", label: "Ranking", Icon: Trophy, path: "/comunidad/ranking" },
-  { id: "wall-of-fame", label: "Hall of Fame", Icon: Award, path: "/comunidad/wall-of-fame" },
+  { id: "feed", label: "Comunidad", shortLabel: "Comunidad", Icon: Globe, path: "/comunidad" },
+  { id: "explorar", label: "Explorar", shortLabel: "Explorar", Icon: Compass, path: "/comunidad/explorar" },
+  { id: "chambas", label: "Chambas", shortLabel: "Chambas", Icon: Briefcase, path: "/comunidad/chambas" },
+  { id: "ranking", label: "Ranking", shortLabel: "Ranking", Icon: Trophy, path: "/comunidad/ranking" },
+  { id: "wall-of-fame", label: "Hall of Fame", shortLabel: "HoF", Icon: Award, path: "/comunidad/wall-of-fame" },
 ];
 
 export default function ComunidadLayout() {
@@ -27,6 +30,7 @@ export default function ComunidadLayout() {
   const navigate = useNavigate();
   const scrollPositions = useRef({});
   const prevPath = useRef(location.pathname);
+  const navVisible = useSmartNav();
 
   // Restore / save window scroll per pathname.
   // Tricky: each Outlet swap unmounts the previous sub-route, so when we
@@ -67,18 +71,18 @@ export default function ComunidadLayout() {
     <div className="min-h-screen bg-slate-50" data-testid="comunidad-layout">
       <Header />
 
-      {/* Fixed tab bar — Section 39.
-          Sticky positioning breaks under our root `.App { overflow-x: hidden }`
-          rule on some Chrome/iOS Safari builds, so we use `position: fixed`
-          anchored directly below the Header (h-14 mobile / h-20 desktop) and
-          push the outlet content down with a matching padding-top. */}
+      {/* Fixed tab bar — Section 39 + 41/2 + 41/6.
+          Hide-on-scroll-down via useSmartNav. Compact spacing + short
+          mobile labels (HoF) so all 5 tabs fit on a 390px iPhone. */}
       <div
-        className="fixed top-14 md:top-20 left-0 right-0 z-30 shadow-sm"
+        className={`fixed top-14 md:top-20 left-0 right-0 z-30 shadow-sm transition-transform duration-300 ease-in-out ${
+          navVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
         style={{ background: "#025F67" }}
         data-testid="comunidad-tabbar"
       >
         <nav
-          className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 overflow-x-auto scrollbar-none"
+          className="max-w-7xl mx-auto px-1 sm:px-4 flex items-center sm:gap-1 justify-between sm:justify-start whitespace-nowrap"
           aria-label="Comunidad navigation"
         >
           {COMUNIDAD_TABS.map((tab) => {
@@ -88,25 +92,25 @@ export default function ComunidadLayout() {
                 key={tab.id}
                 type="button"
                 onClick={() => navigate(tab.path)}
-                className={`flex items-center gap-1.5 flex-shrink-0 px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
-                  isActive
-                    ? "text-white"
-                    : "text-white/60 hover:text-white/90"
+                className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 flex-1 sm:flex-initial px-1.5 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-sm font-semibold transition-all duration-200 border-b-2 ${
+                  isActive ? "text-white" : "text-white/65 hover:text-white/90"
                 }`}
                 style={{ borderColor: isActive ? "#5DCAA5" : "transparent" }}
                 data-testid={`comunidad-tab-${tab.id}`}
                 aria-current={isActive ? "page" : undefined}
               >
                 <tab.Icon className="w-4 h-4 flex-shrink-0" />
-                <span>{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             );
           })}
         </nav>
       </div>
 
-      {/* Active sub-route content — padded to clear the fixed tabbar (~49px) */}
-      <div className="pt-[49px] min-h-0" data-testid="comunidad-outlet">
+      {/* Active sub-route content — padded to clear the fixed tabbar.
+          Mobile tabbar is 2-line (icon+label stacked) ≈ 56px, desktop is single line ≈ 49px. */}
+      <div className="pt-[56px] sm:pt-[49px] min-h-0" data-testid="comunidad-outlet">
         <Outlet />
       </div>
     </div>
