@@ -27,6 +27,7 @@ import ReferralPanel from "../components/ReferralPanel";
 import StreakWidget from "../components/StreakWidget";
 import LeaderboardWidget from "../components/LeaderboardWidget";
 import CouponsCard from "../components/CouponsCard";
+import ProviderLeftNav from "../components/ProviderLeftNav";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -141,63 +142,93 @@ export default function ProviderDashboard() {
   // (set in the effect above; nothing to compute here.)
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-[#f8fafc]">
       <Header />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8" data-testid="provider-dashboard">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" data-testid="provider-dashboard">
         <MilestoneCelebration />
-        <ProviderGreeting
-          user={user}
-          profile={profile}
-          unreadMessages={unread}
-          newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
-        />
-        <StreakWidget />
 
-        <LeaderboardWidget />
+        <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
+          {/* COLUMNA IZQUIERDA — Navegación fija */}
+          <ProviderLeftNav
+            profile={profile}
+            user={user}
+            unreadCount={unread}
+            currentTab={tab}
+            onTabChange={setTab}
+          />
 
-        <CouponsCard />
-
-        <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
-
-        {/* Section 30 — Chambas board CTA + nearby teaser */}
-        <div className="rounded-2xl p-5 mb-6 flex items-start justify-between gap-4 flex-wrap"
-             style={{ background: "linear-gradient(135deg, rgba(2,95,103,0.06) 0%, rgba(47,157,148,0.10) 100%)", border: "1px solid rgba(2,95,103,0.18)" }}
-             data-testid="provider-dashboard-chambas-promo">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
-                 style={{ background: "rgba(255,107,44,0.15)", color: "#C2410C" }}>
-              Nuevo · Beta
+          {/* COLUMNA CENTRO — Contenido principal scrolleable */}
+          <section className="min-w-0 space-y-6" data-testid="provider-dashboard-center">
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "0ms" }}>
+              <ProviderGreeting
+                user={user}
+                profile={profile}
+                unreadMessages={unread}
+                newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
+              />
             </div>
-            <h3 className="font-display font-bold text-slate-900 text-lg mt-2 leading-tight">
-              ¿Necesitas ayuda extra esta semana?
-            </h3>
-            <p className="text-sm text-slate-600 mt-1 max-w-xl">
-              Publica una <strong>chamba temporal</strong> y recibe propuestas de otros proveedores latinos verificados. O aplica tú a chambas abiertas para sumar ingresos extra.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Link to="/empleos" target="_blank" className="px-4 py-2.5 rounded-full text-white text-sm font-bold inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-sm"
-                  style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
-                  data-testid="provider-dashboard-publish-chamba">
-              Publicar chamba →
-            </Link>
-            <Link to="/empleos" className="px-4 py-2.5 rounded-full text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:border-teal-500 inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                  data-testid="provider-dashboard-browse-chambas">
-              Ver chambas activas
-            </Link>
-          </div>
-        </div>
 
-        <ChambasNearby city={profile.city} role="provider" limit={3} />
+            {/* Racha + Ranking lado a lado */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeSlideUp" style={{ animationDelay: "80ms" }} data-testid="provider-dashboard-streak-ranking-row">
+              <StreakWidget />
+              <LeaderboardWidget />
+            </div>
 
-        <WeeklyDigestPreview />
+            {/* Pulso semanal (centro) */}
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "160ms" }}>
+              <MarketPulseCard />
+            </div>
 
-        <ReferralPanel />
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "200ms" }}>
+              <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
+            </div>
 
-        <MarketPulseCard />
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-          <div>
-            <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
+            {/* Section 30 — Chambas board CTA + nearby teaser */}
+            <div className="rounded-2xl p-5 flex items-start justify-between gap-4 flex-wrap animate-fadeSlideUp"
+                 style={{ background: "linear-gradient(135deg, rgba(2,95,103,0.06) 0%, rgba(47,157,148,0.10) 100%)", border: "1px solid rgba(2,95,103,0.18)", animationDelay: "240ms" }}
+                 data-testid="provider-dashboard-chambas-promo">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+                     style={{ background: "rgba(255,107,44,0.15)", color: "#C2410C" }}>
+                  Nuevo · Beta
+                </div>
+                <h3 className="font-display font-bold text-slate-900 text-lg mt-2 leading-tight">
+                  ¿Necesitas ayuda extra esta semana?
+                </h3>
+                <p className="text-sm text-slate-600 mt-1 max-w-xl">
+                  Publica una <strong>chamba temporal</strong> y recibe propuestas de otros proveedores latinos verificados. O aplica tú a chambas abiertas para sumar ingresos extra.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Link to="/empleos" target="_blank" className="px-4 py-2.5 rounded-full text-white text-sm font-bold inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-sm"
+                      style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                      data-testid="provider-dashboard-publish-chamba">
+                  Publicar chamba →
+                </Link>
+                <Link to="/empleos" className="px-4 py-2.5 rounded-full text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:border-teal-500 inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                      data-testid="provider-dashboard-browse-chambas">
+                  Ver chambas activas
+                </Link>
+              </div>
+            </div>
+
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "280ms" }}>
+              <ChambasNearby city={profile.city} role="provider" limit={3} />
+            </div>
+
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "320ms" }}>
+              <WeeklyDigestPreview />
+            </div>
+
+            {/* Mobile-only: mirror del sidebar derecho al final */}
+            <div className="lg:hidden space-y-6" data-testid="provider-dashboard-mobile-sidebar-mirror">
+              <CouponsCard />
+              <ReferralPanel />
+            </div>
+
+            <div className="flex flex-wrap items-start justify-between gap-4 pt-2 animate-fadeSlideUp" style={{ animationDelay: "360ms" }}>
+              <div>
+                <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
             <p className="text-slate-500 text-sm mt-0.5">Gestiona tu negocio, tus clientes y tu eCard.</p>
           </div>
           <Link to={`/services/${profile.slug}`} target="_blank" className="btn-outline flex items-center gap-1 text-sm" data-testid="view-public-ecard">
@@ -465,6 +496,23 @@ export default function ProviderDashboard() {
             )}
           </div>
         </div>
+        {/* fin tabs panel (center) */}
+          </section>
+
+          {/* COLUMNA DERECHA — Sidebar sticky con Recompensas + Referidos */}
+          <aside
+            className="hidden lg:flex lg:flex-col lg:gap-4 lg:sticky lg:top-20 lg:self-start max-h-[calc(100vh-6rem)] overflow-y-auto pr-1 [&_li]:!flex-col [&_li]:!items-stretch [&_li]:!gap-2"
+            data-testid="provider-dashboard-right-sidebar"
+          >
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "120ms" }}>
+              <CouponsCard />
+            </div>
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "200ms" }}>
+              <ReferralPanel />
+            </div>
+          </aside>
+        </div>
+        {/* fin 3-column grid */}
       </main>
     </div>
   );
