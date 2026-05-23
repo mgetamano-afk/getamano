@@ -16,6 +16,7 @@ import CitySearchInput from "../components/CitySearchInput";
 import DownloadBadgesSection from "../components/DownloadBadgesSection";
 import FeaturedProvidersReel from "../components/FeaturedProvidersReel";
 import ProviderCTASection from "../components/ProviderCTASection";
+import LiveActivityTicker from "../components/LiveActivityTicker";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -130,15 +131,6 @@ export default function Landing() {
     { q: t("faq.q2"), a: t("faq.a2") },
     { q: t("faq.q3"), a: t("faq.a3") },
     { q: t("faq.q4"), a: t("faq.a4") },
-  ];
-
-  const tickerMsgs = [
-    "🟢 Carlos M. se unió en Houston, TX",
-    "María's Cleaning recibió ⭐⭐⭐⭐⭐",
-    "Roberto G. encontró un plomero en 5 minutos",
-    "3 nuevos proveedores en Dallas esta semana",
-    "🟢 Ana R. contrató catering en Chicago",
-    `getamano ya está en ${stats.states} estados`,
   ];
 
   return (
@@ -300,14 +292,8 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Live ticker */}
-        <div className="relative bg-black/40 backdrop-blur border-t border-white/10 py-3 overflow-hidden">
-          <div className="flex gap-12 whitespace-nowrap" style={{ animation: "scroll-x 40s linear infinite" }}>
-            {[...tickerMsgs, ...tickerMsgs].map((m, i) => (
-              <span key={i} className="text-sm text-orange-300/90 flex-shrink-0">{m}<span className="ml-12 text-white/30">·</span></span>
-            ))}
-          </div>
-        </div>
+        {/* Live ticker — fed by /api/activity-feed */}
+        <LiveActivityTicker />
       </section>
 
       {/* SECTION 33 — Featured paid providers reel */}

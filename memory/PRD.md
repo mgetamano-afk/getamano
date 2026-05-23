@@ -1516,6 +1516,38 @@ Continue server.py modular extraction (P1) and close the highest-complexity P0 i
 - `routes/subscriptions.py` — `/me/subscription/*` + plans
 - `routes/messaging.py` — `/messaging/*` + legacy `/messages/*` + `/conversations/*`
 - `routes/gallery.py` — gallery + uploads + video
+
+
+---
+
+## Iteration 44b — LiveActivityTicker (Feb 23, 2026)
+
+### Goal
+Increase landing conversion with a **live social-proof strip** below the hero — replaces the previously hardcoded `tickerMsgs` array with a real-time marquee fed by `/api/activity-feed`.
+
+### What was done
+- **New component**: `/app/frontend/src/components/LiveActivityTicker.jsx` (~80 lines).
+- Fetches `/api/activity-feed?limit=8` on mount + polls every 60 s.
+- Bilingual (`text_es` / `text_en` per item, picks based on `useI18n.lang`).
+- Each row is a `<Link>` to the relevant provider eCard or hub.
+- Human-relative timestamps (`hace 29 min`, `hace 2d`, etc.).
+- Fallback to 3 evergreen pills (38 estados / Founding Members / Comunidad latina) when live items < 4 so the strip never looks empty.
+- "EN VIVO / LIVE" badge with pulsing emerald dot anchored left; left-side gradient fade hides marquee text scrolling under the badge.
+- Marquee animation reuses the existing `scroll-x` keyframes (40 s loop).
+- `data-testid="live-activity-ticker"` + per-row testids for QA.
+
+### Files touched
+- **New**: `/app/frontend/src/components/LiveActivityTicker.jsx`.
+- **Modified**: `/app/frontend/src/pages/Landing.jsx` — dropped the static `tickerMsgs` array + inline marquee div, swapped in `<LiveActivityTicker />`.
+
+### Testing
+- Lint passes (frontend ESLint clean).
+- Manual screenshot in `lang="es"` confirmed: badge "EN VIVO" + live items "María Catering se unió a getamano en Dallas · hace 29 min", "Nueva reseña 5★ para María's Cleaning Services en Sallisaw · hace 2d".
+- Same component re-tested in `lang="en"` shows "LIVE" + English copy.
+- Backend `/api/activity-feed` was already covered by previous iterations; no new backend code shipped.
+
+### Impact
+Reuses an existing endpoint to convert static placeholder copy into trust-building real-time social proof on the most-viewed surface of the app. Zero new dependencies, zero new DB collections.
 - `routes/appointments.py` — `/providers/{id}/slots` + `/appointments/*` + `/providers/me/availability`
 - `routes/ai.py` — `/ai/improve-description`, `/ai/draft-description`, `/translate`
 - `routes/scheduler.py` — `_run_*_job`, `_scheduler_loop`, `_start_scheduler`, admin scheduler endpoints
