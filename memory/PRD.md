@@ -1465,3 +1465,65 @@ Three bundled drops:
 - `routes/streaks.py`
 - `routes/auth.py` (largest, most coupled — last)
 
+
+---
+
+## Iteration 44 — Refactor: routes/search.py + routes/jobs.py + routes/seo.py + get_current_user split (Feb 23, 2026)
+
+### Goal
+Continue server.py modular extraction (P1) and close the highest-complexity P0 item from the Code Quality audit: `search_providers` (cyclomatic complexity 27, 16 args). Plus tighten `get_current_user` (auth helper) and improve type-hint coverage in the new modules.
+
+### What was done
+1. **`/app/backend/routes/search.py`** — extracted `GET /api/providers`, `GET /api/search/autocomplete`, `GET /api/search/alternatives`. `search_providers` decomposed into 8 small helpers:
+   - `_resolve_category_id`, `_build_simple_filters` — 9 filter fragments
+   - `_regex_or_clauses`, `_category_id_clause_for_terms`, `_build_text_search` — smart-search synonyms
+   - `_haversine_km`, `_annotate_distance`, `_effective_radius_km` — proximity
+   - `_sort_by_proximity`, `_sort_by_relevance`, `_attach_categories` — output prep
+   - Public route signature unchanged → zero frontend impact. Complexity per helper now ≤ 5.
+2. **`/app/backend/routes/jobs.py`** — extracted all 8 gigs/chambas endpoints (`/api/gigs`, `/api/gigs/{id}`, `/api/gigs/{id}/close`, `/api/gigs/{id}/apply`, `/api/gigs/{id}/applications`, `/api/me/gigs`, `/api/me/gig-applications`) plus the two notification fan-outs. Internal helpers: `_validate_gig_payload`, `_build_list_query`, `_attach_applicant_counts`, `_resolve_category_id_by_name`, `_insert_gig_fanout_notifications`.
+3. **`/app/backend/routes/seo.py`** — extracted 6 SEO endpoints + `/api/sitemap.xml` + `/api/robots.txt` + AI-cached content. Helpers: `_find_city`, `_city_name_regex`, `_count_providers`, `_fetch_related_cities`, `_generate_seo_paragraph`, `_seo_paragraph_fallback`, `_static_sitemap_urls`.
+4. **`get_current_user` refactor in server.py** — split into 3 small helpers:
+   - `_extract_session_token(request)` — cookie-or-Bearer extraction
+   - `_user_id_from_jwt(token)` — pure JWT decode (returns None on failure)
+   - `_user_id_from_emergent_session(token)` — Mongo lookup + expiry enforcement
+   - Main function now reads as 4 sequential steps instead of nested try/except.
+5. **Type hints** — all new modules use `Optional[...]`, `list[dict]`, `dict[str, Any]`, return-type annotations. Boost to project-wide coverage on routes layer.
+6. **Quality nit** — dropped unused `lang` query param from `/search/autocomplete` (frontend reads `label_en` per match instead).
+
+### Files touched
+- **New**: `/app/backend/routes/search.py` (283 lines), `/app/backend/routes/jobs.py` (421 lines), `/app/backend/routes/seo.py` (339 lines)
+- **Modified**: `/app/backend/server.py` — removed 604 lines of inlined endpoints/helpers, refactored `get_current_user`, wired 3 new `include_router` calls at the bottom.
+- **New tests**: `/app/backend/tests/test_iter44_refactor_regression.py` (38 cases by testing agent).
+
+### Refactor result
+`server.py` **9023 → 8419 lines (-604, -6.7%)** in this iteration. Cumulative across forks: `~10800 → 8419 lines (-22%)` since modular extractions began. Total extracted routes: `auth.py` + `community.py` + `search.py` + `jobs.py` + `seo.py` = **2139 lines living in dedicated modules**.
+
+### Testing 100%
+- iter44 pytest suite: **38/38 PASS** (search filters, smart synonyms, proximity, gigs CRUD + validation + authorization, SEO hubs, sitemap, robots, refactored auth flows incl. forgot/reset password).
+- Manual curl smoke pass before testing agent: every search/gig/SEO endpoint returned the same shape as pre-refactor.
+
+### Reviewer notes (from testing agent — for next iteration)
+- `_extract_session_token` prioritises cookie over `Authorization: Bearer …`. Pre-existing behavior, not a regression. Document or invert precedence in a future cleanup.
+- `routes/seo.py` does N+1 `count_documents` per SEO city. Acceptable for current city count (~10) but switch to `$facet` aggregation once cities > 15.
+- Consider Mongo index `(is_active, category_id, latitude, longitude)` once provider catalog grows — proximity scans fetch `limit*4` docs.
+- Sitemap is 581 KB. Add `Cache-Control` headers + split sitemap-index once provider count > 5k.
+- `routes/jobs.py` DuplicateKeyError re-raise could use `raise … from e` (B904 lint nit).
+
+### Refactor backlog (still in server.py, ranked by extraction priority)
+- `routes/notifications.py` — `_provider_notifications`, `_client_notifications`, `_compute_notifications_for_user`, GET/POST `/notifications/*`
+- `routes/admin.py` — all `/admin/*` endpoints excluding the ones already moved (reports, latency, bulk providers, ads, CEO metrics, daily brief, pricing intelligence, quiz funnel)
+- `routes/reports.py` — `/reports/*` + `/admin/reports/*` (small, self-contained)
+- `routes/subscriptions.py` — `/me/subscription/*` + plans
+- `routes/messaging.py` — `/messaging/*` + legacy `/messages/*` + `/conversations/*`
+- `routes/gallery.py` — gallery + uploads + video
+- `routes/appointments.py` — `/providers/{id}/slots` + `/appointments/*` + `/providers/me/availability`
+- `routes/ai.py` — `/ai/improve-description`, `/ai/draft-description`, `/translate`
+- `routes/scheduler.py` — `_run_*_job`, `_scheduler_loop`, `_start_scheduler`, admin scheduler endpoints
+
+### Pending P0/P1
+- **P0**: `verify_otp` already restructured inside `routes/auth.py` (split into `_validate_otp_record` + `_do_verify_otp`) — closed in earlier fork.
+- **P0**: Type hint coverage was 9.6% project-wide — new modules contribute strong baseline; backlog: type-hint legacy server.py helpers gradually as they're extracted.
+- **P1**: Continue server.py extraction with the backlog above.
+- **P1**: Real Twilio + Stripe + Resend keys (blocked on user).
+- **P2**: GCP Translation/Vision APIs (blocked on user GCP config).
+

@@ -212,7 +212,7 @@ async def _do_search_providers(deps, params: _SearchParams) -> list[dict]:
     return providers
 
 
-async def _do_autocomplete(deps, q: str, lang: str) -> dict:
+async def _do_autocomplete(deps, q: str) -> dict:
     canonicals = expand_query(q, max_results=8)
     if not canonicals:
         return {"q": q, "matches": []}
@@ -273,8 +273,11 @@ def make_router(*, db, PUBLIC_GUARD: dict, DEFAULT_COUNTRY: str = "US") -> APIRo
         return await _do_search_providers(deps, params)
 
     @router.get("/search/autocomplete")
-    async def search_autocomplete(q: str = "", lang: str = "es"):
-        return await _do_autocomplete(deps, q, lang)
+    async def search_autocomplete(q: str = ""):
+        # `lang` query param is intentionally not part of the signature: the
+        # canonical labels are ES-first and `_do_autocomplete` already returns
+        # `label_en` per match so the frontend picks the locale client-side.
+        return await _do_autocomplete(deps, q)
 
     @router.get("/search/alternatives")
     async def search_alternatives(q: str = ""):
