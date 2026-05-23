@@ -275,6 +275,39 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Refactor Step 2: `routes/auth.py` extracted
+
+**Lo entregado en esta sesión:**
+1. **Documento Go-Live** creado en `/app/memory/GO_LIVE_CHECKLIST.md`: resumen ejecutivo del proyecto + checklist priorizado de APIs (Stripe / Resend / Twilio / Google Cloud Translation+Vision / DNS / GA4 / PostHog / FCM) con costos, tiempos y enlaces.
+
+2. **Refactor backend Paso 2 — `routes/auth.py`** (320 líneas):
+   - Extraídos 8 endpoints de `server.py` → `routes/auth.py`:
+     `POST /auth/register`, `POST /auth/login`, `POST /auth/google/session`,
+     `GET /auth/me`, `POST /auth/logout`,
+     `POST /auth/send-otp`, `POST /auth/verify-otp`, `GET /auth/me/email-verified`.
+   - Factory pattern `make_router(db, User, RegisterIn, LoginIn, get_current_user, hash_password, verify_password, create_jwt, normalize_phone, track_referral_signup, send_email_via_resend, EMERGENT_AUTH_URL, DEFAULT_COUNTRY)` — mismo patrón que `community.py`, mantiene closures explícitas.
+   - **Bug evitado**: `from __future__ import annotations` rompe FastAPI cuando los modelos vienen de closure (los hints se vuelven strings y FastAPI no resuelve `RegisterIn`/`LoginIn` desde globals); documentado en el docstring del archivo.
+   - `server.py` pasó de **8122 → 7900 líneas** (-222 líneas, -2.7 %).
+   - `_send_email_via_resend` se mantiene en `server.py` porque la digest semanal de gigs también lo usa; se inyecta al auth router por parámetro.
+
+3. **Verificación E2E (curl)** — 9/9 pruebas pasaron:
+   - Login admin · Login provider · /auth/me con cookie · register duplicado (400) · register nuevo (201 + cookie) · send-otp (dev-fallback → logged) · verify-otp código incorrecto (400) · verify-otp correcto (200 + `email_verified:true` en Mongo) · logout (200).
+   - `GET /api/community/posts` sigue respondiendo 200 (zero regresión en el router extraído antes).
+
+**Próximos módulos en cola** (cuando el usuario confirme continuar):
+- `routes/providers.py` (CRUD provider + galería + tarifas + featured) — ~1500 líneas estimadas, alto impacto en líneas pero más interlinked.
+- `routes/jobs.py` (Chambas) — ~200 líneas, autocontenido.
+- `routes/messaging.py` (conversations + appointments) — ~600 líneas.
+- `routes/admin.py` (consola admin completa) — ~500 líneas.
+- `routes/payments.py` (suscripciones + cancel FTC) — ~250 líneas.
+
+**Pendiente del usuario (Go-Live):**
+- Habilitar Cloud Translation API + Cloud Vision API en GCP (2 min).
+- Provisionar `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + 4 product IDs.
+- `RESEND_API_KEY` + verificar dominio `getamano.us` en Resend.
+- `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER` + registro 10DLC.
+- `REACT_APP_GA4_MEASUREMENT_ID` cuando esté listo.
+
 ### Feb 2026 — Sections 23, 24, 25 + Sitemap (combined sprint)
 
 **Section 25 — AI Description Assistant for providers**
