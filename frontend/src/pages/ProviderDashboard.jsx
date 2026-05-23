@@ -28,6 +28,8 @@ import StreakWidget from "../components/StreakWidget";
 import LeaderboardWidget from "../components/LeaderboardWidget";
 import CouponsCard from "../components/CouponsCard";
 import ProviderLeftNav from "../components/ProviderLeftNav";
+import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
+import { MAIN_CATEGORIES } from "../data/categoryMap";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TABS = [
@@ -279,17 +281,15 @@ export default function ProviderDashboard() {
                 <Section title="Información del negocio">
                   <Field label="Nombre del negocio *" value={form.business_name} onChange={v => update("business_name", v)} required testid="form-business-name" />
                   <Field label="Nombre legal" value={form.legal_name} onChange={v => update("legal_name", v)} testid="form-legal-name" />
-                  <SelectField label="Categoría principal *" value={form.category_id} onChange={v => update("category_id", v)} options={categories.map(c => ({ value: c.category_id, label: lang === "es" ? c.name_es : c.name_en }))} testid="form-category-select" />
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Categorías adicionales</label>
-                    <div className="flex flex-wrap gap-2">
-                      {categories.filter(c => c.category_id !== form.category_id).map(c => {
-                        const active = (form.additional_categories || []).includes(c.category_id);
-                        return (
-                          <button key={c.category_id} type="button" onClick={() => update("additional_categories", active ? form.additional_categories.filter(x => x !== c.category_id) : [...(form.additional_categories || []), c.category_id])} className={`px-3 py-1.5 rounded-full text-sm border ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-200 text-slate-700"}`} data-testid={`form-addcat-${c.slug}`}>{c.name_es}</button>
-                        );
-                      })}
-                    </div>
+                  <SelectField label="Categoría principal *" value={form.category_id} onChange={v => update("category_id", v)} options={categories.filter(c => MAIN_CATEGORIES.includes(c.name_es)).sort((a, b) => MAIN_CATEGORIES.indexOf(a.name_es) - MAIN_CATEGORIES.indexOf(b.name_es)).map(c => ({ value: c.category_id, label: lang === "es" ? c.name_es : c.name_en }))} testid="form-category-select" />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Categorías adicionales <span className="text-slate-400 font-normal">(opcional)</span></label>
+                    <p className="text-xs text-slate-500 mb-3">Agrega las especializaciones específicas que ofreces dentro de tu categoría.</p>
+                    <SmartSubcategoryPicker
+                      mainCategory={categories.find(c => c.category_id === form.category_id)?.name_es || ""}
+                      selectedSubs={form.additional_categories || []}
+                      onChange={subs => update("additional_categories", subs)}
+                    />
                   </div>
                   <Field label="Teléfono" value={form.phone} onChange={v => update("phone", v)} testid="form-phone" />
                   <Field label="Email" value={form.email} onChange={v => update("email", v)} testid="form-email" />

@@ -275,6 +275,30 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — Section 40 + Shared test fixtures
+
+**Section 40 — Subcategorías contextuales por categoría principal:**
+- Creado `/app/frontend/src/data/categoryMap.js` con las 16 categorías principales y 180+ subcategorías mapeadas (Limpieza→9 subs, Construcción→20, Mantenimiento→16, Jardinería→12, etc.).
+- Creado `/app/frontend/src/components/SmartSubcategoryPicker.jsx` (170 líneas):
+  - Sección "Especializaciones de {categoría}" en teal (#025F67) con chips de la categoría principal.
+  - Toggle "Ver otras categorías (opcional)" colapsado por defecto con max-h-48 scroll.
+  - Caja resumen teal con conteo "{N} especializaciones elegidas".
+  - Auto-limpia subs irrelevantes al cambiar de categoría principal (con `isFirstRun` ref para evitar wiping las subs guardadas en mount).
+- Actualizado `ProviderDashboard.jsx`:
+  - Dropdown "Categoría principal" filtrado de 188→16 opciones (sólo main categories) ordenadas por `MAIN_CATEGORIES.indexOf`.
+  - Bloque "Categorías adicionales" reemplazado por `<SmartSubcategoryPicker>`.
+- Insertadas 4 nuevas categorías main en DB Mongo: `Mascotas` (🐾), `Tecnología` (💻), `Textiles y Moda` (🧵), `Espiritual y Cultural` (🙏) con `is_main:true`.
+- E2E verificado: Limpieza → muestra 9 chips relevantes, acordeón "otras" muestra 163 subs. Cambiar a otra categoría limpia subs incompatibles.
+
+**Shared test fixtures (`tests/conftest.py`):**
+- Migrado `conftest.py` para añadir 7 fixtures session-scoped: `api_url`, `base_url`, `anon_session`, `admin_session`, `provider_session`, `client_session`, `demo_provider_id`.
+- Cada session-fixture hace login UNA VEZ por test session (no por archivo). Si las credenciales fallan o el endpoint da 429, hace `pytest.skip()` en lugar de romper toda la suite.
+- 37/37 tests existentes pasan sin modificación · 6/6 fixtures verificados via `test_conftest_fixtures.py`.
+
+**Backlog actualizado:**
+- Sección 40 Parte 6 (filtros contextuales en `/buscar`) — mejora de consistencia, sin urgencia.
+- Migrar gradualmente los test files existentes para usar las nuevas fixtures (sin urgencia — funcionan tal cual).
+
 ### May 23, 2026 — Code Quality Audit Fixes (Critical Must-Fix items)
 
 **Applied from external code-quality audit:**
