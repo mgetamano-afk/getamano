@@ -1664,3 +1664,62 @@ Convert anonymous visitors into actionable leads BEFORE they leave the landing. 
 - Pydantic min_length=7 vs digits-check 10–15 → standardize error format later.
 - Android compat: `sms:+1...?body=` works on modern Android; older Android may prefer `&body=`. Add UA sniff when we see field complaints.
 - Source telemetry (`?source=admin`) on deep links for click-through measurement.
+
+
+---
+
+## Iteration 46 — Viral Share Tracking for Provider eCards (Feb 23, 2026)
+
+### Goal
+Convert existing providers into a viral acquisition channel by tracking every share + every referred view. Each share carries `?ref={slug}`; opening that link credits the referrer's profile so providers SEE the impact of their sharing → reinforces the behavior.
+
+### Performance contract (explicitly requested by user)
+- ✅ Zero extra queries in dashboard load: `share_count`, `referred_view_count`, `last_share_at`, `share_channels` are **denormalised on `provider_profiles`** and read in the existing GET /me roundtrip.
+- ✅ `share_events` is **append-only** with one composite index (`provider_user_id, created_at desc`) — used only by the stats endpoint, never on hot paths.
+- ✅ `share_view_dedup` is a **TTL collection** (24h) — auto-purges, prevents flood inflation.
+- ✅ Tracking is **fire-and-forget** on the frontend (`.catch(() => {})`) — never blocks the UX.
+
+### What was done
+
+#### Backend (`/app/backend/server.py` + index seeds)
+- `POST /api/providers/me/share-event` (auth: provider). Body: `{channel: "whatsapp"|"email"|"qr"|"native"|"copy"}`. Appends event row + `$inc` share_count + `share_channels.{channel}` + sets `last_share_at`.
+- `POST /api/providers/track-share-view` (public, no auth). Body: `{ref: "<referrer_slug>"}`. Uses `X-Forwarded-For` for real client IP behind K8s ingress. Idempotent per `(referrer_slug, ip)` for 24h via `share_view_dedup` TTL collection. Returns `{ok, counted, reason}`.
+- `GET /api/providers/me/share-stats` (auth: provider). Returns slug + 2 counters + last_share_at + share_channels{} + 7 most-recent events.
+- Indexes seeded at startup:
+  - `share_events`: `(provider_user_id, created_at desc)`
+  - `share_view_dedup`: unique `(referrer_slug, ip)` + TTL on `expires_at_native`
+
+#### Frontend (3 files modified, 1 new)
+- **`ShareLinkCard.jsx`** — modified:
+  - URL now `${origin}/p/${slug}?ref=${slug}` — keeps `displayUrl` clean (strips `?ref` for the truncated UI text but the actual shared URL has it).
+  - Persuasive Spanish message in first-person: `¡Hola! Te dejo mi eCard de ${businessName} en getamano · servicio latino verificado 🌟\n\n${shortUrl}`.
+  - Every share path (copy / WhatsApp / Email / QR / native) calls `_trackShare(channel)` which fires `POST /providers/me/share-event` (fire-and-forget, errors swallowed).
+- **`ShareStatsCard.jsx`** (NEW, ~120 lines)
+  - 3 metric cards: shares / referred views / multiplier (views/shares).
+  - Channel breakdown chips (top 4 channels with icons + counts).
+  - Zero-state copy when shares=0 explaining the value of sharing.
+- **`ProviderECard.jsx`** — added `useEffect` that reads `?ref` query param, applies sessionStorage dedup, never self-credits, and fires `POST /providers/track-share-view`.
+- **`ProviderDashboard.jsx`** — imports + mounts `<ShareStatsCard />` directly under `<ShareLinkCard />`.
+
+### Bug found + fixed during this iteration
+- Frontend: `ReferenceError: Cannot access 'searchParams' before initialization` because the new `useEffect` was placed above the `const [searchParams] = useSearchParams()` declaration in `ProviderECard.jsx`. Fixed by moving the declaration up + consolidating both ref-tracking effects below it. Validated via screenshot — eCard now loads cleanly with `?ref=test-referrer-slug` and POST `/api/providers/track-share-view` fires once + dedupes on reload.
+
+### Testing (`iteration_46.json`)
+- **Backend: 17/17 pytest PASS** — RBAC, 422 validation, IP dedupe via X-Forwarded-For, self-ref behavior, unknown-slug counted:false, blank ref short-circuit, denormalised counter persistence, recent_events sort + 7-cap.
+- **Frontend: 100%** — Dashboard renders both cards, share buttons fire share-event POSTs per channel, public eCard fires track-share-view on `?ref=`, sessionStorage dedup confirmed, self-ref correctly skipped.
+- **No critical bugs**. Test agent flagged a pre-existing hydration warning unrelated to this iteration; tracked separately.
+
+### Files changed
+- New: `/app/frontend/src/components/ShareStatsCard.jsx`, `/app/backend/tests/test_iter46_share_tracking.py`.
+- Modified: `/app/backend/server.py` (+~100 lines + 2 index seeds), `/app/frontend/src/components/ShareLinkCard.jsx`, `/app/frontend/src/pages/ProviderECard.jsx`, `/app/frontend/src/pages/ProviderDashboard.jsx`.
+
+### Impact for the CEO
+- Every existing provider becomes a viral channel: 1 share by María → potentially many referred views logged + visible in her dashboard.
+- The visible KPI on the dashboard (Multiplicador viral 1.5x) reinforces the sharing behavior — providers see the impact and share more.
+- Zero added cost: works with the existing WhatsApp / Email / QR infrastructure. No Twilio / Resend dependency.
+- Ready to layer on rewards in a future iteration ("Comparte 10 veces → 1 mes Pro gratis").
+
+### Deferred / Backlog
+- `asyncio.gather()` the two awaits inside `track_provider_share_event` (latency micro-optimization; not needed at current volume).
+- Reward gamification on top of `share_count` / `referred_view_count`.
+- Public `/p/{slug}` short-alias route already exists; confirm it renders the same ProviderECard component with `?ref` support (it does — same component, just shorter path).
