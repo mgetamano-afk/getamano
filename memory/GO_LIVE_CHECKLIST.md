@@ -1,5 +1,5 @@
 # 🚀 getamano · Resumen Ejecutivo + Checklist Go-Live
-*Actualizado: Feb 2026*
+*Actualizado: Feb 24, 2026 · Tras iteraciones 44–46*
 
 ---
 
@@ -11,100 +11,168 @@ Marketplace web bilingüe (ES/EN) que conecta a la comunidad latina en USA con p
 ### 🏗️ Arquitectura
 - **Frontend:** React 19 + Tailwind + Shadcn + Lucide/Tabler icons · React Helmet (SEO) · i18n (ES/EN, persistido en `localStorage`).
 - **Backend:** FastAPI + Motor (Mongo async) + JWT cookie httpOnly + bcrypt + rate-limit middleware + audit log.
-- **DB:** MongoDB (única instancia, ~30 colecciones). Índices únicos / TTL bien definidos.
+- **DB:** MongoDB (única instancia, ~35 colecciones). Índices únicos / TTL bien definidos.
 - **PWA:** manifest + service-worker + 3 capturas precargadas + InstallAppModal que detecta device.
+- **Refactor backend (iter 44):** monolito `server.py` reducido 22 % extrayendo `routes/auth.py`, `routes/community.py`, `routes/search.py`, `routes/jobs.py`, `routes/seo.py`. Más mantenible, más rápido de iterar.
 
 ### 🧱 4 Zonas (todas funcionales)
 | Zona | Ruta | Estado |
 |---|---|---|
-| 1. Landing pública | `/` | ✅ Hero, búsqueda, categorías visuales, reel de video, founding counter, FAQ, footer legal |
+| 1. Landing pública | `/` | ✅ Hero, búsqueda, categorías visuales, reel de video, founding counter, FAQ, footer legal · **Ticker en vivo** + **Exit-intent popup** |
 | 2. Cliente | `/buscar`, `/services/:slug`, `/p/:slug` | ✅ Filtros, mapa con proximidad, citas, cotizaciones, reseñas, favoritos, mensajería |
-| 3. Proveedor | `/dashboard/provider`, `/provider/onboarding` | ✅ 6 tabs (Perfil · Galería · Solicitudes · Mensajes · Tarifas · Mi diario · Citas) + Pulse semanal + Streaks + Badges + Referrals + Asistente IA |
-| 4. Admin Console | `/admin/*` (con alias `/dashboard/admin/*`) | ✅ Resumen + CEO Dashboard con Daily Brief IA + Cola de verificación + Catálogo + Reseñas + Reportes bidireccionales + Audit log + Pricing intelligence |
+| 3. Proveedor | `/dashboard/provider`, `/provider/onboarding` | ✅ 6 tabs (Perfil · Galería · Solicitudes · Mensajes · Tarifas · Mi diario · Citas) + Pulse semanal + Streaks + Badges + Referrals + Asistente IA · **Share Stats viral** |
+| 4. Admin Console | `/admin/*` | ✅ Resumen + CEO Dashboard + **Leads Inbox** + Cola de verificación + Catálogo + Reseñas + Reportes bidireccionales + Audit log + Pricing intelligence |
 
-### 🎁 Features destacadas ya en producción
-- **eCard pública** rediseñada (header flotante · WhatsApp primario · 2×2 acciones · Galería con categorías · Video Pro/Premium · Redes sociales · Tarifas referenciales · Citas Calendly-style · JSON-LD SEO).
-- **Búsqueda inteligente:** 35+ términos canónicos × 5 sinónimos bilingües + fuzzy matching tolerante a errores de tipeo.
-- **Hubs SEO:** `/categoria/:slug` × 12 categorías con copy ES/EN hand-crafted + FAQ + JSON-LD `@graph` (BreadcrumbList + Service + ItemList + FAQPage).
-- **Sitemap dinámico**: 4475+ URLs (incluye categoría × ciudad).
-- **Job Board "Chambas"** (`/empleos`) con notificación fan-out automática.
-- **Comunidad social** (`/comunidad`): feed con imágenes, stories, comentarios inline, Wall of Fame, leaderboard mensual con cupones canjeables, ranking en vivo.
-- **Gamificación:** Streaks tipo Duolingo + Badges automáticos (active_week / fast_responder / in_demand) + diario de logros + 19 milestones celebratorios.
-- **Email OTP** con plantilla HTML + rate-limit + bcrypt-hashed.
-- **Suscripciones FTC-compliant:** mensual + anual (ahorro 17 %) + cancelación click-to-cancel en 3 pasos + reactivación.
-- **Onboarding IA:** Claude Haiku 4.5 sugiere mejorar descripción del negocio + Vision API escanea tarjetas de presentación.
-- **Calendario y citas:** disponibilidad semanal + slots públicos + confirmación/decline/no-show.
-- **Reportes bidireccionales** (cliente reporta proveedor y viceversa) con panel admin.
-- **Programa de referidos:** ref_code 6-char + tracking en `?ref=` + 1 mes free Pro automático.
-- **Notificaciones inteligentes** (ambos roles) con polling 60s, Bell con badge, 13+ patrones (eCard incompleta, mensajes sin leer, market pulse semanal, geo, etc.).
-- **Daily Brief CEO con IA:** narrativa + 5 recomendaciones estratégicas + métricas MRR/ARR.
-- **Data Flywheel:** quote_requests + provider_rates + privacy aggregation (n≥5) + Weekly Market Pulse.
+### 🆕 Features añadidas en las últimas iteraciones
+
+#### Iter 44 — Refactor + Code quality
+- Backend modularizado en 5 routers separados (search, jobs, seo, auth, community).
+- `search_providers` refactorizada de complejidad 27 a ≤5 por helper.
+- `get_current_user` partida en 3 helpers (jwt vs session token).
+- Coverage de type hints subió ~3× en los módulos nuevos.
+
+#### Iter 44b — LiveActivityTicker
+- Strip "EN VIVO" debajo del hero con texto bilingüe rotando cada 60s.
+- Lee `/api/activity-feed` (nuevos proveedores + reseñas recientes).
+- Cada item es link clickeable a la eCard correspondiente.
+- Fallback evergreen para que nunca se vea vacío.
+
+#### Iter 44c — Browser Push Opt-In
+- Card sutil abajo-derecha que pide permiso de notificaciones tras 20s + scroll > 600px.
+- Polling client-side a `/activity-feed` cada 90s; dispara `Notification` nativa cuando hay novedad.
+- Click en notificación abre la eCard nueva.
+- Dismiss persistido 30 días.
+- **Limitación**: solo funciona con la pestaña abierta. Service Worker + Web Push para tab-closed = ~3h adicionales cuando lo decidamos.
+
+#### Iter 45 — Lead Inbox (Exit-Intent → SMS/WhatsApp)
+- **Popup exit-intent** en landing: dispara con mouseleave-top (desktop) o 60s idle (mobile).
+- Captura: nombre + teléfono + ciudad + servicio + **canal preferido** (SMS o WhatsApp) + idioma.
+- **`/admin/leads`** Inbox con KPIs (Pendientes / Contactados / Convertidos / Perdidos).
+- Cada lead trae **2 botones**: WhatsApp (`wa.me`) y SMS (deep link `sms:` que abre app nativa iOS/Android).
+- **Mensaje pre-llenado** server-side en el idioma del lead.
+- Click en cualquier botón → auto-marca como "contactado" + abre la app nativa.
+- 24h dedupe con merge: si el lead reenvía con info actualizada, se conserva la nueva.
+- **No requiere Twilio**. Funciona 100 % manual con deep links. Cuando llegue Twilio → flip switch para automatizar.
+
+#### Iter 46 — Viral Share Tracking
+- `ShareLinkCard` ya genera enlaces con `?ref={slug}`.
+- **Cada click** (WhatsApp/Email/QR/Native/Copy) registra evento en `share_events`.
+- Cuando alguien abre `/p/{slug}?ref=X` → suma a `referred_view_count` del referrer X. Dedupe IP+24h via TTL collection.
+- **Nuevo card en dashboard del proveedor:** "Tu impacto al compartir" muestra:
+  - Veces que compartiste
+  - Visitas vía tus shares
+  - Multiplicador viral (1.5x significa que cada share te trajo 1.5 visitas)
+  - Breakdown por canal
+- Performance contract cumplido: 0 queries adicionales en GET /me (counters denormalizados).
+
+### 🎁 Features destacadas (carryover de iteraciones previas)
+- eCard pública rediseñada · Búsqueda inteligente con 35+ sinónimos · Hubs SEO con copy ES/EN · Sitemap dinámico 4500+ URLs · Job Board "Chambas" · Comunidad social con leaderboards mensuales · Gamificación Duolingo-style · Email OTP · Suscripciones FTC-compliant · Onboarding IA (Claude Haiku 4.5) · Calendario y citas · Reportes bidireccionales · Programa referidos · Notificaciones inteligentes · Daily Brief CEO · Data Flywheel.
 
 ### 📈 Estado de testing
-- **Iteración 42:** 100 % E2E pass (backend pytest + frontend Playwright + 6 viewports mobile/tablet/desktop).
-- Cero regresiones críticas conocidas.
+- **Iter 44** (refactor): 38/38 pytest PASS
+- **Iter 45** (Lead Inbox): 20/20 pytest PASS · Frontend 100 %
+- **Iter 46** (Viral Share): 17/17 pytest PASS · Frontend 100 %
+- **Cero regresiones críticas conocidas.**
 
 ### 🧰 Stack & costos fijos actuales
 | Servicio | Estado actual | Costo |
 |---|---|---|
 | MongoDB | Local en pod / Atlas en prod | Atlas M0 free → M10 ~$57/mes en escala |
 | FastAPI + React | Hospedaje Emergent | Incluido en suscripción Emergent |
-| Emergent LLM Key (Claude Haiku 4.5) | Activo, dev | Pay-as-you-go (te avisamos cuando bajo) |
+| Emergent LLM Key (Claude Haiku 4.5) | Activo, dev | Pay-as-you-go |
 | Google Cloud (Geocoding + Maps + Places) | Activo con `GOOGLE_API_KEY` | Tier gratis cubre <$200/mes hasta MVP |
 
 ---
 
-## 🚨 PARTE 2 — Checklist de APIs/Servicios para el Go-Live
+## 🎯 PARTE 2 — Tu lista de tareas como CEO (acción inmediata)
 
-> Lo organizo por **prioridad de bloqueo**. Lo que está en 🔴 es necesario para cobrar y notificar a clientes reales. Lo amarillo es nice-to-have antes del lanzamiento. Lo verde puede ir después.
+### ✅ Lo que YA puedes hacer SIN esperar nada externo
+
+#### A. Probar el sistema completo (15 min — esta semana)
+1. **Verificar Lead Inbox**
+   - Abre `/` en una pestaña incógnito → espera 60s o mueve mouse al borde superior → completa el popup → ve a `/admin/leads` → debe aparecer tu lead.
+   - Haz click en "WhatsApp" → verifica que abre WhatsApp con mensaje pre-llenado.
+   - Haz click en "SMS" → verifica que abre la app de Mensajes nativa con el mensaje listo.
+
+2. **Verificar tu Share Tracking** (con María, tu primera proveedora)
+   - Login como María (`demo.provider@getamano.com / provider123`).
+   - Dashboard → card "Comparte tu eCard" → click "WhatsApp" → te abre WhatsApp con el link `?ref=maria-...`.
+   - Comparte tú mismo el link a un amigo (o ábrelo en incógnito).
+   - Vuelve al dashboard → el card "Tu impacto al compartir" debe mostrar +1 visita.
+
+3. **Verificar el Push Opt-In** (en navegador real, no incógnito)
+   - Espera 20s en `/` + scroll → debe aparecer el card abajo-derecha.
+   - Click "Activar" → acepta el permiso del navegador → ya estás recibiendo pings cuando hay novedad.
+
+4. **Verificar el Ticker en Vivo**
+   - En `/`, debajo del hero, hay un strip oscuro con badge "EN VIVO" + items rotando.
+   - Click en cualquier item te lleva a la eCard correspondiente.
+
+#### B. Generar movimiento real desde el día 1 (esta semana)
+1. **Onboarding manual de los 15 proveedores del bulk upload**
+   - Ve a `/admin/ops` → ya están todos creados como cuentas.
+   - **TU tarea**: contactarlos uno por uno (WhatsApp/llamada) y guiarlos a completar su perfil. El backend ya les mandó credenciales de invitación; verifica en `/admin/latency` cuántos no han logueado todavía.
+   - **Meta inicial**: convertir 7/15 a "activos con perfil 80 %+ completo" en 2 semanas.
+
+2. **Hacer 10 shares manuales con María (el primer caso viral)**
+   - Como María, abre el dashboard → comparte por WhatsApp a 10 grupos/contactos relevantes (vecindario, asociación latina, iglesia, etc.).
+   - Mira el card "Tu impacto al compartir" subir.
+   - **Esto es tu primera evidencia de tracción** que puedes mostrarle a otros proveedores: "María consiguió X visitas en una semana solo compartiendo".
+
+3. **Trabajar los leads del Inbox**
+   - Cada lead que entre al `/admin/leads` debes contactarlo idealmente en <2h (mejor open-rate). Usa los botones nativos para no perder tiempo en escribir.
+   - **Cierra el ciclo**: marca cada uno como `Contactado → Convertido / Perdido` para tener métrica real de conversión.
+
+#### C. Marketing / SEO inmediato
+1. **Conectar Google Search Console** con `getamano.us` (gratis) → submit sitemap `https://getamano.us/sitemap.xml`.
+2. **Subir a Google My Business** una ficha de getamano (gratis) — aparece en búsquedas locales.
+3. **Crear cuenta en Instagram + TikTok** del marketplace y empezar a publicar las eCards de proveedores como contenido.
 
 ---
 
-### 🔴 P0 — Bloqueadores reales para lanzar (orden recomendado)
+## 🚨 PARTE 3 — Checklist de APIs/Servicios para el Go-Live
+
+> Organizado por **prioridad de bloqueo**. Lo rojo es necesario para cobrar y notificar a clientes reales. Amarillo es nice-to-have antes del lanzamiento. Verde puede ir después.
+
+---
+
+### 🔴 P0 — Bloqueadores reales para lanzar
 
 #### 1. 💳 **Stripe (cobros de suscripciones)**
 - **Por qué:** los proveedores ya pueden elegir plan en `/plans`, pero no se les cobra. Sin Stripe, el negocio no factura.
-- **Qué necesito de ti:**
+- **Tu tarea:**
   - Cuenta Stripe en modo **live** (https://dashboard.stripe.com → activar).
-  - Verificar la entidad legal (LLC / EIN). Stripe pide W-9 si es US, tax info si es internacional.
-  - 4 productos creados en Stripe con precios:
-    - Free $0
-    - Basic $9/mes · $90/año
-    - Pro $19/mes · $190/año
-    - Premium $49/mes · $490/año
-  - Webhook endpoint para eventos `customer.subscription.*` (te lo configuro yo cuando me pases las llaves).
-  - **Lo que me das:** `STRIPE_SECRET_KEY` (sk_live_…) + `STRIPE_WEBHOOK_SECRET` (whsec_…) + IDs de los 4 productos.
-- **Dónde:** https://dashboard.stripe.com/apikeys
+  - Verificar entidad legal (LLC / EIN). Stripe pide W-9 si es US.
+  - Crear 4 productos con precios:
+    - Free $0 · Basic $9/mes · $90/año · Pro $19/mes · $190/año · Premium $49/mes · $490/año
+- **Lo que me das:** `STRIPE_SECRET_KEY` (sk_live_…) + `STRIPE_WEBHOOK_SECRET` (whsec_…) + IDs de los 4 productos.
 - **Costo:** 2.9 % + $0.30 por transacción (sin mensualidad).
 - **Tiempo de activación:** 1–2 días (Stripe revisa la cuenta).
 
 #### 2. 📧 **Resend (emails transaccionales)**
-- **Por qué:** Hoy el OTP de registro **NO se envía**, sólo queda en logs (`[EMAIL DEV-FALLBACK]`). Sin Resend, los usuarios reales no pueden verificar su correo.
-- **Qué necesito:**
+- **Por qué:** El OTP de registro hoy **NO se envía**, sólo queda en logs. Sin Resend, los usuarios reales no pueden verificar correo.
+- **Tu tarea:**
   - Registro en https://resend.com
-  - **Verificar el dominio `getamano.us`** (Resend te da 3 registros DNS: SPF + DKIM + DMARC — los pones en tu proveedor de DNS).
+  - **Verificar el dominio `getamano.us`** (3 registros DNS: SPF + DKIM + DMARC).
   - Crear API key.
-  - **Lo que me das:** `RESEND_API_KEY` (re_…) + `SENDER_EMAIL` (ej. `onboarding@getamano.us`).
-- **Dónde:** https://resend.com/api-keys
+- **Lo que me das:** `RESEND_API_KEY` (re_…) + `SENDER_EMAIL` (ej. `onboarding@getamano.us`).
 - **Costo:** **gratis hasta 3 000 emails/mes**, $20/mes hasta 50 000.
-- **Tiempo:** ~30 min si tienes acceso al DNS de getamano.us.
+- **Tiempo:** ~30 min si tienes acceso al DNS.
 
-#### 3. 📱 **Twilio (SMS notificaciones)**
-- **Por qué:** Notificaciones de "nuevo mensaje", "nueva chamba", "cita confirmada" actualmente sólo van a log. Sin SMS pierdes el canal de mayor open-rate (~98 %).
-- **Qué necesito:**
+#### 3. 📱 **Twilio (SMS automatizado)**
+- **Por qué:** Por ahora el Lead Inbox usa deep links nativos (tú mandas el SMS manualmente). Cuando tengas volumen (>30 leads/día) querrás automatizar.
+- **Tu tarea:**
   - Cuenta Twilio (https://twilio.com).
-  - **Comprar un número con capacidad SMS US** (~$1/mes).
-  - **Registrar un brand 10DLC** (obligatorio en USA para SMS comercial — Twilio te lleva por wizard, demora 3–7 días de aprobación).
-  - **Lo que me das:** `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM_NUMBER` (+1xxx).
-- **Dónde:** https://console.twilio.com
+  - Comprar un número con capacidad SMS US (~$1/mes).
+  - **Registrar un brand 10DLC** (obligatorio en USA — Twilio te lleva por wizard, 3–7 días).
+- **Lo que me das:** `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM_NUMBER` (+1xxx).
 - **Costo:** $0.0079 por SMS US + $1/mes número + $4 registro 10DLC.
 - **Tiempo:** 3–7 días (por el 10DLC).
+- **NOTA**: El Lead Inbox funciona perfecto sin esto. Twilio es para escalar.
 
-#### 4. ☁️ **Google Cloud — habilitar 2 APIs**
-- **Por qué:** Ya tienes `GOOGLE_API_KEY` configurada (Geocoding + Maps funcionan), pero **Cloud Translation API y Cloud Vision API devuelven 403**. Sin esto:
-  - Translation: la traducción ES↔EN cae a fallback "no_api_key" (devuelve el mismo texto).
-  - Vision: el escaneo de tarjeta de presentación en onboarding no extrae datos.
-- **Qué necesito:** Que tú mismo vayas a https://console.cloud.google.com/apis/library y le des **Enable** a:
+#### 4. ☁️ **Google Cloud — habilitar 2 APIs (URGENTE: 2 minutos)**
+- **Por qué:** Ya tienes `GOOGLE_API_KEY`, pero **Cloud Translation API y Cloud Vision API devuelven 403**.
+- **Tu tarea:** Ve a https://console.cloud.google.com/apis/library y **Enable**:
   1. **Cloud Translation API**
   2. **Cloud Vision API**
   (Usas la misma key que ya tienes — no necesitas crear nueva.)
@@ -123,37 +191,28 @@ Marketplace web bilingüe (ES/EN) que conecta a la comunidad latina en USA con p
 #### 6. 📊 **GA4 (Google Analytics)**
 - Crear propiedad GA4 en https://analytics.google.com
 - Copiarme el **Measurement ID** (`G-XXXXXXXXXX`).
-- Lo pongo en `REACT_APP_GA4_MEASUREMENT_ID` y se activan automáticamente los 8 eventos ya implementados (page_view, search, sign_up, purchase, booking_request, etc.).
+- Lo pongo en `REACT_APP_GA4_MEASUREMENT_ID` y se activan automáticamente los 8 eventos ya implementados.
 - **Costo:** gratis.
 
 #### 7. 📈 **PostHog (opcional, product analytics)**
-- Si quieres heatmaps + funnels + session replays.
+- Heatmaps + funnels + session replays.
 - Plan gratis hasta 1M eventos/mes.
 - `REACT_APP_POSTHOG_KEY` + `REACT_APP_POSTHOG_HOST`.
 
-#### 8. 🔔 **Push Notifications PWA (Firebase Cloud Messaging)**
-- Para mandar push cuando hay nuevo mensaje/cita (sin SMS).
-- Requiere: proyecto Firebase + Service Worker actualizado + VAPID keys.
-- **Costo:** gratis hasta 1M envíos/mes.
+#### 8. 🔔 **Web Push real (Service Worker + VAPID)**
+- El opt-in que ya construimos solo trabaja con pestaña abierta. Para notificaciones con pestaña cerrada (estilo Twitter/Instagram) necesita Service Worker + VAPID + endpoint de subscription en backend.
+- Si me lo pides, ~3h de trabajo.
 
 ---
 
-### 🟢 P2 — Después del lanzamiento, según tracción
+### 🟢 P2 — Después del lanzamiento
 
-#### 9. **Mapbox / Google Maps JS embebido**
-- Reemplazar Leaflet free (ya funciona) por Google Maps embebido (visual más pulido en eCard).
-- **Costo:** $7 por 1k cargas de mapa.
-
-#### 10. **Cloudinary / CDN para imágenes**
-- Hoy las imágenes van a Emergent Object Storage. Si tráfico crece, mover a Cloudinary acelera carga + compresión auto.
-- **Costo:** gratis hasta 25 GB.
-
-#### 11. **WhatsApp Business API (vía Twilio o 360dialog)**
-- Para mandar plantillas oficiales por WhatsApp en lugar de SMS.
-- Requiere verificación Meta Business (1–2 semanas).
-
-#### 12. **Slack / Discord webhook para alertas internas**
-- Bot que avise al equipo cuando entra nuevo proveedor pendiente, reporte crítico, error 500.
+| # | Servicio | Cuándo |
+|---|---|---|
+| 9 | Mapbox / Google Maps JS embebido (visual más pulido) | Si la tracción lo justifica |
+| 10 | Cloudinary CDN para imágenes | Cuando el tráfico crezca |
+| 11 | WhatsApp Business API oficial (plantillas, 1-2 sem aprobación Meta) | Para outreach masivo |
+| 12 | Slack/Discord webhook para alertas internas | Cuando tengas equipo |
 
 ---
 
@@ -161,18 +220,20 @@ Marketplace web bilingüe (ES/EN) que conecta a la comunidad latina en USA con p
 
 | # | Servicio | Bloqueador? | Tiempo activación | Costo MVP |
 |---|---|---|---|---|
-| 1 | Stripe | 🔴 Sí | 1-2 días | 2.9% + $0.30 / tx |
+| 1 | Stripe | 🔴 Sí | 1-2 días | 2.9 % + $0.30 / tx |
 | 2 | Resend | 🔴 Sí | 30 min | Free |
-| 3 | Twilio | 🔴 Sí | 3-7 días (10DLC) | ~$5/mes |
+| 3 | Twilio | 🟡 No urgente (deep links cubren v1) | 3-7 días (10DLC) | ~$5/mes |
 | 4 | GCP Translation+Vision | 🔴 Sí | 2 min | Free tier |
 | 5 | DNS getamano.us | 🟡 | 1 hora | Ya tienes dominio |
 | 6 | GA4 | 🟡 | 10 min | Free |
-| 7 | PostHog | 🟡 | 10 min | Free |
-| 8 | FCM Push | 🟡 | 1 día | Free |
 
-**Mi recomendación de orden:** Activa primero los 4 P0 en paralelo (mientras Stripe y Twilio aprueban tu cuenta, terminas DNS de Resend y habilitas las APIs de Google). En ~1 semana real puedes estar facturando.
+**Orden recomendado:**
+1. **Hoy (2 min)**: Habilita las 2 APIs de Google Cloud → desbloquea traducción + OCR.
+2. **Esta semana**: Empieza activación Stripe + Resend en paralelo + arregla DNS.
+3. **Mientras tanto**: Trabaja el Lead Inbox manualmente, onboardea a tus 15 proveedores del bulk upload, mide tracción real.
+4. **Próximas 2 semanas**: Cuando Stripe + Resend estén live → primer mes de facturación real.
 
-### 🔐 Cuando tengas las llaves, mándamelas así (ejemplo):
+### 🔐 Cuando tengas las llaves, mándamelas así:
 ```
 STRIPE_SECRET_KEY=sk_live_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
@@ -184,7 +245,28 @@ TWILIO_FROM_NUMBER=+1xxxxx
 REACT_APP_GA4_MEASUREMENT_ID=G-xxxxx
 ```
 
-Las pongo en `/app/backend/.env` y `/app/frontend/.env`, reinicio servicios y todas las integraciones quedan **live** sin tocar más código (el código ya está listo, sólo espera las llaves).
+Las pongo en `/app/backend/.env` y `/app/frontend/.env`, reinicio servicios y todas las integraciones quedan **live** sin tocar más código.
+
+---
+
+## 🔥 PARTE 4 — Roadmap producto pendiente (cuando me lo digas)
+
+### P0 técnico (deuda de código)
+- Continuar refactor de `server.py` (sigue en ~8700 líneas) → extraer `routes/admin.py`, `routes/notifications.py`, `routes/messaging.py`, `routes/subscriptions.py`.
+- Aumentar type-hint coverage en el server.py legacy.
+
+### P1 features de crecimiento (sugerencias)
+1. **Reward redemption sobre el share tracking** — "10 shares con 5 visitas referidas = 1 mes Pro gratis". Counters ya existen, son ~50 líneas.
+2. **Service Worker + Web Push real** — notificaciones con pestaña cerrada (3h).
+3. **Quiz funnel mejorado** — el `/api/quiz/recover` existe pero el funnel UI está subexplotado.
+4. **WhatsApp Business API** vía Twilio (cuando aprueben 10DLC) — automatización del Lead Inbox.
+5. **Páginas legales públicas** — Términos, Privacidad, Cookies (probablemente ya parciales, revisar).
+6. **Email digest semanal a clientes** — "5 nuevos proveedores en tu ciudad" cuando Resend esté live.
+
+### P2 features de retención
+1. **Provider achievements + rewards expansion** — más badges, más milestones celebratorios.
+2. **Sistema de recomendaciones cliente-a-cliente** — "Mi vecina te recomienda este plomero".
+3. **Verificación premium con video selfie** — sello "Verificado Plus".
 
 ---
 
