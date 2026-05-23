@@ -274,15 +274,11 @@ class TestUploadEndpoint:
         assert r.status_code in (401, 403)
 
 
-# ============ Image-only post (📷 placeholder edge case) ============
+# ============ Image-only post (no text required when image present) ============
 class TestImageOnlyPost:
-    def test_image_only_placeholder_emoji_length(self, provider_session):
-        """
-        Frontend sends content='📷' when only image. POST_MIN_LEN=4 in backend.
-        Python len('📷') is 1 → Pydantic min_length=4 will REJECT. This is a known frontend bug.
-        Verify behavior so main agent can patch.
-        """
-        # Upload a tiny image first to get a url
+    def test_image_only_post_succeeds_with_empty_content(self, provider_session):
+        """After iter42 fix: when image_url is present, content can be empty.
+        When NO image, content must still be >= 4 chars (anti-noise guard)."""
         png = bytes.fromhex(
             "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
             "890000000d49444154789c63f80f0000010001005c2cb1c30000000049454e44ae426082"
@@ -293,22 +289,23 @@ class TestImageOnlyPost:
             pytest.skip(f"upload failed: {up.text}")
         image_url = up.json()["url"]
 
-        # Simulate exactly what frontend sends when text is empty + image
+        # 1. Image + empty content → 200
         r = provider_session.post(
             f"{API}/community/posts",
-            json={"content": "📷", "image_url": image_url},
+            json={"content": "", "image_url": image_url},
             timeout=20,
         )
-        # Document actual behavior
-        print(f"Image-only post with content='📷' → {r.status_code} {r.text[:200]}")
-        # We expect this to FAIL (422) due to min_length=4 vs len('📷')=1
-        # If main agent fixed it to allow image-only posts, this passes.
-        if r.status_code == 422:
-            pytest.fail(
-                "IMAGE-ONLY POST REJECTED: frontend sends '📷' (len=1) but POST_MIN_LEN=4. "
-                "Either reduce min_length when image_url present, OR send 4-char placeholder."
-            )
-        assert r.status_code == 200, r.text
+        assert r.status_code == 200, f"image-only post should succeed: {r.text}"
         post_id = r.json()["post_id"]
+        assert r.json()["image_url"] == image_url
+
+        # 2. No image + 2-char content → 422
+        r2 = provider_session.post(
+            f"{API}/community/posts",
+            json={"content": "hi"},
+            timeout=20,
+        )
+        assert r2.status_code == 422, f"short text-only should be rejected: {r2.text}"
+
         # cleanup
         provider_session.delete(f"{API}/community/posts/{post_id}", timeout=20)

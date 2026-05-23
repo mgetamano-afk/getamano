@@ -122,7 +122,7 @@ function NewPostBox({ onPosted }) {
     setPosting(true);
     try {
       const r = await api.post("/community/posts", {
-        content: content.trim() || "📷",  // backend min 4 — when only image, pad gracefully
+        content: content.trim(),
         image_url: imageUrl,
       });
       onPosted?.(r.data);

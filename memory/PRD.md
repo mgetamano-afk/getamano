@@ -1000,3 +1000,70 @@ Two bundled drops in one iteration:
 - Per-user feed (followed-only filter) toggle.
 - Refactor `server.py` (now ~8400 lines) into modular routers — getting urgent.
 
+
+### Feb 23, 2026 — Iteration 42: Comment Threads + Image Uploads (Sprint follow-up to iter41)
+
+**User intent:** "Le entramos a esos dos como siguiente sprint? si" — confirmed the comments + image uploads sprint suggested at the end of iter41.
+
+### Comments threading
+
+**Backend (`/app/backend/server.py`):**
+- New `community_comments` collection with indexes `[(post_id, created_at), user_id]`.
+- 3 new endpoints under `/api/community/*`:
+  - `GET /community/posts/{id}/comments` (public) — returns `{items, total, next_after}`. Comments come back hydrated with `{author: {user_id, name, picture, slug, business_name, is_provider}}`. 404 on unknown or hidden post.
+  - `POST /community/posts/{id}/comments` (auth) — body `{content (1-300 chars)}`. Returns hydrated comment, `$inc` bumps `community_posts.comments_count`. Anti-spam: 10 comments per 5 min per user → 429. Triggers a `category=community` high-priority notification for the post owner (when commenter != owner): title `💬 {first_name} comentó tu post`, body=first 120 chars, CTA → `/comunidad`.
+  - `DELETE /community/comments/{id}` (auth) — owner OR admin. Soft-delete (`is_hidden=true`) + `$inc` decrements `comments_count`.
+- `GET /api/notifications` ad-hoc merge now includes `category="community"` alongside gigs/referrals/streaks/rewards.
+
+**Frontend (`/app/frontend/src/pages/ComunidadPage.jsx`):**
+- New `<CommentsModal />` (~150 lines inlined). Slides from bottom on mobile (`items-end`), centers on desktop. Body scroll locked while open + restored on close.
+- Modal contents: scrollable list (testid=`comments-modal-list`), empty state ("Sé el primero en comentar 💬"), per-comment author chip with ✓ pill for providers, owner-only Eliminar action.
+- Input footer with Send button (testid=`comments-modal-send`) + Enter-to-submit (Shift+Enter for newline) + 300-char cap.
+- Anon visitors see "Inicia sesión para comentar →" CTA at the bottom.
+- `<PostCard />`'s previously disabled comment button is now active (testid=`comunidad-post-comments-{id}`) with live counter (testid=`comunidad-post-comments-count-{id}`). Click opens modal.
+- `<PostFeed />` manages `openCommentsPost` state + onCommentCountChanged callback so the counter on the card bumps optimistically.
+
+### Image uploads in NewPostBox
+
+- Reused existing `POST /api/upload` endpoint (already accepting auth + multipart up to 10MB).
+- Added file input button "Foto" (testid=`comunidad-newpost-image-button`) with cute ImageIcon → file picker accepting jpg/png/webp/gif/heic.
+- Client-side validation: rejects >10MB with toast, rejects non-image types.
+- Preview thumbnail (testid=`comunidad-newpost-preview`) with X button (testid=`comunidad-newpost-remove-image`) to clear the staged image before posting.
+- Loading state during upload (Loader2 spinner) — button disabled until upload completes.
+- File input reset on every selection so the same file can be re-picked.
+- Posts display the image via existing `post.image_url` rendering already in PostCard (max-h-96, rounded, lazy-loaded).
+
+### Bug found + fixed mid-iteration ⚠️
+
+**Catched by the testing agent:** The image-only post flow was broken. Backend `POST_MIN_LEN = 4` strictly required `content` to be ≥4 codepoints. The frontend was sending `'📷'` (len=1) as a placeholder when only an image was uploaded → 422.
+
+**Fix applied (option B per agent recommendation, the cleaner UX path):**
+- Switched `NewPostIn` from Field(`min_length=POST_MIN_LEN`) to a `model_validator(mode="after")` that enforces the 4-char rule ONLY when `image_url` is absent.
+- Frontend simplified: now sends actual empty string when image-only (no placeholder hack).
+- Added `from pydantic import ... model_validator` to imports.
+- E2E reverified: image-only → 200, text-only with 2 chars → 422.
+
+### Testing
+
+- **NEW** `/app/backend/tests/test_iter42_comments_images.py` — **17/17 PASS** across 6 test classes (Anon read, Authed create+rate-limit, Delete ACL, Notification side-effect, Image upload happy/cap/wrong-mime, Image-only post post-fix).
+- **iter41 regression** = 26/26 PASS individually. Combined batch sometimes hits the 5-posts-per-10min spam guard (intentional production behavior) — easily reset by clearing test posts.
+- Frontend Playwright verified: anon comment modal preview (login CTA), authed Carlos comment flow with optimistic update + counter bump, owner delete with confirm dialog, image picker upload + preview + remove + final post with thumbnail visible in feed.
+- Demo state preserved: María still owns 2 posts (`post_demo_seed_001` + `post_demo_seed_002`), first now has 1 seed comment from Carlos.
+
+### Mocked / Pending
+
+- Image upload pipeline writes to local `/uploads` directory (already existed) — no S3/CDN yet. Will plug in when production infra is decided.
+- @mention auto-link in posts — not yet (next sprint candidate).
+- Hashtag trending discovery — not yet (next sprint candidate).
+- Push notifications for new comments queue in `notification_queue` waiting for Twilio/Resend keys.
+
+### Follow-up backlog
+
+- @mention auto-link `@business-name` → /services/{slug}.
+- Hashtag indexing + #trending discovery widget.
+- Reply-to-comment threading (nested 1 level).
+- Image gallery (multi-image post — currently 1).
+- "Save post" bookmark feature.
+- Comment likes (+ reply notifications).
+- **Refactor `server.py` (~8500 lines) into modular routers — getting urgent.**
+

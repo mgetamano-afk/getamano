@@ -14,7 +14,7 @@ from catalog import CATALOG as FULL_CATALOG, SECTOR_LABELS, SECTOR_COLORS, CITIE
 import httpx
 import requests
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
 
@@ -4016,8 +4016,18 @@ POST_MIN_LEN = 4
 
 
 class NewPostIn(BaseModel):
-    content: str = Field(..., min_length=POST_MIN_LEN, max_length=POST_MAX_LEN)
+    content: str = Field(default="", max_length=POST_MAX_LEN)
     image_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _content_or_image(self):
+        # When the post carries an image, the text content can be a short
+        # caption (or even empty). Otherwise enforce the 4-char minimum so
+        # the feed isn't filled with one-word noise.
+        self.content = (self.content or "").strip()
+        if not self.image_url and len(self.content) < POST_MIN_LEN:
+            raise ValueError(f"content debe tener al menos {POST_MIN_LEN} caracteres si no hay imagen")
+        return self
 
 
 async def _hydrate_posts(posts: list[dict], current_user_id: Optional[str] = None) -> list[dict]:
