@@ -378,6 +378,31 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_29.json` — **11/11 backend pytest + 100% frontend**. Demo provider lifecycle (free → subscribe Pro annual → cancel with reason → reactivate → cancel again) all verified end-to-end. Email confirmation lands in backend log. Mobile responsive @393px. Pytest suite saved at `/app/backend/tests/test_iter29_subscriptions.py` for future regression.
 
+### Feb 2026 — Section 27: Smart search (synonyms + fuzzy + bilingual)
+**Backend** (`/app/backend/search_synonyms.py` + `server.py`)
+- New `SEARCH_SYNONYMS` dict — 35+ canonical service names × ~5 bilingual synonyms each (Spanish, English, common misspellings, Spanglish). Covers all major getamano verticals: limpieza, plomería, electricidad, jardinería, construcción, eventos, legal, belleza, automotriz, salud, tecnología, mascotas, mudanzas, educación, HVAC.
+- `normalize()` — diacritic stripping + lowercase + alphanumeric filter for accent-insensitive matching ("limpieza" === "Limpieza" === "limpiesa-ish")
+- `_levenshtein()` — early-exit fuzzy matcher with len-gap ≤ 3 shortcut
+- `expand_query()` — 4-tier matching strategy (substring-canonical → substring-synonym → fuzzy-canonical → fuzzy-synonym), returns up to 6 prioritized matches
+- `suggest_alternatives()` — returns nearest canonical names within Lev ≤ 4 for the empty-state "¿Quisiste decir…?" widget
+- Smart expansion injected into `/api/providers` `q` clause: `limpesa` now matches María's Cleaning via business_name + category-widening (auto-resolves to cat slug `cleaning`)
+- `re.escape(term)` guards against regex injection — verified safe against `(`, `*`, `++`, `.*`, `[abc`, `$$$` etc.
+- Two new endpoints:
+  - `GET /api/search/autocomplete?q=...&lang=es|en` → `{matches: [{label, label_en, slug}, ...]}`. Min 2 chars, max 8 results.
+  - `GET /api/search/alternatives?q=...` → `{alternatives: [...]}` for the zero-results empty state
+
+**Frontend**
+- New `SmartServiceSearch.jsx` — debounced autocomplete (200ms) with arrow-key nav (↑↓ navigate, Enter selects, Escape closes), clear (X) button, loading spinner, bilingual primary+secondary labels, auto-closes on outside click. Uses `data-testid` prefix so it composes inside any form.
+- New `SmartSearchEmptyState.jsx` — empty-state UI for /buscar with 0 results. Three actionable elements:
+  1. Warm headline + hint ("Estamos creciendo")
+  2. "¿Quisiste decir…?" suggestion chips (fetched from `/api/search/alternatives`)
+  3. "Invita un proveedor" growth CTA — gradient orange card linking to `/registro?intent=provider&ref=invite&for=<q>` so dead searches feed back into supply
+  4. "Explorar todos los servicios" safe-fallback link
+- Wired into `Landing.jsx` hero — replaced plain `<input>` with `SmartServiceSearch` next to existing `CityAutocomplete`. Smart-search picks call `onPickService` which navigates to `/buscar?q=Limpieza&category=cleaning&city=...` for direct category filtering.
+- Wired into `Search.jsx` empty state — replaces the legacy "Sin resultados" copy with the rich `SmartSearchEmptyState`.
+
+**Testing:** `iteration_30.json` — **15/15 backend pytest + 100% frontend (24/24 assertions)**. ZERO bugs. Lifecycle verified: 'limpesa' dropdown shows Cleaning/Limpieza → click navigates to /buscar?q=Limpieza&category=cleaning → finds María's Cleaning. 'quinceniera' empty state shows "Quinceañeras" did-you-mean chip + Invite CTA. Regex-injection safe (re.escape). Mobile @393px no overflow. Pytest suite saved at `/app/backend/tests/test_iter30_smart_search.py` with self-throttling for rate limiter. Nit fixed post-test: empty-state-invite-cta padding bumped to `py-3` + `minHeight: 44` for WCAG 2.5.5 tap target compliance.
+
 ## Prioritized Backlog
 
 ### P0 (siguiente)

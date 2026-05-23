@@ -125,8 +125,8 @@ export default function SmartSearchEmptyState({ q, city, onSuggestionClick }) {
             <p className="text-xs text-slate-600 mt-1 leading-relaxed">{T.inviteProBody}</p>
             <Link
               to={`/registro?intent=provider&ref=invite${q ? `&for=${encodeURIComponent(q)}` : ""}`}
-              className="inline-flex mt-3 items-center gap-1.5 px-4 py-2 rounded-full text-white text-xs font-bold hover:scale-[1.02] active:scale-[0.98] transition"
-              style={{ background: "linear-gradient(135deg, #FF6B2C 0%, #F97316 100%)" }}
+              className="inline-flex mt-3 items-center gap-1.5 px-5 py-3 rounded-full text-white text-xs font-bold hover:scale-[1.02] active:scale-[0.98] transition"
+              style={{ background: "linear-gradient(135deg, #FF6B2C 0%, #F97316 100%)", minHeight: 44 }}
               data-testid="empty-state-invite-cta"
             >
               {T.inviteCta} <ArrowRight className="w-3.5 h-3.5" />
