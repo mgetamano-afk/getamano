@@ -7225,6 +7225,92 @@ async def improve_description(payload: ImproveDescriptionIn, user: User = Depend
     }
 
 
+# ── /ai/draft-description — generate a starter description from scratch ──
+# Used by the SmartSubcategoryPicker flow: once a provider picks their main
+# category and 1–3 specializations, this endpoint produces an 80-100-word
+# Spanish (or English) starter so the provider doesn't face a blank textarea.
+
+class DraftDescriptionIn(BaseModel):
+    main_category: str
+    subcategories: List[str] = []
+    business_name: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    locale: Optional[str] = "es"
+
+
+@api_router.post("/ai/draft-description")
+async def draft_description(payload: DraftDescriptionIn, user: User = Depends(get_current_user)):
+    """Generate a fresh 2-3 sentence starter description for a provider."""
+    main_cat = (payload.main_category or "").strip()
+    if not main_cat:
+        raise HTTPException(status_code=400, detail="Selecciona una categoría principal primero.")
+    subs = [s.strip() for s in (payload.subcategories or []) if s.strip()][:6]
+
+    locale = (payload.locale or "es").lower()
+    is_en = locale.startswith("en")
+    city_part = f", {payload.city}" if payload.city else ""
+    if payload.state and payload.city:
+        city_part = f", {payload.city}, {payload.state}"
+
+    if is_en:
+        system_msg = (
+            "You write starter descriptions for service providers on getamano, a Latino services marketplace in the US. "
+            "Tone: warm, human, Latino — never corporate or generic. "
+            "Rules:\n"
+            "1. 2-3 sentences, ~60-90 words, conversational.\n"
+            "2. Mention the main category and weave in the chosen specializations naturally.\n"
+            "3. Mention the city ONLY if provided.\n"
+            "4. End with a soft call to action.\n"
+            "5. Do NOT invent years of experience, prices or claims. Do NOT use \"the best\", \"#1\", \"world-class\".\n"
+            "6. Output ONLY the description text. No quotes, no preface, no list."
+        )
+        user_msg = (
+            f"Main category: {main_cat}\n"
+            f"Specializations: {', '.join(subs) if subs else '(none chosen)'}\n"
+            f"{f'Business name: {payload.business_name}' if payload.business_name else ''}\n"
+            f"Location: {payload.city or ''} {payload.state or ''}\n\n"
+            "Write the starter description."
+        )
+    else:
+        system_msg = (
+            "Escribes descripciones iniciales para proveedores en getamano, un marketplace latino de servicios en USA. "
+            "Tono: cercano, humano, latino — jamás corporativo ni genérico. "
+            "Reglas:\n"
+            "1. Entre 2 y 3 oraciones, ~60-90 palabras, conversacional.\n"
+            "2. Menciona la categoría principal e integra las especializaciones elegidas de forma natural.\n"
+            "3. Menciona la ciudad SOLO si fue provista.\n"
+            "4. Cierra con una llamada a la acción suave.\n"
+            "5. NO inventes años de experiencia, precios ni reclamos. NO uses \"el mejor\", \"#1\", \"de clase mundial\".\n"
+            "6. Devuelve SOLO la descripción. Sin comillas, sin prefijos, sin listas."
+        )
+        user_msg = (
+            f"Categoría principal: {main_cat}\n"
+            f"Especializaciones: {', '.join(subs) if subs else '(ninguna elegida)'}\n"
+            f"{f'Nombre del negocio: {payload.business_name}' if payload.business_name else ''}\n"
+            f"Ubicación: {payload.city or ''}{city_part if not payload.city else ''}\n\n"
+            "Escribe la descripción inicial."
+        )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            session_id=f"draft_desc_{user.user_id}_{int(datetime.now(timezone.utc).timestamp())}",
+            system_message=system_msg,
+        ).with_model("anthropic", "claude-haiku-4-5-20251001")
+        draft = (await chat.send_message(UserMessage(text=user_msg))).strip()
+    except Exception as e:
+        logger.exception("AI draft-description failed")
+        raise HTTPException(status_code=503, detail="No pudimos generar la descripción. Intenta de nuevo.") from e
+
+    # Strip surrounding quotes Claude occasionally adds
+    if draft.startswith(("\"", "'")) and draft.endswith(("\"", "'")):
+        draft = draft[1:-1].strip()
+
+    return {"draft": draft, "model": "claude-haiku-4-5"}
+
+
 # ════════════════════════════════════════════════════════════════════
 # SECTION 18 — Google Cloud APIs (Geocoding + Translation unified key)
 # ════════════════════════════════════════════════════════════════════
@@ -7799,6 +7885,7 @@ _RATE_LIMITED_PATHS = {
     "/api/auth/send-otp":     {"limit": 5,  "window": 60},
     "/api/auth/verify-otp":   {"limit": 12, "window": 60},
     "/api/ai/improve-description": {"limit": 20, "window": 60},
+    "/api/ai/draft-description": {"limit": 20, "window": 60},
     "/api/translate":         {"limit": 60, "window": 60},
     "/api/card-scan":         {"limit": 10, "window": 60},
 }

@@ -29,6 +29,7 @@ import LeaderboardWidget from "../components/LeaderboardWidget";
 import CouponsCard from "../components/CouponsCard";
 import ProviderLeftNav from "../components/ProviderLeftNav";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
+import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -294,7 +295,18 @@ export default function ProviderDashboard() {
                   <Field label="Teléfono" value={form.phone} onChange={v => update("phone", v)} testid="form-phone" />
                   <Field label="Email" value={form.email} onChange={v => update("email", v)} testid="form-email" />
                   <Field label="Sitio web" value={form.website} onChange={v => update("website", v)} testid="form-website" />
-                  <Field label="Descripción" value={form.description} onChange={v => update("description", v)} textarea testid="form-description" full />
+                  <div className="md:col-span-2">
+                    <DescriptionFieldWithAI
+                      value={form.description}
+                      onChange={(v) => update("description", v)}
+                      mainCategory={categories.find((c) => c.category_id === form.category_id)?.name_es || ""}
+                      subcategories={form.additional_categories || []}
+                      businessName={form.business_name}
+                      city={form.city}
+                      state={form.state}
+                      lang={lang}
+                    />
+                  </div>
                 </Section>
 
                 <Section title="Identidad del negocio (opcional)">

@@ -275,6 +275,33 @@ Goal: rank organically for searches like "limpieza Sallisaw", "mecánicos latino
 
 **Testing:** `iteration_25.json` — 92% PASS first run; H1 contrast bug fixed and re-verified white-on-gradient via `getComputedStyle`. All 12 categories render correctly with category-specific SEO copy, FAQs, JSON-LD `@graph`, breadcrumbs, canonical, and CTAs. Spanish/English switching works (uses `tx_lang` localStorage key from I18nContext). Fallback for unknown slug works. Mobile responsiveness clean (no horizontal overflow).
 
+### May 23, 2026 — AI-Powered Description Draft (Section 40 Bonus)
+
+**Backend:**
+- Nuevo endpoint `POST /api/ai/draft-description` añadido junto a `/ai/improve-description`.
+- Acepta `{main_category, subcategories[], business_name?, city?, state?, locale?}`.
+- Usa Claude Haiku 4.5 via Emergent LLM key con prompt específico para Spanish/English (tono cálido, latino, 2-3 oraciones, ~60-90 palabras, prohibido "el mejor"/"clase mundial", termina con CTA suave, no inventa años/precios).
+- Rate-limit configurado: 20 req/min por usuario (mismo que `/ai/improve-description`).
+
+**Frontend:**
+- Nuevo componente `DescriptionFieldWithAI.jsx` (~120 líneas) que reemplaza el `<Field textarea>` plano del Provider Dashboard.
+- Botón "✨ Sugerir con IA" / "Suggest with AI":
+  - Estado **vacío**: gradiente teal `#025F67→#2F9D94`, lleno, shadow drop — invita al click.
+  - Estado **con contenido**: outlined blanco con border teal — sugiere "re-generar" sin imponerse.
+  - Loading: `<Loader2 className="animate-spin" />` + texto "Escribiendo...".
+  - Oculto si no hay `mainCategory` seleccionada; en su lugar muestra hint informativo bajo el textarea.
+- Hidrata desde `form.business_name`, `form.city`, `form.state`, `form.category_id → name_es`, y `form.additional_categories` (subcategorías del SmartSubcategoryPicker).
+- Toast de éxito: "Listo, edítalo a tu gusto para darle tu toque personal".
+- Bilingüe (lee `lang` del contexto i18n).
+
+**E2E verificado (Playwright)**:
+1. Estado inicial: botón "Re-draft" outlined porque descripción tiene contenido.
+2. Limpiar descripción → botón cambia a gradiente lleno "Suggest with AI" + placeholder explicativo.
+3. Click → 1.5s después el textarea se llena con borrador de **269 caracteres** (3 oraciones, menciona María's Cleaning Services + Sallisaw OK + naturaleza del servicio + CTA "¡escríbenos hoy!").
+4. Toast verde "Draft generated — edit it to add your personal touch." visible top-right.
+
+**Lint**: 0 issues (ESLint + ruff).
+
 ### May 23, 2026 — Section 40 + Shared test fixtures
 
 **Section 40 — Subcategorías contextuales por categoría principal:**
