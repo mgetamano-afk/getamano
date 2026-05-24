@@ -1780,3 +1780,62 @@ Convert the viral share counters from iter 46 into a tangible reward so provider
 - **Embajador Gold**: 100 shares + 50 referred views → 1 year Pro free + featured spot on landing.
 - "Diamond" tier with Premium plan upgrade.
 - Public leaderboard of top embajadores (with provider consent) — additional social proof on landing.
+
+
+---
+
+## Iteration 48 — Google Cloud APIs hardening (Feb 24, 2026)
+
+### Goal
+Make the Google Cloud integration (Translation + Vision) **work zero-friction the second the CEO enables them**. Cover the 3 layers: backend error diagnosis, admin diagnostic widget, public eCard translate toggle, and dashboard scan-card button.
+
+### What was done
+
+#### (a) Backend hardening
+- New helper `_diagnose_google_api_error(status, body)` maps Google's responses to actionable error_kinds: `api_disabled`, `permission_denied`, `quota_exceeded`, `bad_request`, `unknown`, `network`. Returns Spanish + English hints for the UI.
+- `/api/translate` and `/api/card-scan` now return `source="api_error"` + `error_kind` + Spanish `note` instead of swallowing the upstream error.
+- New `GET /api/admin/google-cloud-status` (admin auth): probes both APIs in parallel via `asyncio.gather` (~1.8 s round-trip). Returns `{configured, key_prefix, translation:{enabled, error_kind, hint}, vision:{enabled, error_kind, hint}, checked_at}`.
+
+#### (b) BusinessCardScanner now reachable from dashboard
+- Provider dashboard's "Información del negocio" section gets a discrete "Escanear tarjeta de negocio" link (icon: ScanLine, teal).
+- Click opens the existing `BusinessCardScanner` modal.
+- `onExtracted` callback merges Vision-extracted fields **into the form ONLY for empty fields** so the provider's previous edits are preserved.
+- Toast confirms "Campos rellenados desde la tarjeta. Revisa y guarda."
+
+#### (c) Public eCard ES↔EN toggle
+- New `/app/frontend/src/components/TranslatableDescription.jsx` wraps the description with a tiny `Languages` toggle.
+- Lazy translation: no API call on mount, only on click. Local + server-side cache (`translation_cache` collection) ensure 2nd click is instant.
+- Graceful degradation: when API key invalid or APIs disabled, the toggle shows the actionable Spanish note inline (e.g. "API key inválida o sin permisos. Verifica GOOGLE_API_KEY...") and keeps the source text visible — never replaces with empty/identical content.
+- Mounted in `ProviderECard.jsx` (description block).
+
+#### (d) Admin Google Cloud Status widget
+- New tab "Google Cloud" inside `/admin/ops` (next to "Onboarding masivo" + "Latencia de respuesta").
+- 2 rows per API: green check + "ACTIVA" badge when enabled, red X + "INACTIVA" + Spanish hint + direct link to the corresponding `console.cloud.google.com/apis/library/{translate,vision}.googleapis.com` page when disabled.
+- 4-step tutorial below ("Cómo activar las APIs (2 min)") explicitly walks the CEO through the click.
+- Refrescar button re-pings.
+
+### Testing (iteration_48.json)
+- **Backend: 10/10 pytest PASS** — auth gating + response shape + reality probe (current key returns 403 → mapped correctly to `permission_denied`).
+- **Frontend: 12/12 UI PASS** — all data-testids present, both INACTIVA cards render with hints + console links, Refrescar fires network, scan button opens modal, translate toggle degrades gracefully.
+- **Zero bugs introduced**. Pre-existing React hydration warning in US_STATES select (iter 47) still present — non-blocking, scheduled cleanup.
+
+### Files changed
+- New: `/app/frontend/src/components/TranslatableDescription.jsx`, `/app/backend/tests/test_iter48_google_cloud_status.py`.
+- Modified: `/app/backend/server.py` (+~110 lines: `_diagnose_google_api_error` + `admin_google_cloud_status` + hardened translate + card-scan handlers).
+- Modified: `/app/frontend/src/pages/AdminOpsPage.jsx` (+~145 lines: `GoogleCloudStatus`, `ApiStatusRow`, new Cloud tab + tutorial card).
+- Modified: `/app/frontend/src/pages/ProviderECard.jsx` (description block now uses `TranslatableDescription`).
+- Modified: `/app/frontend/src/pages/ProviderDashboard.jsx` (scan button + scanner mount + auto-fill onExtracted callback).
+
+### Impact for the CEO
+- **Self-diagnostic loop is live**: CEO opens `/admin/ops` → Google Cloud tab → sees exactly what's wrong + click-through link to fix it. No more guessing.
+- **Zero-friction activation**: the moment the CEO enables Cloud Translation + Vision in Google Cloud Console, every existing UI element (scan button, translate toggle) flips to working — no redeploy needed.
+- **Graceful failure path**: even with APIs disabled today, providers and clients see helpful notes instead of crashes.
+- The TestRealityProbe in test_iter48 is intentionally state-agnostic: same suite validates both "disabled" and "enabled" reality.
+
+### Action item for CEO (still pending — non-blocking)
+1. Go to https://console.cloud.google.com/apis/library
+2. Click "Cloud Translation API" → Enable
+3. Click "Cloud Vision API" → Enable
+4. Optionally: rotate `GOOGLE_API_KEY` if the current one is restricted/revoked.
+
+Once done, /admin/ops → Cloud tab will show 2 ACTIVA badges + the translate toggle on every eCard will actually translate.
