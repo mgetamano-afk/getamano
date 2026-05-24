@@ -46,7 +46,7 @@ export default function AdminReviews() {
                     <span className="font-medium text-white">{r.user_name}</span>
                     <div className="flex">{[...Array(r.rating)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-orange-400 text-orange-400" />)}</div>
                     {r.is_flagged && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-900 text-red-300">FLAG</span>}
-                    {r.provider && <a href={`/services/${r.provider.slug}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1 ml-auto">{r.provider.business_name} <ExternalLink className="w-3 h-3" /></a>}
+                    {r.provider && <a href={`/provider/${r.provider.slug}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1 ml-auto">{r.provider.business_name} <ExternalLink className="w-3 h-3" /></a>}
                   </div>
                   {r.comment && <p className="mt-1 text-sm text-slate-300">{r.comment}</p>}
                   <div className="text-[10px] text-slate-500 mt-1">{new Date(r.created_at).toLocaleString()}</div>

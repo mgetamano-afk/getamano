@@ -82,7 +82,7 @@ export default function ProviderOnboarding() {
       }
       await refresh();
       toast.success("¡Tu eCard está lista!");
-      navigate(`/services/${data.slug}`, { replace: true });
+      navigate(`/provider/${data.slug}`, { replace: true });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Error");
     } finally {

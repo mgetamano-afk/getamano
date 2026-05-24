@@ -270,7 +270,7 @@ export default function ProviderDashboard() {
                 <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
             <p className="text-slate-500 text-sm mt-0.5">Gestiona tu negocio, tus clientes y tu eCard.</p>
           </div>
-          <Link to={`/services/${profile.slug}`} target="_blank" className="btn-outline flex items-center gap-1 text-sm" data-testid="view-public-ecard">
+          <Link to={`/provider/${profile.slug}`} target="_blank" className="btn-outline flex items-center gap-1 text-sm" data-testid="view-public-ecard">
             Ver mi eCard <ExternalLink className="w-3.5 h-3.5" />
           </Link>
         </div>

@@ -236,7 +236,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
                       <OwnerIdentityBadge identity={p.owner_identity} size="sm" />
                     </div>
                     <Link
-                      to={`/services/${p.slug}`}
+                      to={`/provider/${p.slug}`}
                       className="inline-block w-full text-center text-xs font-semibold px-3 py-1.5 rounded-full transition"
                       style={{ backgroundColor: "#2F9D94", color: "white" }}
                       data-testid={`map-popup-cta-${p.slug}`}

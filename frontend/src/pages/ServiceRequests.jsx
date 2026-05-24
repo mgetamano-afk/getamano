@@ -72,7 +72,7 @@ export default function ServiceRequests() {
                     {isProvider ? (
                       <span className="font-medium text-slate-900">{r.client_name}</span>
                     ) : (
-                      <Link to={`/services/${r.slug}`} className="font-medium text-blue-600 hover:underline">{r.business_name}</Link>
+                      <Link to={`/provider/${r.slug}`} className="font-medium text-blue-600 hover:underline">{r.business_name}</Link>
                     )}
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[r.status]}`}>{STATUS_LABEL[r.status]}</span>
                   </div>

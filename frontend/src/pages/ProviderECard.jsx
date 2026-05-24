@@ -143,14 +143,18 @@ export default function ProviderECard() {
 
   const verified = p.verification_status === "approved";
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address || ""} ${p.city} ${p.state} ${p.zip_code || ""}`)}`;
-  // SEO: hreflang alternates between /proveedor/{slug} (ES) and /provider/{slug} (EN)
+  // SEO i18n — derive canonical lang from the URL path (NOT from useI18n state).
+  // Googlebot lands on a specific canonical URL; that URL itself decides the lang
+  // signal, regardless of the visitor's browser locale or saved preference.
+  const pathIsEn = typeof window !== "undefined" && /^\/(provider|services)\//.test(window.location.pathname);
+  const seoLang = pathIsEn ? "en" : "es";
   const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
   const esUrl = `${origin}/proveedor/${p.slug}`;
   const enUrl = `${origin}/provider/${p.slug}`;
-  const seoTitle = lang === "en"
+  const seoTitle = seoLang === "en"
     ? `${p.business_name} · ${p.city}, ${p.state} — Latino provider`
     : `${p.business_name} · ${p.city}, ${p.state} — Proveedor latino`;
-  const seoDescription = (p.description || "").slice(0, 160) || (lang === "en"
+  const seoDescription = (p.description || "").slice(0, 160) || (seoLang === "en"
     ? `Verified Latino provider in ${p.city}, ${p.state}. Book, request quote or message on getamano.`
     : `Proveedor latino verificado en ${p.city}, ${p.state}. Reserva, pide cotización o envía mensaje en getamano.`);
 
@@ -159,9 +163,9 @@ export default function ProviderECard() {
       <SeoHead
         title={seoTitle}
         description={seoDescription}
-        canonical={lang === "en" ? enUrl : esUrl}
+        canonical={pathIsEn ? enUrl : esUrl}
         alternates={[{ lang: "es", url: esUrl }, { lang: "en", url: enUrl }]}
-        lang={lang}
+        lang={seoLang}
         image={p.logo_url ? buildFileUrl(p.logo_url) : undefined}
       />
       <Header />

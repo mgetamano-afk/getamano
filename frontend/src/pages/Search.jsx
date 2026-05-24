@@ -407,7 +407,7 @@ export default function Search() {
                         </div>
                         <div className="flex-1 p-4 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <Link to={`/services/${p.slug}`} onClick={e => e.stopPropagation()} className="font-display font-semibold text-base truncate hover:underline" style={{ color: "#025F67" }}>{p.business_name}</Link>
+                            <Link to={`/provider/${p.slug}`} onClick={e => e.stopPropagation()} className="font-display font-semibold text-base truncate hover:underline" style={{ color: "#025F67" }}>{p.business_name}</Link>
                             {p.rating_count > 0 && (
                               <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#063154" }}>
                                 <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#F59E0B" }} /> {Number(p.rating_avg).toFixed(1)}
@@ -522,7 +522,7 @@ export default function Search() {
             ) : (
               <div className="grid md:grid-cols-2 gap-5">
                 {providers.map(p => (
-                  <Link key={p.provider_id} to={`/services/${p.slug}`} className="card-lift bg-white rounded-2xl border border-slate-200 overflow-hidden block" data-testid={`result-card-${p.slug}`}>
+                  <Link key={p.provider_id} to={`/provider/${p.slug}`} className="card-lift bg-white rounded-2xl border border-slate-200 overflow-hidden block" data-testid={`result-card-${p.slug}`}>
                     <div className="h-32 bg-slate-100 relative">
                       {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" />}
                       {p.verification_status === "approved" && (

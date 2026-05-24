@@ -79,7 +79,7 @@ export default function RankingPage({ embedded = false }) {
               return (
                 <Link
                   key={r.provider_id}
-                  to={`/services/${r.slug}`}
+                  to={`/provider/${r.slug}`}
                   className={`relative rounded-2xl text-white overflow-hidden flex flex-col items-center justify-end pb-4 px-2 ${cardHeight} bg-gradient-to-br ${accent} hover:scale-[1.02] transition-transform shadow-lg`}
                   data-testid={`ranking-podium-${r.rank}`}
                 >
@@ -106,7 +106,7 @@ export default function RankingPage({ embedded = false }) {
             <ul className="divide-y divide-slate-100">
               {rest.map(r => (
                 <li key={r.provider_id} data-testid={`ranking-row-${r.rank}`}>
-                  <Link to={`/services/${r.slug}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition">
+                  <Link to={`/provider/${r.slug}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition">
                     <span className="font-display font-bold text-lg text-slate-400 w-8 text-center flex-shrink-0">#{r.rank}</span>
                     <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-slate-200">
                       <img src={r.photo_url || getDicebearAvatar(r.business_name)} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />

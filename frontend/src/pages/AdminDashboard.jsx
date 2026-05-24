@@ -96,7 +96,7 @@ export default function AdminDashboard() {
                   <div className="font-medium text-slate-900 truncate">{p.business_name}</div>
                   <div className="text-sm text-slate-500 truncate">{p.city}, {p.state} · {p.phone}</div>
                 </div>
-                <Link to={`/services/${p.slug}`} target="_blank" className="text-blue-600 hover:underline text-sm flex items-center gap-1" data-testid={`admin-view-${p.slug}`}>
+                <Link to={`/provider/${p.slug}`} target="_blank" className="text-blue-600 hover:underline text-sm flex items-center gap-1" data-testid={`admin-view-${p.slug}`}>
                   Ver <ExternalLink className="w-3 h-3" />
                 </Link>
                 <div className="flex gap-1">

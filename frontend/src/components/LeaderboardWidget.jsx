@@ -177,7 +177,7 @@ export default function LeaderboardWidget() {
             return (
               <Link
                 key={r.provider_id}
-                to={`/services/${r.slug}`}
+                to={`/provider/${r.slug}`}
                 className="flex flex-col items-center min-w-0 text-center"
                 data-testid={`leaderboard-widget-podium-${r.rank}`}
               >

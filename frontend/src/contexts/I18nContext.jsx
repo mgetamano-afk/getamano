@@ -221,25 +221,29 @@ const dict = {
 
 const I18nContext = createContext(null);
 
-// SEO i18n — paths that start with one of these are English routes (Google/X
-// land users here when they click an EN result from the SERP). We auto-switch
-// to EN on first visit so the entire UI matches the URL the visitor opened.
+// SEO i18n — path-based language signals. Visitors landing on an EN canonical
+// URL (e.g. from Google EN result) should see English; visitors on an ES URL
+// should see Spanish — both BEFORE we fall through to navigator.language.
 const EN_PATH_PREFIXES = ["/services", "/cities", "/provider/", "/category/", "/en/"];
+const ES_PATH_PREFIXES = ["/servicios", "/ciudades", "/proveedor/", "/categoria/", "/comunidad", "/empleos"];
 
-function _isEnglishPath(pathname) {
+function _pathStartsWithAny(pathname, prefixes) {
   if (!pathname) return false;
-  return EN_PATH_PREFIXES.some(p => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p));
+  return prefixes.some(p => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p + "?"));
 }
 
 // BUG-08 — Smart language detection on first visit.
-// Priority: URL path (EN routes) > explicit user choice (localStorage.tx_lang)
-//          > browser language > 'es'.
+// Priority: URL path (EN > ES, both override locale) > explicit user choice
+//          (localStorage.tx_lang) > browser language > 'es'.
 function detectInitialLang() {
   try {
-    // If the visitor landed directly on an EN canonical URL (likely from Google),
-    // honor that signal BEFORE anything else — they expect English.
-    if (typeof window !== "undefined" && _isEnglishPath(window.location.pathname)) {
-      return "en";
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      // EN paths win against any other signal (Googlebot or visitor from EN SERP).
+      if (_pathStartsWithAny(path, EN_PATH_PREFIXES)) return "en";
+      // ES paths win against navigator.language (so Googlebot en-US visiting
+      // /proveedor/{slug} does not erroneously render an EN page on the ES URL).
+      if (_pathStartsWithAny(path, ES_PATH_PREFIXES)) return "es";
     }
     const stored = localStorage.getItem("tx_lang");
     if (stored === "es" || stored === "en") return stored;

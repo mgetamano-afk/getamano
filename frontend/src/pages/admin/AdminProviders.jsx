@@ -77,7 +77,7 @@ export default function AdminProviders() {
                 <td className="p-4 text-slate-300 capitalize">{p.plan}</td>
                 <td className="p-4 text-right">
                   <div className="inline-flex gap-1">
-                    <a href={`/services/${p.slug}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-800 rounded-lg" title="Ver"><ExternalLink className="w-4 h-4 text-blue-400" /></a>
+                    <a href={`/provider/${p.slug}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-slate-800 rounded-lg" title="Ver"><ExternalLink className="w-4 h-4 text-blue-400" /></a>
                     <button onClick={() => setEditing(p)} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs" data-testid={`provider-edit-${p.slug}`}>Editar</button>
                     <button onClick={() => toggleActive(p)} className="p-2 hover:bg-slate-800 rounded-lg" title={p.is_active ? "Pausar" : "Activar"} data-testid={`provider-toggle-${p.slug}`}>
                       {p.is_active ? <Pause className="w-4 h-4 text-yellow-400" /> : <Play className="w-4 h-4 text-green-400" />}

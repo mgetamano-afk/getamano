@@ -99,7 +99,7 @@ function ReelCard({ provider, index, isLiked, onLike, onCardClick }) {
 
   return (
     <Link
-      to={`/services/${provider.slug}`}
+      to={`/provider/${provider.slug}`}
       onClick={onCardClick}
       className="snap-start flex-shrink-0 w-[176px] sm:w-[200px] group"
       data-testid={`reel-card-${provider.provider_id}`}

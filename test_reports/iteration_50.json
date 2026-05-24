@@ -1,0 +1,63 @@
+{
+  "summary": "Iteration 50 — Re-verification of i18n SEO fixes from iter 49. RESULTS: 2 of 3 prior HIGH/CRITICAL fixes verified, 1 still partially broken, plus 1 newly-exposed bug. PASSED: (a) ProviderECard now derives lang/canonical from window.location.pathname — /provider/ renders html lang=en + canonical /provider/, /proveedor/ renders html lang=es + canonical /proveedor/, both under any localStorage state (verified by clearing/forcing localStorage to opposite lang and re-loading). (b) I18nContext.detectInitialLang now respects ES_PATH_PREFIXES (servicios, ciudades, proveedor/, categoria/, comunidad, empleos) — /proveedor/ URL with localStorage cleared correctly detects 'es' even when navigator.language is en-US. (c) Sitemap regression: 9090 xhtml:link annotations emitted, '/' appears once with x-default hreflang only — matches spec. (d) ShareLinkCard.fullUrl = '/provider/${slug}' confirmed. (e) ProviderOnboarding signup redirect now navigates to /provider/${data.slug}, ProviderDashboard view-public-ecard now links to /provider/${profile.slug}. (f) /services/cleaning/sallisaw correctly renders English h1 'Cleaning in Sallisaw, OK' + English intro. (g) /services index renders English h1 'All services on getamano'. STILL BROKEN: (1) 3 broken /services/${provider.slug} refs remain in components/ShareECardBlock.jsx:21, components/QuickActionsFAB.jsx:109, components/ECardFloatingHeader.jsx:56 — these build share/copy/review URLs of the form ${origin}/services/${provider?.slug} that, when clicked or shared, navigate to a 'Categoría no encontrada' page (confirmed live at /services/maria-cleaning-services-sallisaw-ok). Spec allowed /services/${categorySlug} only — these three reference provider slugs and must be migrated to /provider/${slug}. NEW BUG EXPOSED: og:locale appears TWICE on every page — index.html has a hardcoded <meta property=\"og:locale\" content=\"es_US\"> at /app/frontend/public/index.html:28 and SeoHead.jsx adds another via Helmet. On EN pages there are two tags: es_US (static, first in DOM) and en_US (Helmet, second). Crawlers reading the first occurrence will see es_US even on EN pages — defeats the SeoHead.jsx ogLocale fix. Remove the static og:locale tag from public/index.html (and likely og:title/og:description Spanish defaults too, since Helmet now manages them).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Static index.html duplicates og:locale (and og:title, og:description)",
+        "issue": "/app/frontend/public/index.html line 28 has hardcoded <meta property=\"og:locale\" content=\"es_US\"> which is NOT removed when Helmet mounts SeoHead. Result: DOM contains two og:locale tags on every page; on EN routes (/services, /services/{cat}/{city}, /provider/{slug}) the first DOM occurrence is es_US and the second is en_US. Facebook/Twitter/Google scrapers that take the first og:locale will treat all EN pages as Spanish. Fix: remove lines 22-28 og:* defaults from public/index.html (Helmet manages them now). Same applies to og:title and og:description hardcoded Spanish in static HTML.",
+        "selector": "/app/frontend/public/index.html:22-32",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Three broken /services/${provider.slug} share URL builders remain",
+        "issue": "components/ShareECardBlock.jsx:21 — const url = `${window.location.origin}/services/${provider?.slug}`; components/QuickActionsFAB.jsx:109 — const url = `${window.location.origin}/services/${slug}#reseñas`; components/ECardFloatingHeader.jsx:56 — const url = `${window.location.origin}/services/${provider?.slug}`. These build URLs used by copy/share/floating-share buttons. Confirmed live: navigating to /services/maria-cleaning-services-sallisaw-ok shows 'Categoría no encontrada'. Should be /provider/${slug}.",
+        "selector": "grep -rn '/services/${provider?.slug}\\|/services/${slug}' /app/frontend/src",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "User clicks 'Share eCard' (ShareECardBlock) or floating share (ECardFloatingHeader) or 'Copy reviews link' (QuickActionsFAB) → clipboard receives broken URL → recipients open it and land on 'Categoría no encontrada'",
+        "issue": "Outbound share links are broken; viral / referral flow is regressed",
+        "affected_selectors": ["[data-testid='share-ecard']", "[data-testid='quick-actions-fab']", ".ecard-floating-header"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "/services index (lang=en)",
+        "issues": ["Breadcrumb still 'Inicio > Servicios' (Spanish) on EN variant; category section headings 'Hogar y mantenimiento', 'Jardinería y exteriores', etc remain Spanish; individual category chip names ('Latin Catering', 'Beauty', 'Moving' are EN but the section captions and breadcrumbs are not). H1+intro are correctly EN."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_49.json",
+    "/app/test_reports/iteration_50.json"
+  ],
+  "action_items": [
+    "HIGH: Remove hardcoded og:locale, og:title, og:description, twitter:* from /app/frontend/public/index.html lines 22-32. Keep only basic title/description/theme-color. React Helmet (via SeoHead) now manages these per-page; static defaults create duplicates that contradict the dynamic ones.",
+    "HIGH: Fix 3 share-URL builders to use /provider/${slug} (or lang-aware /provider vs /proveedor based on current useI18n lang): components/ShareECardBlock.jsx:21, components/QuickActionsFAB.jsx:109, components/ECardFloatingHeader.jsx:56.",
+    "MEDIUM: Translate remaining Spanish UI on /services index — breadcrumb 'Inicio > Servicios' and category section headings 'Hogar y mantenimiento' etc. — when lang=en.",
+    "OPTIONAL: After removing duplicates, re-verify with a Facebook OG debugger or curl + parse: only one og:locale tag should remain and its value must equal en_US on /services* /cities* /provider/* and es_US on /servicios* /ciudades* /proveedor/*."
+  ],
+  "critical_code_review_comments": [
+    "ProviderECard.jsx:149 derives pathIsEn via regex /^\\/(provider|services)\\//. Including 'services' in the EN-path check is fine for SEO but redundant since /services/{slug} is no longer routed to ProviderECard (only /provider/{slug}, /proveedor/{slug}, /p/{slug}). Consider tightening to /^\\/provider\\// to avoid future confusion.",
+    "I18nContext.jsx ES_PATH_PREFIXES correctly added at same priority as EN — confirmed working.",
+    "Hardcoded og:* meta tags in public/index.html duplicate React Helmet output. This is a common Helmet pitfall: react-helmet-async only injects new tags, it does not delete pre-existing ones from the static HTML. Move all dynamic OG/Twitter tags exclusively into SeoHead.",
+    "Three components still build share URLs against the legacy /services/{provider-slug} path that no longer routes to an eCard. Without a single source of truth (e.g., a getProviderUrl(slug, lang) helper in lib/seoUrls.js), this kind of regression will recur."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (sitemap regression verified)",
+    "frontend": "78% — 7/9 spec items pass: ProviderECard EN/ES SEO heads correct, detectInitialLang ES-prefix wins over Accept-Language, ShareLinkCard fixed, ProviderDashboard view-public-ecard fixed, ProviderOnboarding redirect fixed, sitemap regression intact, /services* English h1+intro render. FAIL: 3 /services/{provider-slug} share builders, og:locale duplicate."
+  },
+  "test_credentials": "Admin: admin@getamano.com / admin123; Provider: demo.provider@getamano.com / provider123. Not used in this iteration — all checks were on public routes via Playwright with localStorage manipulation.",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Two remaining fixes needed: (A) delete og:* / twitter:* hardcoded meta lines from /app/frontend/public/index.html so Helmet is the sole source. After fix, verify with: await page.evaluate('Array.from(document.querySelectorAll(\"meta[property=og:locale]\")).map(m=>m.content)') — should return exactly one entry per page, en_US on EN, es_US on ES. (B) sed-replace the 3 share-URL builders: ShareECardBlock.jsx:21, QuickActionsFAB.jsx:109, ECardFloatingHeader.jsx:56 to use /provider/${slug}. After fix re-verify: navigate to /services/{any-provider-slug} should not be reachable from any in-app button or copy action. Sitemap, detectInitialLang, ProviderECard canonical, and EN /services pages are all confirmed working — no need to retest those.",
+  "rca of the issue": "The two remaining bugs share a single root cause: 'incomplete sweep when the route map changed'. When /services/{slug}→ProviderECard was removed and SEO hubs added, only the obvious code paths (App.js routes, useNavigate calls, <Link to=...>) were updated. Two passive surfaces were missed: (1) static HTML defaults in public/index.html which exist outside the React tree and were never reconciled with the new dynamic SeoHead behavior, (2) three string-template URL builders inside Share/Copy/QuickActions components that produce outbound URLs rather than internal navigation — these are easy to miss with grep because they look like 'origin/services/x' rather than 'to=/services/x'. Mitigation: introduce lib/seoUrls.js helpers (buildProviderUrl, buildShareUrl) and forbid raw template URLs via ESLint custom rule; and eliminate static OG meta tags from index.html as a default project convention when using Helmet."
+}

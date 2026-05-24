@@ -65,7 +65,7 @@ export default function AdminQueue() {
                     {(p.services || []).slice(0, 4).map((s, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">{s}</span>)}
                   </div>
                 </div>
-                <a href={`/services/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm flex items-center gap-1 hover:underline" data-testid={`queue-view-${p.slug}`}>
+                <a href={`/provider/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm flex items-center gap-1 hover:underline" data-testid={`queue-view-${p.slug}`}>
                   Ver eCard <ExternalLink className="w-3 h-3" />
                 </a>
                 <div className="flex gap-2 w-full md:w-auto">

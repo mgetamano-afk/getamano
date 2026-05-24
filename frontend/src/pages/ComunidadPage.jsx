@@ -49,7 +49,7 @@ function StoriesRow() {
         {stories.map(s => (
           <Link
             key={s.user_id}
-            to={`/services/${s.slug}`}
+            to={`/provider/${s.slug}`}
             className="flex flex-col items-center flex-shrink-0 w-16 group"
             data-testid={`comunidad-story-${s.user_id}`}
           >
@@ -274,14 +274,14 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
             const avatar = a.picture || getDicebearAvatar(a.business_name || a.name || "U");
             return (
               <li key={c.comment_id} className="flex gap-2.5" data-testid={`inline-comment-${c.comment_id}`}>
-                <Link to={a.slug ? `/services/${a.slug}` : "#"} className="flex-shrink-0">
+                <Link to={a.slug ? `/provider/${a.slug}` : "#"} className="flex-shrink-0">
                   <img src={avatar} alt={a.name} className="w-7 h-7 rounded-full object-cover" loading="lazy" />
                 </Link>
                 <div className="flex-1 min-w-0">
                   <div className="rounded-2xl bg-slate-50 px-3 py-2">
                     <div className="flex items-center gap-1 flex-wrap">
                       {a.slug ? (
-                        <Link to={`/services/${a.slug}`} className="text-xs font-bold text-slate-900 hover:underline">{a.business_name || a.name}</Link>
+                        <Link to={`/provider/${a.slug}`} className="text-xs font-bold text-slate-900 hover:underline">{a.business_name || a.name}</Link>
                       ) : (
                         <span className="text-xs font-bold text-slate-900">{a.name}</span>
                       )}
@@ -363,13 +363,13 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 mb-3 hover:border-slate-300 transition" data-testid={`comunidad-post-${post.post_id}`}>
       <header className="flex items-start gap-3">
-        <Link to={a.slug ? `/services/${a.slug}` : "#"} className="flex-shrink-0">
+        <Link to={a.slug ? `/provider/${a.slug}` : "#"} className="flex-shrink-0">
           <img src={avatar} alt={a.name} className="w-10 h-10 rounded-full object-cover" loading="lazy" />
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             {a.slug ? (
-              <Link to={`/services/${a.slug}`} className="font-semibold text-sm text-slate-900 hover:underline truncate">{a.business_name || a.name}</Link>
+              <Link to={`/provider/${a.slug}`} className="font-semibold text-sm text-slate-900 hover:underline truncate">{a.business_name || a.name}</Link>
             ) : (
               <span className="font-semibold text-sm text-slate-900 truncate">{a.name}</span>
             )}
@@ -672,7 +672,7 @@ function RightSidebar() {
                 const isFollowing = follows.has(p.user_id);
                 return (
                   <li key={p.provider_id} className="flex items-center gap-2.5" data-testid={`comunidad-suggested-${p.provider_id}`}>
-                    <Link to={`/services/${p.slug}`} className="flex-shrink-0">
+                    <Link to={`/provider/${p.slug}`} className="flex-shrink-0">
                       <img
                         src={p.logo_url || p.photo_url || getDicebearAvatar(p.business_name)}
                         alt={p.business_name}
@@ -681,7 +681,7 @@ function RightSidebar() {
                       />
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <Link to={`/services/${p.slug}`} className="text-xs font-semibold text-slate-900 hover:underline truncate block">{p.business_name}</Link>
+                      <Link to={`/provider/${p.slug}`} className="text-xs font-semibold text-slate-900 hover:underline truncate block">{p.business_name}</Link>
                       <p className="text-[10px] text-slate-500 truncate">{p.main_category} · {p.city}</p>
                     </div>
                     <button
