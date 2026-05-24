@@ -106,7 +106,7 @@ export default function QuickActionsFAB() {
       toast("Configura tu eCard primero.", { icon: "ℹ️" });
       return;
     }
-    const url = `${window.location.origin}/services/${slug}#reseñas`;
+    const url = `${window.location.origin}/provider/${slug}#reseñas`;
     const msg = `¡Hola! ¿Te quedaste contento con mi servicio? Me ayudarías muchísimo con una reseña corta en mi eCard 👇\n${url}`;
     try {
       await navigator.clipboard.writeText(msg);

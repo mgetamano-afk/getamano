@@ -1839,3 +1839,69 @@ Make the Google Cloud integration (Translation + Vision) **work zero-friction th
 4. Optionally: rotate `GOOGLE_API_KEY` if the current one is restricted/revoked.
 
 Once done, /admin/ops → Cloud tab will show 2 ACTIVA badges + the translate toggle on every eCard will actually translate.
+
+
+---
+
+## Iteration 49 + 50 — i18n SEO bilingüe completo (Feb 24, 2026)
+
+### Goal
+Multiply organic traffic by indexing every getamano page (categories, cities, providers) in BOTH Spanish and English as separate canonical URLs with proper hreflang annotations. The marketplace was previously ES-only for Google despite having an EN UI toggle.
+
+### What was done
+
+#### Backend (`/app/backend/routes/seo.py`)
+- New `_bilingual_entry(base, es, en, prio, freq)` helper emits BOTH `<url>` blocks per content pair with mutual `<xhtml:link rel="alternate" hreflang="...">` annotations plus `x-default`. When es_path == en_path (e.g. home `/`) only one entry is emitted with x-default to avoid duplicates.
+- Sitemap re-generated: 9090 hreflang annotations across categories, cities, providers, static pages. New XML namespace `xmlns:xhtml="http://www.w3.org/1999/xhtml"`.
+- `_ROBOTS_TXT` now allows `/services/`, `/cities/`, `/provider/` (English routes) in addition to the ES routes.
+
+#### Frontend SEO infrastructure (new + modified)
+- `SeoHead.jsx` accepts:
+  - `alternates: [{lang, url}]` → emits `<link rel="alternate" hrefLang="...">` per entry + auto x-default.
+  - `lang: "es"|"en"` → sets `<html lang="...">` dynamically + `<meta property="og:locale">` + `og:locale:alternate`.
+- New `lib/seoUrls.js` with `buildAlternates(path)`, `toEsUrl`, `toEnUrl` mapping ES↔EN URL prefixes.
+- 5 SEO pages wired (SeoPage, SeoServicesIndex, SeoCitiesIndex, SeoCityDetail, SeoCategoryDetail):
+  - Detect `isEn` from `useLocation().pathname`.
+  - Title, description, h1, intro paragraph all in English when ruta `/services|/cities|/category`.
+  - SeoPage additionally translates the AI-cached content via `/api/translate` on EN routes (cached server-side 90 days, no extra cost after first hit).
+- ProviderECard:
+  - Derives `pathIsEn` from `window.location.pathname` (NOT from `useI18n` state) so Googlebot sees correct canonical.
+  - SeoHead with both alternates `/proveedor/{slug}` + `/provider/{slug}`.
+- New routes in `App.js`: `/services`, `/services/:cat`, `/services/:cat/:city`, `/cities`, `/cities/:slug` — all alias the same components with locale derived from URL.
+- Removed `/services/:slug` → ProviderECard (was conflicting with new SEO hubs). Eligible alias paths for the eCard: `/proveedor/{slug}`, `/provider/{slug}`, `/p/{slug}`.
+
+#### I18nContext smart language detection
+- `detectInitialLang` now checks URL path first:
+  - `EN_PATH_PREFIXES = [/services, /cities, /provider/, /category/, /en/]` → forces EN.
+  - `ES_PATH_PREFIXES = [/servicios, /ciudades, /proveedor/, /categoria/, /comunidad, /empleos]` → forces ES (so Googlebot en-US visiting an ES URL doesn't accidentally render EN content on ES canonical).
+  - Falls through to localStorage → navigator.language → "es".
+
+#### Cleanup of stale URLs (sweep)
+- 23 broken `/services/${X.slug}` references replaced with `/provider/${X.slug}` across: RankingPage, Search, ProviderDashboard, ComunidadPage, ServiceRequests, ClientDashboard, ProviderOnboarding, AdminDashboard, AdminProviders, AdminQueue, AdminReviews, LeaderboardWidget, ProvidersMap, FeaturedProvidersReel.
+- 3 additional share-URL builders (ShareECardBlock, QuickActionsFAB, ECardFloatingHeader) also corrected.
+- `ShareLinkCard.jsx` + `ShareECard.jsx` canonical = `/provider/${slug}`.
+- Removed hardcoded og:title/og:description/og:locale/twitter:title/twitter:description from `public/index.html` — react-helmet-async + SeoHead now is the single source of truth.
+
+### Testing (iteration_49 + 50)
+- **Iter 49**: 22/22 backend pytest PASS · Frontend revealed 3 HIGH/CRITICAL issues (now all fixed).
+- **Iter 50**: 7/9 spec items re-verified; 2 remaining (og:locale duplication + 3 broken share builders) fixed in this same session.
+- **Sitemap reality probe**: `curl /api/sitemap.xml | grep -c xhtml:link` = 9090.
+- **OG locale uniqueness** confirmed on `/services/cleaning/sallisaw`: exactly one `og:locale=en_US` tag, title in English, description in English, AI content in English (translated + cached).
+
+### Files changed
+- New: `/app/frontend/src/lib/seoUrls.js`, 2 test reports (49 + 50).
+- Modified backend: `/app/backend/routes/seo.py` (+~80 lines: URL_PAIRS_STATIC + _bilingual_entry + sitemap rewrite + ROBOTS_TXT).
+- Modified frontend: `/app/frontend/src/components/seo/SeoHead.jsx`, `/app/frontend/src/contexts/I18nContext.jsx`, `App.js` (routes), 5 SEO pages, `ProviderECard.jsx`, `ShareLinkCard.jsx`, `ShareECard.jsx`, `ShareECardBlock.jsx`, `QuickActionsFAB.jsx`, `ECardFloatingHeader.jsx`, `public/index.html` + 14 pages where stale `/services/{slug}` refs were swept.
+
+### Impact for the CEO
+- **Indexable in both languages**: Google can now serve `/provider/maria-cleaning-services-sallisaw-ok` to en-US searchers and `/proveedor/...` to es-US searchers. Same eCard, two SERP appearances.
+- **Total addressable market doubled**: getamano was reaching only ES-language searchers; now anyone searching "cleaner near me" in English in any of the 23 indexed cities can land directly on the EN canonical with English UI + auto-translated description.
+- **Zero new content cost**: existing Spanish content is translated on-demand by Google Translate (Translation API now enabled) and cached 90 days in `translation_cache` collection.
+- **Same UI for both**: visitor lands on the canonical URL they came from, UI matches the URL language automatically.
+
+### Recommended next CEO action
+Submit `https://getamano.us/sitemap.xml` to Google Search Console. Within 7-14 days Google should start indexing both ES and EN canonical URLs and showing them in their respective locale-restricted SERPs.
+
+### Deferred / Backlog
+- Translate the remaining below-the-fold strings ("Proveedores destacados", "¿Por qué contratar...") to English when isEn — non-blocking, h1 + meta + AI content already English.
+- Optional: add `lib/seoUrls.js` ESLint rule to forbid raw `/services/${slug}` templates so this regression class can't recur (suggested by testing agent).
