@@ -1723,3 +1723,60 @@ Convert existing providers into a viral acquisition channel by tracking every sh
 - `asyncio.gather()` the two awaits inside `track_provider_share_event` (latency micro-optimization; not needed at current volume).
 - Reward gamification on top of `share_count` / `referred_view_count`.
 - Public `/p/{slug}` short-alias route already exists; confirm it renders the same ProviderECard component with `?ref` support (it does — same component, just shorter path).
+
+
+---
+
+## Iteration 47 — Share Rewards: "Embajador Bronze" (Feb 24, 2026)
+
+### Goal
+Convert the viral share counters from iter 46 into a tangible reward so providers have a concrete incentive to keep sharing — first tier of a gamification ladder.
+
+### What was done
+
+#### Backend (`/app/backend/server.py`)
+- `SHARE_REWARD_TIERS` constant (extensible array) — first tier "Embajador Bronze":
+  - Thresholds: 10 shares + 5 referred views
+  - Reward: 30 days bonus + min plan `pro`
+- `GET /api/providers/me/share-rewards` (provider auth) — returns share_count, referred_view_count, and tiers[] with per-tier progress fields: `shares_pct`, `views_pct`, `shares_remaining`, `views_remaining`, `eligible`, `status: locked|eligible|claimed`, `claimed_at`, `expires_at`.
+- `POST /api/providers/me/share-rewards/claim/{tier_id}` (provider auth):
+  - Validates eligibility against denormalised counters.
+  - Idempotent via unique index `(user_id, tier_id)` on `share_reward_claims` — `DuplicateKeyError` → 400 "Recompensa ya reclamada".
+  - Extends subscription correctly: stacks +30 days from `max(now, current_renewal)` so providers don't lose future renewal time when claiming.
+  - Upgrades plan only if currently below `min_plan` (never downgrades from premium).
+  - Inserts a new subscription doc if user had none.
+  - Sets `last_reward_tier` on the subscription + audit_log `share_reward.claimed`.
+- New index seeded at startup: `share_reward_claims.create_index([("user_id", 1), ("tier_id", 1)], unique=True)`.
+
+#### Frontend (1 new file)
+- **`/app/frontend/src/components/ShareRewardsCard.jsx`** (~190 lines)
+  - 3 visual states: **locked** (slate badge "En progreso" + progress bars), **eligible** (amber pulsing badge "¡DESBLOQUEADA!" + orange gradient "Reclamar mi recompensa" CTA), **claimed** (emerald check + "Reclamada el DD/MM/YYYY").
+  - Progress rows with smooth animated bars + remaining counter ("faltan 3").
+  - Confetti animation (CSS keyframes, no library) on successful claim.
+  - Auto-reloads card after claim → status flips to "claimed" without page refresh.
+  - Toast "🎉 ¡Recompensa desbloqueada! Plan pro extendido 30 días."
+  - `data-testid`s: `share-rewards-card`, `share-rewards-progress-shares`, `share-rewards-progress-views`, `share-rewards-claim-embajador_bronze`.
+- Mounted right after `<ShareStatsCard />` in `ProviderDashboard.jsx` so providers see counters → progress → reward in vertical flow.
+
+### Testing (iteration_47.json)
+- **Backend: 12/12 pytest PASS** — all 17 review checkpoints covered including the tricky ones:
+  - Stacking +30 days from a future renewal_date (not from today).
+  - No downgrade from premium.
+  - Insert new subscription doc if missing.
+  - Idempotency at DB layer.
+- **Frontend: 100%** — locked → eligible → claim+toast+confetti → claimed lifecycle verified in Playwright with screenshots.
+
+### Files changed
+- New: `/app/frontend/src/components/ShareRewardsCard.jsx`, `/app/backend/tests/test_iter47_share_rewards.py`.
+- Modified: `/app/backend/server.py` (+~120 lines: 2 endpoints + tier constant + index seed), `/app/frontend/src/pages/ProviderDashboard.jsx` (+1 import +1 component mount).
+
+### Impact for the CEO
+- First concrete reward tier wired end-to-end. Providers now SEE progress bars filling up — psychological lock-in.
+- María (demo provider) is now in `claimed` state for `embajador_bronze` → subscription `plan=pro`, `next_renewal_date=2027-06-21` (a full year extended), so she sees the value immediately.
+- Architecture is extensible: adding Silver / Gold tiers is just appending to `SHARE_REWARD_TIERS` array — frontend already renders any number of tiers.
+
+### Backlog (future tiers — when share volume justifies)
+- **Embajador Silver**: 30 shares + 15 referred views → 3 months Pro free.
+- **Embajador Gold**: 100 shares + 50 referred views → 1 year Pro free + featured spot on landing.
+- "Diamond" tier with Premium plan upgrade.
+- Public leaderboard of top embajadores (with provider consent) — additional social proof on landing.
