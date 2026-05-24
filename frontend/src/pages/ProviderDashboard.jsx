@@ -13,6 +13,7 @@ import MilestoneCelebration from "../components/MilestoneCelebration";
 import AchievementJournal from "../components/AchievementJournal";
 import ShareLinkCard from "../components/ShareLinkCard";
 import ShareStatsCard from "../components/ShareStatsCard";
+import ShareRewardsCard from "../components/ShareRewardsCard";
 import ProviderRates from "../components/ProviderRates";
 import MarketPulseCard from "../components/MarketPulseCard";
 import DashboardGallery from "../components/DashboardGallery";
@@ -191,6 +192,7 @@ export default function ProviderDashboard() {
             <div className="animate-fadeSlideUp" style={{ animationDelay: "200ms" }}>
               <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
               <ShareStatsCard />
+              <ShareRewardsCard />
             </div>
 
             {/* Section 30 — Chambas board CTA + nearby teaser */}

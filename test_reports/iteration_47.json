@@ -1,0 +1,46 @@
+{
+  "summary": "Section 46B Share Rewards / Embajador Bronze: 12/12 backend pytest pass + full UI lifecycle (locked→eligible→claim+toast+confetti→claimed) verified live in browser. All 17 review-request checkpoints covered.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ProviderDashboard (unrelated)", "issues": ["Pre-existing React hydration warning: <span> rendered inside <option> in US_STATES <select> (ProviderDashboard.jsx:387). Not introduced by Section 46B — flagging for future cleanup."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter47_share_rewards.py",
+    "/app/test_reports/pytest/iter47_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "claim_share_reward in server.py is ~80 lines — consider extracting _extend_subscription helper for unit testability, but not blocking.",
+    "Subscription `amount: 0` is set to 0 unconditionally on reward claim; if billing later reads this, it should be revisited to preserve prior amount (current behavior matches review request acceptance criteria, just a future-billing note).",
+    "ShareRewardsCard `if (loading || !data) return null` silently hides the card when the GET fails (e.g. 404 'Sin perfil') — intentional and graceful, no action needed.",
+    "Unique index db.share_reward_claims [(user_id, tier_id)] correctly enforces idempotency at DB layer (DuplicateKeyError caught → 400)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter47_share_rewards.py (new)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100%"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (provider_id=prov_10b9f21bf971, user_id=user_3e47ee2b3526); admin@getamano.com / admin123",
+  "seed_data_creation": "Tests mutate provider_profiles.share_count / referred_view_count and subscriptions.next_renewal_date for demo provider. On teardown, hand-off state left as: share_count=24, referred_view_count=16, claims=0 (eligible), subscription plan=pro, next_renewal_date=now+365d.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests env: must set REACT_APP_BACKEND_URL when running pytest (e.g. REACT_APP_BACKEND_URL=https://verified-providers-2.preview.emergentagent.com python -m pytest backend/tests/test_iter47_share_rewards.py). After full UI test the provider is now in CLAIMED state (claimed during UI playwright run). To re-run the UI test, delete the claim via mongo: db.share_reward_claims.delete_many({'user_id':'user_3e47ee2b3526','tier_id':'embajador_bronze'}).",
+  "rca of the issue": "N/A — no bugs found. All 17 review checkpoints (auth gating 401/403, GET shape, status transitions locked/eligible/claimed, claim happy-path, not-eligible 400, duplicate 400, non-existent tier 404, anon 401, /me/subscription persistence, status=claimed + claimed_at populated, no-downgrade-from-premium, insert when missing subscription, +30d stacking from future renewal_date, frontend card 3 states, click→toast+confetti+auto-refresh, all 4 data-testids present) verified PASS.",
+  "verified_endpoints": [
+    "GET /api/providers/me/share-rewards (200 provider / 403 admin / 401 anon)",
+    "POST /api/providers/me/share-rewards/claim/{tier_id} (200 eligible / 400 ineligible / 400 duplicate / 404 unknown tier / 401 anon)",
+    "GET /api/me/subscription (verifies plan/next_renewal_date/last_reward_tier persistence)"
+  ],
+  "ui_data_testids_verified": [
+    "share-rewards-card",
+    "share-rewards-progress-shares",
+    "share-rewards-progress-views",
+    "share-rewards-claim-embajador_bronze"
+  ]
+}

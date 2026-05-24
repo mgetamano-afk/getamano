@@ -645,6 +645,9 @@ async def seed():
         # share_view_dedup: 24h TTL collection that prevents counter inflation
         await db.share_view_dedup.create_index([("referrer_slug", 1), ("ip", 1)], unique=True)
         await db.share_view_dedup.create_index("expires_at_native", expireAfterSeconds=0)
+        # Section 46B — Reward claims: unique per (user, tier) so a user can
+        # never claim the same reward twice (Mongo $insert raises DuplicateKeyError).
+        await db.share_reward_claims.create_index([("user_id", 1), ("tier_id", 1)], unique=True)
     except Exception as e:
         logger.warning(f"Index creation: {e}")
 
@@ -8262,6 +8265,163 @@ async def get_my_share_stats(user: User = Depends(get_current_user)):
         "last_share_at": profile.get("last_share_at"),
         "share_channels": profile.get("share_channels") or {},
         "recent_events": recent,
+    }
+
+
+# ─── Share Reward tiers (Section 46B) ─────────────────────────────────
+# Each tier is unlockable ONCE per provider. The reward extends their plan's
+# next_renewal_date by `bonus_days` AND upgrades plan to `min_plan` if they were
+# below it. Idempotent via `share_reward_claims` collection.
+SHARE_REWARD_TIERS = [
+    {
+        "tier_id": "embajador_bronze",
+        "label_es": "Embajador Bronze",
+        "label_en": "Bronze Ambassador",
+        "icon": "🥉",
+        "min_shares": 10,
+        "min_referred_views": 5,
+        "bonus_days": 30,
+        "min_plan": "pro",
+        "description_es": "1 mes de Plan Pro gratis por traer comunidad a getamano.",
+        "description_en": "1 month of Pro Plan free for bringing community to getamano.",
+    },
+]
+
+
+def _tier_progress(tier: dict, shares: int, views: int) -> dict:
+    """Compute progress percentages + locked/eligible flags for a tier."""
+    shares_pct = min(100, int(shares * 100 / tier["min_shares"])) if tier["min_shares"] else 100
+    views_pct = min(100, int(views * 100 / tier["min_referred_views"])) if tier["min_referred_views"] else 100
+    eligible = shares >= tier["min_shares"] and views >= tier["min_referred_views"]
+    return {
+        "shares_pct": shares_pct,
+        "views_pct": views_pct,
+        "shares_remaining": max(0, tier["min_shares"] - shares),
+        "views_remaining": max(0, tier["min_referred_views"] - views),
+        "eligible": eligible,
+    }
+
+
+@api_router.get("/providers/me/share-rewards")
+async def get_my_share_rewards(user: User = Depends(get_current_user)):
+    """Returns reward tiers with the provider's progress + claim status."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "share_count": 1, "referred_view_count": 1},
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil.")
+    shares = int(profile.get("share_count") or 0)
+    views = int(profile.get("referred_view_count") or 0)
+    # Fetch all this user's previous claims at once
+    claims = await db.share_reward_claims.find(
+        {"user_id": user.user_id}, {"_id": 0, "tier_id": 1, "claimed_at": 1, "expires_at": 1},
+    ).to_list(50)
+    claims_by_tier = {c["tier_id"]: c for c in claims}
+    tiers_out = []
+    for tier in SHARE_REWARD_TIERS:
+        progress = _tier_progress(tier, shares, views)
+        claim = claims_by_tier.get(tier["tier_id"])
+        status = "claimed" if claim else ("eligible" if progress["eligible"] else "locked")
+        tiers_out.append({
+            **tier,
+            **progress,
+            "status": status,
+            "claimed_at": (claim or {}).get("claimed_at"),
+            "expires_at": (claim or {}).get("expires_at"),
+        })
+    return {
+        "share_count": shares,
+        "referred_view_count": views,
+        "tiers": tiers_out,
+    }
+
+
+def _plan_rank(plan: str) -> int:
+    return {"free": 0, "basic": 1, "pro": 2, "premium": 3}.get(plan or "free", 0)
+
+
+@api_router.post("/providers/me/share-rewards/claim/{tier_id}")
+async def claim_share_reward(tier_id: str, request: Request,
+                              user: User = Depends(get_current_user)):
+    """Atomic claim: locks the reward + extends next_renewal_date 30 days + bumps plan."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    tier = next((t for t in SHARE_REWARD_TIERS if t["tier_id"] == tier_id), None)
+    if not tier:
+        raise HTTPException(status_code=404, detail="Recompensa no existe.")
+    # Verify eligibility from the source of truth (denormalised counters).
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "share_count": 1, "referred_view_count": 1},
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil.")
+    shares = int(profile.get("share_count") or 0)
+    views = int(profile.get("referred_view_count") or 0)
+    if shares < tier["min_shares"] or views < tier["min_referred_views"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Aún no calificas. Necesitas {tier['min_shares']} shares y {tier['min_referred_views']} visitas referidas.",
+        )
+    # Idempotency: only allow ONE claim per (user, tier).
+    now = datetime.now(timezone.utc)
+    new_renewal = now + timedelta(days=tier["bonus_days"])
+    claim_doc = {
+        "claim_id": f"shrew_{uuid.uuid4().hex[:12]}",
+        "user_id": user.user_id,
+        "tier_id": tier_id,
+        "claimed_at": now.isoformat(),
+        "expires_at": new_renewal.isoformat(),
+        "plan_granted": tier["min_plan"],
+        "bonus_days": tier["bonus_days"],
+    }
+    try:
+        await db.share_reward_claims.insert_one(claim_doc)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=400, detail="Recompensa ya reclamada.")
+    # Extend subscription: upgrade plan if below the reward's min_plan AND push
+    # next_renewal_date out by bonus_days from whichever is later (now vs current renewal).
+    sub = await db.subscriptions.find_one({"user_id": user.user_id}, {"_id": 0})
+    base_renewal = now
+    if sub and sub.get("next_renewal_date"):
+        try:
+            current = datetime.fromisoformat(sub["next_renewal_date"])
+            if current.tzinfo is None:
+                current = current.replace(tzinfo=timezone.utc)
+            base_renewal = max(base_renewal, current)
+        except (TypeError, ValueError):
+            pass
+    extended = base_renewal + timedelta(days=tier["bonus_days"])
+    current_plan = (sub or {}).get("plan", "free")
+    new_plan = tier["min_plan"] if _plan_rank(tier["min_plan"]) > _plan_rank(current_plan) else current_plan
+    update_doc = {
+        "user_id": user.user_id,
+        "plan": new_plan,
+        "billing_cycle": (sub or {}).get("billing_cycle") or "monthly",
+        "amount": 0,  # this period is a reward, not billed
+        "annual_discount_applied": (sub or {}).get("annual_discount_applied", False),
+        "status": "active",
+        "next_renewal_date": extended.isoformat(),
+        "updated_at": now.isoformat(),
+        "last_reward_tier": tier_id,
+    }
+    if sub:
+        await db.subscriptions.update_one({"user_id": user.user_id}, {"$set": update_doc})
+    else:
+        update_doc["created_at"] = now.isoformat()
+        await db.subscriptions.insert_one(update_doc)
+    await audit_log(user.user_id, "share_reward.claimed", {
+        "tier_id": tier_id, "plan": new_plan, "extended_to": extended.isoformat(),
+    }, request)
+    return {
+        "ok": True,
+        "tier_id": tier_id,
+        "plan": new_plan,
+        "extended_to": extended.isoformat(),
+        "bonus_days": tier["bonus_days"],
     }
 
 
