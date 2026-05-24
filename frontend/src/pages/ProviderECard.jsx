@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ShareECard from "../components/ShareECard";
 import TranslatableDescription from "../components/TranslatableDescription";
+import { SeoHead } from "../components/seo/SeoHead";
 import SocialLinks from "../components/SocialLinks";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
@@ -142,9 +143,27 @@ export default function ProviderECard() {
 
   const verified = p.verification_status === "approved";
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address || ""} ${p.city} ${p.state} ${p.zip_code || ""}`)}`;
+  // SEO: hreflang alternates between /proveedor/{slug} (ES) and /provider/{slug} (EN)
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
+  const esUrl = `${origin}/proveedor/${p.slug}`;
+  const enUrl = `${origin}/provider/${p.slug}`;
+  const seoTitle = lang === "en"
+    ? `${p.business_name} · ${p.city}, ${p.state} — Latino provider`
+    : `${p.business_name} · ${p.city}, ${p.state} — Proveedor latino`;
+  const seoDescription = (p.description || "").slice(0, 160) || (lang === "en"
+    ? `Verified Latino provider in ${p.city}, ${p.state}. Book, request quote or message on getamano.`
+    : `Proveedor latino verificado en ${p.city}, ${p.state}. Reserva, pide cotización o envía mensaje en getamano.`);
 
   return (
     <div className="min-h-screen bg-neutral-50">
+      <SeoHead
+        title={seoTitle}
+        description={seoDescription}
+        canonical={lang === "en" ? enUrl : esUrl}
+        alternates={[{ lang: "es", url: esUrl }, { lang: "en", url: enUrl }]}
+        lang={lang}
+        image={p.logo_url ? buildFileUrl(p.logo_url) : undefined}
+      />
       <Header />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10" data-testid="provider-ecard">
         {/* Section 32 — Floating header with back / like / share */}

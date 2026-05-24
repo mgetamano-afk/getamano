@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
@@ -7,9 +7,12 @@ import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/s
 import OwnerIdentityBadge from "../../components/OwnerIdentityBadge";
 import { ShieldCheck, Star, MapPin, Phone, MessageCircle, Award } from "lucide-react";
 import CategoryIcon from "../../components/CategoryIcon";
+import { buildAlternates } from "../../lib/seoUrls";
 
 export default function SeoPage() {
   const { categorySlug, citySlug } = useParams();
+  const location = useLocation();
+  const isEn = location.pathname.startsWith("/services/");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [aiContent, setAiContent] = useState(null);
@@ -20,11 +23,29 @@ export default function SeoPage() {
       .then(r => setData(r.data))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-    // Fetch unique AI-generated SEO paragraph (cached server-side)
+    // Fetch unique AI-generated SEO paragraph (cached server-side, ES source).
+    // For EN routes we send the ES paragraph through /api/translate (also cached
+    // 90 days) so Google indexes a proper English version on the /services/...
+    // canonical URL.
     api.get(`/seo/content/${categorySlug}/${citySlug}`)
-      .then(r => setAiContent(r.data.content))
+      .then(async (r) => {
+        const esText = r.data.content;
+        if (!isEn) { setAiContent(esText); return; }
+        try {
+          const tr = await api.post("/translate", {
+            text: esText,
+            source_id: `seo:${categorySlug}/${citySlug}`,
+            source_field: "ai_content",
+            source_lang: "es",
+            target_lang: "en",
+          });
+          setAiContent(tr.data?.translated_text || esText);
+        } catch (_e) {
+          setAiContent(esText);
+        }
+      })
       .catch(() => setAiContent(null));
-  }, [categorySlug, citySlug]);
+  }, [categorySlug, citySlug, isEn]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
 
@@ -36,17 +57,30 @@ export default function SeoPage() {
   }
 
   const { category, city, providers, related_cities, related_categories } = data;
-  const breadcrumbs = [
+  const catName = isEn ? (category.name_en || category.name_es) : category.name_es;
+  const catNameLower = catName.toLowerCase();
+  const breadcrumbs = isEn ? [
+    { label: "Home", to: "/" },
+    { label: "Services", to: "/services" },
+    { label: catName, to: `/services/${category.slug}` },
+    { label: city.name },
+  ] : [
     { label: "Inicio", to: "/" },
     { label: "Servicios", to: "/servicios" },
     { label: category.name_es, to: `/servicios/${category.slug}` },
     { label: city.name },
   ];
 
-  const title = `${category.name_es} en ${city.name}, ${city.state}`;
-  const description = providers.length > 0
-    ? `Encuentra ${providers.length} proveedores latinos de ${category.name_es.toLowerCase()} en ${city.name}, ${city.state}. Verificados, con reseñas reales y reciben pagos seguros.`
-    : `Estamos buscando proveedores latinos de ${category.name_es.toLowerCase()} en ${city.name}, ${city.state}. ¿Eres uno? Únete gratis a getamano.`;
+  const title = isEn
+    ? `${catName} in ${city.name}, ${city.state}`
+    : `${category.name_es} en ${city.name}, ${city.state}`;
+  const description = isEn
+    ? (providers.length > 0
+        ? `Find ${providers.length} verified Latino providers of ${catNameLower} in ${city.name}, ${city.state}. Real reviews and secure payments.`
+        : `We're looking for Latino ${catNameLower} providers in ${city.name}, ${city.state}. Join getamano for free.`)
+    : (providers.length > 0
+        ? `Encuentra ${providers.length} proveedores latinos de ${category.name_es.toLowerCase()} en ${city.name}, ${city.state}. Verificados, con reseñas reales y reciben pagos seguros.`
+        : `Estamos buscando proveedores latinos de ${category.name_es.toLowerCase()} en ${city.name}, ${city.state}. ¿Eres uno? Únete gratis a getamano.`);
 
   // JSON-LD: BreadcrumbList + ItemList (collection) + LocalBusiness for each provider
   const itemListLd = {
@@ -105,7 +139,9 @@ export default function SeoPage() {
       <SeoHead
         title={title}
         description={description}
-        canonical={`${origin}/servicios/${category.slug}/${city.slug}`}
+        canonical={`${origin}${location.pathname}`}
+        alternates={buildAlternates(location.pathname)}
+        lang={isEn ? "en" : "es"}
         jsonLd={[buildBreadcrumbsJsonLd(breadcrumbs, origin), itemListLd, faqLd]}
       />
       <Header />
@@ -121,13 +157,17 @@ export default function SeoPage() {
               <CategoryIcon slug={category.slug} size={36} color="#FFFFFF" stroke={1.6} />
             </span>
             <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#025F67" }} data-testid="seo-h1">
-              {category.name_es} en {city.name}, {city.state}
+              {title}
             </h1>
           </div>
           <p className="text-slate-600 text-base md:text-lg max-w-3xl" data-testid="seo-intro">
             {providers.length > 0
-              ? `Encuentra ${providers.length} proveedores latinos verificados de ${category.name_es.toLowerCase()} en ${city.name}. Compara reseñas, solicita cotización gratis y contrata con confianza.`
-              : `Aún no tenemos proveedores activos en esta categoría y ciudad. Si eres proveedor de ${category.name_es.toLowerCase()} en ${city.name}, únete gratis y sé el primero.`}
+              ? (isEn
+                  ? `Find ${providers.length} verified Latino providers of ${catNameLower} in ${city.name}. Compare reviews, request a free quote and hire with confidence.`
+                  : `Encuentra ${providers.length} proveedores latinos verificados de ${category.name_es.toLowerCase()} en ${city.name}. Compara reseñas, solicita cotización gratis y contrata con confianza.`)
+              : (isEn
+                  ? `We don't have active providers in this category and city yet. If you're a ${catNameLower} provider in ${city.name}, join free and be the first.`
+                  : `Aún no tenemos proveedores activos en esta categoría y ciudad. Si eres proveedor de ${category.name_es.toLowerCase()} en ${city.name}, únete gratis y sé el primero.`)}
           </p>
 
           {category.license_flag === "red" && (

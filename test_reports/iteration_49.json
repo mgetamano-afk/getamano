@@ -1,0 +1,86 @@
+{
+  "summary": "Iteration 49 — i18n SEO sitemap/robots + dual-route hreflang frontend. Backend pytest 15/15 PASS + 1 skip (verified-providers-2 slug not seeded). Sitemap correctly emits xhtml:link hreflang annotations for every /servicios↔/services, /ciudades↔/cities, /proveedor↔/provider pair; home / emitted once with x-default; robots.txt allows EN routes. Frontend SEO heads pass for /servicios, /services, /ciudades, /cities, /servicios/cleaning/sallisaw, /services/cleaning/sallisaw, /provider/maria-cleaning-services-sallisaw-ok (correct html lang, canonical, 3 hreflangs each). HOWEVER three critical issues found: (1) ProviderECard at /proveedor/{slug} renders html lang='en' + canonical=/provider/... when navigator.language=en-US (e.g. Googlebot, fresh visitors) because detectInitialLang() has no ES-path-prefix override — only EN paths win against locale; (2) ~26 internal links across the app still use to=`/services/${slug}` for PROVIDER slugs (Search, Ranking, Comunidad, ProviderDashboard 'View public eCard', AdminQueue, AdminProviders, AdminReviews, AdminDashboard, ClientDashboard, ServiceRequests, ProviderOnboarding post-signup redirect, SeoPage breadcrumb) — these now hit the new SeoCategoryDetail and render 'Categoría no encontrada'; (3) og:locale is hardcoded to es_US on EVERY page including English variants (should be en_US on /services, /cities, /provider).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "I18nContext.detectInitialLang",
+        "issue": "No ES-path-prefix override. When localStorage tx_lang is empty AND navigator.language is en-* (Googlebot / English browsers visiting a Spanish URL directly), the page renders with html lang='en' even on /proveedor/{slug}, /servicios/{cat}/{city}, /ciudades, /comunidad. ProviderECard then computes canonical=/provider/{slug} on a /proveedor/ URL — duplicate-content signal. Add ES_PATH_PREFIXES = ['/servicios', '/ciudades', '/proveedor/', '/comunidad', '/empleos'] check with same priority as EN.",
+        "selector": "/app/frontend/src/contexts/I18nContext.jsx:237 detectInitialLang",
+        "priority": "HIGH"
+      },
+      {
+        "component": "SeoHead og:locale",
+        "issue": "og:locale meta is hardcoded to 'es_US' on EVERY page — verified across /services, /services/cleaning/sallisaw, /cities, /provider/maria-cleaning-services-sallisaw-ok (all returned og:locale=es_US even though html lang=en). Should emit en_US on EN variants per requirement 'og:locale=en_US' for /services/cleaning/sallisaw.",
+        "selector": "SeoHead.jsx — meta[property=og:locale]",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Internal provider links (~26 occurrences) still use /services/{slug} pattern",
+        "issue": "Iteration 49 freed /services/* for SEO category hubs and removed /services/{slug}→ProviderECard route, but ~26 in-app Link/anchor refs still build `to=/services/${provider.slug}` and now hit SeoCategoryDetail which shows 'Categoría no encontrada'. Confirmed broken at /services/maria-cleaning-services-sallisaw-ok. Files affected: pages/Search.jsx (2x), pages/RankingPage.jsx (2x), pages/ComunidadPage.jsx (5x), pages/ProviderDashboard.jsx 'View public eCard' button, pages/ClientDashboard.jsx, pages/ServiceRequests.jsx, pages/ProviderOnboarding.jsx (post-signup redirect!), pages/AdminDashboard.jsx, pages/admin/AdminProviders.jsx, pages/admin/AdminQueue.jsx, pages/admin/AdminReviews.jsx, pages/seo/SeoPage.jsx breadcrumb. Should be /provider/${slug} (or /proveedor/${slug} based on current lang).",
+        "selector": "grep -rn '/services/${' src/",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Provider signs up → ProviderOnboarding navigates to `/services/${data.slug}` (line 85) → lands on 'Categoría no encontrada' instead of their new public eCard",
+        "issue": "First-impression regression for every newly onboarded provider",
+        "affected_selectors": ["/app/frontend/src/pages/ProviderOnboarding.jsx:85"]
+      },
+      {
+        "flow": "Provider dashboard 'View public eCard' button (data-testid=view-public-ecard) → links to /services/${profile.slug} → category-not-found page",
+        "issue": "Providers cannot preview their own eCard from dashboard",
+        "affected_selectors": ["[data-testid=view-public-ecard]"]
+      },
+      {
+        "flow": "Search results card click → /services/${p.slug} → category-not-found",
+        "issue": "Search is functionally broken — users cannot reach provider eCards from search",
+        "affected_selectors": ["[data-testid^=result-card-]"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "SeoCategoryDetail /servicios/cleaning/sallisaw and /services/cleaning/sallisaw",
+        "issues": ["intro/description meta still in Spanish on EN variant: 'getamano — el marketplace fresco y confiable...' — agent_to_agent context claims meta description should be in English on /services. h1 IS in English correctly ('Cleaning in Sallisaw, OK') but the visible body fallback intro and meta description remained Spanish for the SeoServicesIndex /services page (h1 still 'Todos los servicios en getamano' — Spanish text on lang=en page)."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter49_i18n_seo.py",
+    "/app/test_reports/pytest/iter49_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Migrate ~26 internal links from /services/${provider.slug} to /provider/${slug} (or lang-aware /proveedor vs /provider). Run: grep -rn '/services/${' /app/frontend/src/ — fix each. Highest-impact: ProviderOnboarding.jsx:85 (post-signup), ProviderDashboard.jsx:273 (view eCard), Search.jsx:410/525 (result cards), AdminQueue/AdminProviders/AdminReviews/AdminDashboard, ComunidadPage (5x), RankingPage (2x), ClientDashboard, ServiceRequests, SeoPage breadcrumb.",
+    "HIGH: I18nContext.detectInitialLang — add ES_PATH_PREFIXES check (/servicios, /ciudades, /proveedor/, /comunidad, /empleos) BEFORE navigator.language fallback so Googlebot/EN browsers visiting ES URLs render lang='es' + correct canonical.",
+    "HIGH: SeoHead — emit og:locale dynamically based on `lang` prop. Today it's hardcoded es_US even when lang=en.",
+    "MEDIUM: SeoServicesIndex /services page — h1 still 'Todos los servicios en getamano' (Spanish) on lang=en variant. Translate.",
+    "MEDIUM: Meta description on all SEO pages stays Spanish on EN variants. Provide EN copy in SeoHead default when lang=en.",
+    "LOW: /provider/verified-providers-2 throws an uncaught axios 404 (red error overlay in dev). Graceful 404 page would be cleaner."
+  ],
+  "critical_code_review_comments": [
+    "Sitemap implementation (seo.py URL_PAIRS_STATIC + _bilingual_entry) is clean and correct — emits well-formed mutual hreflang annotations for every ES/EN pair, home / emitted exactly once with x-default. xml.etree parses successfully.",
+    "Robots.txt now allows all 6 hub paths (servicios/services/ciudades/cities/proveedor/provider) — verified.",
+    "Backend SEO router takes 1.1s to emit 9093-line sitemap (~1500 URLs) — acceptable. Consider caching the full XML response with 1h TTL once production traffic grows.",
+    "ProviderECard.jsx:162 — `canonical={lang === 'en' ? enUrl : esUrl}` couples canonical to the React i18n state instead of the URL the user is currently on (window.location.pathname). This is the root cause of the lang=en canonical=/provider on /proveedor/ URL bug. Fix: derive `isEn = location.pathname.startsWith('/provider/')` and use that for both canonical AND lang prop on SeoHead, independent of useI18n().lang.",
+    "detectInitialLang() — Documentation comment says 'Priority: URL path (EN routes) > explicit user choice (localStorage.tx_lang)' but only EN paths get URL priority. ES paths fall through to LS → navigator.language → fallback es. For Googlebot (en-US locale) hitting /proveedor/, ES URL renders in English. SEO impact: hreflang signal contradicts html lang on Spanish URLs.",
+    "MAJOR REGRESSION: 26 internal Link references to /services/{provider_slug} now resolve to SeoCategoryDetail and show 'Categoría no encontrada'. The route change was made without a global sweep. Provider onboarding redirect is the most visible failure path.",
+    "og:locale hardcoded in SeoHead.jsx — does not honor the lang prop. Trivial fix: `<meta property=og:locale content={lang === 'en' ? 'en_US' : 'es_US'}/>`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter49_i18n_seo.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15, 1 skipped)",
+    "frontend": "60% — 7/7 SEO head attributes correct on category/city/index pages; provider ES route + og:locale + 26 internal links broken"
+  },
+  "test_credentials": "Not required for this iteration; all tested routes are public.",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Re-run /app/backend/tests/test_iter49_i18n_seo.py after fixes — sitemap & robots already pass. Frontend re-verification: (1) curl in EN locale to /proveedor/maria-cleaning-services-sallisaw-ok with localStorage cleared → expect html lang=es + canonical=/proveedor/...; (2) check og:locale toggles between en_US/es_US per page lang; (3) regression: every /services/${slug} reference must navigate to provider eCard (not category-not-found). Quick smoke: log in as demo.provider@getamano.com/provider123 → click 'View public eCard' → must reach /provider/{slug} eCard, NOT 'Categoría no encontrada'.",
+  "rca of the issue": "Root cause for ProviderECard ES URL rendering EN: ProviderECard.jsx (line 162) builds canonical from `lang` reactive state (useI18n), and I18nContext.detectInitialLang only overrides localStorage when path starts with EN prefixes — never when path starts with ES prefixes. Combined effect: visitor (or Googlebot) with navigator.language=en-US lands on /proveedor/maria-... → detectInitialLang sees no EN-prefix match, no LS, navigator.language=en → returns 'en' → ProviderECard renders lang=en with canonical=/provider/. Fix: (a) in ProviderECard derive isEn from window.location.pathname.startsWith('/provider/') for SEO meta — decouple from i18n state; OR (b) extend detectInitialLang with ES_PATH_PREFIXES check at same priority as EN_PATH_PREFIXES. Root cause for /services/${slug} regression: removing the route was a one-line App.js change but the 26 outbound Link/anchor refs throughout the codebase were not updated in the same commit."
+}

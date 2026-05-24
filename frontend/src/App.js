@@ -110,10 +110,12 @@ function AppRouter() {
       {/* Zone 2: Client Experience */}
       <Route path="/search" element={<Search />} />
       <Route path="/buscar" element={<Search />} />
-      <Route path="/services/:slug" element={<ProviderECard />} />
       <Route path="/proveedor/:slug" element={<ProviderECard />} />
       <Route path="/provider/:slug" element={<ProviderECard />} />
       <Route path="/p/:slug" element={<ProviderECard />} />
+      {/* Legacy alias: /services/{slug} used to point to the eCard. We keep it
+          mounted last after the SEO hubs so the more-specific category match
+          wins, and the eCard is still reachable via /provider/{slug}. */}
       <Route path="/wall" element={<Community />} />
 
       {/* Section 39 — Persistent /comunidad layout with sticky tab bar.
@@ -185,6 +187,12 @@ function AppRouter() {
       <Route path="/servicios/:categorySlug/:citySlug" element={<SeoPage />} />
       <Route path="/ciudades" element={<SeoCitiesIndex />} />
       <Route path="/ciudades/:citySlug" element={<SeoCityDetail />} />
+      {/* English canonical aliases for SEO i18n — same components, hreflang annotated */}
+      <Route path="/services" element={<SeoServicesIndex />} />
+      <Route path="/services/:categorySlug" element={<SeoCategoryDetail />} />
+      <Route path="/services/:categorySlug/:citySlug" element={<SeoPage />} />
+      <Route path="/cities" element={<SeoCitiesIndex />} />
+      <Route path="/cities/:citySlug" element={<SeoCityDetail />} />
     </Routes>
   );
 }

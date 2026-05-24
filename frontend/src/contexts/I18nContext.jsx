@@ -221,10 +221,26 @@ const dict = {
 
 const I18nContext = createContext(null);
 
+// SEO i18n — paths that start with one of these are English routes (Google/X
+// land users here when they click an EN result from the SERP). We auto-switch
+// to EN on first visit so the entire UI matches the URL the visitor opened.
+const EN_PATH_PREFIXES = ["/services", "/cities", "/provider/", "/category/", "/en/"];
+
+function _isEnglishPath(pathname) {
+  if (!pathname) return false;
+  return EN_PATH_PREFIXES.some(p => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p));
+}
+
 // BUG-08 — Smart language detection on first visit.
-// Priority: explicit user choice (localStorage.tx_lang) > browser language > 'es'.
+// Priority: URL path (EN routes) > explicit user choice (localStorage.tx_lang)
+//          > browser language > 'es'.
 function detectInitialLang() {
   try {
+    // If the visitor landed directly on an EN canonical URL (likely from Google),
+    // honor that signal BEFORE anything else — they expect English.
+    if (typeof window !== "undefined" && _isEnglishPath(window.location.pathname)) {
+      return "en";
+    }
     const stored = localStorage.getItem("tx_lang");
     if (stored === "es" || stored === "en") return stored;
     const candidates = [navigator.language, ...(navigator.languages || [])].filter(Boolean);

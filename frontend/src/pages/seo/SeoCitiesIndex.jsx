@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
 import { MapPin } from "lucide-react";
+import { buildAlternates } from "../../lib/seoUrls";
 
 export default function SeoCitiesIndex() {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const isEn = location.pathname.startsWith("/cities");
 
   useEffect(() => {
     api.get("/seo/cities").then(r => setCities(r.data.items || [])).finally(() => setLoading(false));
@@ -20,9 +23,13 @@ export default function SeoCitiesIndex() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
       <SeoHead
-        title="Ciudades con proveedores latinos"
-        description="Encuentra proveedores latinos verificados en las principales ciudades de USA: Dallas, Houston, Miami, Los Ángeles, Chicago y más."
-        canonical={`${origin}/ciudades`}
+        title={isEn ? "Cities with Latino providers" : "Ciudades con proveedores latinos"}
+        description={isEn
+          ? "Find verified Latino providers in major US cities: Dallas, Houston, Miami, Los Angeles, Chicago and more."
+          : "Encuentra proveedores latinos verificados en las principales ciudades de USA: Dallas, Houston, Miami, Los Ángeles, Chicago y más."}
+        canonical={`${origin}${location.pathname}`}
+        alternates={buildAlternates(location.pathname)}
+        lang={isEn ? "en" : "es"}
         jsonLd={buildBreadcrumbsJsonLd(breadcrumbs, origin)}
       />
       <Header />

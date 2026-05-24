@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
 import { MapPin } from "lucide-react";
+import { buildAlternates } from "../../lib/seoUrls";
 
 export default function SeoCityDetail() {
   const { citySlug } = useParams();
+  const location = useLocation();
+  const isEn = location.pathname.startsWith("/cities/");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,9 +33,15 @@ export default function SeoCityDetail() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
       <SeoHead
-        title={`Proveedores latinos en ${city.name}, ${city.state}`}
-        description={`Encuentra los mejores proveedores latinos verificados en ${city.name}, ${city.state}. ${total_providers} negocios activos en getamano.`}
-        canonical={`${origin}/ciudades/${city.slug}`}
+        title={isEn
+          ? `Latino providers in ${city.name}, ${city.state}`
+          : `Proveedores latinos en ${city.name}, ${city.state}`}
+        description={isEn
+          ? `Find the best verified Latino providers in ${city.name}, ${city.state}. ${total_providers} active businesses on getamano.`
+          : `Encuentra los mejores proveedores latinos verificados en ${city.name}, ${city.state}. ${total_providers} negocios activos en getamano.`}
+        canonical={`${origin}${location.pathname}`}
+        alternates={buildAlternates(location.pathname)}
+        lang={isEn ? "en" : "es"}
         jsonLd={buildBreadcrumbsJsonLd(breadcrumbs, origin)}
       />
       <Header />

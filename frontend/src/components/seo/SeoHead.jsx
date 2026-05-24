@@ -3,19 +3,39 @@ import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 
 /**
- * Reusable SEO helmet — sets title, description, OG, canonical and optional JSON-LD.
+ * Reusable SEO helmet — sets title, description, OG, canonical, hreflang
+ * alternates and optional JSON-LD.
+ *
+ * `alternates` — array of `{ lang: "es"|"en", url: "https://..." }` so Google
+ * knows the same content exists in another language. The "x-default" hreflang
+ * is auto-derived from the first ES entry (most of our marketplace is ES-first).
+ *
+ * `lang` — sets <html lang="..."> dynamically so screen readers + Google pick
+ * the right locale.
  */
-export function SeoHead({ title, description, canonical, image, jsonLd }) {
+export function SeoHead({ title, description, canonical, image, jsonLd, alternates, lang = "es" }) {
   const fullTitle = title ? `${title} — getamano` : "getamano · Marketplace latino en USA";
   const ogImage = image || "/getamano-logo-full.png";
+  const ogLocale = lang === "en" ? "en_US" : "es_US";
+  const defaultUrl = (alternates || []).find((a) => a.lang === "es")?.url
+    || (alternates || [])[0]?.url
+    || canonical;
   return (
     <Helmet>
+      <html lang={lang} />
       <title>{fullTitle}</title>
       {description && <meta name="description" content={description} />}
       {canonical && <link rel="canonical" href={canonical} />}
+      {(alternates || []).map((alt) => (
+        <link key={alt.lang} rel="alternate" hrefLang={alt.lang} href={alt.url} />
+      ))}
+      {defaultUrl && <link rel="alternate" hrefLang="x-default" href={defaultUrl} />}
       <meta property="og:title" content={fullTitle} />
       {description && <meta property="og:description" content={description} />}
       <meta property="og:type" content="website" />
+      <meta property="og:locale" content={ogLocale} />
+      {lang === "es" && <meta property="og:locale:alternate" content="en_US" />}
+      {lang === "en" && <meta property="og:locale:alternate" content="es_US" />}
       {canonical && <meta property="og:url" content={canonical} />}
       <meta property="og:image" content={ogImage} />
       <meta name="twitter:card" content="summary_large_image" />

@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
 import CategoryIcon from "../../components/CategoryIcon";
+import { buildAlternates } from "../../lib/seoUrls";
 
 export default function SeoServicesIndex() {
   const [sectors, setSectors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const isEn = location.pathname.startsWith("/services");
 
   useEffect(() => {
     api.get("/seo/sectors").then(r => setSectors(r.data.sectors || [])).finally(() => setLoading(false));
@@ -20,9 +23,13 @@ export default function SeoServicesIndex() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
       <SeoHead
-        title="Todos los servicios"
-        description="Explora más de 170 categorías de servicios ofrecidos por proveedores latinos verificados en USA: hogar, salud, eventos, autos, tecnología y más."
-        canonical={`${origin}/servicios`}
+        title={isEn ? "All services" : "Todos los servicios"}
+        description={isEn
+          ? "Explore 170+ service categories offered by verified Latino providers in the USA: home, health, events, auto, tech and more."
+          : "Explora más de 170 categorías de servicios ofrecidos por proveedores latinos verificados en USA: hogar, salud, eventos, autos, tecnología y más."}
+        canonical={`${origin}${location.pathname}`}
+        alternates={buildAlternates(location.pathname)}
+        lang={isEn ? "en" : "es"}
         jsonLd={buildBreadcrumbsJsonLd(breadcrumbs, origin)}
       />
       <Header />

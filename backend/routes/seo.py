@@ -233,45 +233,89 @@ async def _do_seo_content(deps, category_slug: str, city_slug: str) -> dict:
 
 
 # ─── Sitemap + Robots ──────────────────────────────────────────────────
-def _static_sitemap_urls(base: str) -> list[str]:
+# Each ES path has its EN twin. We emit BOTH URLs per pair with mutual
+# xhtml:link rel="alternate" hreflang annotations so Google indexes them as
+# the same content in different locales (proper i18n SEO).
+URL_PAIRS_STATIC: list[tuple[str, str, float, str]] = [
+    # (es_path, en_path, priority, changefreq)
+    ("/", "/", 1.0, "daily"),
+    ("/servicios", "/services", 0.9, "weekly"),
+    ("/ciudades", "/cities", 0.9, "weekly"),
+    ("/comunidad", "/community", 0.8, "weekly"),
+    ("/empleos", "/gigs", 0.7, "weekly"),
+    ("/plans", "/plans", 0.8, "monthly"),
+    ("/instalar", "/install", 0.7, "monthly"),
+    ("/terminos", "/terms", 0.3, "monthly"),
+    ("/privacidad", "/privacy", 0.3, "monthly"),
+]
+
+
+def _bilingual_entry(base: str, es_path: str, en_path: str, priority: float, changefreq: str) -> list[str]:
+    """Emit <url> blocks (ES + optionally EN) with mutual hreflang annotations.
+
+    When es_path == en_path (e.g. the home `/`), only one entry is emitted.
+    """
+    es_url = f"{base}{es_path}"
+    en_url = f"{base}{en_path}"
+    if es_path == en_path:
+        return [
+            f"<url><loc>{es_url}</loc>"
+            f'<xhtml:link rel="alternate" hreflang="x-default" href="{es_url}"/>'
+            f"<priority>{priority}</priority><changefreq>{changefreq}</changefreq></url>"
+        ]
+    alternates = (
+        f'<xhtml:link rel="alternate" hreflang="es" href="{es_url}"/>'
+        f'<xhtml:link rel="alternate" hreflang="en" href="{en_url}"/>'
+        f'<xhtml:link rel="alternate" hreflang="x-default" href="{es_url}"/>'
+    )
     return [
-        f"<url><loc>{base}/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>",
-        f"<url><loc>{base}/servicios</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>",
-        f"<url><loc>{base}/ciudades</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>",
-        f"<url><loc>{base}/plans</loc><priority>0.8</priority><changefreq>monthly</changefreq></url>",
-        f"<url><loc>{base}/comunidad</loc><priority>0.8</priority><changefreq>weekly</changefreq></url>",
-        f"<url><loc>{base}/instalar</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>",
-        f"<url><loc>{base}/terminos</loc><priority>0.3</priority><changefreq>monthly</changefreq></url>",
-        f"<url><loc>{base}/privacidad</loc><priority>0.3</priority><changefreq>monthly</changefreq></url>",
+        f"<url><loc>{es_url}</loc>{alternates}<priority>{priority}</priority><changefreq>{changefreq}</changefreq></url>",
+        f"<url><loc>{en_url}</loc>{alternates}<priority>{priority}</priority><changefreq>{changefreq}</changefreq></url>",
     ]
 
 
 async def _do_sitemap(deps) -> Response:
     base = SEO_BASE_URL
-    urls = _static_sitemap_urls(base)
-    # Section 22 SEO category hubs — ES + EN dual indexing
-    for slug in SEO_CATEGORY_SLUGS:
-        urls.append(f"<url><loc>{base}/categoria/{slug}</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>")
-        urls.append(f"<url><loc>{base}/category/{slug}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+    urls: list[str] = []
+
+    # Static pages — bilingual pairs
+    for es, en, prio, freq in URL_PAIRS_STATIC:
+        urls.extend(_bilingual_entry(base, es, en, prio, freq))
+
+    # Category hubs (canonical + bilingual pair for the index AND each city)
     cats = await deps.db.categories.find({}, {"_id": 0, "slug": 1}).to_list(SITEMAP_CATS_LIMIT)
     for cat in cats:
-        urls.append(f"<url><loc>{base}/servicios/{cat['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+        urls.extend(_bilingual_entry(
+            base, f"/servicios/{cat['slug']}", f"/services/{cat['slug']}", 0.7, "weekly",
+        ))
         for city in deps.SEO_CITIES:
-            urls.append(
-                f"<url><loc>{base}/servicios/{cat['slug']}/{city['slug']}</loc>"
-                f"<priority>0.8</priority><changefreq>weekly</changefreq></url>"
-            )
+            urls.extend(_bilingual_entry(
+                base,
+                f"/servicios/{cat['slug']}/{city['slug']}",
+                f"/services/{cat['slug']}/{city['slug']}",
+                0.8, "weekly",
+            ))
+
+    # City hubs
     for city in deps.SEO_CITIES:
-        urls.append(f"<url><loc>{base}/ciudades/{city['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+        urls.extend(_bilingual_entry(
+            base, f"/ciudades/{city['slug']}", f"/cities/{city['slug']}", 0.7, "weekly",
+        ))
+
+    # Provider eCards — bilingual /proveedor/{slug} ↔ /provider/{slug}
     providers = await deps.db.provider_profiles.find(
         {"is_active": True, **deps.PUBLIC_GUARD}, {"_id": 0, "slug": 1},
     ).to_list(SITEMAP_PROVIDERS_LIMIT)
     for p in providers:
         if p.get("slug"):
-            urls.append(f"<url><loc>{base}/proveedor/{p['slug']}</loc><priority>0.7</priority><changefreq>weekly</changefreq></url>")
+            urls.extend(_bilingual_entry(
+                base, f"/proveedor/{p['slug']}", f"/provider/{p['slug']}", 0.7, "weekly",
+            ))
+
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+        '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
         + "\n".join(urls) + "\n</urlset>"
     )
     return Response(content=xml, media_type="application/xml")
@@ -280,8 +324,11 @@ async def _do_sitemap(deps) -> Response:
 _ROBOTS_TXT = """User-agent: *
 Allow: /
 Allow: /servicios/
+Allow: /services/
 Allow: /ciudades/
+Allow: /cities/
 Allow: /proveedor/
+Allow: /provider/
 Disallow: /dashboard/
 Disallow: /admin/
 Disallow: /api/
