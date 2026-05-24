@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Users, Plus, Trash2, Copy, Check, AlertTriangle, ChevronLeft,
   Clock, Zap, TrendingDown, Activity, UserCheck, Mail, RefreshCw,
+  Cloud, CloudOff, CheckCircle2, XCircle, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
@@ -296,6 +297,134 @@ function LatencyDashboard() {
   );
 }
 
+function GoogleCloudStatus() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get("/admin/google-cloud-status");
+      setData(r.data);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo obtener el estado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div className="space-y-4" data-testid="google-cloud-status">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Estado de Google Cloud APIs</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Verifica si Translation y Vision están habilitadas en tu proyecto.
+          </p>
+        </div>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-full hover:bg-slate-50 disabled:opacity-60"
+          data-testid="cloud-refresh"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          Refrescar
+        </button>
+      </div>
+
+      {!data ? (
+        <div className="py-16 text-center text-slate-400 text-sm">Cargando…</div>
+      ) : !data.configured ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" data-testid="cloud-not-configured">
+          <CloudOff className="w-5 h-5 inline mr-2 -mt-0.5" />
+          <strong>GOOGLE_API_KEY no configurada</strong> en el backend. {data.hint}
+        </div>
+      ) : (
+        <>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+            <span className="font-semibold">API key configurada:</span>{" "}
+            <code className="bg-slate-100 px-2 py-0.5 rounded">{data.key_prefix}</code>
+            <span className="text-slate-400 ml-3 text-xs">
+              Última verificación: {data.checked_at?.replace("T", " ").slice(0, 19)}
+            </span>
+          </div>
+
+          <ApiStatusRow
+            name="Cloud Translation API"
+            description="Traduce automáticamente descripciones y reseñas ES↔EN"
+            console_url="https://console.cloud.google.com/apis/library/translate.googleapis.com"
+            status={data.translation}
+            testid="cloud-translation-row"
+          />
+          <ApiStatusRow
+            name="Cloud Vision API"
+            description="OCR para escanear tarjetas de negocio y autocompletar perfil"
+            console_url="https://console.cloud.google.com/apis/library/vision.googleapis.com"
+            status={data.vision}
+            testid="cloud-vision-row"
+          />
+
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <strong>¿Cómo activar las APIs? (2 min)</strong>
+            <ol className="mt-2 list-decimal pl-5 space-y-1 text-blue-800">
+              <li>Abre <a href="https://console.cloud.google.com/apis/library" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Cloud Console → APIs Library</a></li>
+              <li>Busca <strong>"Cloud Translation API"</strong> → click <strong>Enable</strong></li>
+              <li>Busca <strong>"Cloud Vision API"</strong> → click <strong>Enable</strong></li>
+              <li>Vuelve aquí y haz click en <strong>Refrescar</strong> — los círculos deben pasar a verde.</li>
+            </ol>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ApiStatusRow({ name, description, console_url, status, testid }) {
+  const ok = status?.enabled;
+  return (
+    <div
+      className={`rounded-2xl border p-4 flex items-start gap-4 ${ok ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}
+      data-testid={testid}
+    >
+      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${ok ? "bg-emerald-500" : "bg-red-500"}`}>
+        {ok ? <CheckCircle2 className="w-6 h-6 text-white" /> : <XCircle className="w-6 h-6 text-white" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className={`text-sm font-bold ${ok ? "text-emerald-900" : "text-red-900"}`}>{name}</h3>
+          <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${ok ? "bg-emerald-200 text-emerald-900" : "bg-red-200 text-red-900"}`}>
+            {ok ? "ACTIVA" : "INACTIVA"}
+          </span>
+        </div>
+        <p className="text-xs text-slate-600 mt-1">{description}</p>
+        {!ok && status?.hint && (
+          <p className="text-xs text-red-800 mt-2 leading-snug">⚠️ {status.hint}</p>
+        )}
+        {!ok && (
+          <a
+            href={console_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-red-700 underline hover:text-red-900"
+            data-testid={`${testid}-console-link`}
+          >
+            Habilitar en Google Cloud Console <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+        {ok && status?.sample && (
+          <p className="text-xs text-emerald-700 mt-2">
+            ✓ Prueba: <code className="bg-white/60 px-1 rounded">"ok" → "{status.sample}"</code>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminOpsPage() {
   const [tab, setTab] = useState("bulk");
   return (
@@ -307,7 +436,7 @@ export default function AdminOpsPage() {
         </Link>
         <h1 className="font-display text-3xl font-bold text-slate-900 mb-6 tracking-tight">Operaciones</h1>
 
-        <div className="flex gap-2 mb-6 border-b border-slate-200">
+        <div className="flex gap-2 mb-6 border-b border-slate-200 flex-wrap">
           <button
             onClick={() => setTab("bulk")}
             className={`px-4 py-2 text-sm font-bold border-b-2 transition ${tab === "bulk" ? "text-teal-700" : "text-slate-400 hover:text-slate-600 border-transparent"}`}
@@ -324,9 +453,19 @@ export default function AdminOpsPage() {
           >
             <Clock className="w-4 h-4 inline mr-1.5" /> Latencia de respuesta
           </button>
+          <button
+            onClick={() => setTab("cloud")}
+            className={`px-4 py-2 text-sm font-bold border-b-2 transition ${tab === "cloud" ? "text-teal-700" : "text-slate-400 hover:text-slate-600 border-transparent"}`}
+            style={{ borderColor: tab === "cloud" ? "#025F67" : "transparent" }}
+            data-testid="admin-ops-tab-cloud"
+          >
+            <Cloud className="w-4 h-4 inline mr-1.5" /> Google Cloud
+          </button>
         </div>
 
-        {tab === "bulk" ? <BulkOnboarding /> : <LatencyDashboard />}
+        {tab === "bulk" && <BulkOnboarding />}
+        {tab === "latency" && <LatencyDashboard />}
+        {tab === "cloud" && <GoogleCloudStatus />}
       </main>
     </div>
   );

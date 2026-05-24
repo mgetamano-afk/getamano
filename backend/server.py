@@ -7303,6 +7303,44 @@ class TranslateRequestIn(BaseModel):
     source_lang: Literal["es", "en"] = "es"
 
 
+def _diagnose_google_api_error(status_code: int, body_text: str) -> dict:
+    """Map Google API error responses to actionable CEO-facing hints.
+
+    Returns: { kind, hint_es, hint_en } so the UI / admin panel knows whether to
+    tell the CEO 'enable the API' vs 'check billing' vs 'wait, quota exceeded'.
+    """
+    body_lower = (body_text or "").lower()
+    if "service_disabled" in body_lower or "has not been used" in body_lower:
+        return {
+            "kind": "api_disabled",
+            "hint_es": "El API no está habilitado en tu proyecto de Google Cloud. Ve a console.cloud.google.com → APIs & Services → Library y haz click en 'Enable'.",
+            "hint_en": "API not enabled on your Google Cloud project. Go to console.cloud.google.com → APIs & Services → Library and click 'Enable'.",
+        }
+    if "permission_denied" in body_lower or "api key not valid" in body_lower:
+        return {
+            "kind": "permission_denied",
+            "hint_es": "API key inválida o sin permisos. Verifica GOOGLE_API_KEY en el panel de Emergent y restricciones en Google Cloud.",
+            "hint_en": "Invalid or unauthorized API key. Verify GOOGLE_API_KEY in Emergent panel and key restrictions in Google Cloud.",
+        }
+    if status_code == 429 or "quota" in body_lower or "rate" in body_lower:
+        return {
+            "kind": "quota_exceeded",
+            "hint_es": "Has excedido la cuota gratuita de Google Cloud. Espera unos minutos o sube de tier.",
+            "hint_en": "Free Google Cloud quota exceeded. Wait a few minutes or upgrade tier.",
+        }
+    if status_code == 400 or "invalid" in body_lower:
+        return {
+            "kind": "bad_request",
+            "hint_es": "Petición rechazada por Google. Probablemente el contenido no es válido.",
+            "hint_en": "Request rejected by Google. Likely invalid content.",
+        }
+    return {
+        "kind": "unknown",
+        "hint_es": f"Error inesperado de Google (HTTP {status_code}).",
+        "hint_en": f"Unexpected Google error (HTTP {status_code}).",
+    }
+
+
 @api_router.post("/translate")
 async def translate_text(payload: TranslateRequestIn):
     """Translation service with cache. Returns original text when no API key is set
@@ -7333,11 +7371,16 @@ async def translate_text(payload: TranslateRequestIn):
                 json={"q": payload.text, "target": payload.target_lang,
                       "source": payload.source_lang, "format": "text"},
             )
-            r.raise_for_status()
+            if r.status_code >= 400:
+                diag = _diagnose_google_api_error(r.status_code, r.text)
+                logger.warning("translate API %s: %s", diag["kind"], r.text[:200])
+                return {"translated_text": payload.text, "cached": False,
+                        "source": "api_error", "error_kind": diag["kind"], "note": diag["hint_es"]}
             translated = r.json()["data"]["translations"][0]["translatedText"]
     except Exception as e:
         logger.warning(f"translate API call failed: {e}")
-        return {"translated_text": payload.text, "cached": False, "source": "api_error"}
+        return {"translated_text": payload.text, "cached": False, "source": "api_error",
+                "error_kind": "network", "note": "El servicio de traducción no respondió."}
     # 3) Store in cache (upsert defensively)
     now_dt = datetime.now(timezone.utc)
     await db.translation_cache.update_one(
@@ -7911,11 +7954,16 @@ async def scan_business_card(payload: CardScanIn, user: Optional[User] = Depends
                     "imageContext": {"languageHints": ["es", "en"]},
                 }]},
             )
-            r.raise_for_status()
+            if r.status_code >= 400:
+                diag = _diagnose_google_api_error(r.status_code, r.text)
+                logger.warning("Vision API %s: %s", diag["kind"], r.text[:200])
+                return {"source": "api_error", "fields": {}, "raw_text": "",
+                        "error_kind": diag["kind"], "note": diag["hint_es"]}
             data = r.json()
     except Exception as e:
         logger.warning(f"Vision OCR call failed: {e}")
         return {"source": "api_error", "fields": {}, "raw_text": "",
+                "error_kind": "network",
                 "note": "El servicio OCR no respondió. Llena el formulario manualmente."}
     try:
         annotation = data["responses"][0].get("fullTextAnnotation") or {}
@@ -7929,6 +7977,68 @@ async def scan_business_card(payload: CardScanIn, user: Optional[User] = Depends
                 "note": "No detectamos texto. Asegúrate de que la tarjeta esté enfocada y bien iluminada."}
     fields = _parse_card_text(text)
     return {"source": "vision", "fields": fields, "raw_text": text}
+
+
+@api_router.get("/admin/google-cloud-status")
+async def admin_google_cloud_status(_admin: User = Depends(require_admin)):
+    """Diagnostic: ping Translation + Vision and report which are enabled.
+
+    Useful for the CEO to verify GCP setup BEFORE the 'Enable API' click works.
+    Lightweight: 1-char translation ping + 1-byte image to Vision.
+    """
+    api_key = (os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not api_key:
+        return {
+            "configured": False,
+            "translation": {"enabled": False, "error_kind": "no_api_key"},
+            "vision": {"enabled": False, "error_kind": "no_api_key"},
+            "hint": "GOOGLE_API_KEY no configurada en /app/backend/.env",
+        }
+
+    async def _check_translation():
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as cli:
+                r = await cli.post(
+                    f"https://translation.googleapis.com/language/translate/v2?key={api_key}",
+                    json={"q": "ok", "target": "es", "source": "en", "format": "text"},
+                )
+                if r.status_code == 200:
+                    return {"enabled": True, "sample": r.json()["data"]["translations"][0]["translatedText"]}
+                diag = _diagnose_google_api_error(r.status_code, r.text)
+                return {"enabled": False, "status_code": r.status_code,
+                        "error_kind": diag["kind"], "hint": diag["hint_es"]}
+        except Exception as e:
+            return {"enabled": False, "error_kind": "network", "hint": str(e)[:120]}
+
+    async def _check_vision():
+        # 1x1 transparent PNG as the cheapest possible probe
+        tiny_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as cli:
+                r = await cli.post(
+                    f"https://vision.googleapis.com/v1/images:annotate?key={api_key}",
+                    json={"requests": [{
+                        "image": {"content": tiny_png},
+                        "features": [{"type": "LABEL_DETECTION", "maxResults": 1}],
+                    }]},
+                )
+                if r.status_code == 200:
+                    return {"enabled": True}
+                diag = _diagnose_google_api_error(r.status_code, r.text)
+                return {"enabled": False, "status_code": r.status_code,
+                        "error_kind": diag["kind"], "hint": diag["hint_es"]}
+        except Exception as e:
+            return {"enabled": False, "error_kind": "network", "hint": str(e)[:120]}
+
+    # Run both probes in parallel so the CEO sees results fast
+    translation_result, vision_result = await asyncio.gather(_check_translation(), _check_vision())
+    return {
+        "configured": True,
+        "key_prefix": api_key[:6] + "…" if len(api_key) > 6 else "set",
+        "translation": translation_result,
+        "vision": vision_result,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ════════════════════════════════════════════════════════════════════

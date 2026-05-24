@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ShareECard from "../components/ShareECard";
+import TranslatableDescription from "../components/TranslatableDescription";
 import SocialLinks from "../components/SocialLinks";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
@@ -202,7 +203,15 @@ export default function ProviderECard() {
                   {p.city && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {p.city}, {p.state}</span>}
                   {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800 font-medium"><Star className="w-3.5 h-3.5 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)} ({p.rating_count})</span>}
                 </div>
-                {p.description && <p className="mt-4 text-slate-700 leading-relaxed">{p.description}</p>}
+                {p.description && (
+                  <TranslatableDescription
+                    text={p.description}
+                    sourceId={`prov:${p.provider_id}`}
+                    sourceField="description"
+                    sourceLang="es"
+                    displayLang={lang}
+                  />
+                )}
 
                 {/* Section 33 — Engagement & gamification badges */}
                 <EngagementBadges providerId={p.provider_id} />

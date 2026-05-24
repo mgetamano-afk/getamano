@@ -36,6 +36,8 @@ import WeeklyHealthEmailPreview from "../components/WeeklyHealthEmailPreview";
 import WaitingClientsBadge from "../components/WaitingClientsBadge";
 import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
 import CitySearchInput from "../components/CitySearchInput";
+import BusinessCardScanner from "../components/BusinessCardScanner";
+import { ScanLine } from "lucide-react";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { US_STATES, getStateByAbbr } from "../data/usLocations";
 
@@ -63,6 +65,7 @@ export default function ProviderDashboard() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("perfil");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
 
@@ -154,6 +157,27 @@ export default function ProviderDashboard() {
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       <Header />
+      <BusinessCardScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onExtracted={(fields) => {
+          // Map Vision-extracted fields into the form. We only overwrite empty
+          // fields so the provider's previous edits are preserved.
+          setForm((prev) => {
+            const next = { ...prev };
+            const setIfEmpty = (k, v) => { if (v && !((next[k] || "").trim())) next[k] = v; };
+            setIfEmpty("business_name", fields.business_name);
+            setIfEmpty("phone", fields.phone);
+            setIfEmpty("email", fields.email);
+            setIfEmpty("website", fields.website);
+            setIfEmpty("city", fields.city);
+            setIfEmpty("state", fields.state);
+            setIfEmpty("zip_code", fields.zip_code);
+            return next;
+          });
+          toast.success("Campos rellenados desde la tarjeta. Revisa y guarda.");
+        }}
+      />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" data-testid="provider-dashboard">
         <MilestoneCelebration />
 
@@ -292,6 +316,17 @@ export default function ProviderDashboard() {
                 </div>
 
                 <Section title="Información del negocio">
+                  {/* Section 18A — scan a business card to auto-fill fields */}
+                  <div className="md:col-span-2 -mt-2 mb-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setScannerOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-900 hover:underline"
+                      data-testid="provider-scan-card-btn"
+                    >
+                      <ScanLine className="w-4 h-4" /> Escanear tarjeta de negocio
+                    </button>
+                  </div>
                   <Field label="Nombre del negocio *" value={form.business_name} onChange={v => update("business_name", v)} required testid="form-business-name" />
                   <Field label="Nombre legal" value={form.legal_name} onChange={v => update("legal_name", v)} testid="form-legal-name" />
                   <SelectField label="Categoría principal *" value={form.category_id} onChange={v => update("category_id", v)} options={categories.filter(c => MAIN_CATEGORIES.includes(c.name_es)).sort((a, b) => MAIN_CATEGORIES.indexOf(a.name_es) - MAIN_CATEGORIES.indexOf(b.name_es)).map(c => ({ value: c.category_id, label: lang === "es" ? c.name_es : c.name_en }))} testid="form-category-select" />

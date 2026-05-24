@@ -1,0 +1,50 @@
+{
+  "summary": "Section 48 — Google Cloud APIs hardening: 10/10 backend pytest pass + 12/12 frontend UI checks pass. /api/admin/google-cloud-status auth gating (200/403/401) + shape contract verified. /api/translate and /api/card-scan return source='api_error' + error_kind='permission_denied' + Spanish note when key invalid (matches reality of current revoked GOOGLE_API_KEY). Admin Ops Cloud tab renders INACTIVA badges, Spanish hints, console.cloud.google.com links + 4-step tutorial; Refrescar triggers network. Provider dashboard surfaces 'Escanear tarjeta de negocio' button that opens BusinessCardScanner modal. Public eCard renders TranslatableDescription with toggle — click degrades gracefully (note shown, description text preserved).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter48_google_cloud_status.py",
+    "/app/test_reports/pytest/iter48_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "_diagnose_google_api_error covers all 5 documented Google failure modes (api_disabled/permission_denied/quota_exceeded/bad_request/unknown) + a network fallback at the call site — good coverage.",
+    "/api/admin/google-cloud-status fires two parallel httpx probes (asyncio.gather) so admin UX stays snappy (~1.8s observed) — well done.",
+    "Reality probe: current GOOGLE_API_KEY (AIzaSy…) returns HTTP 403 + 'API key not valid' which the diagnoser correctly maps to error_kind='permission_denied' (matches main agent's note). When CEO replaces / unrestricts the key, the same probe should flip to enabled:true with zero code changes.",
+    "Pre-existing (NOT introduced this iter): React hydration warning <span> inside <option> in ProviderDashboard.jsx US_STATES select — already flagged in iteration_47.json, still present. Low priority cleanup.",
+    "/api/translate and /api/card-scan correctly preserve the original text/payload on api_error so the UI never shows an empty description — graceful degradation contract is solid.",
+    "Public eCard TranslatableDescription correctly renders the note (data-testid='translatable-description-note') AND keeps the source text visible on error — confirmed in screenshot."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter48_google_cloud_status.py (new)"
+  ],
+  "success_rate": { "backend": "100% (10/10)", "frontend": "100% (12/12)" },
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123",
+  "seed_data_creation": "None — tests are read-only diagnostics. Translation cache entry created for 'Hola, soy María.' es→en under source_id=TEST_iter48 (1 row, expires automatically in 90d via TTL index).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "When CEO enables Translation + Vision APIs in Google Cloud Console (or rotates GOOGLE_API_KEY to a valid one), re-run /app/backend/tests/test_iter48_google_cloud_status.py — the same suite covers both states (enabled and disabled). The TestRealityProbe test accepts both happy-path and known-failure error_kinds so it remains stable across the toggle. Frontend Cloud tab will flip INACTIVA badges → ACTIVA automatically once /api/admin/google-cloud-status returns enabled:true.",
+  "verified_endpoints": [
+    "GET /api/admin/google-cloud-status (200 admin / 403 provider / 401 anon, shape: configured+translation+vision+checked_at+key_prefix)",
+    "POST /api/translate (api_error + error_kind=permission_denied + Spanish note + translated_text=original)",
+    "POST /api/card-scan (api_error + error_kind=permission_denied + Spanish note + empty fields)"
+  ],
+  "ui_data_testids_verified": [
+    "admin-ops-page",
+    "admin-ops-tab-cloud",
+    "google-cloud-status",
+    "cloud-refresh",
+    "provider-scan-card-btn",
+    "card-scanner-modal",
+    "card-scanner-close",
+    "translatable-description",
+    "translatable-description-toggle",
+    "translatable-description-text-source",
+    "translatable-description-note"
+  ],
+  "rca of the issue": "N/A — no bugs. The 'INACTIVA' state shown in the UI is the REALITY of the configured GOOGLE_API_KEY today (revoked / restricted). The 403 + API_KEY_INVALID upstream response is correctly mapped to error_kind='permission_denied' with an actionable Spanish hint pointing to Google Cloud Console. CEO action (enable APIs OR rotate key) is the manual fix; code is correct and graceful."
+}
