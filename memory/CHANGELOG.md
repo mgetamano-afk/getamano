@@ -2,6 +2,56 @@
 
 Append-only log of major work shipped per session.
 
+## May 26, 2026 (5th drop) — Section 57 + Banner of the Week
+
+### Section 57.A — Community Feed Auto-Refresh (2 layers + pull-to-refresh)
+Adapted from the prompt's Supabase Realtime version to our MongoDB + FastAPI stack using pure HTTP polling:
+- **Layer 1 — Visibility API**: when the user returns to the tab/PWA after 2+ minutes away, the feed silently refreshes (no spinner, no jumps).
+- **Layer 2 — 60s polling** while the tab is visible (skipped during first 5s after mount). Checks the most recent post's `created_at` vs ours; if fresher posts exist, count them and surface a sticky banner.
+- **"Hay N posts nuevos — toca para ver"** floating banner ([data-testid="comunidad-new-posts-banner"]) appears centered at the top of the feed; tapping triggers a smooth scroll-to-top after the silent refresh.
+- **Pull-to-refresh** for mobile via Touch events on `window.scrollY=0`: dragging down past 80px shows a rotating refresh indicator ([data-testid="comunidad-pull-indicator"]) that fires `silentRefresh()` on release.
+
+### Section 57.B — HeartHandshake Icon for Comunidad
+Replaced 3 instances of the previous Comunidad icons across the app:
+- `BottomNav.jsx` — `MessageCircle` (mensajes) → REMOVED entirely. The Comunidad slot now uses **`HeartHandshake`** from lucide-react.
+- `ComunidadLayout.jsx` first tab — `Globe` → **`HeartHandshake`**.
+- `ComunidadPage.jsx` internal nav — `Home as HomeIcon` → **`HeartHandshake`** for /comunidad route.
+
+### Section 57.C — Bottom Nav Reorder
+Updated to the prompt-specified order: **Inicio · Buscar · Comunidad · Chambas · Mi cuenta**. The old "Mensajes" slot was removed from the bottom nav — messages now live in the Header bell (with unread badge) where they belong on mobile.
+
+### Section 57.D — Heartbeat Tap Animation
+New CSS keyframes in `App.css`:
+- `gtm-heartbeat` — scale 1 → 1.45 → 1.15 → 1.35 → 1.08 → 1 over 550ms (cubic-bezier 0.36, 0.07, 0.19, 0.97)
+- `gtm-color-burst` — gray → orange → red → teal over 550ms (sync'd to scale)
+- `gtm-label-pop` — text scale + color punch on the "Comunidad" label
+
+JS controller in BottomNav: `tappingPath` state + `setTimeout(600)` cleanup. Only applies to items declared with `animate: "heartbeat"` (currently just Community).
+
+### Section 57.E — PWA Update Banner (DEFERRED)
+Defer to next session — needs Service Worker overhaul. Approved by user.
+
+### Banner of the Week (CEO marketing idea)
+- New backend `GET /api/banners/banner-of-the-week` (public, no auth) — MongoDB aggregation pipeline that selects the highest-liked public banner from the last 7 days. Falls back to all-time most-liked if no banner has likes this week. Returns `null` only when there are zero published banners.
+- New `BannerOfTheWeekCard.jsx` component on the public Landing page (right after `FeaturedProvidersReel`, before the category slider). Renders:
+  - Pink-orange gradient "BANNER OF THE WEEK" badge
+  - Bilingual H2 + sub
+  - "See full gallery" link → `/galeria-banners`
+  - Hero banner image with hover scale + likes badge + style ribbon (brand color)
+  - Provider card: logo/initials, business name + verified shield, city/state
+  - Two CTAs: "View [business]'s eCard" (dark) + "Create my banner with AI" (pink) → drives Banner Pro adoption
+- **Viral loop**: featured provider gets free traffic → other providers see it → "yo quiero salir aquí" → adopt Banner Pro → more eCards look professional → more liking → more virality.
+
+### Testing
+- `/app/test_reports/iteration_55.json` — **100% pass**, 5/5 backend pytest + all UI testids verified. No bugs.
+- Test file: `/app/backend/tests/test_banner_of_the_week.py`.
+
+### Code-review notes (deferred backlog)
+- **P1**: `ComunidadPage.jsx` is 870+ lines — split PostFeed, NewPostBox, internal nav into separate files.
+- **P2**: 401 console noise on public Landing — gate `/me`/`/conversations` probes on user presence (not blocking).
+- **P2**: BannerOfTheWeek fetches on every mount — add SWR cache or 5-minute stale window.
+
+
 ## May 26, 2026 (latest) — Marketplace de Banners (Section 57 / CEO recommendation)
 
 The viral loop: provider creates banner with AI → opts-in to publish → public gallery showcases real businesses → visitors browse + like → "yo quiero uno así" → more providers adopt Banner Pro → more eCards look professional → conversion up.

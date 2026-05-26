@@ -1994,3 +1994,13 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - BannerGenerator gets "Publicar en galería" button that uploads composed PNG + creates the share record.
 - Header desktop + mobile nav now expose the gallery link.
 - Tests: `/app/test_reports/iteration_54.json` 100% pass (20/20 backend + 9/9 frontend flows).
+
+### May 26, 2026 (5th drop) — Section 57 + Banner of the Week
+- **Sec 57.A**: Auto-refresh comunidad feed (Visibility API + 60s polling + "new posts" banner + pull-to-refresh).
+- **Sec 57.B**: HeartHandshake icon replaces Globe/MessageCircle/HomeIcon across 3 navigation surfaces.
+- **Sec 57.C**: Bottom nav reordered to Inicio · Buscar · Comunidad · Chambas · Mi cuenta (mensajes moved to Header bell).
+- **Sec 57.D**: Heartbeat tap animation (CSS @keyframes + JS controller) on Community icon.
+- **Sec 57.E**: PWA Update Banner — DEFERRED to next session.
+- **Banner of the Week**: New /api/banners/banner-of-the-week endpoint + BannerOfTheWeekCard on Landing for viral marketing loop.
+- Tests: `/app/test_reports/iteration_55.json` 100% pass (5/5 backend + all UI testids verified).
+
