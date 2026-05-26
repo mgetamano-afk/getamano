@@ -1,34 +1,52 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Search, HeartHandshake, User, Briefcase } from "lucide-react";
+import {
+  Home,
+  Search,
+  HeartHandshake,
+  User,
+  Briefcase,
+  Sparkles,
+  Bookmark,
+  MessageCircle,
+  LogIn,
+  CreditCard,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import useSmartNav from "../hooks/useSmartNav";
 
 /**
- * BottomNav — mobile-only sticky bottom navigation.
+ * BottomNav — Section 63 (Universal footer navigation).
  *
- * Shown when:
- *   - User is logged in
- *   - Viewport < 768px
- *   - Not on /admin/* (admins use their own sidebar)
- *   - Not when virtual keyboard is detected open
+ * The PRIMARY navigation of the app. Sits sticky at the bottom on all
+ * screen sizes. Consolidates the most important destinations from the
+ * old Header, ComunidadLayout, and ProviderLeftNav menus into ONE place.
  *
- * Respects iOS safe-area-inset-bottom (home indicator on Face ID iPhones).
+ * Layout:
+ *   · Mobile (<768px) — 5 items, icon + tiny label, grid-cols-5
+ *   · Tablet (≥768px) — 6-8 items, icon + label, evenly distributed
+ *   · Desktop (≥1024px) — same as tablet, capped at ~7xl max width
+ *
+ * Items adapt to user role:
+ *   · Guest               → Inicio · Buscar · Galería · Comunidad · Entrar
+ *   · Client (logged in)  → Inicio · Buscar · Comunidad · Chambas · Mi cuenta
+ *   · Provider (logged)   → Panel · Mensajes · Comunidad · Galería · Mi negocio
+ *
+ * Hidden on /admin/* (admin uses its own sidebar) and on auth screens.
+ * Auto-hides on scroll-down via useSmartNav (mimic Instagram).
  */
-const STORAGE_KEY = "getamano_bottom_nav_hidden_paths";
-
 export default function BottomNav() {
   const { user } = useAuth();
-  const { t, lang } = useI18n();
+  const { lang } = useI18n();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const [tappingPath, setTappingPath] = useState(""); // Section 57 — heartbeat tap state
+  const [tappingPath, setTappingPath] = useState("");
   const smartVisible = useSmartNav();
 
-  // Refresh unread badge whenever path changes (lightweight)
+  // Refresh unread badge on path change.
   useEffect(() => {
     if (!user) { setUnread(0); return; }
     api.get("/conversations").then(r => {
@@ -36,8 +54,7 @@ export default function BottomNav() {
     }).catch(() => {});
   }, [user, location.pathname]);
 
-  // Detect virtual keyboard on Android (Android resizes the visual viewport
-  // when the keyboard opens). iOS doesn't resize so this is a no-op there.
+  // Detect Android virtual keyboard.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const initialH = window.innerHeight;
@@ -49,22 +66,19 @@ export default function BottomNav() {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  // Toggle a body class so global CSS can leave room for the nav (avoids
-  // bottom content being hidden behind it on long pages).
-  const navVisible = !!user && !location.pathname.startsWith("/admin") && !keyboardOpen;
+  // Toggle body class so global CSS can reserve bottom padding.
+  const HIDDEN_PATHS = ["/login", "/register", "/registro", "/verificar-correo", "/verify-email", "/forgot-password", "/reset-password"];
+  const isHidden = location.pathname.startsWith("/admin")
+    || HIDDEN_PATHS.some(p => location.pathname.startsWith(p))
+    || keyboardOpen;
+
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.body.classList.toggle("has-bottom-nav", navVisible);
+    document.body.classList.toggle("has-bottom-nav", !isHidden);
     return () => { document.body.classList.remove("has-bottom-nav"); };
-  }, [navVisible]);
+  }, [isHidden]);
 
-  // CAMBIO A — also hide nav on auth/onboarding screens (less friction)
-  const HIDDEN_PATHS = ["/login", "/register", "/registro", "/verificar-correo", "/verify-email"];
-
-  if (!user) return null;
-  if (location.pathname.startsWith("/admin")) return null;
-  if (HIDDEN_PATHS.some(p => location.pathname.startsWith(p))) return null;
-  if (keyboardOpen) return null;
+  if (isHidden) return null;
 
   const pathname = location.pathname;
   const isActive = (path) => {
@@ -73,81 +87,163 @@ export default function BottomNav() {
     if (path === "/comunidad") return pathname.startsWith("/comunidad") || pathname.startsWith("/community");
     if (path === "/search") return pathname.startsWith("/search") || pathname.startsWith("/buscar");
     if (path === "/empleos") return pathname.startsWith("/empleos") || pathname.startsWith("/gigs");
+    if (path === "/galeria-banners") return pathname.startsWith("/galeria-banners") || pathname.startsWith("/banner-gallery");
+    if (path === "/mis-guardadas") return pathname.startsWith("/mis-guardadas") || pathname.startsWith("/my-saved");
+    if (path === "/plans") return pathname.startsWith("/plans");
+    if (path === "/messages") return pathname.startsWith("/messages");
     return pathname.startsWith(path);
   };
 
-  // Section 57 — Bottom nav new order:
-  //   Inicio · Buscar · Comunidad · Chambas · Mi cuenta
-  // Mensajes moves to the Header bell (already there with unread badge).
-  const items = [
-    { path: "/", icon: Home, label: lang === "en" ? "Home" : "Inicio", testid: "bottom-nav-home" },
-    { path: "/search", icon: Search, label: lang === "en" ? "Search" : "Buscar", testid: "bottom-nav-search" },
-    { path: "/comunidad", icon: HeartHandshake, label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
-    { path: "/empleos", icon: Briefcase, label: lang === "en" ? "Gigs" : "Chambas", testid: "bottom-nav-empleos" },
-    { path: "/dashboard", icon: User, label: lang === "en" ? "Account" : "Mi cuenta", badge: unread, testid: "bottom-nav-dashboard" },
-  ];
+  // Build items per user role. Each item: {path, icon, label, testid, badge?, mobile, animate?}
+  // `mobile: true` = shown also on mobile (max 5). All items always shown ≥md.
+  const galleryPath = lang === "en" ? "/banner-gallery" : "/galeria-banners";
+  const savedPath = lang === "en" ? "/my-saved" : "/mis-guardadas";
+
+  let items;
+  if (!user) {
+    items = [
+      { path: "/",                icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home",      mobile: true },
+      { path: "/search",          icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search",    mobile: true },
+      { path: "/comunidad",       icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", mobile: true, animate: "heartbeat" },
+      { path: "/empleos",         icon: Briefcase,       label: lang === "en" ? "Gigs"      : "Chambas",   testid: "bottom-nav-empleos",   mobile: false },
+      { path: galleryPath,        icon: Sparkles,        label: lang === "en" ? "Gallery"   : "Galería",   testid: "bottom-nav-gallery",   mobile: true },
+      { path: "/plans",           icon: CreditCard,      label: lang === "en" ? "Plans"     : "Planes",    testid: "bottom-nav-plans",     mobile: false },
+      { path: "/login",           icon: LogIn,           label: lang === "en" ? "Sign in"   : "Entrar",    testid: "bottom-nav-login",     mobile: true },
+    ];
+  } else if (user.role === "provider") {
+    items = [
+      { path: "/",                       icon: Home,            label: lang === "en" ? "Home"      : "Inicio",     testid: "bottom-nav-home",      mobile: false },
+      { path: "/dashboard/provider",     icon: User,            label: lang === "en" ? "Panel"     : "Panel",      testid: "bottom-nav-dashboard", mobile: true },
+      { path: "/search",                 icon: Search,          label: lang === "en" ? "Search"    : "Buscar",     testid: "bottom-nav-search",    mobile: false },
+      { path: "/comunidad",              icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad",  testid: "bottom-nav-community", mobile: true, animate: "heartbeat" },
+      { path: "/empleos",                icon: Briefcase,       label: lang === "en" ? "Gigs"      : "Chambas",    testid: "bottom-nav-empleos",   mobile: true },
+      { path: galleryPath,               icon: Sparkles,        label: lang === "en" ? "Gallery"   : "Galería",    testid: "bottom-nav-gallery",   mobile: false },
+      { path: "/messages",               icon: MessageCircle,   label: lang === "en" ? "Inbox"     : "Mensajes",   testid: "bottom-nav-messages",  mobile: true, badge: unread },
+    ];
+  } else {
+    // client (default)
+    items = [
+      { path: "/",                       icon: Home,            label: lang === "en" ? "Home"      : "Inicio",     testid: "bottom-nav-home",      mobile: true },
+      { path: "/search",                 icon: Search,          label: lang === "en" ? "Search"    : "Buscar",     testid: "bottom-nav-search",    mobile: true },
+      { path: "/comunidad",              icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad",  testid: "bottom-nav-community", mobile: true, animate: "heartbeat" },
+      { path: "/empleos",                icon: Briefcase,       label: lang === "en" ? "Gigs"      : "Chambas",    testid: "bottom-nav-empleos",   mobile: false },
+      { path: galleryPath,               icon: Sparkles,        label: lang === "en" ? "Gallery"   : "Galería",    testid: "bottom-nav-gallery",   mobile: false },
+      { path: savedPath,                 icon: Bookmark,        label: lang === "en" ? "Saved"     : "Guardadas",  testid: "bottom-nav-saved",     mobile: false },
+      { path: "/messages",               icon: MessageCircle,   label: lang === "en" ? "Inbox"     : "Mensajes",   testid: "bottom-nav-messages",  mobile: false, badge: unread },
+      { path: "/dashboard",              icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta",  testid: "bottom-nav-dashboard", mobile: true, badge: unread },
+    ];
+  }
+
+  const mobileItems = items.filter(i => i.mobile).slice(0, 5);
+  const desktopItems = items;
 
   return (
     <nav
-      className={`md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 transition-transform duration-300 ease-in-out ${smartVisible ? "translate-y-0" : "translate-y-full"}`}
+      className={`fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 transition-transform duration-300 ease-in-out ${smartVisible ? "translate-y-0" : "translate-y-full"}`}
       style={{ paddingBottom: "var(--safe-bottom, 0px)" }}
       data-testid="bottom-nav"
-      aria-label="Mobile navigation"
+      aria-label="Primary navigation"
     >
-      <ul className="grid grid-cols-5 h-14">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.path);
-          const isTapping = tappingPath === item.path;
-          const handleTap = () => {
-            if (item.animate === "heartbeat") {
-              setTappingPath(item.path);
-              setTimeout(() => setTappingPath(""), 600);
-            }
-          };
-          return (
-            <li key={item.path} className="flex">
-              <Link
-                to={item.path}
-                onClick={handleTap}
-                className="relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:bg-slate-100"
-                style={{ minHeight: 44 }}
-                data-testid={item.testid}
-                aria-current={active ? "page" : undefined}
-              >
-                <span className="relative">
-                  <Icon
-                    className={`w-5 h-5 transition-colors gtm-nav-icon ${isTapping ? "tapping" : ""}`}
-                    style={{ color: active ? "#025F67" : "#64748B" }}
-                    strokeWidth={active ? 2.5 : 2}
-                  />
-                  {item.badge > 0 && (
-                    <span
-                      className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-white text-[10px] font-bold leading-none ring-2 ring-white"
-                      style={{ background: "#FF6B2C" }}
-                      data-testid={`${item.testid}-badge`}
-                    >
-                      {item.badge > 99 ? "99+" : item.badge}
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={`text-[10px] font-medium leading-none tracking-tight gtm-nav-label ${isTapping ? "tapping" : ""}`}
-                  style={{ color: active ? "#025F67" : "#64748B" }}
-                >
-                  {item.label}
-                </span>
-                {active && (
-                  <span
-                    className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
-                    style={{ background: "#025F67" }}
-                  />
-                )}
-              </Link>
-            </li>
-          );
-        })}
+      {/* Mobile (<md): 5-column grid */}
+      <ul className="md:hidden grid grid-cols-5 h-14">
+        {mobileItems.map((item) => renderItem(item, isActive, tappingPath, setTappingPath, /* compact */ true))}
+      </ul>
+
+      {/* Tablet & desktop (≥md): centered horizontal row */}
+      <ul className="hidden md:flex items-center justify-center gap-1 lg:gap-3 max-w-7xl mx-auto h-16 px-4">
+        {desktopItems.map((item) => renderItem(item, isActive, tappingPath, setTappingPath, /* compact */ false))}
       </ul>
     </nav>
+  );
+}
+
+function renderItem(item, isActive, tappingPath, setTappingPath, compact) {
+  const Icon = item.icon;
+  const active = isActive(item.path);
+  const tapping = tappingPath === item.path;
+  const handleTap = () => {
+    if (item.animate === "heartbeat") {
+      setTappingPath(item.path);
+      setTimeout(() => setTappingPath(""), 600);
+    }
+  };
+
+  // Compact (mobile) variant — grid cell with tiny label below icon.
+  if (compact) {
+    return (
+      <li key={item.path} className="flex">
+        <Link
+          to={item.path}
+          onClick={handleTap}
+          className="relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:bg-slate-100"
+          style={{ minHeight: 44 }}
+          data-testid={item.testid}
+          aria-current={active ? "page" : undefined}
+        >
+          <span className="relative">
+            <Icon
+              className={`w-5 h-5 transition-colors gtm-nav-icon ${tapping ? "tapping" : ""}`}
+              style={{ color: active ? "#025F67" : "#64748B" }}
+              strokeWidth={active ? 2.5 : 2}
+            />
+            {item.badge > 0 && (
+              <span
+                className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-white text-[10px] font-bold leading-none ring-2 ring-white"
+                style={{ background: "#FF6B2C" }}
+                data-testid={`${item.testid}-badge`}
+              >
+                {item.badge > 99 ? "99+" : item.badge}
+              </span>
+            )}
+          </span>
+          <span
+            className={`text-[10px] font-medium leading-none tracking-tight gtm-nav-label ${tapping ? "tapping" : ""}`}
+            style={{ color: active ? "#025F67" : "#64748B" }}
+          >
+            {item.label}
+          </span>
+          {active && (
+            <span
+              className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+              style={{ background: "#025F67" }}
+            />
+          )}
+        </Link>
+      </li>
+    );
+  }
+
+  // Desktop variant — pill with icon + label side-by-side.
+  return (
+    <li key={item.path}>
+      <Link
+        to={item.path}
+        onClick={handleTap}
+        className={`relative inline-flex items-center gap-2 px-3 lg:px-4 h-11 rounded-full text-sm font-semibold transition-all ${
+          active
+            ? "bg-teal-50 text-teal-700 shadow-sm"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+        }`}
+        data-testid={`${item.testid}-desktop`}
+        aria-current={active ? "page" : undefined}
+      >
+        <span className="relative">
+          <Icon
+            className={`w-5 h-5 transition-colors gtm-nav-icon ${tapping ? "tapping" : ""}`}
+            strokeWidth={active ? 2.5 : 2}
+          />
+          {item.badge > 0 && (
+            <span
+              className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-white text-[10px] font-bold leading-none ring-2 ring-white"
+              style={{ background: "#FF6B2C" }}
+              data-testid={`${item.testid}-desktop-badge`}
+            >
+              {item.badge > 99 ? "99+" : item.badge}
+            </span>
+          )}
+        </span>
+        <span className="whitespace-nowrap">{item.label}</span>
+      </Link>
+    </li>
   );
 }

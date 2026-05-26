@@ -234,13 +234,15 @@ html { -webkit-text-size-adjust: 100%; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
 
-/* Bottom-nav clearance — leave room at the bottom of the page on mobile when
-   the BottomNav (h-14 = 56px) + safe area is visible. The nav itself is only
-   rendered for logged-in users < 768px and not on /admin/*, but the padding
-   is harmless on other pages. */
-@media (max-width: 767px) {
+/* Bottom-nav clearance — Section 63 consolidated nav is now visible on ALL
+   screen sizes. Mobile uses h-14 (56px); ≥md uses h-16 (64px). Padding keeps
+   page content from being covered by the sticky footer nav. */
+body.has-bottom-nav {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
   body.has-bottom-nav {
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 

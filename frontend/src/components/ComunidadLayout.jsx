@@ -71,7 +71,7 @@ export default function ComunidadLayout() {
 
       {/* Section 62 — Slim pill bar on mobile/tablet only; hidden on desktop (LeftNav takes over). Auto-hides on scroll down. */}
       <div
-        className={`fixed top-14 md:top-20 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-transform duration-300 lg:hidden ${
+        className={`fixed top-14 md:top-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-transform duration-300 lg:hidden ${
           isVisible ? "translate-y-0" : "-translate-y-full"
         }`}
         data-testid="comunidad-tabbar"
