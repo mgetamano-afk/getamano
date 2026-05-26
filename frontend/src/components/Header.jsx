@@ -76,6 +76,7 @@ export default function Header() {
               <Link to="/plans" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-plans">{t("nav.plans")}</Link>
             )}
             <button
+              type="button"
               onClick={() => { const to = lang === "es" ? "en" : "es"; changeLang(to); trackLanguageSwitch(to); }}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 rounded-full hover:bg-slate-100"
               data-testid="lang-toggle"
@@ -117,6 +118,7 @@ export default function Header() {
           </nav>
 
           <button
+            type="button"
             onClick={() => setOpen(!open)}
             className="md:hidden p-2.5 -mr-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition"
             data-testid="mobile-menu-toggle"

@@ -17,7 +17,8 @@ export const lazyImg = (src, { priority = false, fetchPriority = "auto" } = {}) 
   src,
   loading: priority ? "eager" : "lazy",
   decoding: priority ? "sync" : "async",
-  fetchpriority: priority ? "high" : fetchPriority,
+  // JSX expects camelCase fetchPriority
+  fetchPriority: priority ? "high" : fetchPriority,
 });
 
 /**

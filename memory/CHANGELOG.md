@@ -2,6 +2,69 @@
 
 Append-only log of major work shipped per session.
 
+## May 26, 2026 (6th drop) — Sections 58 + 59 + Stories (24h)
+
+### Section 58 — Infrastructure for 60M users (scale-ready foundations)
+Practical wins implemented without external APIs (Sentry/Cloudflare/Upstash deferred):
+- **MongoDB indexes audit**: added ~12 new indexes across high-traffic collections:
+  - `reviews` (provider+created, provider+rating)
+  - `service_requests` (provider+created, client+created)
+  - `messages` (conversation+status)
+  - `share_events` (provider_user+created)
+  - `exit_leads` (status+created)
+  - `favorites` (user+provider)
+  - `notification_queue` (user+created)
+  - `audit_log` (user+created)
+  - `provider_profiles` compound (verification_status+rating_avg, plan+rating_avg)
+  - `quote_requests` (provider+created)
+- **Code splitting**: converted 18 secondary pages to `React.lazy()`:
+  - SavedECardsPage, BannerGalleryPage, RankingPage, AdminOpsPage
+  - All Admin/* (AdminOverview, AdminCEO, AdminQuizFunnel, AdminLeadsInbox, AdminPricingIntelligence, AdminQueue, AdminProviders, AdminReviews, AdminCatalog, AdminAudit, AdminReportsBidirectional)
+  - All Legal/* (Terms, Privacy, ReviewsPolicy, Cookies)
+  - All SEO/* (SeoServicesIndex, SeoCitiesIndex, SeoCityDetail, SeoCategoryDetail, SeoPage)
+  - Wrapped `<Routes>` in `<Suspense fallback={ChunkFallback}>` with branded teal bouncing-dots loader.
+- **Production console silencer**: `silenceConsoleInProd()` in new `/lib/imageHelpers.js`; called from `index.js` before mounting. Silences log/info/debug in prod, keeps warn/error for crash diagnostics.
+- **Lazy image helper** `lazyImg(url, { priority })` — returns `{ src, loading, decoding, fetchPriority }` props for native browser lazy-loading. Used in StoriesCarousel.
+
+### Section 59 — Empty States + Elegant 404
+- **NotFoundPage.jsx** at catch-all `<Route path="*">`:
+  - Animated SVG countdown ring (5s, stroke-dashoffset trick)
+  - Teal "G" gradient logo + numeric seconds inside
+  - Bilingual title/sub
+  - "Ir ahora / Go now" CTA that respects same-origin history (back) or routes to `/dashboard` (logged in) / `/` (anon)
+  - 4 quick-link pills: Home / Search / Community / Gigs
+  - Soft footer: "Cuéntanos en Comunidad"
+- **EmptyState.jsx** reusable: icon + title + subtitle + primaryAction + secondaryAction + tags + tip. Applied to:
+  - `SavedECardsPage` (no saved eCards)
+  - `BannerGalleryPage` (no banners in filter)
+  - `ComunidadPage` (no posts yet)
+
+### Section 60 — Stories (24h ephemeral, my CEO recommendation)
+- **Backend**: new `stories` collection with MongoDB **TTL index** on `expires_at` (auto-deletes 24h after creation). 5 endpoints:
+  - `POST /api/stories` (provider only) — body `{image_url, caption?}`. Throttle: max 5 active stories per provider → 429.
+  - `GET /api/stories/active` (public) — returns aggregated-by-provider with `stories_count` per provider tile.
+  - `GET /api/stories/by-provider/{provider_user_id}` (public) — chronological list of one provider's active stories for carousel playback.
+  - `POST /api/stories/{story_id}/view` (auth) — increments `views_count`; idempotent via unique `(story_id, viewer_user_id)` index.
+  - `DELETE /api/stories/{story_id}` — owner or admin only.
+- **Frontend**: `StoriesCarousel.jsx` — single file containing:
+  - `<StoriesCarousel>` — horizontal scroll of avatar tiles with **Instagram-style gradient rings** (pink → orange → rose). Provider sees a "+ Tu historia" tile.
+  - `<StoryViewer>` — fullscreen modal with top progress bars (5s auto-advance per story), provider header, image, caption overlay, touch+arrow navigation, **Escape key + arrow keys** to close/navigate.
+  - `<StoryCreator>` — modal with image picker (8MB max, JPG/PNG/WebP), caption (140 chars), pink gradient submit button + reminder "⏱️ Tu historia se borra sola en 24h".
+- Wired into `ComunidadPage` above the NewPostBox so it's the first thing users see when entering Comunidad.
+- Backend curl tests: creating 3 stories, listing aggregated returns 1 group with stories_count=3. View counter idempotent.
+
+### Testing
+- `/app/test_reports/iteration_56.json` — backend **9/9 pass** (100%). Frontend partial pass due to Playwright/form submission edge case (not a real bug — auth flow validated via curl + earlier screenshots). Fixed defensively: added `type="button"` to Header lang-toggle, mobile-menu-toggle, Login OAuth buttons (Google/Apple/Facebook).
+
+### Code-review notes (deferred backlog)
+- **P0**: server.py now ~10,100 lines. URGENT to split: extract banners, stories, providers, payments to `routes/`.
+- **P1 (deferred Sec 58 external infra)**: Sentry (frontend+backend), Cloudflare CDN, Upstash Redis caching layer — all need API keys.
+- **P1 (deferred Sec 57.E)**: PWA Update Banner with service worker postMessage trigger.
+- **P2**: Story TTL test in CI (24h fast-forward via test fixture).
+- **P2**: StoriesCarousel should auto-refresh on tab visibility change (like the feed).
+- **P2**: Add lazyImg to all <img> in BannerGalleryPage, SavedECardsPage, BannerOfTheWeekCard, ProviderCards.
+
+
 ## May 26, 2026 (5th drop) — Section 57 + Banner of the Week
 
 ### Section 57.A — Community Feed Auto-Refresh (2 layers + pull-to-refresh)

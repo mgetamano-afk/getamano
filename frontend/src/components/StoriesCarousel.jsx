@@ -169,6 +169,18 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
     if (s) api.post(`/stories/${s.story_id}/view`).catch(() => {});
   }, [stories, activeIdx]);
 
+  // Escape-to-close (Section 58 polish)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") goLeft();
+      else if (e.key === "ArrowRight") goRight();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx, stories.length, hasNext, hasPrev]);
+
   // Auto-advance progress
   useEffect(() => {
     if (!stories.length || paused) return;
