@@ -2,6 +2,50 @@
 
 Append-only log of major work shipped per session.
 
+## May 26, 2026 (8th drop) — Sections 62 + 63 (Nav Consolidation + Milestone Confetti)
+
+### Section 62 — Navigation consolidation
+**Problem reported by user (screenshot evidence)**: the green ComunidadLayout TabBar stayed permanently fixed AND duplicated BottomNav items (Comunidad↔Community, Chambas↔Gigs).
+
+**Fix**:
+- **ComunidadLayout TabBar** redesigned:
+  - Visual: changed from solid teal block to slim **white pill bar** (`bg-white/95 backdrop-blur-md border-b border-slate-200/80`)
+  - Items: removed "Chambas" (duplicates BottomNav "Gigs"), renamed "Comunidad" → "Feed", removed "HeartHandshake" icon (only in BottomNav now). New set: 📰 Feed · 🧭 Explorar · 🏆 Ranking · 🥇 Hall of Fame
+  - Behavior: now uses `useSmartNav` to **auto-hide on scroll-down** + reappear on scroll-up (no longer permanently static)
+  - Breakpoint: `lg:hidden` so it only renders on mobile/tablet
+- **Desktop LeftNav** moved INTO ComunidadLayout (was previously inside ComunidadPage, but blocked by `embedded=true` prop):
+  - 4 sticky-top items with the SAME paths/icons as the mobile TabBar (single source of truth)
+  - Active state: `bg-teal-50 text-teal-700` + trailing teal-500 dot
+  - Hidden on mobile (`lg:block`)
+- **ComunidadPage's old LeftNav** is now dead code (kept for backward compatibility, gated by `embedded=true`).
+
+### Section 63 — MilestoneConfetti (CEO marketing recommendation)
+Provider celebrates when they cross a likes/views/reviews/bookmarks threshold for the first time.
+
+- **New `MilestoneConfetti.jsx` component**:
+  - **9 thresholds**: 10, 25, 50, 100, 250, 500, 1000, 2500, 5000
+  - **4 metrics**: likes, views, reviews, bookmarks (bilingual ES/EN copy)
+  - **50 confetti pieces** via pure CSS `gtm-confetti-fall` keyframe — random horizontal start, rotation (--rot-start → --rot-end), color (8-color palette), shape (square/circle), 1.8-3s fall duration
+  - **Toast banner**: amber→orange→pink gradient with 🎉 bounce, "MILESTONE UNLOCKED" label, headline (`¡N corazones alcanzados!` / `N hearts reached!`), supportive sub-text
+  - **Anti-spam**: localStorage key `gtm:milestone:{providerId}:{metric}` persists last celebrated threshold → no duplicate fires
+  - **Auto-dismiss**: 5.5s
+  - **Haptic**: `navigator.vibrate([50, 30, 50])`
+- **Wired into ProviderECard**: 3 instances (likes / reviews / bookmarks), each gated by `user.user_id === p.user_id` (only the OWNER sees their own celebration).
+
+### Bug fixes from testing agent retest
+- **LeftNav non-render on desktop** (iteration 58 HIGH): App.js passed `embedded=true` to ComunidadPage which gated the LeftNav. Fix: moved LeftNav into ComunidadLayout itself, removing dependency on ComunidadPage's `embedded` prop.
+- **MilestoneConfetti close button blocked** (iteration 58 MEDIUM): `animate-bounce 🎉` intercepted pointer events. Fix: added `pointer-events-none` to the inner content wrapper + `z-10` on the close button so React `onClick` fires without `force=True`.
+
+### Testing
+- `/app/test_reports/iteration_59.json` — **100% pass**. Desktop LeftNav 4/4 testids, mobile TabBar 4/4, milestone confetti close+re-fire+non-owner gating 4/4, SPA navigation 3/3. No bugs.
+- Test file: `/app/backend/tests/test_iter58_navigation.py` (no backend changes; mostly frontend verification).
+
+### Code-review notes (deferred backlog)
+- **P2**: ComunidadPage.jsx still has a dead `LeftNav` function gated by `embedded=true`. Cleanup recommended.
+- **P2**: Hydration warning on ProviderDashboard select (US_STATES) — pre-existing, unrelated.
+- **P2**: 401s logged for some user-specific endpoints when owner views own eCard — cosmetic, no impact.
+
+
 ## May 26, 2026 (7th drop) — Section 61: Universal Like Animations + Story Likes/Views
 
 ### Universal Like Animations
