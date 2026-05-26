@@ -1905,3 +1905,67 @@ Submit `https://getamano.us/sitemap.xml` to Google Search Console. Within 7-14 d
 ### Deferred / Backlog
 - Translate the remaining below-the-fold strings ("Proveedores destacados", "¿Por qué contratar...") to English when isEn — non-blocking, h1 + meta + AI content already English.
 - Optional: add `lib/seoUrls.js` ESLint rule to forbid raw `/services/${slug}` templates so this regression class can't recur (suggested by testing agent).
+
+
+---
+
+## Iteration 51 — Sections 44/45/46/47/48 + Acquisition Agent roadmap (Feb 24, 2026)
+
+### Goal
+Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bidirectional reports, 46 ComunidadTabBar fix, 47 UserAvatar+Mentions, 48 SplashScreen) plus the strategic Acquisition Agent technical plan.
+
+### What was done
+
+#### Section 44 — Smart NavBar + Provider Dashboard cleanup
+- `Header.jsx` now shows **firstName** (or email prefix fallback) instead of "Mi panel" — pill-shaped button with avatar circle: ⚙ for provider, initial for client.
+- "Planes" link **hidden for logged-in users** (they reach it inside their dashboard); still visible for anonymous visitors. Applied to both desktop nav AND mobile drawer.
+- Removed `ProviderLeftNav` from `ProviderDashboard.jsx` (was a duplicate of the horizontal TABS). Grid collapsed from 3 → 2 columns; import kept with eslint-disable for fast rollback.
+- New `ECardPreviewModal.jsx` — "Ver mi eCard" no longer opens a new tab. Now it opens an iframe modal that renders `/provider/{slug}` 1:1 with the public eCard. Closes on Escape + backdrop + close button. Footer link "Abrir en pestaña" remains for those who want to share.
+
+#### Section 45 — Bidirectional reports
+- Existing infrastructure was already complete: `/reports/reasons` with `client_to_provider` + `provider_to_client`, `POST /reports`, `GET /reports/mine`, `ReportModal` component handling both flows via role detection.
+- **NEW**: `GET /api/reports/against-me` — any user sees reports filed against them. Reporter identity (id/email/name) is REDACTED. Pending reports have description replaced with "(En revisión — el equipo de getamano analizará el caso en 24-48h)" so the reported user can't identify the reporter through written content.
+- **NEW**: `/app/frontend/src/components/MyReportsPanel.jsx` — read-only reusable panel for both "Mis reportes enviados" (mode=filed) and "Reportes contra mí" (mode=against). 3 status badges (En revisión / Resuelto / Desestimado) with icons + colors. Empty state copy + 50-item limit + sorted by date.
+
+#### Section 46 — ComunidadTabBar always visible (CSS fix)
+- Removed `useSmartNav` hook from `ComunidadLayout.jsx`. Previously the TabBar slid up/down with scroll — confirmed via DevTools as bug by Co-founder Jah.
+- TabBar now position:fixed, top-14 md:top-20, always rendered. Validated: scrolling 1500px down keeps bounding box at y≈80.
+
+#### Section 47 — UserAvatar + @mentions
+- New `/app/frontend/src/components/UserAvatar.jsx` — single source of truth: priority avatarUrl > avatarEmoji > dicebear (legacy) > colored initial. Optional `slug` prop wraps the avatar in a Link to `/provider/{slug}`. Sizes xs/sm/md/lg/xl + ringClass + testid for QA.
+- New `/app/frontend/src/components/MentionedText.jsx` — regex `(^|[^a-zA-Z0-9_.])@([a-zA-Z0-9_.]{3,30})` parses `@handle` mentions and renders them as clickable Links to `/u/{handle}`. Excludes emails (boundary check rejects alphanumeric-preceded @). Applied to ComunidadPage post.content + inline comments.
+
+#### Section 48 — SplashScreen mobile PWA
+- New `/app/frontend/src/components/SplashScreen.jsx` mounted in App.js inside BrowserRouter.
+- Renders only when: viewport < 768px AND PWA standalone display-mode (or ?splash=1 debug) AND no prefers-reduced-motion AND 6h cooldown not active.
+- 1.8s show + 400ms fade-out. Logo + brand mark + tagline "Comunidad latina en USA · ¡Bienvenido!" on teal→orange gradient. Pulsing concentric ring + slide-up animations (pure CSS, no library).
+
+#### Acquisition Agent strategic plan
+- Saved as `/app/memory/ACQUISITION_AGENT_PLAN.md` (NOT implemented). 160 proveedores/mes, $1.6K MRR target. Stack: Apify ($49) + n8n self-hosted ($5) + Claude Sonnet (~$60) + Resend (free) ≈ $113/mo. 8-week phased rollout. Decision: P2 — implement after Stripe + Resend are live in production.
+
+### Bug fixed during iteration
+- Initial `?splash=1` debug bypassed `prefers-reduced-motion`. Hoisted reduced-motion check above the disjunction so debug never overrides accessibility preference.
+
+### Testing (iteration_51.json)
+- **Backend: 7/7 pytest PASS** — /reports/against-me redaction + masking, /reports/mine regression, auth gates.
+- **Frontend: 14/15 PASS** — only the SplashScreen reduced-motion edge case (fixed in same session).
+- **Zero critical bugs**. Pre-existing hydration warning (`<option> in <span>`) in ProviderDashboard noted by testing agent — not from this iter, tracked for future.
+
+### Files changed
+- New backend test: `/app/backend/tests/test_iter51_section45_reports_against.py`.
+- New backend endpoint: 1 (`/api/reports/against-me` in `server.py`).
+- New frontend components: 5 (`UserAvatar`, `MentionedText`, `SplashScreen`, `ECardPreviewModal`, `MyReportsPanel`).
+- Modified frontend: `Header.jsx`, `ComunidadLayout.jsx`, `ComunidadPage.jsx`, `ProviderDashboard.jsx`, `App.js`.
+- New docs: `/app/memory/ACQUISITION_AGENT_PLAN.md`.
+
+### Impact for the CEO
+- **Single-screen for provider workflow**: removed duplicate left nav, eCard opens in-app modal — no more lost context from new tabs.
+- **Trust + transparency**: providers can see when they're reported (with sensitive info redacted) → empowers self-improvement, fights "shadow banning" perception.
+- **Mobile flow fixed**: comunidad TabBar stays anchored, splash screen welcomes PWA users.
+- **Acquisition strategy documented**: 8-week plan ready to execute once production keys are live, with clear KPIs and stack budget.
+
+### Backlog (deferred from this iteration)
+- **Section 44 PART 2 — full client dashboard rebuild** (6 tabs: Inicio, Perfil, Guardados, Mensajes, Mis Chambas, Historial). Big scope (~400 lines + new API endpoints for favorites + bookings history) — recommended as Iter 52.
+- Acquisition Agent implementation (P2 by design).
+- Add "Reportar este cliente" button surface in provider's quote-request & message cards (backend ready, just need to wire ReportModal trigger).
+- ProviderDashboard hydration warning (option inside span) — pre-existing, separate cleanup.

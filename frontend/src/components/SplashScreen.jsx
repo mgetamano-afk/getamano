@@ -50,10 +50,11 @@ export default function SplashScreen() {
 
   useEffect(() => {
     // Decide synchronously on mount whether to even render
+    if (_reducedMotion()) { setPhase("done"); return; }
     const debugForce = typeof window !== "undefined"
       && new URLSearchParams(window.location.search).get("splash") === "1";
     const shouldShow = debugForce
-      || (_isMobile() && _isStandalone() && !_reducedMotion() && !_isOnCooldown());
+      || (_isMobile() && _isStandalone() && !_isOnCooldown());
     if (!shouldShow) { setPhase("done"); return; }
     setPhase("visible");
     _markShown();
