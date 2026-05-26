@@ -9,6 +9,7 @@ import AnalyticsTracker from "./components/AnalyticsTracker";
 import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
 import BottomNav from "./components/BottomNav";
+import SmartActionHub from "./components/SmartActionHub";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { registerServiceWorker } from "./lib/pwa";
 import { trackIOSFirstLaunchOnce } from "./lib/deviceDetection";
@@ -246,6 +247,7 @@ function App() {
               </RouteErrorBoundary>
               <BottomNav />
               <QuickActionsFAB />
+              <SmartActionHub />
             </BrowserRouter>
           </PwaInstallProvider>
         </AuthProvider>
