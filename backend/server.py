@@ -584,6 +584,10 @@ async def seed():
         # native BSON Date field (`expires_at`). Cheap insurance against unbounded growth.
         await db.translation_cache.create_index("expires_at", expireAfterSeconds=0)
         await db.reviews.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
+        # Section 55 — Saved eCards (bookmark + like)
+        await db.saved_ecards.create_index([("user_id", 1), ("provider_id", 1)], unique=True)
+        await db.saved_ecards.create_index([("user_id", 1), ("saved_at", -1)])
+        await db.saved_ecards.create_index([("provider_id", 1), ("save_type", 1)])
         await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
         # Section 35/36 — community feed indexes
         await db.community_posts.create_index([("created_at", -1)])
@@ -1610,6 +1614,172 @@ async def add_favorite(payload: FavoriteIn, user: User = Depends(get_current_use
 async def remove_favorite(provider_id: str, user: User = Depends(get_current_user)):
     await db.favorites.delete_one({"user_id": user.user_id, "provider_id": provider_id})
     return {"ok": True}
+
+
+# ============ SECTION 55 — Saved eCards (Bookmark + Like + Personal note) ============
+# A unified store for "I want to hire this provider later" (bookmark) and
+# "I like this profile" (like). Both clients AND providers can use it — a
+# plumber bookmarks a landscaper, etc.
+
+SaveType = Literal["bookmark", "like", "both"]
+
+
+class SaveECardIn(BaseModel):
+    provider_id: str
+    save_type: SaveType = "bookmark"
+    personal_note: Optional[str] = Field(default=None, max_length=500)
+
+
+class SaveECardNoteIn(BaseModel):
+    personal_note: Optional[str] = Field(default=None, max_length=500)
+
+
+async def _recompute_provider_save_counts(provider_id: str) -> None:
+    """Update like_count + bookmark_count on the provider profile after save changes."""
+    likes = await db.saved_ecards.count_documents({
+        "provider_id": provider_id,
+        "save_type": {"$in": ["like", "both"]},
+    })
+    bookmarks = await db.saved_ecards.count_documents({
+        "provider_id": provider_id,
+        "save_type": {"$in": ["bookmark", "both"]},
+    })
+    await db.provider_profiles.update_one(
+        {"provider_id": provider_id},
+        {"$set": {"like_count": likes, "bookmark_count": bookmarks}},
+    )
+
+
+@api_router.put("/saved-ecards")
+async def upsert_saved_ecard(payload: SaveECardIn, user: User = Depends(get_current_user)):
+    """Create/update a saved-eCard entry. Self-save forbidden for providers."""
+    # Forbid self-saving (a provider can't save their own eCard)
+    own = await db.provider_profiles.find_one(
+        {"user_id": user.user_id, "provider_id": payload.provider_id},
+        {"_id": 0, "provider_id": 1},
+    )
+    if own:
+        raise HTTPException(status_code=400, detail="No puedes guardar tu propia eCard.")
+
+    target = await db.provider_profiles.find_one(
+        {"provider_id": payload.provider_id},
+        {"_id": 0, "provider_id": 1, "verification_status": 1},
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    note = (payload.personal_note or "").strip() or None
+
+    await db.saved_ecards.update_one(
+        {"user_id": user.user_id, "provider_id": payload.provider_id},
+        {
+            "$set": {
+                "user_id": user.user_id,
+                "provider_id": payload.provider_id,
+                "save_type": payload.save_type,
+                "personal_note": note,
+                "personal_note_updated_at": now_iso if note else None,
+                "last_updated_at": now_iso,
+            },
+            "$setOnInsert": {
+                "save_id": f"sav_{uuid.uuid4().hex[:12]}",
+                "saved_at": now_iso,
+            },
+        },
+        upsert=True,
+    )
+    await _recompute_provider_save_counts(payload.provider_id)
+    saved = await db.saved_ecards.find_one(
+        {"user_id": user.user_id, "provider_id": payload.provider_id},
+        {"_id": 0},
+    )
+    return saved or {"ok": True}
+
+
+@api_router.delete("/saved-ecards/{provider_id}")
+async def delete_saved_ecard(provider_id: str, user: User = Depends(get_current_user)):
+    """Fully remove the saved-eCard entry (both bookmark + like)."""
+    res = await db.saved_ecards.delete_one({"user_id": user.user_id, "provider_id": provider_id})
+    if res.deleted_count:
+        await _recompute_provider_save_counts(provider_id)
+    return {"ok": True, "removed": res.deleted_count}
+
+
+@api_router.put("/saved-ecards/{provider_id}/note")
+async def update_saved_ecard_note(provider_id: str, payload: SaveECardNoteIn,
+                                   user: User = Depends(get_current_user)):
+    """Update only the personal note on an existing saved-eCard entry."""
+    existing = await db.saved_ecards.find_one(
+        {"user_id": user.user_id, "provider_id": provider_id},
+        {"_id": 0},
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="No tienes esta eCard guardada.")
+    note = (payload.personal_note or "").strip() or None
+    await db.saved_ecards.update_one(
+        {"user_id": user.user_id, "provider_id": provider_id},
+        {"$set": {
+            "personal_note": note,
+            "personal_note_updated_at": datetime.now(timezone.utc).isoformat() if note else None,
+        }},
+    )
+    return {"ok": True, "personal_note": note}
+
+
+@api_router.get("/saved-ecards/me/state/{provider_id}")
+async def get_saved_state(provider_id: str, user: User = Depends(get_current_user)):
+    """Return the current user's save state for a specific provider.
+    Used by the SaveECardButtons on the public eCard to hydrate initial UI.
+    """
+    s = await db.saved_ecards.find_one(
+        {"user_id": user.user_id, "provider_id": provider_id},
+        {"_id": 0},
+    )
+    return s or {"save_type": None, "personal_note": None}
+
+
+@api_router.get("/saved-ecards/me")
+async def list_my_saved_ecards(filter: Optional[Literal["all", "bookmark", "like"]] = "all",
+                                user: User = Depends(get_current_user)):
+    """List all eCards the current user has bookmarked/liked, joined with
+    provider profile data. Sorted by most recently saved.
+    """
+    query: dict = {"user_id": user.user_id}
+    if filter == "bookmark":
+        query["save_type"] = {"$in": ["bookmark", "both"]}
+    elif filter == "like":
+        query["save_type"] = {"$in": ["like", "both"]}
+    rows = await db.saved_ecards.find(query, {"_id": 0}).sort("saved_at", -1).to_list(300)
+    provider_ids = [r["provider_id"] for r in rows]
+    profiles = await db.provider_profiles.find(
+        {"provider_id": {"$in": provider_ids}},
+        {"_id": 0, "user_id": 0},
+    ).to_list(len(provider_ids))
+    by_pid = {p["provider_id"]: p for p in profiles}
+    result = []
+    for r in rows:
+        prof = by_pid.get(r["provider_id"])
+        if not prof:
+            continue
+        result.append({
+            **r,
+            "provider": {
+                "provider_id": prof.get("provider_id"),
+                "slug": prof.get("slug"),
+                "business_name": prof.get("business_name"),
+                "logo_url": prof.get("logo_url"),
+                "category_id": prof.get("category_id"),
+                "city": prof.get("city"),
+                "state": prof.get("state"),
+                "rating_avg": prof.get("rating_avg", 0),
+                "rating_count": prof.get("rating_count", 0),
+                "verification_status": prof.get("verification_status"),
+                "phone": prof.get("phone"),
+            },
+        })
+    return result
+
 
 # ============ ADMIN ============
 @api_router.get("/admin/providers")
@@ -9185,3 +9355,331 @@ api_router.include_router(
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.
 app.include_router(api_router)
+
+
+# ============ SECTION 56 — Open Graph: Social Media Previews ============
+# When a provider shares their eCard URL in Facebook/WhatsApp/Twitter/LinkedIn/
+# iMessage, the link bot fetches the page WITHOUT executing JavaScript. Our
+# React SPA serves an empty <div id="root">, so no preview ever shows up.
+#
+# Fix: detect social bots by User-Agent on /p/{slug} requests, and respond with
+# a tiny HTML document containing rich OG meta tags + a fallback redirect for
+# human visitors. The image is generated dynamically as an SVG (1200×630).
+from fastapi.responses import HTMLResponse, Response as _OGResponse  # noqa: E402
+from html import escape as _html_escape  # noqa: E402
+
+_SOCIAL_BOT_PATTERNS = (
+    "facebookexternalhit", "twitterbot", "linkedinbot", "whatsapp",
+    "slackbot", "telegrambot", "pinterest", "discordbot", "vkshare",
+    "redditbot", "applebot", "skypeuripreview", "embedly", "quora link preview",
+    "showyoubot", "outbrain", "facebot", "ia_archiver",
+)
+
+
+def _is_social_bot(user_agent: str) -> bool:
+    if not user_agent:
+        return False
+    ua = user_agent.lower()
+    return any(pat in ua for pat in _SOCIAL_BOT_PATTERNS)
+
+
+def _request_public_url(request: Request) -> str:
+    """Best-effort detection of the public origin (handles proxies + envs)."""
+    fwd_proto = request.headers.get("x-forwarded-proto", "https")
+    fwd_host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    if fwd_host:
+        return f"{fwd_proto}://{fwd_host}".rstrip("/")
+    return (os.environ.get("PUBLIC_URL") or "https://getamano.us").rstrip("/")
+
+
+def _build_og_image_svg(provider: dict) -> str:
+    """Section 56 — Render a 1200×630 SVG card with provider info.
+
+    SVG is intentionally lightweight (no external fonts beyond system stack)
+    and includes:
+      - Teal getamano gradient background
+      - Circular avatar (initials fallback if no logo)
+      - Verified ribbon
+      - Business name (truncated)
+      - Category · City, State
+      - Star rating + review count (if any)
+      - Pro badge (if pro/premium plan)
+      - "Ver eCard completa →" CTA
+      - getamano footer
+    """
+    name = (provider.get("business_name") or "Negocio").strip()
+    name_display = name if len(name) <= 28 else name[:27] + "…"
+    cat = (provider.get("category") or {}).get("name_es") or provider.get("category_label") or ""
+    city = provider.get("city") or ""
+    state = provider.get("state") or ""
+    rating = provider.get("rating_avg") or 0
+    review_count = provider.get("rating_count") or 0
+    plan = (provider.get("plan") or "free").lower()
+    is_verified = (provider.get("verification_status") == "approved")
+    logo_url = provider.get("logo_url") or ""
+
+    # Initials fallback (max 2 chars)
+    initials = "".join([w[0] for w in name.split()[:2] if w]).upper() or "G"
+
+    # Star representation
+    star_full = "★" * int(round(rating))
+    star_empty = "☆" * (5 - int(round(rating)))
+    star_line = (star_full + star_empty) if rating > 0 else ""
+
+    # Escape user-provided strings to avoid SVG injection
+    e = _html_escape
+    name_safe = e(name_display)
+    cat_safe = e(cat)
+    city_safe = e(", ".join(p for p in [city, state] if p))
+    initials_safe = e(initials)
+    logo_safe = e(logo_url)
+
+    # Pre-build conditional blocks (use safe values only)
+    verified_block = (
+        '<g transform="translate(880,80)">'
+        '<rect width="180" height="36" rx="18" fill="#10B981"/>'
+        '<text x="90" y="24" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="16" font-weight="700" fill="white">✓ Verificado</text>'
+        '</g>'
+    ) if is_verified else ""
+
+    pro_badge = (
+        '<g transform="translate(880,140)">'
+        '<rect width="100" height="32" rx="16" fill="#F59E0B"/>'
+        '<text x="50" y="22" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="white">⭐ Pro</text>'
+        '</g>'
+    ) if plan in ("pro", "premium") else ""
+
+    rating_block = (
+        f'<text x="80" y="445" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="#FCD34D">{star_line}</text>'
+        f'<text x="80" y="490" font-family="system-ui,-apple-system,sans-serif" font-size="22" fill="rgba(255,255,255,0.92)">{rating:.1f} de 5 · {review_count} reseña{"s" if review_count != 1 else ""}</text>'
+    ) if rating > 0 else (
+        '<text x="80" y="475" font-family="system-ui,-apple-system,sans-serif" font-size="22" fill="rgba(255,255,255,0.6)">Sin reseñas todavía</text>'
+    )
+
+    # Avatar: either circular image clip or initials
+    if logo_url:
+        avatar = (
+            f'<defs><clipPath id="avatarClip"><circle cx="980" cy="380" r="110"/></clipPath></defs>'
+            f'<circle cx="980" cy="380" r="115" fill="white"/>'
+            f'<image href="{logo_safe}" x="870" y="270" width="220" height="220" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>'
+        )
+    else:
+        avatar = (
+            f'<circle cx="980" cy="380" r="115" fill="rgba(255,255,255,0.15)" stroke="white" stroke-width="3"/>'
+            f'<text x="980" y="420" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="80" font-weight="800" fill="white">{initials_safe}</text>'
+        )
+
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#063154"/>
+      <stop offset="55%" stop-color="#0A4D5E"/>
+      <stop offset="100%" stop-color="#025F67"/>
+    </linearGradient>
+    <pattern id="grain" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <circle cx="30" cy="30" r="1.2" fill="rgba(255,255,255,0.03)"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grain)"/>
+
+  <!-- Left accent stripe -->
+  <rect x="0" y="0" width="14" height="630" fill="#2F9D94"/>
+
+  <!-- Top label -->
+  <text x="80" y="100" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="#2F9D94">PROFESIONAL VERIFICADO · GETAMANO</text>
+
+  <!-- Verified badge top-right -->
+  {verified_block}
+  {pro_badge}
+
+  <!-- Avatar / Logo (right) -->
+  {avatar}
+
+  <!-- Business name -->
+  <text x="80" y="270" font-family="system-ui,-apple-system,sans-serif" font-size="68" font-weight="800" fill="white">{name_safe}</text>
+
+  <!-- Category · City, State -->
+  <text x="80" y="335" font-family="system-ui,-apple-system,sans-serif" font-size="30" font-weight="500" fill="rgba(255,255,255,0.85)">{cat_safe}{' · ' if cat_safe and city_safe else ''}{city_safe}</text>
+
+  <!-- Rating -->
+  {rating_block}
+
+  <!-- Footer -->
+  <line x1="80" y1="555" x2="1120" y2="555" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <text x="80" y="595" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" fill="#2F9D94">Ver eCard completa →</text>
+  <text x="1120" y="595" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" text-anchor="end" fill="rgba(255,255,255,0.7)">getamano.us</text>
+</svg>'''
+    return svg
+
+
+@app.get("/api/og-image/{slug}.svg")
+async def og_image(slug: str):
+    """Section 56 — Dynamic 1200×630 SVG used as og:image for the eCard.
+
+    Cached aggressively because the data changes rarely (rating, name).
+    24h max-age + stale-while-revalidate.
+    """
+    provider = await db.provider_profiles.find_one({"slug": slug}, {"_id": 0})
+    if not provider:
+        # Generic fallback so social previews don't 404
+        provider = {
+            "business_name": "getamano",
+            "category": {"name_es": "Marketplace latino"},
+            "city": "USA",
+            "state": "",
+            "rating_avg": 0,
+            "rating_count": 0,
+        }
+    else:
+        # enrich category name if needed
+        if provider.get("category_id"):
+            cat = await db.categories.find_one({"category_id": provider["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+            if cat:
+                provider["category"] = {"name_es": cat.get("name_es") or cat.get("name_en")}
+
+    svg = _build_og_image_svg(provider)
+    return _OGResponse(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+def _build_og_html(provider: dict, public_url: str, slug: str) -> str:
+    """Section 56 — Render bot-friendly HTML with rich OG meta tags."""
+    e = _html_escape
+    name = (provider.get("business_name") or "getamano").strip()
+    cat = (provider.get("category") or {}).get("name_es") or ""
+    city = provider.get("city") or ""
+    state = provider.get("state") or ""
+    rating = provider.get("rating_avg") or 0
+    review_count = provider.get("rating_count") or 0
+    is_verified = (provider.get("verification_status") == "approved")
+    description_parts = []
+    if rating > 0:
+        description_parts.append(f"⭐ {rating:.1f} ({review_count} reseña{'s' if review_count != 1 else ''})")
+    if cat:
+        description_parts.append(cat)
+    loc = ", ".join(p for p in [city, state] if p)
+    if loc:
+        description_parts.append(loc)
+    if is_verified:
+        description_parts.append("Verificado ✓")
+    description_parts.append("Contrátalo directo en Getamano")
+    description = " · ".join(description_parts)
+
+    title = f"{name} | getamano"
+    profile_url = f"{public_url}/p/{slug}"
+    og_image_url = f"{public_url}/api/og-image/{slug}.svg"
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>{e(title)}</title>
+  <meta name="description" content="{e(description)}">
+  <link rel="canonical" href="{e(profile_url)}">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="profile">
+  <meta property="og:site_name" content="getamano">
+  <meta property="og:locale" content="es_US">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:title" content="{e(title)}">
+  <meta property="og:description" content="{e(description)}">
+  <meta property="og:image" content="{e(og_image_url)}">
+  <meta property="og:image:secure_url" content="{e(og_image_url)}">
+  <meta property="og:image:type" content="image/svg+xml">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{e(name)} en getamano">
+  <meta property="og:url" content="{e(profile_url)}">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{e(title)}">
+  <meta name="twitter:description" content="{e(description)}">
+  <meta name="twitter:image" content="{e(og_image_url)}">
+  <meta name="twitter:image:alt" content="{e(name)} en getamano">
+
+  <!-- Fallback redirect for human visitors -->
+  <meta http-equiv="refresh" content="0; url={e(profile_url)}">
+  <link rel="alternate" hreflang="es" href="{e(profile_url)}">
+  <link rel="alternate" hreflang="en" href="{e(public_url)}/provider/{e(slug)}">
+</head>
+<body style="font-family:system-ui,sans-serif;background:#063154;color:white;padding:40px;text-align:center;">
+  <h1>{e(name)}</h1>
+  <p>{e(description)}</p>
+  <p><a href="{e(profile_url)}" style="color:#2F9D94;font-weight:700;">Abrir mi eCard en getamano →</a></p>
+  <script>window.location.replace({profile_url!r});</script>
+</body>
+</html>"""
+
+
+@app.get("/api/og/p/{slug}", response_class=HTMLResponse)
+async def og_provider_html(slug: str, request: Request):
+    """Section 56 — Serve OG-rich HTML for a provider's eCard.
+
+    Used both as the explicit endpoint AND via the bot middleware below
+    (which rewrites /p/{slug} for social-media crawler User-Agents).
+    """
+    public_url = _request_public_url(request)
+    provider = await db.provider_profiles.find_one({"slug": slug}, {"_id": 0})
+    if not provider:
+        return HTMLResponse(
+            content=_build_og_html({"business_name": "Proveedor no encontrado"}, public_url, slug),
+            status_code=404,
+        )
+    if provider.get("category_id"):
+        cat = await db.categories.find_one({"category_id": provider["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+        if cat:
+            provider["category"] = {"name_es": cat.get("name_es") or cat.get("name_en")}
+    html = _build_og_html(provider, public_url, slug)
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+            "X-Robots-Tag": "all",
+        },
+    )
+
+
+@app.middleware("http")
+async def og_bot_middleware(request, call_next):
+    """Section 56 — Intercept social-bot fetches of /p/{slug} and /provider/{slug}
+    BEFORE the request reaches the React SPA. Pure pass-through for humans.
+    """
+    path = request.url.path or ""
+    ua = request.headers.get("user-agent", "")
+    if _is_social_bot(ua):
+        slug = None
+        if path.startswith("/p/"):
+            slug = path[3:].split("/", 1)[0].split("?", 1)[0]
+        elif path.startswith("/provider/"):
+            slug = path[10:].split("/", 1)[0].split("?", 1)[0]
+        elif path.startswith("/services/") and path.count("/") == 2:
+            # English alias /services/{slug} (only the leaf case — category routes
+            # have more path segments and are handled elsewhere).
+            slug = path[10:].split("/", 1)[0].split("?", 1)[0]
+        if slug:
+            public_url = _request_public_url(request)
+            provider = await db.provider_profiles.find_one({"slug": slug}, {"_id": 0})
+            if provider:
+                if provider.get("category_id"):
+                    cat = await db.categories.find_one({"category_id": provider["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+                    if cat:
+                        provider["category"] = {"name_es": cat.get("name_es") or cat.get("name_en")}
+                html = _build_og_html(provider, public_url, slug)
+                return HTMLResponse(
+                    content=html,
+                    headers={
+                        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+                        "X-Robots-Tag": "all",
+                    },
+                )
+    return await call_next(request)

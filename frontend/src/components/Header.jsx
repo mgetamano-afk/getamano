@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Globe, LogOut, Menu, X, MessageCircle } from "lucide-react";
+import { Globe, LogOut, Menu, X, MessageCircle, Bookmark } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
@@ -81,6 +81,9 @@ export default function Header() {
             </button>
             {user ? (
               <>
+                <Link to="/mis-guardadas" className="relative p-2 text-slate-600 hover:text-amber-500" data-testid="nav-saved" aria-label={lang === "en" ? "Saved eCards" : "Mis guardadas"} title={lang === "en" ? "Saved eCards" : "Mis guardadas"}>
+                  <Bookmark className="w-5 h-5" />
+                </Link>
                 <Link to="/messages" className="relative p-2 text-slate-600 hover:text-blue-600" data-testid="nav-messages" aria-label="messages">
                   <MessageCircle className="w-5 h-5" />
                   {unread > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unread}</span>}
@@ -169,6 +172,9 @@ export default function Header() {
               {user ? (
                 <>
                   <div className="my-2 h-px bg-slate-100" />
+                  <Link to="/mis-guardadas" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100 inline-flex items-center gap-2 w-full" data-testid="mobile-nav-saved">
+                    <Bookmark className="w-4 h-4" /> {lang === "en" ? "My Saved" : "Mis guardadas"}
+                  </Link>
                   <Link to="/messages" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100 inline-flex items-center gap-2 w-full">
                     <MessageCircle className="w-4 h-4" /> Mensajes
                     {unread > 0 && <span className="ml-auto bg-orange-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{unread}</span>}

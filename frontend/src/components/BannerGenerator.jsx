@@ -61,9 +61,13 @@ export default function BannerGenerator({ profile }) {
   const state = profile?.state || "";
   const website = profile?.website || "";
 
-  // Compute share URL once
+  // Compute share URL once — uses OG endpoint so QR scans yield rich social
+  // previews when shared further. Auto-redirects to /p/{slug} for humans.
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const publicUrl = slug ? `${origin}/p/${slug}` : `${origin}`;
+  const backend = process.env.REACT_APP_BACKEND_URL || origin;
+  const publicUrl = slug ? `${backend}/api/og/p/${slug}` : `${origin}`;
+  // Cleaner version for the printed text on the banner
+  const displayPublicUrl = slug ? `${origin}/p/${slug}` : origin;
 
   useEffect(() => {
     // QR as URL — server-rendered, doesn't taint canvas if we set crossOrigin
@@ -196,7 +200,7 @@ export default function BannerGenerator({ profile }) {
       // Public URL
       ctx.fillStyle = color;
       ctx.font = "700 22px 'Poppins', 'Inter', system-ui, sans-serif";
-      const cleanUrl = publicUrl.replace(/^https?:\/\//, "");
+      const cleanUrl = displayPublicUrl.replace(/^https?:\/\//, "");
       ctx.fillText(cleanUrl, textX, BANNER_H - 70);
 
       // 6. QR code in right area
@@ -234,7 +238,7 @@ export default function BannerGenerator({ profile }) {
 
     compose();
     return () => { cancelled = true; };
-  }, [bgImage, color, businessName, city, state, phone, website, publicUrl, qrUrl]);
+  }, [bgImage, color, businessName, city, state, phone, website, publicUrl, displayPublicUrl, qrUrl]);
 
   // Rounded rectangle helper
   const roundRect = (ctx, x, y, w, h, r) => {

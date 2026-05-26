@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 53 — Sections 54 (EN i18n), 55 (Saved eCards: bookmark/like/note), 56 (OG dynamic previews). All 15 backend pytest cases pass; all critical frontend flows pass: save buttons on /p/:slug, bookmark→note modal→save→preview, like toggle (no modal), /mis-guardadas page with filters, self-save hidden on own profile, EN translation of header nav-saved aria-label + /mis-guardadas page title.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter53_sections_55_56.py",
+    "/app/test_reports/pytest/iter53.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 9686 lines (was 9188 in iter 52) — well over the 700-line threshold. Sections 55 + 56 each added ~150 lines. The og_bot_middleware at the bottom runs on EVERY request — even /api/* and static asset requests pay the cost of the UA-substring check and path-prefix checks. Consider gating it on path early or moving SocialBot logic to an APIRouter mounted only on /p and /provider, or run it as a Starlette Route rather than a global middleware.",
+    "The /api/og/p/{slug} route returns 200 with cache-control headers for valid slugs but uses a plain HTMLResponse (no cache) for the 404 fallback — minor inconsistency.",
+    "_recompute_provider_save_counts does two count_documents queries + one update_one on every PUT/DELETE — fine at current scale but consider an aggregation/$facet to halve roundtrips when this grows.",
+    "Saved eCards list endpoint sorts by saved_at but never updates saved_at on re-save (only $setOnInsert) — so if a user changes a bookmark to a like and then to bookmark again, the list ordering reflects the ORIGINAL save time, which may surprise users. Consider sorting by last_updated_at instead, or expose both.",
+    "Public provider profile (GET /api/providers/by-slug/...) exposes like_count + bookmark_count to anyone — fine for likes but bookmarks are arguably more private. Confirm this is intentional product decision.",
+    "OG image SVG fallback when slug is missing still returns 200 (good for not breaking social previews), but the underlying React route /p/{bad-slug} likely shows a 404 page. Social bot would see a happy preview and humans would see 404 — slight UX dissonance.",
+    "The og_provider_html endpoint sets X-Robots-Tag: all — this is the inverse of noindex. Confirmed intentional but worth a comment in code so future engineers don't accidentally noindex it."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter53_sections_55_56.py"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% on testable flows (6/6 critical UI flows + 1 self-save guard + 1 EN translation aria-label)"},
+  "test_credentials": "demo.client@getamano.com / client123 (used for save flows), demo.provider@getamano.com / provider123 (self-save guard verification)",
+  "seed_data_creation": "test_iter53 creates 1 saved_ecard entry per run on demo.provider's profile; module-scoped autouse fixture cleans it up before AND after the run via DELETE /api/saved-ecards/{provider_id}. Frontend Playwright test left 1 bookmark + 1 like on the provider from demo.client — visible in the /mis-guardadas screenshot. Not cleaned (low-priority test artifact).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Sections 54-56 fully covered by /app/backend/tests/test_iter53_sections_55_56.py (15 cases). For Section 56, the og_bot_middleware is registered on the FastAPI app but in the Kubernetes preview ingress routes /p/* to the React SPA, so the middleware never fires for browser requests — only /api/og/p/{slug} works directly via curl, which is by design (share components in the FE now construct shortUrls pointing at /api/og/p/...). All OG meta tags validated via WhatsApp UA. Frontend SaveECardButtons + SavedECardsPage testids match spec. Demo provider currently has like_count=1, bookmark_count=1 from the Playwright run — fine for next regression.",
+  "rca of the issue": "No bugs to RCA — all backend endpoints return expected status + payloads, all frontend testids resolve, modal/preview/filter flows match the spec, and EN translations render correctly on /mis-guardadas (page title 'My Saved eCards', stat labels 'BOOKMARKED' / 'LIKED' / 'PRO TIP', filter buttons 'All' / 'Bookmarked' / 'Liked')."
+}

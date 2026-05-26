@@ -4,7 +4,10 @@ import { toast } from "sonner";
 
 export default function ShareECard({ businessName, slug, description }) {
   const [open, setOpen] = useState(false);
-  const url = `${window.location.origin}/provider/${slug}`;
+  const origin = window.location.origin;
+  const backend = process.env.REACT_APP_BACKEND_URL || origin;
+  // Section 56 — OG-rich URL: bots see meta tags, humans get auto-redirected.
+  const url = `${backend}/api/og/p/${slug}`;
   const text = `${businessName} — ${description ? description.slice(0, 120) : "Mira este negocio en getamano"} ${url}`;
 
   const opts = [

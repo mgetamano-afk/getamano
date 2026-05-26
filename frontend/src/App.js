@@ -33,6 +33,7 @@ import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
+import SavedECardsPage from "./pages/SavedECardsPage";
 import RankingPage from "./pages/RankingPage";
 import ComunidadLayout from "./components/ComunidadLayout";
 import ComunidadExplorar from "./pages/ComunidadExplorar";
@@ -100,6 +101,9 @@ function AppRouter() {
       {/* Section 35 — Public monthly leaderboard */}
       <Route path="/ranking" element={<RankingPage />} />
       <Route path="/leaderboard" element={<RankingPage />} />
+
+      <Route path="/mis-guardadas" element={<SavedECardsPage />} />
+      <Route path="/my-saved" element={<SavedECardsPage />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />

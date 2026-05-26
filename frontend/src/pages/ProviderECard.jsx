@@ -20,6 +20,7 @@ import EngagementBadges from "../components/EngagementBadges";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
+import SaveECardButtons from "../components/SaveECardButtons";
 import GalleryGrid from "../components/GalleryGrid";
 import CategoryIcon from "../components/CategoryIcon";
 import BookingModal from "../components/BookingModal";
@@ -86,14 +87,6 @@ export default function ProviderECard() {
 
   const trackClick = () => {
     if (p) api.post(`/providers/${p.provider_id}/contact-click`).catch(() => {});
-  };
-
-  const addFavorite = async () => {
-    if (!user) { toast.error("Inicia sesión para guardar favoritos"); return; }
-    try {
-      await api.post("/favorites", { provider_id: p.provider_id });
-      toast.success("Agregado a favoritos");
-    } catch (e) { toast.error("Error"); }
   };
 
   const sendQuoteRequest = async () => {
@@ -313,14 +306,20 @@ export default function ProviderECard() {
                 </button>
               </div>
             </div>
-            <button onClick={addFavorite} className="mt-2 text-sm text-slate-500 hover:text-orange-500 flex items-center gap-1" data-testid="ecard-favorite-button">
-              <Heart className="w-4 h-4" /> {lang === "en" ? "Save to favorites" : "Guardar en favoritos"}
-            </button>
-            {user && user.user_id !== p.user_id && (
-              <button onClick={() => setShowReport(true)} className="ml-3 mt-2 text-xs text-slate-400 hover:text-red-600 inline-flex items-center gap-1" data-testid="ecard-report-button">
-                <Flag className="w-3 h-3" /> Reportar este proveedor
-              </button>
-            )}
+            <div className="mt-3" data-testid="ecard-save-section">
+              <SaveECardButtons
+                providerId={p.provider_id}
+                providerName={p.business_name}
+                initialLikes={p.like_count || 0}
+                initialBookmarks={p.bookmark_count || 0}
+                isOwn={user && user.user_id === p.user_id}
+              />
+              {user && user.user_id !== p.user_id && (
+                <button onClick={() => setShowReport(true)} className="ml-1 mt-2 text-xs text-slate-400 hover:text-red-600 inline-flex items-center gap-1" data-testid="ecard-report-button">
+                  <Flag className="w-3 h-3" /> Reportar este proveedor
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -448,10 +447,10 @@ export default function ProviderECard() {
                           <span
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border"
                             style={{ backgroundColor: "#ECFDF5", color: "#047857", borderColor: "#A7F3D0" }}
-                            title={`Reseña verificada · ${r.verification_source === "appointment" ? "tras cita confirmada" : r.verification_source === "service_request" ? "tras solicitud de cotización" : "tras conversación con el proveedor"}`}
+                            title={t(`review.verified_tooltip.${r.verification_source || "messaging"}`)}
                             data-testid={`review-verified-${r.review_id}`}
                           >
-                            <ShieldCheck className="w-3 h-3" /> Verificada
+                            <ShieldCheck className="w-3 h-3" /> {t("review.verified")}
                           </span>
                         )}
                       </div>

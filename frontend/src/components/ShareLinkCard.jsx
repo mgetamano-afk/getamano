@@ -17,12 +17,16 @@ export default function ShareLinkCard({ slug, businessName }) {
 
   if (!slug) return null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const backend = process.env.REACT_APP_BACKEND_URL || origin;
   // Friendly short alias + ?ref so referred views can be credited
   const refParam = `?ref=${encodeURIComponent(slug)}`;
-  const shortUrl = `${origin}/p/${slug}${refParam}`;
+  // Section 56 — share-ready URL points at our OG endpoint (rich social previews
+  // for WhatsApp / Facebook / Twitter / iMessage) which auto-redirects humans
+  // to /p/{slug} via meta-refresh + window.location.replace.
+  const shortUrl = `${backend}/api/og/p/${slug}${refParam}`;
   // Canonical SEO URL (kept clean for the "Ver mi eCard" preview)
   const fullUrl = `${origin}/provider/${slug}`;
-  const displayUrl = shortUrl.replace(/^https?:\/\//, "").replace(refParam, "");
+  const displayUrl = shortUrl.replace(/^https?:\/\//, "").replace(refParam, "").replace("/api/og/p/", "/p/");
 
   // Persuasive Spanish message — first-person, concrete, link last.
   const shareText = `¡Hola! Te dejo mi eCard de ${businessName} en getamano · servicio latino verificado 🌟\n\n${shortUrl}`;

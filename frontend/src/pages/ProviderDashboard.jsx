@@ -46,17 +46,17 @@ import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { US_STATES, getStateByAbbr } from "../data/usLocations";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-const TABS = [
-  { id: "perfil", label: "Perfil", Icon: Settings },
-  { id: "tarifas", label: "Mis Tarifas", Icon: DollarSign },
-  { id: "galeria", label: "Galería", Icon: ImageIcon },
-  { id: "banner", label: "Banner Pro", Icon: Sparkles },
-  { id: "citas", label: "Citas", Icon: Calendar },
-  { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
-  { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
-  { id: "referidos", label: "Referidos", Icon: Trophy },
-  { id: "diario", label: "Mi diario", Icon: Trophy },
-  { id: "suscripcion", label: "Suscripción", Icon: CreditCard },
+const TAB_KEYS = [
+  { id: "perfil", labelKey: "tabs.profile", Icon: Settings },
+  { id: "tarifas", labelKey: "tabs.rates", Icon: DollarSign },
+  { id: "galeria", labelKey: "tabs.gallery", Icon: ImageIcon },
+  { id: "banner", labelKey: "tabs.banner", Icon: Sparkles },
+  { id: "citas", labelKey: "tabs.appointments", Icon: Calendar },
+  { id: "solicitudes", labelKey: "tabs.requests", Icon: Inbox },
+  { id: "mensajes", labelKey: "tabs.messages", Icon: MessageCircle },
+  { id: "referidos", labelKey: "tabs.referrals", Icon: Trophy },
+  { id: "diario", labelKey: "tabs.journal", Icon: Trophy },
+  { id: "suscripcion", labelKey: "tabs.subscription", Icon: CreditCard },
 ];
 
 export default function ProviderDashboard() {
@@ -300,14 +300,14 @@ export default function ProviderDashboard() {
         {/* Tabs */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="flex overflow-x-auto border-b border-slate-100" data-testid="dashboard-tabs">
-            {TABS.map(tt => (
+            {TAB_KEYS.map(tt => (
               <button
                 key={tt.id}
                 onClick={() => setTab(tt.id)}
                 className={`flex items-center gap-2 px-5 py-4 text-sm font-medium border-b-2 transition flex-shrink-0 ${tab === tt.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-900"}`}
                 data-testid={`dashboard-tab-${tt.id}`}
               >
-                <tt.Icon className="w-4 h-4" /> {tt.label}
+                <tt.Icon className="w-4 h-4" /> {t(tt.labelKey)}
                 {tt.id === "mensajes" && unread > 0 && <span className="ml-1 bg-orange-500 text-white text-xs rounded-full px-2 py-0.5">{unread}</span>}
               </button>
             ))}
