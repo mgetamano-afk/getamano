@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import { Newspaper, Compass, Trophy, Award } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 import Header from "./Header";
@@ -109,9 +109,44 @@ export default function ComunidadLayout() {
         </nav>
       </div>
 
-      {/* Active sub-route content — padded only on mobile/tablet to clear the slim 44px tabbar (desktop has LeftNav not TabBar) */}
+      {/* Active sub-route content — padded only on mobile/tablet to clear the slim 44px tabbar */}
       <div className="pt-[44px] lg:pt-0" data-testid="comunidad-outlet">
-        <Outlet />
+        <div className="container mx-auto px-0 lg:px-4">
+          <div className="lg:flex lg:gap-6 lg:max-w-7xl lg:mx-auto">
+            {/* Desktop LeftNav (Section 62) — replaces the old in-page LeftNav */}
+            <aside className="hidden lg:block lg:w-56 lg:flex-shrink-0 lg:pt-6" data-testid="comunidad-leftnav">
+              <nav className="sticky top-24 space-y-1">
+                {COMUNIDAD_TABS.map((tab) => {
+                  const isActive = activeTab.id === tab.id;
+                  return (
+                    <Link
+                      key={tab.id}
+                      to={tab.path}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                        isActive
+                          ? "bg-teal-50 text-teal-700 shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      }`}
+                      data-testid={`comunidad-nav-${tab.id === "feed" ? "feed" : tab.id === "wall-of-fame" ? "wall" : tab.id}`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      <tab.Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-teal-600" : "text-slate-400"}`} strokeWidth={isActive ? 2.5 : 2} />
+                      <span>{tab.label}</span>
+                      {isActive && (
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-500" aria-hidden="true" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </aside>
+
+            {/* Main column */}
+            <div className="flex-1 min-w-0">
+              <Outlet />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

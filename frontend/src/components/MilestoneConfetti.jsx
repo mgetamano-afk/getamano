@@ -138,14 +138,14 @@ export default function MilestoneConfetti({ metric, value, providerKey, label })
           <button
             type="button"
             onClick={dismiss}
-            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/15 hover:bg-black/25 flex items-center justify-center text-white/90"
+            className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/15 hover:bg-black/25 flex items-center justify-center text-white/90"
             aria-label="Cerrar"
             data-testid="milestone-banner-close"
           >
             <X className="w-3.5 h-3.5" />
           </button>
 
-          <div className="relative">
+          <div className="relative pointer-events-none">
             <div className="text-4xl mb-1 animate-bounce" aria-hidden="true">🎉</div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-white/90 inline-flex items-center gap-1 mb-1">
               <Sparkles className="w-3 h-3" />
