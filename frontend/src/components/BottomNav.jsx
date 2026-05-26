@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Search, MessageCircle, User, Briefcase } from "lucide-react";
+import { Home, Search, HeartHandshake, User, Briefcase } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
@@ -25,6 +25,7 @@ export default function BottomNav() {
   const location = useLocation();
   const [unread, setUnread] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [tappingPath, setTappingPath] = useState(""); // Section 57 — heartbeat tap state
   const smartVisible = useSmartNav();
 
   // Refresh unread badge whenever path changes (lightweight)
@@ -69,18 +70,21 @@ export default function BottomNav() {
   const isActive = (path) => {
     if (path === "/") return pathname === "/";
     if (path === "/dashboard") return pathname.startsWith("/dashboard");
-    if (path === "/messages") return pathname.startsWith("/messages");
+    if (path === "/comunidad") return pathname.startsWith("/comunidad") || pathname.startsWith("/community");
     if (path === "/search") return pathname.startsWith("/search") || pathname.startsWith("/buscar");
     if (path === "/empleos") return pathname.startsWith("/empleos") || pathname.startsWith("/gigs");
     return pathname.startsWith(path);
   };
 
+  // Section 57 — Bottom nav new order:
+  //   Inicio · Buscar · Comunidad · Chambas · Mi cuenta
+  // Mensajes moves to the Header bell (already there with unread badge).
   const items = [
     { path: "/", icon: Home, label: lang === "en" ? "Home" : "Inicio", testid: "bottom-nav-home" },
     { path: "/search", icon: Search, label: lang === "en" ? "Search" : "Buscar", testid: "bottom-nav-search" },
+    { path: "/comunidad", icon: HeartHandshake, label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
     { path: "/empleos", icon: Briefcase, label: lang === "en" ? "Gigs" : "Chambas", testid: "bottom-nav-empleos" },
-    { path: "/messages", icon: MessageCircle, label: lang === "en" ? "Inbox" : "Mensajes", badge: unread, testid: "bottom-nav-messages" },
-    { path: "/dashboard", icon: User, label: lang === "en" ? "Account" : "Mi cuenta", testid: "bottom-nav-dashboard" },
+    { path: "/dashboard", icon: User, label: lang === "en" ? "Account" : "Mi cuenta", badge: unread, testid: "bottom-nav-dashboard" },
   ];
 
   return (
@@ -94,10 +98,18 @@ export default function BottomNav() {
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
+          const isTapping = tappingPath === item.path;
+          const handleTap = () => {
+            if (item.animate === "heartbeat") {
+              setTappingPath(item.path);
+              setTimeout(() => setTappingPath(""), 600);
+            }
+          };
           return (
             <li key={item.path} className="flex">
               <Link
                 to={item.path}
+                onClick={handleTap}
                 className="relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:bg-slate-100"
                 style={{ minHeight: 44 }}
                 data-testid={item.testid}
@@ -105,7 +117,7 @@ export default function BottomNav() {
               >
                 <span className="relative">
                   <Icon
-                    className={`w-5 h-5 transition-colors ${active ? "" : ""}`}
+                    className={`w-5 h-5 transition-colors gtm-nav-icon ${isTapping ? "tapping" : ""}`}
                     style={{ color: active ? "#025F67" : "#64748B" }}
                     strokeWidth={active ? 2.5 : 2}
                   />
@@ -120,7 +132,7 @@ export default function BottomNav() {
                   )}
                 </span>
                 <span
-                  className="text-[10px] font-medium leading-none tracking-tight"
+                  className={`text-[10px] font-medium leading-none tracking-tight gtm-nav-label ${isTapping ? "tapping" : ""}`}
                   style={{ color: active ? "#025F67" : "#64748B" }}
                 >
                   {item.label}

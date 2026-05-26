@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Globe, Compass, Briefcase, Trophy, Award } from "lucide-react";
+import { HeartHandshake, Compass, Briefcase, Trophy, Award } from "lucide-react";
 import Header from "./Header";
 
 /**
@@ -20,7 +20,7 @@ import Header from "./Header";
  *    in production by Co-founder Jah via DevTools.
  */
 const COMUNIDAD_TABS = [
-  { id: "feed", label: "Comunidad", shortLabel: "Comunidad", Icon: Globe, path: "/comunidad" },
+  { id: "feed", label: "Comunidad", shortLabel: "Comunidad", Icon: HeartHandshake, path: "/comunidad" },
   { id: "explorar", label: "Explorar", shortLabel: "Explorar", Icon: Compass, path: "/comunidad/explorar" },
   { id: "chambas", label: "Chambas", shortLabel: "Chambas", Icon: Briefcase, path: "/comunidad/chambas" },
   { id: "ranking", label: "Ranking", shortLabel: "Ranking", Icon: Trophy, path: "/comunidad/ranking" },

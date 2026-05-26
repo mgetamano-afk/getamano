@@ -114,3 +114,36 @@
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
 
+
+/* ─── Section 57 — Bottom nav Heart Handshake heartbeat tap effect ─── */
+@keyframes gtm-heartbeat {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(1.45); }
+  40%  { transform: scale(1.15); }
+  60%  { transform: scale(1.35); }
+  80%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes gtm-color-burst {
+  0%   { color: #9ca3af; }
+  15%  { color: #f97316; }
+  40%  { color: #ef4444; }
+  70%  { color: #0D7377; }
+  100% { color: #0D7377; }
+}
+@keyframes gtm-label-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.gtm-nav-icon.tapping {
+  animation:
+    gtm-heartbeat 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards,
+    gtm-color-burst 0.55s ease forwards;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.gtm-nav-label.tapping {
+  animation: gtm-label-pop 0.4s ease forwards;
+  color: #0D7377 !important;
+}

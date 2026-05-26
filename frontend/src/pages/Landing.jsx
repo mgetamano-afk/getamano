@@ -19,6 +19,7 @@ import ProviderCTASection from "../components/ProviderCTASection";
 import LiveActivityTicker from "../components/LiveActivityTicker";
 import PushOptInBanner from "../components/PushOptInBanner";
 import ExitIntentLeadCapture from "../components/ExitIntentLeadCapture";
+import BannerOfTheWeekCard from "../components/BannerOfTheWeekCard";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -300,6 +301,9 @@ export default function Landing() {
 
       {/* SECTION 33 — Featured paid providers reel */}
       <FeaturedProvidersReel />
+
+      {/* SECTION 57 — Banner of the Week (CEO marketing recommendation) */}
+      <BannerOfTheWeekCard />
 
       {/* CATEGORY SLIDER */}
       <section className="bg-white py-16 md:py-24">

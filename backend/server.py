@@ -8691,6 +8691,33 @@ class BannerPublishIn(BaseModel):
     keywords: Optional[str] = Field(default=None, max_length=200)
 
 
+@api_router.get("/banners/banner-of-the-week")
+async def banner_of_the_week():
+    """Marketing — return the most-liked public banner from the last 7 days.
+    Used by the public Landing page to showcase a real provider in the hero.
+
+    Falls back to the all-time most-liked if no banner has likes this week.
+    """
+    from datetime import timedelta
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    pipeline = [
+        {"$match": {"is_public": True, "created_at": {"$gte": week_ago}, "likes": {"$gt": 0}}},
+        {"$sort": {"likes": -1, "created_at": -1}},
+        {"$limit": 1},
+        {"$project": {"_id": 0}},
+    ]
+    rows = await db.banner_shares.aggregate(pipeline).to_list(1)
+    if not rows:
+        # all-time fallback so the hero never goes empty
+        rows = await db.banner_shares.find(
+            {"is_public": True},
+            {"_id": 0},
+        ).sort([("likes", -1), ("created_at", -1)]).limit(1).to_list(1)
+    if not rows:
+        return None
+    return rows[0]
+
+
 @api_router.post("/banners/publish")
 async def publish_banner(payload: BannerPublishIn, user: User = Depends(get_current_user)):
     """Provider publishes the final composed banner PNG to the public gallery.

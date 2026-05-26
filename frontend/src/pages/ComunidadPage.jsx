@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Heart, MessageCircle, Share2, Trash2, Trophy, Image as ImageIcon,
   Search, Bell, Users, Sparkles, Bookmark, Settings, X, Send,
-  Home as HomeIcon, Briefcase, Loader2, Globe, MapPin
+  Home as HomeIcon, Briefcase, Loader2, Globe, MapPin, ArrowUp, RefreshCw, HeartHandshake
 } from "lucide-react";
 import { toast } from "sonner";
 import Header from "../components/Header";
@@ -470,6 +470,16 @@ function PostFeed() {
   const [loading, setLoading] = useState(true);
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Section 57 — auto-refresh state
+  const [newPostsAvailable, setNewPostsAvailable] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const lastFetchRef = useRef(Date.now());
+  const mountedAtRef = useRef(Date.now());
+  // Pull-to-refresh state (mobile)
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const pullStartRef = useRef(0);
+  const PULL_THRESHOLD = 80;
 
   const endpoint = user ? "/community/posts/feed" : "/community/posts";
 
@@ -479,18 +489,109 @@ function PostFeed() {
     return api.get(endpoint, { params }).then(r => r.data);
   };
 
+  // Silent refresh — no spinner, replaces feed with latest
+  const silentRefresh = useCallback(async () => {
+    try {
+      const d = await load(null);
+      setPosts(d.items || []);
+      setNextBefore(d.next_before);
+      setNewPostsAvailable(0);
+      lastFetchRef.current = Date.now();
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint]);
+
+  // Polling: count posts strictly newer than what we have on screen
+  const checkForNewPosts = useCallback(async () => {
+    if (!posts.length) return;
+    try {
+      const d = await load(null);
+      const ourLatest = posts[0]?.created_at;
+      if (!ourLatest) return;
+      const fresh = (d.items || []).filter(p => p.created_at > ourLatest).length;
+      if (fresh > 0) setNewPostsAvailable(fresh);
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts]);
+
+  // Tap the "new posts" banner
+  const showNewPosts = async () => {
+    setRefreshing(true);
+    await silentRefresh();
+    setRefreshing(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   useEffect(() => {
     let alive = true;
     load().then(d => {
       if (!alive) return;
       setPosts(d.items || []);
       setNextBefore(d.next_before);
+      lastFetchRef.current = Date.now();
     }).catch(() => {}).finally(() => alive && setLoading(false));
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.user_id]);
 
-  const onPosted = (p) => setPosts(prev => [p, ...prev]);
+  // CAPA 1 — Visibility API: refresh on tab-return after 2+ min
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      const minSinceFetch = (Date.now() - lastFetchRef.current) / 60000;
+      if (minSinceFetch >= 2) silentRefresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [silentRefresh]);
+
+  // CAPA 2 — 60s polling while tab is visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - mountedAtRef.current < 5000) return; // 5s grace
+      checkForNewPosts();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [checkForNewPosts]);
+
+  // Pull-to-refresh (mobile touch)
+  useEffect(() => {
+    const onTouchStart = (e) => {
+      if (window.scrollY > 0) return;
+      pullStartRef.current = e.touches[0].clientY;
+    };
+    const onTouchMove = (e) => {
+      if (window.scrollY > 0) return;
+      const dy = e.touches[0].clientY - pullStartRef.current;
+      if (dy > 0) {
+        setPullDistance(Math.min(dy, PULL_THRESHOLD + 30));
+        setIsPulling(dy > PULL_THRESHOLD);
+      }
+    };
+    const onTouchEnd = async () => {
+      if (isPulling) {
+        setRefreshing(true);
+        await silentRefresh();
+        setRefreshing(false);
+      }
+      setPullDistance(0); setIsPulling(false);
+    };
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd);
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [isPulling, silentRefresh]);
+
+  const onPosted = (p) => {
+    setPosts(prev => [p, ...prev]);
+    lastFetchRef.current = Date.now();
+    setNewPostsAvailable(0);
+  };
   const onLike = async (postId) => {
     if (!user) { toast.info("Inicia sesión para dar me gusta"); return; }
     setPosts(prev => prev.map(p => p.post_id === postId
@@ -527,7 +628,37 @@ function PostFeed() {
     );
   }
   return (
-    <div data-testid="comunidad-feed">
+    <div data-testid="comunidad-feed" className="relative">
+      {/* Pull-to-refresh indicator */}
+      {pullDistance > 20 && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 -top-2 z-20 transition-all"
+          style={{ transform: `translateX(-50%) translateY(${pullDistance - 30}px)`, opacity: Math.min(1, pullDistance / 80) }}
+          data-testid="comunidad-pull-indicator"
+        >
+          <div className="w-10 h-10 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center">
+            <RefreshCw className={`w-5 h-5 text-teal-600 transition-transform ${isPulling ? "rotate-180" : ""}`} />
+          </div>
+        </div>
+      )}
+
+      {/* Section 57 — "New posts" sticky banner (Facebook/Instagram pattern) */}
+      {newPostsAvailable > 0 && (
+        <button
+          type="button"
+          onClick={showNewPosts}
+          disabled={refreshing}
+          className="sticky top-2 z-30 mx-auto mb-3 px-4 py-2 rounded-full text-white text-sm font-medium shadow-lg flex items-center gap-2 transition hover:scale-105 active:scale-95 animate-fadeSlideUp disabled:opacity-70"
+          style={{ background: "#0D7377", left: 0, right: 0, width: "fit-content", display: "flex" }}
+          data-testid="comunidad-new-posts-banner"
+        >
+          <ArrowUp className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          {newPostsAvailable === 1
+            ? "Hay 1 post nuevo — toca para ver"
+            : `Hay ${newPostsAvailable} posts nuevos — toca para ver`}
+        </button>
+      )}
+
       <NewPostBox onPosted={onPosted} />
       {posts.length === 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500 text-sm" data-testid="comunidad-empty">
@@ -567,7 +698,7 @@ function PostFeed() {
 function LeftNav() {
   const { user } = useAuth();
   const items = [
-    { to: "/comunidad", icon: HomeIcon, label: "Comunidad", testid: "comunidad-nav-feed" },
+    { to: "/comunidad", icon: HeartHandshake, label: "Comunidad", testid: "comunidad-nav-feed" },
     { to: "/search", icon: Search, label: "Explorar", testid: "comunidad-nav-search" },
     { to: "/empleos", icon: Briefcase, label: "Chambas", testid: "comunidad-nav-empleos" },
     { to: "/ranking", icon: Trophy, label: "Ranking", testid: "comunidad-nav-ranking" },
