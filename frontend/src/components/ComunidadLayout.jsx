@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Globe, Compass, Briefcase, Trophy, Award } from "lucide-react";
 import Header from "./Header";
-import useSmartNav from "../hooks/useSmartNav";
 
 /**
  * ComunidadLayout — Section 39 + 41/Correction #2 + 41/Correction #6.
@@ -13,9 +12,12 @@ import useSmartNav from "../hooks/useSmartNav";
  * the active sub-route via <Outlet />.
  *
  * Section 41 changes:
- *  · Tab bar hides on scroll-down + reappears on scroll-up (useSmartNav).
- *  · Labels compacted on mobile so all 5 tabs fit on an iPhone 13/14 (390px)
- *    without horizontal scroll — keeps "Comunidad" always visible.
+ *  · Compact spacing + short mobile labels (HoF) so all 5 tabs fit on a 390px iPhone.
+ *
+ * Section 46:
+ *  · TabBar is ALWAYS visible (position: fixed, no hide-on-scroll-down) so the
+ *    user never loses navigation while scrolling the feed — bug fix confirmed
+ *    in production by Co-founder Jah via DevTools.
  */
 const COMUNIDAD_TABS = [
   { id: "feed", label: "Comunidad", shortLabel: "Comunidad", Icon: Globe, path: "/comunidad" },
@@ -30,7 +32,8 @@ export default function ComunidadLayout() {
   const navigate = useNavigate();
   const scrollPositions = useRef({});
   const prevPath = useRef(location.pathname);
-  const navVisible = useSmartNav();
+  // Section 46 — TabBar always visible. No useSmartNav hook here so it doesn't
+  // hide while the user scrolls the feed (TabBar is the navigation of THIS section).
 
   // Restore / save window scroll per pathname.
   // Tricky: each Outlet swap unmounts the previous sub-route, so when we
@@ -71,13 +74,12 @@ export default function ComunidadLayout() {
     <div className="min-h-screen bg-slate-50" data-testid="comunidad-layout">
       <Header />
 
-      {/* Fixed tab bar — Section 39 + 41/2 + 41/6.
-          Hide-on-scroll-down via useSmartNav. Compact spacing + short
-          mobile labels (HoF) so all 5 tabs fit on a 390px iPhone. */}
+      {/* Fixed tab bar — Section 39 + 41/2 + 41/6 + 46 (always visible).
+          Section 46: removed hide-on-scroll-down (useSmartNav) — the comunidad
+          TabBar is the navigation of THIS section so it must stay anchored
+          while the user scrolls the feed. */}
       <div
-        className={`fixed top-14 md:top-20 left-0 right-0 z-30 shadow-sm transition-transform duration-300 ease-in-out ${
-          navVisible ? "translate-y-0" : "-translate-y-full"
-        }`}
+        className="fixed top-14 md:top-20 left-0 right-0 z-30 shadow-sm"
         style={{ background: "#025F67" }}
         data-testid="comunidad-tabbar"
       >

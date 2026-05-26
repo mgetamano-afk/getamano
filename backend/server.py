@@ -1105,6 +1105,26 @@ async def list_my_reports(user: User = Depends(get_current_user)):
     return {"items": items, "total": len(items)}
 
 
+@api_router.get("/reports/against-me")
+async def list_reports_against_me(user: User = Depends(get_current_user)):
+    """Section 45 — Transparency: any user can see reports filed AGAINST them.
+
+    Reporter identity is NEVER exposed; only status, reason, dates and resolution
+    notes go to the reported user. Pending reports are shown as "Under review"
+    without revealing the detailed description (to prevent retaliation).
+    """
+    items = await db.reports.find(
+        {"target_id": user.user_id},
+        {"_id": 0, "reporter_id": 0, "reporter_email": 0, "reporter_name": 0},
+    ).sort("created_at", -1).limit(50).to_list(50)
+    # Anonymize and filter sensitive details per status
+    for r in items:
+        if r.get("status") == "pending":
+            r["description"] = "(En revisión — el equipo de getamano analizará el caso en 24-48h)"
+        # Reporter role stays visible so users see "cliente" vs "proveedor".
+    return {"items": items, "total": len(items)}
+
+
 @api_router.get("/admin/reports")
 async def admin_list_reports(
     status: Optional[Literal["pending", "resolved", "dismissed"]] = None,

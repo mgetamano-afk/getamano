@@ -46,6 +46,7 @@ import AdminOverview from "./pages/admin/AdminOverview";
 import AdminCEO from "./pages/admin/AdminCEO";
 import AdminQuizFunnel from "./pages/admin/AdminQuizFunnel";
 import AdminLeadsInbox from "./pages/admin/AdminLeadsInbox";
+import SplashScreen from "./components/SplashScreen";
 import AdminPricingIntelligence from "./pages/admin/AdminPricingIntelligence";
 import AdminQueue from "./pages/admin/AdminQueue";
 import AdminProviders from "./pages/admin/AdminProviders";
@@ -210,6 +211,7 @@ function App() {
         <AuthProvider>
           <PwaInstallProvider>
             <BrowserRouter>
+              <SplashScreen />
               <Toaster position="top-right" richColors />
               <AnalyticsTracker />
               <InstallPrompt />

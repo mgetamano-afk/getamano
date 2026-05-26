@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Globe, LogOut, User as UserIcon, Menu, X, MessageCircle } from "lucide-react";
+import { Globe, LogOut, Menu, X, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
@@ -16,6 +16,18 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const navVisible = useSmartNav();
+
+  // Section 44 — smart navbar: prefer first name over "Mi panel". Falls back to
+  // email prefix if there's no name, then to the i18n label as last resort.
+  const firstName = (user?.name || "").trim().split(/\s+/)[0]
+    || (user?.email || "").split("@")[0]
+    || t("nav.dashboard");
+  const dashboardPath = user?.role === "provider"
+    ? "/dashboard/provider"
+    : user?.role === "admin"
+    ? "/admin"
+    : "/dashboard/client";
+  const initials = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
 
   useEffect(() => {
     if (!user) { setUnread(0); return; }
@@ -54,7 +66,10 @@ export default function Header() {
             <Link to="/comunidad" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium inline-flex items-center gap-1" data-testid="nav-community">
               Comunidad <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="En vivo" />
             </Link>
-            <Link to="/plans" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-plans">{t("nav.plans")}</Link>
+            {/* Section 44 — Hide "Planes" for logged-in users; they have it inside their dashboard */}
+            {!user && (
+              <Link to="/plans" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-plans">{t("nav.plans")}</Link>
+            )}
             <button
               onClick={() => { const to = lang === "es" ? "en" : "es"; changeLang(to); trackLanguageSwitch(to); }}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 rounded-full hover:bg-slate-100"
@@ -70,8 +85,15 @@ export default function Header() {
                   <MessageCircle className="w-5 h-5" />
                   {unread > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unread}</span>}
                 </Link>
-                <Link to="/dashboard" className="btn-outline" data-testid="nav-dashboard">
-                  <UserIcon className="w-4 h-4 inline mr-1" /> {t("nav.dashboard")}
+                <Link to={dashboardPath} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition" data-testid="nav-dashboard">
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    style={{ background: user.role === "provider" ? "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" : "linear-gradient(135deg, #F97316 0%, #FB923C 100%)" }}
+                    aria-hidden="true"
+                  >
+                    {user.role === "provider" ? "⚙" : initials}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-700 max-w-[140px] truncate">{firstName}</span>
                 </Link>
                 <NotificationBell />
                 <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-600" data-testid="nav-logout" aria-label="logout">
@@ -132,7 +154,10 @@ export default function Header() {
               <Link to="/comunidad" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100 inline-flex items-center gap-2 w-full" data-testid="mobile-nav-community">
                 Comunidad <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
               </Link>
-              <Link to="/plans" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100">{t("nav.plans")}</Link>
+              {/* Section 44 — Hide "Planes" for logged-in users */}
+              {!user && (
+                <Link to="/plans" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100" data-testid="mobile-nav-plans">{t("nav.plans")}</Link>
+              )}
               <button
                 onClick={() => { const to = lang === "es" ? "en" : "es"; changeLang(to); trackLanguageSwitch(to); setOpen(false); }}
                 className="w-full text-left px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100 inline-flex items-center gap-2"
@@ -148,7 +173,16 @@ export default function Header() {
                     <MessageCircle className="w-4 h-4" /> Mensajes
                     {unread > 0 && <span className="ml-auto bg-orange-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{unread}</span>}
                   </Link>
-                  <Link to="/dashboard" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-blue-700 font-semibold hover:bg-blue-50 active:bg-blue-100">{t("nav.dashboard")}</Link>
+                  <Link to={dashboardPath} onClick={() => setOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl text-blue-700 font-semibold hover:bg-blue-50 active:bg-blue-100" data-testid="mobile-nav-dashboard">
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                      style={{ background: user.role === "provider" ? "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" : "linear-gradient(135deg, #F97316 0%, #FB923C 100%)" }}
+                      aria-hidden="true"
+                    >
+                      {user.role === "provider" ? "⚙" : initials}
+                    </span>
+                    <span className="truncate">{firstName}</span>
+                  </Link>
                   <Link to="/profile" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100">Mi perfil</Link>
                 </>
               ) : null}

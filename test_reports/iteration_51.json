@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 51 — End-to-end test of 5 prompts: Section 45 (reports/against-me + reports/mine), Section 44 NavBar (firstName + conditional Plans), Section 46 Comunidad TabBar fixed, Section 47 UserAvatar/MentionedText, Section 48 SplashScreen, ProviderDashboard eCard iframe modal + removed ProviderLeftNav. Backend pytest 7/7 passed; frontend Playwright 14/15 passed; 1 SplashScreen reduced-motion edge case is a doc-vs-code inconsistency (debug ?splash=1 bypasses prefers-reduced-motion).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SplashScreen.jsx", "issue": "Doc comment says 'Honors prefers-reduced-motion by simply not rendering', but the debug ?splash=1 override bypasses the reduced-motion check (line 55-56). Either fix doc comment or AND-in `!_reducedMotion()` to the debug branch.", "selector": "[data-testid='splash-screen']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ProviderDashboard (logged provider)", "issues": ["React hydration warning: 'In HTML, <option> cannot be a child of <span>' — appears in console on /dashboard/provider. Pre-existing, but visible. Search for select/option wrapped in a <span> in ProviderDashboard."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter51_section45_reports_against.py",
+    "/app/test_reports/pytest/iter51.xml"
+  ],
+  "action_items": [
+    "(Optional) Decide whether ?splash=1 debug override should still honor prefers-reduced-motion; if yes, change line 55 of SplashScreen.jsx to `const shouldShow = !_reducedMotion() && (debugForce || (_isMobile() && _isStandalone() && !_isOnCooldown()));`. If no, update the docblock on line 16 to clarify the debug-flag bypass.",
+    "(Optional) Investigate hydration warning '<option> cannot be a child of <span>' originating from ProviderDashboard (App.js line 143). Not from this iteration's changes but surfaces in console."
+  ],
+  "critical_code_review_comments": [
+    "Backend /reports/against-me correctly: (a) requires auth (401), (b) filters by target_id == current user, (c) drops reporter_id/email/name keys, (d) masks pending description with '(En revisión, oculto al destinatario)', (e) returns full description once status flips to resolved/dismissed — all verified end-to-end via test_iter51_section45_reports_against.py.",
+    "Header.jsx conditional render of nav-plans is correct: logged-out users see it (count=1), logged-in users hide it (count=0). nav-dashboard text shows real first name 'María' (verified ⚙María button text), and href routes properly to /dashboard/provider.",
+    "ComunidadLayout TabBar: useSmartNav was removed — bounding box stays at y=80 even after scrolling 1500px down (was sticking at y=80 with no drift), confirming position:fixed behavior.",
+    "ProviderDashboard: ProviderLeftNav element NOT present (count=0); 'Ver mi eCard' is rendered as a <button> with NO target attribute; clicking opens [data-testid='ecard-preview-modal'] with iframe inside; modal closes on Escape AND on backdrop click; 'Abrir en pestaña' link has target='_blank'.",
+    "MentionedText regex `/(^|[^a-zA-Z0-9_.])@([a-zA-Z0-9_.]{3,30})/g` correctly excludes emails because the `[^a-zA-Z0-9_.]` lookbehind class rejects emails where alphanumeric local-part char precedes `@`. Verified no leaked /u/{local} link in any post containing an email."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter51_section45_reports_against.py (NEW)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "93% (14/15 — 1 SplashScreen reduced-motion edge case)"},
+  "test_credentials": "/app/memory/test_credentials.md (admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123)",
+  "seed_data_creation": "Created and resolved 1 TEST_iter51 report (client→provider) during test_against_me_reporter_identity_redacted; the report remains in DB with status=resolved.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend URL is https://verified-providers-2.preview.emergentagent.com (NOT amano-revival.preview.emergentagent.com — that one 404s). Auth rate-limit is 8 req/min on /api/auth/login, so cache sessions via module-scoped fixtures. ?splash=1 forces splash render on mobile viewports (width<768) regardless of prefers-reduced-motion — this is debug bypass behavior. The TEST_iter51 resolved report against demo.provider can be reused for /reports/against-me 'resolved keeps description' tests.",
+  "rca of the issue": "SplashScreen prefers-reduced-motion: the boolean logic `debugForce || (_isMobile() && _isStandalone() && !_reducedMotion() && !_isOnCooldown())` makes the debug query param a hard override that ignores reduced-motion. The natural mobile-PWA flow does respect reduced-motion correctly. Mitigation: either factor `_reducedMotion()` out as a global short-circuit before the disjunction, or update the JSDoc to state that the debug flag intentionally bypasses motion-preferences for QA."
+}

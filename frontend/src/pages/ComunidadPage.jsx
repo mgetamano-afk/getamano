@@ -11,6 +11,7 @@ import Footer from "../components/Footer";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { getDicebearAvatar } from "../lib/avatar";
+import MentionedText from "../components/MentionedText";
 
 const MAX_LEN = 500;
 
@@ -289,7 +290,9 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
                         <span className="text-[9px] font-bold text-teal-700 bg-teal-100 px-1 py-0.5 rounded">✓</span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap" data-testid={`inline-comment-content-${c.comment_id}`}>{c.content}</p>
+                    <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap" data-testid={`inline-comment-content-${c.comment_id}`}>
+                      <MentionedText text={c.content} />
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 px-2 text-[10px] text-slate-400">
                     <span>{relTime(c.created_at)}</span>

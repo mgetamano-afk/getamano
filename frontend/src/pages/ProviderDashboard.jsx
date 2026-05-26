@@ -29,7 +29,8 @@ import ReferralPanel from "../components/ReferralPanel";
 import StreakWidget from "../components/StreakWidget";
 import LeaderboardWidget from "../components/LeaderboardWidget";
 import CouponsCard from "../components/CouponsCard";
-import ProviderLeftNav from "../components/ProviderLeftNav";
+import ProviderLeftNav from "../components/ProviderLeftNav";  // eslint-disable-line no-unused-vars -- kept for fast rollback (Section 44)
+import ECardPreviewModal from "../components/ECardPreviewModal";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
 import EcardHealth from "../components/EcardHealth";
 import WeeklyHealthEmailPreview from "../components/WeeklyHealthEmailPreview";
@@ -66,6 +67,7 @@ export default function ProviderDashboard() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("perfil");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [ecardPreviewOpen, setEcardPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
 
@@ -157,6 +159,11 @@ export default function ProviderDashboard() {
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       <Header />
+      <ECardPreviewModal
+        open={ecardPreviewOpen}
+        onClose={() => setEcardPreviewOpen(false)}
+        slug={profile?.slug}
+      />
       <BusinessCardScanner
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
@@ -181,15 +188,10 @@ export default function ProviderDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" data-testid="provider-dashboard">
         <MilestoneCelebration />
 
-        <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
-          {/* COLUMNA IZQUIERDA — Navegación fija */}
-          <ProviderLeftNav
-            profile={profile}
-            user={user}
-            unreadCount={unread}
-            currentTab={tab}
-            onTabChange={setTab}
-          />
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
+          {/* Section 44 — Removed ProviderLeftNav (duplicate top menu).
+              Single source of truth is the TABS bar below ("Dashboard / Mensajes /
+              Citas / Solicitudes / Referidos / Mi Diario / Suscripción"). */}
 
           {/* COLUMNA CENTRO — Contenido principal scrolleable */}
           <section className="min-w-0 space-y-6" data-testid="provider-dashboard-center">
@@ -270,9 +272,14 @@ export default function ProviderDashboard() {
                 <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
             <p className="text-slate-500 text-sm mt-0.5">Gestiona tu negocio, tus clientes y tu eCard.</p>
           </div>
-          <Link to={`/provider/${profile.slug}`} target="_blank" className="btn-outline flex items-center gap-1 text-sm" data-testid="view-public-ecard">
+          <button
+            type="button"
+            onClick={() => setEcardPreviewOpen(true)}
+            className="btn-outline flex items-center gap-1 text-sm"
+            data-testid="view-public-ecard"
+          >
             Ver mi eCard <ExternalLink className="w-3.5 h-3.5" />
-          </Link>
+          </button>
         </div>
 
         {/* SECTION 16A — Profile Completion */}
