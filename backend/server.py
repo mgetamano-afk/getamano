@@ -1643,169 +1643,9 @@ async def remove_favorite(provider_id: str, user: User = Depends(get_current_use
     return {"ok": True}
 
 
-# ============ SECTION 55 — Saved eCards (Bookmark + Like + Personal note) ============
-# A unified store for "I want to hire this provider later" (bookmark) and
-# "I like this profile" (like). Both clients AND providers can use it — a
-# plumber bookmarks a landscaper, etc.
-
-SaveType = Literal["bookmark", "like", "both"]
-
-
-class SaveECardIn(BaseModel):
-    provider_id: str
-    save_type: SaveType = "bookmark"
-    personal_note: Optional[str] = Field(default=None, max_length=500)
-
-
-class SaveECardNoteIn(BaseModel):
-    personal_note: Optional[str] = Field(default=None, max_length=500)
-
-
-async def _recompute_provider_save_counts(provider_id: str) -> None:
-    """Update like_count + bookmark_count on the provider profile after save changes."""
-    likes = await db.saved_ecards.count_documents({
-        "provider_id": provider_id,
-        "save_type": {"$in": ["like", "both"]},
-    })
-    bookmarks = await db.saved_ecards.count_documents({
-        "provider_id": provider_id,
-        "save_type": {"$in": ["bookmark", "both"]},
-    })
-    await db.provider_profiles.update_one(
-        {"provider_id": provider_id},
-        {"$set": {"like_count": likes, "bookmark_count": bookmarks}},
-    )
-
-
-@api_router.put("/saved-ecards")
-async def upsert_saved_ecard(payload: SaveECardIn, user: User = Depends(get_current_user)):
-    """Create/update a saved-eCard entry. Self-save forbidden for providers."""
-    # Forbid self-saving (a provider can't save their own eCard)
-    own = await db.provider_profiles.find_one(
-        {"user_id": user.user_id, "provider_id": payload.provider_id},
-        {"_id": 0, "provider_id": 1},
-    )
-    if own:
-        raise HTTPException(status_code=400, detail="No puedes guardar tu propia eCard.")
-
-    target = await db.provider_profiles.find_one(
-        {"provider_id": payload.provider_id},
-        {"_id": 0, "provider_id": 1, "verification_status": 1},
-    )
-    if not target:
-        raise HTTPException(status_code=404, detail="Proveedor no encontrado.")
-
-    now_iso = datetime.now(timezone.utc).isoformat()
-    note = (payload.personal_note or "").strip() or None
-
-    await db.saved_ecards.update_one(
-        {"user_id": user.user_id, "provider_id": payload.provider_id},
-        {
-            "$set": {
-                "user_id": user.user_id,
-                "provider_id": payload.provider_id,
-                "save_type": payload.save_type,
-                "personal_note": note,
-                "personal_note_updated_at": now_iso if note else None,
-                "last_updated_at": now_iso,
-            },
-            "$setOnInsert": {
-                "save_id": f"sav_{uuid.uuid4().hex[:12]}",
-                "saved_at": now_iso,
-            },
-        },
-        upsert=True,
-    )
-    await _recompute_provider_save_counts(payload.provider_id)
-    saved = await db.saved_ecards.find_one(
-        {"user_id": user.user_id, "provider_id": payload.provider_id},
-        {"_id": 0},
-    )
-    return saved or {"ok": True}
-
-
-@api_router.delete("/saved-ecards/{provider_id}")
-async def delete_saved_ecard(provider_id: str, user: User = Depends(get_current_user)):
-    """Fully remove the saved-eCard entry (both bookmark + like)."""
-    res = await db.saved_ecards.delete_one({"user_id": user.user_id, "provider_id": provider_id})
-    if res.deleted_count:
-        await _recompute_provider_save_counts(provider_id)
-    return {"ok": True, "removed": res.deleted_count}
-
-
-@api_router.put("/saved-ecards/{provider_id}/note")
-async def update_saved_ecard_note(provider_id: str, payload: SaveECardNoteIn,
-                                   user: User = Depends(get_current_user)):
-    """Update only the personal note on an existing saved-eCard entry."""
-    existing = await db.saved_ecards.find_one(
-        {"user_id": user.user_id, "provider_id": provider_id},
-        {"_id": 0},
-    )
-    if not existing:
-        raise HTTPException(status_code=404, detail="No tienes esta eCard guardada.")
-    note = (payload.personal_note or "").strip() or None
-    await db.saved_ecards.update_one(
-        {"user_id": user.user_id, "provider_id": provider_id},
-        {"$set": {
-            "personal_note": note,
-            "personal_note_updated_at": datetime.now(timezone.utc).isoformat() if note else None,
-        }},
-    )
-    return {"ok": True, "personal_note": note}
-
-
-@api_router.get("/saved-ecards/me/state/{provider_id}")
-async def get_saved_state(provider_id: str, user: User = Depends(get_current_user)):
-    """Return the current user's save state for a specific provider.
-    Used by the SaveECardButtons on the public eCard to hydrate initial UI.
-    """
-    s = await db.saved_ecards.find_one(
-        {"user_id": user.user_id, "provider_id": provider_id},
-        {"_id": 0},
-    )
-    return s or {"save_type": None, "personal_note": None}
-
-
-@api_router.get("/saved-ecards/me")
-async def list_my_saved_ecards(filter: Optional[Literal["all", "bookmark", "like"]] = "all",
-                                user: User = Depends(get_current_user)):
-    """List all eCards the current user has bookmarked/liked, joined with
-    provider profile data. Sorted by most recently saved.
-    """
-    query: dict = {"user_id": user.user_id}
-    if filter == "bookmark":
-        query["save_type"] = {"$in": ["bookmark", "both"]}
-    elif filter == "like":
-        query["save_type"] = {"$in": ["like", "both"]}
-    rows = await db.saved_ecards.find(query, {"_id": 0}).sort("saved_at", -1).to_list(300)
-    provider_ids = [r["provider_id"] for r in rows]
-    profiles = await db.provider_profiles.find(
-        {"provider_id": {"$in": provider_ids}},
-        {"_id": 0, "user_id": 0},
-    ).to_list(len(provider_ids))
-    by_pid = {p["provider_id"]: p for p in profiles}
-    result = []
-    for r in rows:
-        prof = by_pid.get(r["provider_id"])
-        if not prof:
-            continue
-        result.append({
-            **r,
-            "provider": {
-                "provider_id": prof.get("provider_id"),
-                "slug": prof.get("slug"),
-                "business_name": prof.get("business_name"),
-                "logo_url": prof.get("logo_url"),
-                "category_id": prof.get("category_id"),
-                "city": prof.get("city"),
-                "state": prof.get("state"),
-                "rating_avg": prof.get("rating_avg", 0),
-                "rating_count": prof.get("rating_count", 0),
-                "verification_status": prof.get("verification_status"),
-                "phone": prof.get("phone"),
-            },
-        })
-    return result
+# ============ SECTION 55 — Saved eCards (extracted) ============
+# All `/api/saved-ecards/*` endpoints have been moved to `routes/saved_ecards.py`
+# and are wired via `api_router.include_router(...)` near the bottom of this file.
 
 
 # ============ ADMIN ============
@@ -9689,6 +9529,7 @@ from routes.auth import make_router as _make_auth_router  # noqa: E402
 from routes.search import make_router as _make_search_router  # noqa: E402
 from routes.jobs import make_router as _make_jobs_router  # noqa: E402
 from routes.seo import make_router as _make_seo_router  # noqa: E402
+from routes.saved_ecards import make_router as _make_saved_ecards_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9740,6 +9581,14 @@ api_router.include_router(
         SEO_CITIES=SEO_CITIES,
         SECTOR_LABELS=SECTOR_LABELS,
         SECTOR_COLORS=SECTOR_COLORS,
+    )
+)
+
+api_router.include_router(
+    _make_saved_ecards_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
     )
 )
 

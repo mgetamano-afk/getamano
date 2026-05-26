@@ -8,7 +8,7 @@
  *
  * Bump CACHE_VERSION to invalidate all caches on next visit.
  */
-const CACHE_VERSION = "v2-logo";
+const CACHE_VERSION = "v3-push";
 const CACHE_STATIC = `getamano-static-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `getamano-runtime-${CACHE_VERSION}`;
 const CACHE_IMAGES = `getamano-images-${CACHE_VERSION}`;
@@ -133,4 +133,61 @@ self.addEventListener("fetch", (event) => {
 // Listen for skipWaiting from a client (used by InstallPrompt 'reload to update')
 self.addEventListener("message", (e) => {
   if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
+// ============================================================
+// Section 63 — Push notifications
+// Show OS-level notifications even when the tab is closed. The server
+// publishes via Web Push protocol with payload like:
+//   { title, body, url, icon, badge, tag }
+// On click we focus an existing tab if open, or open a new one to `url`.
+// ============================================================
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (_) {
+    payload = { title: "getamano", body: event.data ? event.data.text() : "" };
+  }
+  const title = payload.title || "getamano";
+  const options = {
+    body: payload.body || "",
+    icon: payload.icon || "/icon-192x192.png",
+    badge: payload.badge || "/icon-96x96.png",
+    tag: payload.tag || "getamano-notification",
+    renotify: !!payload.renotify,
+    requireInteraction: !!payload.requireInteraction,
+    data: { url: payload.url || "/" },
+    vibrate: [120, 60, 120],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // Focus existing tab on same origin if present
+      for (const client of clientList) {
+        try {
+          const u = new URL(client.url);
+          if (u.origin === self.location.origin && "focus" in client) {
+            client.navigate(targetUrl).catch(() => {});
+            return client.focus();
+          }
+        } catch (_) {/* ignore */}
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+
+// Optional — let pages listen for push subscription change (browser rotates keys).
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    self.clients.matchAll().then((clients) => {
+      clients.forEach((c) => c.postMessage({ type: "PUSH_SUBSCRIPTION_CHANGE" }));
+    })
+  );
 });

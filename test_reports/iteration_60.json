@@ -1,0 +1,47 @@
+{
+  "summary": "Section 63 — full validation of (1) BottomNav consolidation, (2) Header simplification, (3) saved-ecards routes/saved_ecards.py refactor, and (4) Service Worker push hooks. Backend 15/15 pass. Frontend 100% on all primary acceptance criteria. One MINOR finding: BottomNav's galleryPath/savedPath links go to English aliases (/banner-gallery, /my-saved) even when lang=es displays Spanish labels — both routes resolve, so behavior is correct but path is inconsistent with label.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "BottomNav gallery/saved paths",
+        "issue": "Logged-in client with lang=es and Spanish labels (Galería, Guardadas) navigates to /banner-gallery and /my-saved (English aliases) instead of /galeria-banners and /mis-guardadas. Pages still load correctly via server-side route aliases, isActive() handles both prefixes. Same code path: `lang === 'en' ? '/banner-gallery' : '/galeria-banners'` in BottomNav.jsx lines 99-100 — suggests lang was 'en' at first render before I18nContext rehydrated to 'es'. Either eager-default to 'es' or read URL/cookie before paint to avoid the mismatch.",
+        "affected_selectors": ["bottom-nav-gallery-desktop", "bottom-nav-saved-desktop"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter60_saved_ecards_refactor.py",
+    "/app/test_reports/pytest/iter60_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL polish: ensure I18nContext lang default reads from cookie/localStorage synchronously before BottomNav first render so galleryPath/savedPath match the displayed language. Not blocking — both URLs resolve."
+  ],
+  "critical_code_review_comments": [
+    "routes/saved_ecards.py refactor is clean: 5 endpoints extracted to a closure-based make_router with no behavior change. All 15 backend assertions (CRUD + state + filters + auth gate + 404 paths) pass identically to the pre-refactor implementation.",
+    "BottomNav.jsx perfectly consolidates nav. Hidden-paths logic correctly covers /admin, /login, /register, /verificar-correo, /verify-email, /forgot-password, /reset-password — verified via DOM count=0 on all checked. Smart-scroll auto-hide preserved via useSmartNav.",
+    "Header.jsx successfully stripped of all primary nav (nav-explore, nav-community, nav-gallery, nav-plans, nav-messages, nav-saved, mobile-nav-community, mobile-nav-explore, mobile-nav-gallery, mobile-nav-plans, mobile-nav-messages all confirmed count=0). Identity-only cluster confirmed: header-logo-link, lang-toggle, NotificationBell, nav-dashboard (or nav-login for guests).",
+    "service-worker.js v3-push: confirmed addEventListener('push'), 'notificationclick', and 'pushsubscriptionchange' handlers present. File served at HTTP 200, 6133 bytes. No JS errors when registering.",
+    "ComunidadLayout pill bar: header bottom=65px, pill top=96px → 31px gap with header sticky at top-16 (64px). No overlap. md:top-16 adjustment correct.",
+    "MINOR: BottomNav uses lang-conditional paths but labels go through t() / lang switch — a brief race during first paint can produce label=ES + path=EN. Both English and Spanish aliases work server-side so this is cosmetic only, not blocking.",
+    "Pre-existing 401 console noise on /comunidad for unauthenticated optional resources (notification subscriptions, presence) — unchanged from previous iterations, not a regression."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter60_saved_ecards_refactor.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15)",
+    "frontend": "100% on acceptance criteria; 1 minor cosmetic path-language mismatch"
+  },
+  "test_credentials": "demo.client@getamano.com / client123 (used) · admin@getamano.com / admin123 (route hidden-check) · demo.provider@getamano.com / provider123 (existing data)",
+  "seed_data_creation": "No seed needed — used existing demo.provider provider_id=prov_10b9f21bf971 for save/like/note flows. All TEST_-prefixed notes were cleaned up via DELETE in test_08.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter60 validates Section 63 (BottomNav consolidation + saved-ecards refactor + SW push). All endpoints in /api/saved-ecards/* are now under /app/backend/routes/saved_ecards.py — no behavior change. New testids: bottom-nav, bottom-nav-{home,search,community,empleos,gallery,plans,login,saved,messages,dashboard}, and bottom-nav-{...}-desktop variants for ≥md. Header old testids removed: nav-explore, nav-community, nav-gallery, nav-plans, nav-messages, nav-saved, mobile-nav-community, mobile-nav-explore, mobile-nav-gallery, mobile-nav-plans, mobile-nav-messages — DO NOT use these. Hidden paths: /admin/*, /login, /register, /registro, /verificar-correo, /verify-email, /forgot-password, /reset-password. SW file path /service-worker.js, CACHE_VERSION='v3-push'. Web push subscribe endpoint NOT yet on server — only SW handler.",
+  "rca of the issue": "Cosmetic path-language mismatch in BottomNav: galleryPath and savedPath are computed using `lang === 'en' ? ... : ...` at render time. If I18nContext hasn't fully hydrated when BottomNav first mounts, lang may briefly read 'en' (default). After hydration to 'es', the labels update via t(), but the Link `to` prop on the already-rendered items may retain the en path until next re-render. Fix: read lang from localStorage/cookie synchronously in the context's initial state, or memo the paths with useMemo([lang]) to force re-eval. Non-blocking because backend has both /galeria-banners ↔ /banner-gallery and /mis-guardadas ↔ /my-saved aliases."
+}
