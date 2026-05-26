@@ -1978,3 +1978,11 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **Sec 53**: ServiceAreasInput with autocomplete chips (replaces "Sallisaw OK, Muldrow OK..." free text).
 - Tests: `/app/test_reports/iteration_52.json` 100% pass.
 
+
+
+### May 26, 2026 (later) — Sections 54-56 completed (see CHANGELOG.md for full details)
+- **Sec 54**: Expanded I18nContext with ~120 new EN/ES keys (saved.*, banner.*, review.*, share.*, chip.*, areas.*, tabs.*, common.*). New components fully i18n'd.
+- **Sec 55**: Mis eCards Guardadas — full stack. `saved_ecards` MongoDB collection + 5 REST endpoints + `SaveECardButtons.jsx` (Like + Bookmark + Note modal) + `SavedECardsPage.jsx` at `/mis-guardadas` and `/my-saved`. Header gets new Bookmark icon link.
+- **Sec 56**: Open Graph dynamic previews — `/api/og-image/{slug}.svg` returns 1200×630 SVG; `/api/og/p/{slug}` returns 17-meta-tag HTML for social bots with auto-redirect for humans. Share components updated to use OG URL.
+- Tests: `/app/test_reports/iteration_53.json` 100% pass.
+- Backlog: Marketplace de Banners (public gallery) deferred — ready to ship next session.

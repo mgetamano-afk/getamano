@@ -2,7 +2,69 @@
 
 Append-only log of major work shipped per session.
 
-## May 26, 2026 — Sections 49-53 (AI Banner + Verified Reviews + UX Chips + Smart Autocomplete + Gallery +tile)
+## May 26, 2026 (later) — Sections 54-56 (Full EN i18n + Saved eCards + Open Graph Previews)
+
+### Section 56 — Open Graph Dynamic Previews
+- New endpoint `GET /api/og-image/{slug}.svg` — returns a hand-rolled **1200×630 SVG** with provider business name, category, city/state, star rating, "Verified" badge, "Pro" badge (if applicable), circular avatar (logo or initials), getamano gradient background + grain texture, and CTA. Aggressively cached (24h max-age, 7d stale-while-revalidate).
+- New endpoint `GET /api/og/p/{slug}` — returns a bot-friendly HTML document with **17 OG/Twitter meta tags** (og:type, og:site_name, og:locale + alternate, og:title, og:description, og:image + secure_url + type + dimensions + alt, og:url, twitter:card=summary_large_image, etc.) + meta-refresh + JS redirect for humans.
+- New middleware `og_bot_middleware` — intercepts `/p/{slug}` and `/provider/{slug}` requests for **18 social-bot User-Agents** (facebookexternalhit, twitterbot, linkedinbot, whatsapp, slackbot, telegrambot, pinterest, discordbot, vkshare, redditbot, applebot, skypeuripreview, embedly, quora link preview, showyoubot, outbrain, facebot, ia_archiver) and serves OG-rich HTML. Pure pass-through for humans.
+- Share components updated:
+  - `ShareLinkCard.jsx` `shortUrl` now points at `${REACT_APP_BACKEND_URL}/api/og/p/${slug}?ref=...` so every channel triggers rich previews.
+  - `ShareECard.jsx` likewise.
+  - `BannerGenerator.jsx` QR code encodes the OG URL; printed text on the banner stays clean as `/p/{slug}`.
+- Caveat: in the Kubernetes preview ingress, `/p/*` routes directly to the React SPA so the middleware never fires for browser requests — the strategy is to share OG URLs explicitly, which gives bots full meta + auto-redirects humans.
+- E2E verified: 17 meta tags present in WhatsApp UA fetch; SVG renders correctly.
+
+### Section 55 — Mis eCards Guardadas (Bookmark + Like + Personal Note)
+- New MongoDB collection `saved_ecards` with composite index `(user_id, provider_id)` unique.
+- 5 backend endpoints:
+  - `PUT /api/saved-ecards` — upsert with save_type ∈ {bookmark, like, both} + personal_note (max 500 chars). Rejects self-save with HTTP 400.
+  - `DELETE /api/saved-ecards/{provider_id}` — full removal.
+  - `PUT /api/saved-ecards/{provider_id}/note` — note-only update (404 if not saved).
+  - `GET /api/saved-ecards/me/state/{provider_id}` — current state.
+  - `GET /api/saved-ecards/me?filter=all|bookmark|like` — full list joined with provider profile.
+- Provider profile auto-maintains `like_count` + `bookmark_count` via `_recompute_provider_save_counts()` on every change.
+- New `SaveECardButtons.jsx` component renders Like + Bookmark + Note-modal directly on the public eCard, replacing the old "addFavorite" link. Hidden when `isOwn=true`.
+- New `SavedECardsPage.jsx` at `/mis-guardadas` (ES) and `/my-saved` (EN):
+  - Stats cards: bookmarks total, likes total, pro tip.
+  - Filter pills: All / Bookmarked / Liked.
+  - List items with logo, name, verified ribbon, rating + count, inline note editor, call/open-eCard/remove actions.
+- Header navigation gets a new `Bookmark` icon link → `/mis-guardadas`.
+
+### Section 54 — Full EN i18n Coverage (Pragmatic)
+- Expanded `I18nContext.jsx` with **~120 new translation keys** in both `es` and `en`:
+  - `common.*` (add/remove/edit/delete/confirm/close/send/update/loading_more/required/optional/try_again/coming_soon/read_more/read_less/next/previous/finish/signin_required)
+  - `tabs.*` (profile/rates/gallery/banner/appointments/requests/messages/referrals/journal/subscription)
+  - `nav.saved`, `nav.messages`
+  - `saved.*` (~25 keys — page title/subtitle, filters, stats, tip, empty state, note flow, action buttons, modal labels)
+  - `banner.*` (~25 keys — title, color/style/keywords labels, 5 styles + descriptions, CTA states, empty/loading/preview/tips)
+  - `review.*` (verified + 3 verification-source tooltips + empty state)
+  - `share.*` (title, copy, copied, qr, more, instagram clipboard message)
+  - `chip.*` + `areas.*` (placeholder helpers, max-reached, autocomplete dropdown labels)
+- Refactored to use `t()`:
+  - `SavedECardsPage.jsx` — all visible strings
+  - `SaveECardButtons.jsx` — button labels, modal copy, toasts (with EN/ES fallback)
+  - `ProviderECard.jsx` verified-review badge — `t('review.verified')` + `t('review.verified_tooltip.${source}')`
+  - `ProviderDashboard.jsx` — TAB_KEYS uses `labelKey` resolved via `t(tt.labelKey)` so all 10 tabs translate
+
+### Testing
+- `/app/test_reports/iteration_53.json` — **100% pass**, 15/15 backend pytest + 6/6 critical UI flows + self-save guard + EN translation verification. No bugs.
+- Test file: `/app/backend/tests/test_iter53_sections_55_56.py`.
+
+### Code-review notes from testing agent (deferred backlog)
+- **P1**: server.py now 9686 lines. The OG bot middleware runs on EVERY request — should be promoted to a Starlette Route or gated earlier by path prefix.
+- **P1**: `og_provider_html` 404 fallback returns no cache headers (inconsistency with the 200 path).
+- **P2**: `_recompute_provider_save_counts` does 2 count_documents + 1 update — switch to aggregation `$facet` when scale demands.
+- **P2**: Saved list sorts by `saved_at` (immutable) — consider `last_updated_at` for "recently active" UX.
+- **P2**: `bookmark_count` is publicly exposed via `/by-slug/{slug}` — confirm intentional vs private.
+- **P2**: OG SVG fallback always 200 + the SPA renders 404 for invalid slugs → social bot sees happy preview, human sees 404. Minor UX dissonance.
+- **P2**: Add a `// noindex-safe` comment near `X-Robots-Tag: all` so future engineers don't flip it.
+
+### Backlog moved forward
+- **Marketplace de Banners** (CEO recommendation from previous finish) — deferred. Ready to ship: new collection `banner_shares`, public gallery `/galeria-banners` with like voting, opt-in toggle in BannerGenerator. ~2-3h next session.
+
+
+## May 26, 2026 (earlier) — Sections 49-53 (AI Banner + Verified Reviews + UX Chips + Smart Autocomplete + Gallery +tile)
 
 ### Section 49 — AI Professional Banner Generator
 - Backend `POST /api/providers/me/generate-banner` using `OpenAIImageGeneration` (gpt-image-1 via Emergent LLM Key).
