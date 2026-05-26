@@ -1986,3 +1986,11 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **Sec 56**: Open Graph dynamic previews — `/api/og-image/{slug}.svg` returns 1200×630 SVG; `/api/og/p/{slug}` returns 17-meta-tag HTML for social bots with auto-redirect for humans. Share components updated to use OG URL.
 - Tests: `/app/test_reports/iteration_53.json` 100% pass.
 - Backlog: Marketplace de Banners (public gallery) deferred — ready to ship next session.
+
+
+### May 26, 2026 (latest) — Marketplace de Banners completed (Section 57 / CEO recommendation)
+- 7 backend endpoints + 4 indexes. `banner_shares` collection with auto-rotation cap (5/provider).
+- New `BannerGalleryPage.jsx` at `/galeria-banners` (ES) + `/banner-gallery` (EN) with hero, style filters, sort, optimistic likes, lightbox modal, locale pin.
+- BannerGenerator gets "Publicar en galería" button that uploads composed PNG + creates the share record.
+- Header desktop + mobile nav now expose the gallery link.
+- Tests: `/app/test_reports/iteration_54.json` 100% pass (20/20 backend + 9/9 frontend flows).

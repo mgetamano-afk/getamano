@@ -2,6 +2,48 @@
 
 Append-only log of major work shipped per session.
 
+## May 26, 2026 (latest) — Marketplace de Banners (Section 57 / CEO recommendation)
+
+The viral loop: provider creates banner with AI → opts-in to publish → public gallery showcases real businesses → visitors browse + like → "yo quiero uno así" → more providers adopt Banner Pro → more eCards look professional → conversion up.
+
+### Backend (server.py, 7 endpoints)
+- `POST /api/banners/publish` — provider-only. Takes {image_url, style, color, keywords?}. Auto-rotation: max 5 published per provider; oldest non-pinned is deleted on 6th publish (with its likes).
+- `GET /api/banners/public` — public listing. Params: `style?` (modern|festive|professional|minimal|warm), `sort=popular|recent` (popular = pinned-first → likes desc → recent), `limit` (1–60, default 24), `offset`. Returns `{items, limit, offset, next_offset}`.
+- `GET /api/banners/me` — provider's own published banners (max 20).
+- `DELETE /api/banners/{share_id}` — owner or admin. Cascades `banner_likes` for that share.
+- `POST /api/banners/{share_id}/like` — auth required. Idempotent toggle via unique index `(share_id, user_id)`. Self-like → 400. Returns `{liked, likes}`.
+- `GET /api/banners/{share_id}/like-state` — auth required. `{liked: bool}`.
+- `POST /api/banners/{share_id}/view` — public fire-and-forget view counter.
+- 4 new MongoDB indexes on `banner_shares` + `banner_likes`.
+
+### Frontend
+- **New page `BannerGalleryPage.jsx`** at `/galeria-banners` (ES) and `/banner-gallery` (EN):
+  - Hero with "Banner Showcase" badge + bilingual H1 + descriptive sub.
+  - Filter pills (All + 5 styles) with emoji + colored brand-color dot per card.
+  - Sort segmented control (Popular / Recent).
+  - Responsive masonry grid (1 / 2 / 3 cols).
+  - Optimistic-UI like button with rose-fill state, disabled+tooltip on own banner, requires auth.
+  - "Featured" amber badge for pinned banners.
+  - Lightbox modal: full image + business name + verified shield + Like + "View eCard" → links to `/p/{slug}` (ES) or `/provider/{slug}` (EN).
+  - CTA banner inside modal for providers: "Create your own banner in 30 seconds with AI" → `/dashboard/provider`.
+  - Empty state with "Be the first to publish" copy.
+  - Pagination via `Load more banners` button.
+  - **URL→Language pin** on mount so deep-links display correct locale.
+- **BannerGenerator.jsx** — added "Publicar en galería" / "Publish to gallery" pink-gradient button next to Download. Flow: composedUrl (dataURL) → Blob → File → POST /api/upload → POST /api/banners/publish → emerald "Publicado" badge with link to gallery.
+- **Header.jsx** — desktop + mobile nav links to Banner Gallery (`nav-banner-gallery` + `mobile-nav-banner-gallery`) with locale-aware href.
+
+### Testing
+- `/app/test_reports/iteration_54.json` — **100% pass**, 20/20 backend pytest + 9/9 critical UI flows. No bugs.
+- Test file: `/app/backend/tests/test_iter54_banner_marketplace.py`.
+
+### Code-review notes from testing agent (deferred backlog)
+- **P0**: server.py now 9849 lines — STRONGLY extract banner endpoints (Sec 49 + 57) into `routes/banners.py`.
+- **P1**: publish auto-rotation does 4 sequential round-trips — collapse with `find_one_and_delete`.
+- **P2**: Add IP+share TTL dedup to `/banners/{share_id}/view` to prevent counter inflation.
+- **P2**: Add `{likes: {$gt: 0}}` guard on like-decrement to prevent drift below zero in concurrent edge cases.
+- **P2**: Project away `keywords` on public listing if/when keywords get large.
+
+
 ## May 26, 2026 (later) — Sections 54-56 (Full EN i18n + Saved eCards + Open Graph Previews)
 
 ### Section 56 — Open Graph Dynamic Previews

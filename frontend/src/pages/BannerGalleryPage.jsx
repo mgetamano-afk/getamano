@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Sparkles, Heart, Loader2, ChevronRight, ShieldCheck, Palette, ArrowRight, X, ExternalLink } from "lucide-react";
+import { Sparkles, Heart, Loader2, ChevronRight, ShieldCheck, ArrowRight, X, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { buildFileUrl } from "../components/ImageUpload";
 
@@ -19,7 +19,18 @@ const STYLE_FILTERS = [
 
 export default function BannerGalleryPage() {
   const { user } = useAuth();
-  const { lang } = useI18n();
+  const { lang, changeLang } = useI18n();
+  const location = useLocation();
+  // Soft URL→language pin: /banner-gallery deep-links should display EN, /galeria-banners ES.
+  // We only flip when the route disagrees with current lang to avoid loops.
+  useEffect(() => {
+    const isEnRoute = location.pathname.startsWith("/banner-gallery");
+    const isEsRoute = location.pathname.startsWith("/galeria-banners");
+    if (isEnRoute && lang !== "en") changeLang("en");
+    else if (isEsRoute && lang !== "es") changeLang("es");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
