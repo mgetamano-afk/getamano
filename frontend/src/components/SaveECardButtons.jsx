@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Heart, Bookmark, X, Loader2, Pencil, MessageSquare } from "lucide-react";
+import { Bookmark, X, Loader2, Pencil, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { useNavigate } from "react-router-dom";
+import LikeButton from "./LikeButton";
 
 /**
  * SaveECardButtons — Section 55.
@@ -150,19 +151,16 @@ export default function SaveECardButtons({ providerId, providerName, initialLike
   return (
     <div data-testid="save-ecard-buttons">
       <div className="flex flex-wrap items-center gap-2">
-        {/* Like */}
-        <button
-          type="button"
+        {/* Like (heart with celebration animation) */}
+        <LikeButton
+          liked={isLiked}
+          count={likes}
           onClick={toggleLike}
           disabled={saving || loadingState}
-          className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-full border transition disabled:opacity-60 ${isLiked ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-white border-slate-200 text-slate-600 hover:border-rose-200 hover:text-rose-500"}`}
-          data-testid="save-ecard-like-btn"
-          aria-pressed={isLiked}
-          aria-label={isLiked ? t("saved.unlike_button") : t("saved.like_button")}
-        >
-          <Heart className={`w-4 h-4 ${isLiked ? "fill-rose-500 text-rose-500" : ""}`} />
-          <span className="text-sm font-medium">{likes > 0 ? likes : ""}</span>
-        </button>
+          size="md"
+          testid="save-ecard-like-btn"
+          ariaLabel={isLiked ? t("saved.unlike_button") : t("saved.like_button")}
+        />
 
         {/* Bookmark */}
         <button

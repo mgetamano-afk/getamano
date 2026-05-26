@@ -1,0 +1,43 @@
+{
+  "summary": "Section 61 (Story likes + universal LikeButton animations) — backend 7/7 passing (2.5s) and frontend confirmed across Banner Gallery, Comunidad, Story Viewer, and ProviderECard. POST /api/stories/{id}/like toggles correctly, returns {liked, likes_count}; owner self-like blocked with 400 'No puedes dar like a tu propia historia'; non-existent story → 404; GET /like-state returns liked bool; like-count persists on /stories/active and /stories/by-provider; views_count dedup via unique index confirmed. Frontend LikeButton: gallery card 'data-liked' toggles 0→1 with gtm-like-btn class, count went 12→13 in screenshot; story-viewer modal rendered via createPortal (parent=BODY, rect 1440x900); client-as-non-owner sees floating story-viewer-like and toggles correctly; provider-as-owner sees story-views-count (Eye 3), story-likes-count (Heart 0), and story-owner-delete (Eliminar) at the bottom but NO like button; comunidad-post-like-* toggles 0→1; save-ecard-like-btn on /p/{slug} toggles; ecard-recommend-button (renamed RecommendButton) still renders the 'Recomiendas este negocio · 3' pill correctly — no regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Story Viewer", "issues": ["Image area renders mostly black during testing — the story image URL /api/files/getamano/uploads/... appears to fail loading in the Playwright session (401 in console for one resource). The viewer chrome (header, like button, views/delete) is correctly visible. Likely a /api/files auth or cache header issue unrelated to Section 61; please verify the file endpoint serves the image to authenticated session for stories."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter57_story_likes.py",
+    "/app/test_reports/pytest/iter57_results.xml"
+  ],
+  "action_items": [
+    "(LOW) Investigate why /api/files/getamano/uploads/<provider>/<file>.png returns 401 inside story-viewer for an authenticated client session. The viewer UI works; only the image bytes don't render. Could be httpOnly cookie not auto-forwarded on <img> requests, or the file endpoint requires a different auth scheme.",
+    "(NICE-TO-HAVE) On /galeria-banners, count text inside [data-testid='gallery-like-*-count'] updates visually (screenshot confirms 12→13) but Playwright text_content() may have returned a stale value because the count element re-renders mid-animation. Not a functional bug — just a testing-stability hint: read count from data-attribute or wait 1500ms before reading.",
+    "(NICE-TO-HAVE) Optional: add Escape-to-close keyboard handler on the story viewer (carried over from iter56 — still applicable)."
+  ],
+  "critical_code_review_comments": [
+    "toggle_story_like correctly handles MongoDB's naive datetime by re-applying tzinfo=UTC before comparing to datetime.now(tz=UTC). Prevents the 'can't compare offset-naive and offset-aware datetimes' bug.",
+    "Unique index (story_id, user_id) on story_likes guarantees idempotency — even concurrent double-clicks won't double-count. Verified by alternating toggle (count delta == 1).",
+    "Owner check uses provider_user_id == user.user_id; returns 400 with localized Spanish detail. Good.",
+    "Likes are not cascade-deleted when a story is deleted — orphans accumulate. Acknowledged by review request as low priority; could add TTL or join-cleanup later.",
+    "Frontend LikeButton (file confirmed at /app/frontend/src/components/LikeButton.jsx) emits data-testid + data-testid-count and applies gtm-like-btn + gtm-heart-pulse/color animations via CSS keyframes. Particle system gracefully degrades (navigator.vibrate guarded). 'pill' / 'ghost' / 'floating' variants all rendered in the wild.",
+    "RecommendButton.jsx (renamed from old LikeButton.jsx) still works on /p/{slug} as ecard-recommend-button — no import regression after the rename.",
+    "Story-viewer uses createPortal(document.body), confirmed by parent.tagName==='BODY' in DOM. Modal correctly fills 1440x900 — escape containing-block CSS issue from iter56 is resolved.",
+    "Banner-of-the-week badge has gtm-like-btn data-liked='1' class added (verified in source) — visible only when a banner is currently the weekly winner; not asserted in this test run because the badge wasn't on screen at test time. Behavioral spot-check not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter57_story_likes.py (new — 7 tests)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "95% — all interactive LikeButton variants verified (gallery card, story-viewer, comunidad post, save-ecard); banner-of-the-week badge + gallery-modal-like not visually asserted (badge not active at test time, modal variant code-confirmed identical to card)"},
+  "test_credentials": "Used demo.client@getamano.com/client123 (toggling likes) + demo.provider@getamano.com/provider123 (owner-view). Both /api/auth/login → 200 with session_token cookie.",
+  "seed_data_creation": "None. Tests are self-cleaning — final toggle restores like state for any liked story.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 61 ships clean. Backend: 7 tests in /app/backend/tests/test_iter57_story_likes.py — pattern is to call /stories/active to discover provider groups, then /stories/by-provider/{user_id} to drill into individual story_id rows (likes_count + views_count live on the story row, NOT on the group). When testing a NEW story endpoint that needs a story_id, prefer this discovery path over POST /stories (creation requires image_url field — multipart-style payload, not just text). Frontend: createPortal works — viewer rect is 1440x900 with parent=BODY. If a future iter needs to assert count increment text on LikeButton, read [data-testid='{id}-count'] AFTER a 1.2s wait, not 500ms, because animation is 700ms + count-pop overlay. Only one open watch item: /api/files/getamano/uploads/ may need cookie-or-bearer auth — story image renders black in screenshots though all UI controls work.",
+  "rca of the issue": "Initial test failure (422 on POST /stories) was a test-helper bug: I assumed /stories/active returned {stories: [...]} per group but it actually returns {latest_story_id, stories_count, ...}. Fix: changed helper to use latest_story_id directly and added _story_meta() that calls /stories/by-provider/{user_id} for full row data. No backend/business issue — pure test data shape misunderstanding."
+}

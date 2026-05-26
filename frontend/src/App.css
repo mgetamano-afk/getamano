@@ -147,3 +147,55 @@
   animation: gtm-label-pop 0.4s ease forwards;
   color: #0D7377 !important;
 }
+
+/* ─── Section 61 — Beautiful Like animations (used everywhere) ─── */
+@keyframes gtm-heart-pulse {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.55); }
+  45%  { transform: scale(1.1); }
+  65%  { transform: scale(1.35); }
+  85%  { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+@keyframes gtm-heart-color {
+  0%   { color: currentColor; filter: none; }
+  20%  { color: #fb7185; filter: drop-shadow(0 0 4px rgba(244,63,94,0.4)); }
+  50%  { color: #f43f5e; filter: drop-shadow(0 0 8px rgba(244,63,94,0.55)); }
+  100% { color: #f43f5e; filter: none; }
+}
+.gtm-heart.is-pulsing {
+  animation:
+    gtm-heart-pulse 0.7s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards,
+    gtm-heart-color 0.7s ease forwards;
+  transform-origin: center;
+}
+@keyframes gtm-heart-particle {
+  0%   { transform: translate(0, 0) scale(0.2); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(var(--scale)); opacity: 0; }
+}
+.gtm-heart-particle {
+  animation: gtm-heart-particle 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@keyframes gtm-plus-one {
+  0%   { transform: translate(-50%, 0) scale(0.7); opacity: 0; }
+  20%  { transform: translate(-50%, -16px) scale(1.15); opacity: 1; }
+  70%  { transform: translate(-50%, -34px) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -48px) scale(0.9); opacity: 0; }
+}
+.gtm-plus-one {
+  animation: gtm-plus-one 1.05s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+  text-shadow: 0 1px 2px rgba(244, 63, 94, 0.25);
+}
+@keyframes gtm-count-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.25); color: #f43f5e; }
+  100% { transform: scale(1); }
+}
+.gtm-like-count.is-pulsing {
+  animation: gtm-count-pop 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  display: inline-block;
+}
+.gtm-like-btn[data-liked="1"]:hover .gtm-heart {
+  transform: scale(1.05);
+}

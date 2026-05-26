@@ -8,6 +8,7 @@ import { Sparkles, Heart, Loader2, ChevronRight, ShieldCheck, ArrowRight, X, Ext
 import { toast } from "sonner";
 import { buildFileUrl } from "../components/ImageUpload";
 import EmptyState from "../components/EmptyState";
+import LikeButton from "../components/LikeButton";
 
 const STYLE_FILTERS = [
   { id: "", emoji: "✨", labelEs: "Todos", labelEn: "All" },
@@ -274,18 +275,16 @@ export default function BannerGalleryPage() {
                           </p>
                         </div>
                       </Link>
-                      <button
-                        type="button"
+                      <LikeButton
+                        liked={liked}
+                        count={b.likes || 0}
                         onClick={() => toggleLike(b.share_id, isOwn)}
                         disabled={isOwn || !!pendingLikes[b.share_id]}
-                        className={`flex-shrink-0 inline-flex items-center gap-1 h-9 px-3 rounded-full border transition disabled:opacity-50 disabled:cursor-not-allowed ${liked ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-white border-slate-200 text-slate-500 hover:border-rose-200 hover:text-rose-500"}`}
-                        data-testid={`gallery-like-${b.share_id}`}
-                        aria-pressed={liked}
-                        title={isOwn ? (lang === "en" ? "You can't like your own banner" : "No puedes dar like a tu propio banner") : ""}
-                      >
-                        <Heart className={`w-4 h-4 ${liked ? "fill-rose-500 text-rose-500" : ""}`} />
-                        <span className="text-xs font-bold">{b.likes || 0}</span>
-                      </button>
+                        size="sm"
+                        testid={`gallery-like-${b.share_id}`}
+                        ariaLabel={liked ? (lang === "en" ? "Unlike" : "Quitar like") : (lang === "en" ? "Like" : "Dar like")}
+                        disabledTitle={isOwn ? (lang === "en" ? "You can't like your own banner" : "No puedes dar like a tu propio banner") : ""}
+                      />
                     </div>
                   </div>
                 </div>
@@ -347,16 +346,15 @@ export default function BannerGalleryPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
+                  <LikeButton
+                    liked={!!likeStates[modal.share_id]}
+                    count={modal.likes || 0}
                     onClick={() => toggleLike(modal.share_id, user && user.user_id === modal.provider_user_id)}
                     disabled={(user && user.user_id === modal.provider_user_id) || !!pendingLikes[modal.share_id]}
-                    className={`inline-flex items-center gap-1.5 h-10 px-4 rounded-full border transition disabled:opacity-50 ${likeStates[modal.share_id] ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-white border-slate-200 text-slate-600 hover:border-rose-200 hover:text-rose-500"}`}
-                    data-testid="gallery-modal-like"
-                  >
-                    <Heart className={`w-4 h-4 ${likeStates[modal.share_id] ? "fill-rose-500 text-rose-500" : ""}`} />
-                    <span className="text-sm font-bold">{modal.likes || 0}</span>
-                  </button>
+                    size="md"
+                    testid="gallery-modal-like"
+                    ariaLabel={lang === "en" ? "Like this banner" : "Dar like a este banner"}
+                  />
                   <Link
                     to={(lang === "en" && modal.provider_slug) ? `/provider/${modal.provider_slug}` : (modal.provider_slug ? `/p/${modal.provider_slug}` : "#")}
                     className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium"

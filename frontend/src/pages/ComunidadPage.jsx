@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Heart, MessageCircle, Share2, Trash2, Trophy, Image as ImageIcon,
+  MessageCircle, Share2, Trash2, Trophy, Image as ImageIcon,
   Search, Bell, Users, Sparkles, Bookmark, Settings, X, Send,
   Home as HomeIcon, Briefcase, Loader2, Globe, MapPin, ArrowUp, RefreshCw, HeartHandshake
 } from "lucide-react";
@@ -11,6 +11,7 @@ import Footer from "../components/Footer";
 import { api } from "../lib/api";
 import EmptyState from "../components/EmptyState";
 import StoriesCarousel from "../components/StoriesCarousel";
+import LikeButton from "../components/LikeButton";
 import { useAuth } from "../contexts/AuthContext";
 import { getDicebearAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
@@ -413,18 +414,14 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
       )}
 
       <footer className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1">
-        <button
-          type="button"
+        <LikeButton
+          liked={!!post.liked_by_me}
+          count={post.likes_count || 0}
           onClick={() => onLike(post.post_id)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-            post.liked_by_me ? "text-rose-500 bg-rose-50" : "text-slate-500 hover:bg-slate-50 hover:text-rose-500"
-          }`}
-          aria-pressed={!!post.liked_by_me}
-          data-testid={`comunidad-post-like-${post.post_id}`}
-        >
-          <Heart className={`w-4 h-4 ${post.liked_by_me ? "fill-rose-500" : ""}`} />
-          <span data-testid={`comunidad-post-likes-${post.post_id}`}>{post.likes_count || 0}</span>
-        </button>
+          size="sm"
+          variant="ghost"
+          testid={`comunidad-post-like-${post.post_id}`}
+        />
         <button
           type="button"
           onClick={() => setCommentsOpen(v => !v)}

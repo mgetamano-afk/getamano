@@ -1,12 +1,14 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send } from "lucide-react";
+import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
+import LikeButton from "./LikeButton";
 
 /**
  * StoriesCarousel — Section 60 (CEO recommendation).
@@ -147,13 +149,20 @@ export default function StoriesCarousel() {
  * sequence with auto-advancing 5s progress bars (Instagram-style).
  */
 function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
+  const { user } = useAuth();
   const { lang } = useI18n();
+  const navigate = useNavigate();
   const [stories, setStories] = useState([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
   const intervalRef = useRef(null);
+  // Section 61 — Story like state
+  const [likeStates, setLikeStates] = useState({}); // story_id → liked bool
+  const [likePending, setLikePending] = useState({});
+
+  const isOwner = user && group && user.user_id === group.provider_user_id;
 
   useEffect(() => {
     let alive = true;
@@ -168,6 +177,62 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
     const s = stories[activeIdx];
     if (s) api.post(`/stories/${s.story_id}/view`).catch(() => {});
   }, [stories, activeIdx]);
+
+  // Hydrate like state for current story (for non-owner viewers)
+  useEffect(() => {
+    const s = stories[activeIdx];
+    if (!s || isOwner || !user) return;
+    if (likeStates[s.story_id] !== undefined) return; // already loaded
+    api.get(`/stories/${s.story_id}/like-state`).then((r) => {
+      setLikeStates((cur) => ({ ...cur, [s.story_id]: !!r.data.liked }));
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx, stories, isOwner, user]);
+
+  const toggleStoryLike = async () => {
+    const s = stories[activeIdx];
+    if (!s || isOwner) return;
+    if (!user) {
+      toast.message(lang === "en" ? "Sign in to like stories" : "Inicia sesión para dar like");
+      return;
+    }
+    if (likePending[s.story_id]) return;
+    setLikePending((cur) => ({ ...cur, [s.story_id]: true }));
+    const wasLiked = !!likeStates[s.story_id];
+    setLikeStates((cur) => ({ ...cur, [s.story_id]: !wasLiked }));
+    // Optimistic count update on the story object
+    setStories((cur) => cur.map((st, i) => i === activeIdx ? { ...st, likes_count: (st.likes_count || 0) + (wasLiked ? -1 : 1) } : st));
+    try {
+      const { data } = await api.post(`/stories/${s.story_id}/like`);
+      setLikeStates((cur) => ({ ...cur, [s.story_id]: data.liked }));
+      setStories((cur) => cur.map((st, i) => i === activeIdx ? { ...st, likes_count: data.likes_count } : st));
+    } catch (e) {
+      // revert
+      setLikeStates((cur) => ({ ...cur, [s.story_id]: wasLiked }));
+      setStories((cur) => cur.map((st, i) => i === activeIdx ? { ...st, likes_count: (st.likes_count || 0) + (wasLiked ? 1 : -1) } : st));
+      toast.error(e?.response?.data?.detail || "Error");
+    } finally {
+      setLikePending((cur) => { const n = { ...cur }; delete n[s.story_id]; return n; });
+    }
+  };
+
+  const deleteStory = async () => {
+    const s = stories[activeIdx];
+    if (!s || !isOwner) return;
+    if (!window.confirm(lang === "en" ? "Delete this story?" : "¿Eliminar esta historia?")) return;
+    try {
+      await api.delete(`/stories/${s.story_id}`);
+      toast.success(lang === "en" ? "Story deleted" : "Historia eliminada");
+      const remaining = stories.filter((_, i) => i !== activeIdx);
+      if (remaining.length === 0) onClose();
+      else {
+        setStories(remaining);
+        if (activeIdx >= remaining.length) setActiveIdx(remaining.length - 1);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Error");
+    }
+  };
 
   // Escape-to-close (Section 58 polish)
   useEffect(() => {
@@ -212,9 +277,10 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
 
   const active = stories[activeIdx];
 
-  return (
+  return createPortal((
     <div
       className="fixed inset-0 z-[120] bg-black flex items-center justify-center"
+      style={{ height: "100vh", maxHeight: "100vh" }}
       data-testid="story-viewer"
       onMouseDown={() => setPaused(true)}
       onMouseUp={() => setPaused(false)}
@@ -276,16 +342,55 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
           <img
             {...lazyImg(buildFileUrl(active.image_url), { priority: true })}
             alt={active.caption || group.business_name}
-            className="max-w-full max-h-full object-contain"
+            className="object-contain"
+            style={{ maxWidth: "100%", maxHeight: "100vh", width: "auto", height: "auto" }}
             data-testid="story-viewer-image"
           />
 
           {/* Caption */}
           {active.caption && (
-            <div className="absolute bottom-16 left-6 right-6 z-10">
+            <div className="absolute bottom-20 left-6 right-6 z-10">
               <p className="text-white text-base font-medium drop-shadow-lg text-center leading-snug px-4">
                 {active.caption}
               </p>
+            </div>
+          )}
+
+          {/* Section 61 — Story actions: like (for viewers) OR views/likes counter (for owner) */}
+          {isOwner ? (
+            <div className="absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between gap-3 pointer-events-auto">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 backdrop-blur text-white text-sm font-semibold shadow-md" data-testid="story-views-count">
+                  <Eye className="w-4 h-4" /> {active.views_count || 0}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 backdrop-blur text-rose-300 text-sm font-semibold shadow-md gtm-like-btn" data-liked="1" data-testid="story-likes-count">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 gtm-heart"><path d="M12 21s-7-4.5-9.5-9C.5 8.5 2 5 5 5c1.7 0 3.3.9 4 2.4C9.7 5.9 11.3 5 13 5c3 0 4.5 3.5 2.5 7C19 16.5 12 21 12 21z"/></svg>
+                  {active.likes_count || 0}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={deleteStory}
+                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 hover:bg-rose-500/80 backdrop-blur text-white text-xs font-semibold transition"
+                data-testid="story-owner-delete"
+                aria-label={lang === "en" ? "Delete story" : "Eliminar historia"}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {lang === "en" ? "Delete" : "Eliminar"}
+              </button>
+            </div>
+          ) : (
+            <div className="absolute bottom-4 left-4 z-10 pointer-events-auto" data-testid="story-viewer-actions">
+              <LikeButton
+                liked={!!likeStates[active.story_id]}
+                count={active.likes_count || 0}
+                onClick={toggleStoryLike}
+                disabled={!!likePending[active.story_id]}
+                size="md"
+                variant="floating"
+                testid="story-viewer-like"
+                ariaLabel={lang === "en" ? "Like this story" : "Dar like a esta historia"}
+              />
             </div>
           )}
 
@@ -305,7 +410,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
         </>
       )}
     </div>
-  );
+  ), document.body);
 }
 
 /**
@@ -358,7 +463,7 @@ function StoryCreator({ onClose, onCreated }) {
     }
   };
 
-  return (
+  return createPortal((
     <div
       className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget && !uploading && !creating) onClose(); }}
@@ -460,5 +565,5 @@ function StoryCreator({ onClose, onCreated }) {
         </p>
       </div>
     </div>
-  );
+  ), document.body);
 }

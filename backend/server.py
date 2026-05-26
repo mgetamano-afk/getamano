@@ -599,6 +599,8 @@ async def seed():
         await db.stories.create_index([("provider_user_id", 1), ("created_at", -1)])
         await db.stories.create_index([("is_public", 1), ("created_at", -1)])
         await db.story_views.create_index([("story_id", 1), ("viewer_user_id", 1)], unique=True)
+        await db.story_likes.create_index([("story_id", 1), ("user_id", 1)], unique=True)
+        await db.story_likes.create_index([("story_id", 1)])
         # Section 58 — extra indexes for scale (60M-user readiness)
         await db.reviews.create_index([("provider_id", 1), ("created_at", -1)])
         await db.reviews.create_index([("provider_id", 1), ("rating", -1)])
@@ -9009,6 +9011,44 @@ async def track_story_view(story_id: str, user: User = Depends(get_current_user)
     except Exception:
         pass  # duplicate view — already counted
     return {"ok": True}
+
+
+@api_router.post("/stories/{story_id}/like")
+async def toggle_story_like(story_id: str, user: User = Depends(get_current_user)):
+    """Like/unlike a story. Idempotent per user. Story owner cannot like own."""
+    story = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "provider_user_id": 1, "expires_at": 1})
+    if not story:
+        raise HTTPException(status_code=404, detail="Historia no encontrada.")
+    if story["provider_user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="No puedes dar like a tu propia historia.")
+    if isinstance(story.get("expires_at"), datetime):
+        exp = story["expires_at"]
+        # MongoDB strips tzinfo on read; treat as UTC if naive
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="La historia expiró.")
+    existing = await db.story_likes.find_one({"story_id": story_id, "user_id": user.user_id}, {"_id": 0})
+    if existing:
+        await db.story_likes.delete_one({"story_id": story_id, "user_id": user.user_id})
+        await db.stories.update_one({"story_id": story_id}, {"$inc": {"likes_count": -1}})
+        liked = False
+    else:
+        await db.story_likes.insert_one({
+            "story_id": story_id,
+            "user_id": user.user_id,
+            "created_at": datetime.now(timezone.utc),
+        })
+        await db.stories.update_one({"story_id": story_id}, {"$inc": {"likes_count": 1}})
+        liked = True
+    fresh = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "likes_count": 1})
+    return {"liked": liked, "likes_count": (fresh or {}).get("likes_count", 0)}
+
+
+@api_router.get("/stories/{story_id}/like-state")
+async def get_story_like_state(story_id: str, user: User = Depends(get_current_user)):
+    existing = await db.story_likes.find_one({"story_id": story_id, "user_id": user.user_id}, {"_id": 0})
+    return {"liked": bool(existing)}
 
 
 @api_router.delete("/stories/{story_id}")

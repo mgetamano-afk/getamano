@@ -85,8 +85,8 @@ export default function BannerOfTheWeekCard() {
               />
             </div>
             {/* Likes badge */}
-            <span className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-white/95 backdrop-blur text-rose-600 text-sm font-bold shadow-md" data-testid="banner-of-the-week-likes">
-              <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+            <span className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-white/95 backdrop-blur text-rose-600 text-sm font-bold shadow-md gtm-like-btn" data-testid="banner-of-the-week-likes" data-liked="1">
+              <Heart className="w-4 h-4 fill-rose-500 text-rose-500 gtm-heart" />
               {banner.likes || 0}
             </span>
             <span className="absolute top-4 right-4 inline-flex items-center gap-1 px-3 h-8 rounded-full text-white text-[11px] font-bold shadow-md" style={{ background: banner.color || "#0D7377" }}>

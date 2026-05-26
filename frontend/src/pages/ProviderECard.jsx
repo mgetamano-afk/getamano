@@ -12,7 +12,7 @@ import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
 import { ShieldCheck, Phone, MessageSquare, FileText, MapPin, Star, Clock, Globe, Heart, Mail, ChevronLeft, Home as HomeIcon, X, Award, CreditCard, Flag, Calendar, Sparkles } from "lucide-react";
 import WhatsAppButton from "../components/WhatsAppButton";
-import LikeButton from "../components/LikeButton";
+import RecommendButton from "../components/RecommendButton";
 import ECardModal from "../components/ECardModal";
 import ECardFloatingHeader from "../components/ECardFloatingHeader";
 import ShareECardBlock from "../components/ShareECardBlock";
@@ -238,7 +238,7 @@ export default function ProviderECard() {
                   </div>
                 )}
                 <div className="mt-4">
-                  <LikeButton providerId={p.provider_id} initialCount={p.likes_count || 0} size="lg" />
+                  <RecommendButton providerId={p.provider_id} initialCount={p.likes_count || 0} size="lg" />
                 </div>
               </div>
             </div>
