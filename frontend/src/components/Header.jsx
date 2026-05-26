@@ -63,6 +63,11 @@ export default function Header() {
 
           <nav className="hidden md:flex items-center gap-2">
             <Link to="/search" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium" data-testid="nav-explore">{t("nav.explore")}</Link>
+            <Link to={lang === "en" ? "/banner-gallery" : "/galeria-banners"} className="px-4 py-2 text-slate-700 hover:text-pink-600 font-medium inline-flex items-center gap-1" data-testid="nav-banner-gallery">
+              <span>✨</span>
+              <span className="hidden lg:inline">{lang === "en" ? "Banner Gallery" : "Galería"}</span>
+              <span className="lg:hidden">{lang === "en" ? "Gallery" : "Galería"}</span>
+            </Link>
             <Link to="/comunidad" className="px-4 py-2 text-slate-700 hover:text-blue-600 font-medium inline-flex items-center gap-1" data-testid="nav-community">
               Comunidad <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="En vivo" />
             </Link>
@@ -154,6 +159,9 @@ export default function Header() {
             </div>
             <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scroll-touch">
               <Link to="/search" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100" data-testid="mobile-nav-explore">{t("nav.explore")}</Link>
+              <Link to={lang === "en" ? "/banner-gallery" : "/galeria-banners"} onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100 inline-flex items-center gap-2 w-full" data-testid="mobile-nav-banner-gallery">
+                <span>✨</span> {lang === "en" ? "Banner Gallery" : "Galería de banners"}
+              </Link>
               <Link to="/comunidad" onClick={() => setOpen(false)} className="block px-4 py-3 rounded-xl text-slate-800 font-medium hover:bg-slate-50 active:bg-slate-100 inline-flex items-center gap-2 w-full" data-testid="mobile-nav-community">
                 Comunidad <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
               </Link>

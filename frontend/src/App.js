@@ -34,6 +34,7 @@ import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
 import SavedECardsPage from "./pages/SavedECardsPage";
+import BannerGalleryPage from "./pages/BannerGalleryPage";
 import RankingPage from "./pages/RankingPage";
 import ComunidadLayout from "./components/ComunidadLayout";
 import ComunidadExplorar from "./pages/ComunidadExplorar";
@@ -104,6 +105,9 @@ function AppRouter() {
 
       <Route path="/mis-guardadas" element={<SavedECardsPage />} />
       <Route path="/my-saved" element={<SavedECardsPage />} />
+
+      <Route path="/galeria-banners" element={<BannerGalleryPage />} />
+      <Route path="/banner-gallery" element={<BannerGalleryPage />} />
 
       {/* Auth */}
       <Route path="/login" element={<Login />} />

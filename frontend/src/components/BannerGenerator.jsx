@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "../lib/api";
-import { Sparkles, Download, Loader2, X, Palette, RefreshCw, Image as ImageIcon, Check } from "lucide-react";
+import { Sparkles, Download, Loader2, X, Palette, RefreshCw, Image as ImageIcon, Check, Share2, Globe, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
+import { useI18n } from "../contexts/I18nContext";
+import { Link } from "react-router-dom";
 
 /**
  * BannerGenerator — Section 49.
@@ -46,6 +48,7 @@ const BANNER_H = 630;
 
 export default function BannerGenerator({ profile }) {
   const canvasRef = useRef(null);
+  const { lang } = useI18n();
   const [color, setColor] = useState(COLOR_PALETTE[0].value);
   const [style, setStyle] = useState("modern");
   const [keywords, setKeywords] = useState("");
@@ -53,6 +56,8 @@ export default function BannerGenerator({ profile }) {
   const [bgImage, setBgImage] = useState(""); // data URL or http URL
   const [composedUrl, setComposedUrl] = useState("");
   const [qrUrl, setQrUrl] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [publishedShareId, setPublishedShareId] = useState(""); // tracks current published instance
 
   const slug = profile?.slug || "";
   const businessName = profile?.business_name || "Tu Negocio";
@@ -78,6 +83,7 @@ export default function BannerGenerator({ profile }) {
   const generate = async () => {
     setGenerating(true);
     setComposedUrl("");
+    setPublishedShareId(""); // new generation invalidates prior published instance
     try {
       const { data } = await api.post("/providers/me/generate-banner", {
         color,
@@ -86,9 +92,9 @@ export default function BannerGenerator({ profile }) {
       }, { timeout: 90000 });
       const dataUrl = `data:${data.mime || "image/png"};base64,${data.image_base64}`;
       setBgImage(dataUrl);
-      toast.success("Banner generado");
+      toast.success(lang === "en" ? "Banner generated" : "Banner generado");
     } catch (e) {
-      const msg = e?.response?.data?.detail || "Error al generar. Reintenta.";
+      const msg = e?.response?.data?.detail || (lang === "en" ? "Generation failed. Try again." : "Error al generar. Reintenta.");
       toast.error(msg);
     } finally {
       setGenerating(false);
@@ -263,7 +269,40 @@ export default function BannerGenerator({ profile }) {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    toast.success("Banner descargado");
+    toast.success(lang === "en" ? "Banner downloaded" : "Banner descargado");
+  };
+
+  // Marketplace de Banners — publish the composed PNG to the public gallery
+  const publishToGallery = async () => {
+    if (!composedUrl || publishing) return;
+    setPublishing(true);
+    try {
+      // 1. Convert dataURL → Blob → File for the existing upload endpoint
+      const resp = await fetch(composedUrl);
+      const blob = await resp.blob();
+      const file = new File([blob], `${slug || "banner"}-${Date.now()}.png`, { type: "image/png" });
+      const fd = new FormData();
+      fd.append("file", file);
+      const up = await api.post("/upload", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 60000,
+      });
+      const imageUrl = up.data?.url;
+      if (!imageUrl) throw new Error("upload failed");
+      // 2. Publish metadata
+      const pub = await api.post("/banners/publish", {
+        image_url: imageUrl,
+        style,
+        color,
+        keywords: keywords.trim() || null,
+      });
+      setPublishedShareId(pub.data?.share_id || "");
+      toast.success(lang === "en" ? "Banner published to gallery 🎉" : "¡Banner publicado en la galería! 🎉");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || (lang === "en" ? "Couldn't publish. Try again." : "No se pudo publicar. Reintenta."));
+    } finally {
+      setPublishing(false);
+    }
   };
 
   return (
@@ -389,8 +428,30 @@ export default function BannerGenerator({ profile }) {
             className="inline-flex items-center gap-2 px-5 h-11 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium"
             data-testid="banner-download-btn"
           >
-            <Download className="w-4 h-4" /> Descargar PNG
+            <Download className="w-4 h-4" /> {lang === "en" ? "Download PNG" : "Descargar PNG"}
           </button>
+        )}
+        {composedUrl && !publishedShareId && (
+          <button
+            type="button"
+            onClick={publishToGallery}
+            disabled={publishing}
+            className="inline-flex items-center gap-2 px-5 h-11 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-sm font-medium disabled:opacity-60"
+            data-testid="banner-publish-btn"
+            title={lang === "en" ? "Show your banner in the public Banner Gallery for inspiration" : "Muestra tu banner en la galería pública para inspirar a otros"}
+          >
+            {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+            {publishing ? (lang === "en" ? "Publishing..." : "Publicando...") : (lang === "en" ? "Publish to gallery" : "Publicar en galería")}
+          </button>
+        )}
+        {publishedShareId && (
+          <div className="inline-flex items-center gap-2 px-4 h-11 rounded-full bg-emerald-50 text-emerald-700 text-sm border border-emerald-200" data-testid="banner-published-badge">
+            <Check className="w-4 h-4" />
+            {lang === "en" ? "Published" : "Publicado"}
+            <Link to={lang === "en" ? "/banner-gallery" : "/galeria-banners"} className="ml-1 underline inline-flex items-center gap-1 hover:text-emerald-800" data-testid="banner-published-view-link">
+              <Eye className="w-3 h-3" /> {lang === "en" ? "View" : "Ver"}
+            </Link>
+          </div>
         )}
       </div>
 
