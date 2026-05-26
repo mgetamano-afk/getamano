@@ -2027,3 +2027,10 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **Sec 63 — MilestoneConfetti**: CSS-only confetti shower (50 pieces, gtm-confetti-fall keyframe) + gradient toast banner when provider crosses milestone thresholds (10/25/50/100/250/500/1000/2500/5000) on 4 metrics (likes/views/reviews/bookmarks). Anti-spam via localStorage. Wired into ProviderECard for owner-only celebration.
 - Tests: `/app/test_reports/iteration_59.json` 100% pass. Both fixes (LeftNav lg:block + close button pointer-events) verified.
 
+
+### May 26, 2026 (9th drop) — New logo rollout v1
+- Regenerated 22 logo assets from new 3750×3750 RGBA source: 10 PWA icons, 5 Apple touch, 3 in-app logos, 2 maskable (with 78% safe-zone + #2C555F bg), favicon.ico (16/32/48/64).
+- Service worker CACHE_VERSION bumped to "v2-logo" so installed PWAs auto-refresh.
+- Old assets backed up to /tmp/old_logos_backup/.
+- Verified visually: Landing header + Login hero show new logo (teal-slate square with white hand+sparkles).
+

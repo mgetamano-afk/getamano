@@ -2,6 +2,37 @@
 
 Append-only log of major work shipped per session.
 
+## May 26, 2026 (9th drop) — New logo rollout (v1)
+
+User uploaded a refreshed brand logo (`getamano_logov1.png`, 3750×3750, RGBA): a deep teal-slate square with rounded corners showing a black hand silhouette with white sparkles.
+
+### Regenerated 22 logo assets
+All from the high-res source via Python/Pillow `LANCZOS` resample → `optimize=True` PNG output:
+
+- **PWA icons** (10): 72/96/128/144/152/167/180/192/256/384/512 px (`/icon-{size}.png`)
+- **Apple touch icons** (5): 120/152/167/180 + default `apple-touch-icon.png`
+- **In-app logo files** (3): `getamano-logo.png` (512), `getamano-logo-mark.png` (512), `getamano-logo-full.png` (1200 — used as OG fallback)
+- **Maskable icons** (2): 192/512 with **78% safe-zone padding** + `#2C555F` background (matches the logo's dominant color) so Android adaptive icons don't crop the design
+- **Favicon multi-res**: `favicon.ico` with 16/32/48/64 px frames
+
+### Cache invalidation
+- `service-worker.js` `CACHE_VERSION` bumped from `"v1"` to `"v2-logo"` so installed PWAs auto-fetch the new assets on next visit.
+- Service worker strategy unchanged (HTML network-first, JS/CSS stale-while-revalidate, images cache-first 90d, /api/* never cached).
+- Manifest icons array unchanged (paths are stable; only file contents changed).
+
+### Theme color
+- Kept `theme_color: #025F67` (bright teal) for PWA chrome — harmonizes with the new logo without being identical.
+- Maskable safe-zone uses `#2C555F` (the new logo's dominant color) so the inner shape blends seamlessly when displayed via Android's adaptive icon mask.
+
+### Verified
+- Landing page header: new logo visible
+- Login page hero: new 192px logo visible
+- Old assets backed up to `/tmp/old_logos_backup/` (21 files preserved).
+
+### Rollback path
+If anything breaks: `cp /tmp/old_logos_backup/* /app/frontend/public/` and revert CACHE_VERSION.
+
+
 ## May 26, 2026 (8th drop) — Sections 62 + 63 (Nav Consolidation + Milestone Confetti)
 
 ### Section 62 — Navigation consolidation

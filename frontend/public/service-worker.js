@@ -8,7 +8,7 @@
  *
  * Bump CACHE_VERSION to invalidate all caches on next visit.
  */
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2-logo";
 const CACHE_STATIC = `getamano-static-${CACHE_VERSION}`;
 const CACHE_RUNTIME = `getamano-runtime-${CACHE_VERSION}`;
 const CACHE_IMAGES = `getamano-images-${CACHE_VERSION}`;
