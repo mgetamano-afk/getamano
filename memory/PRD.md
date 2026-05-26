@@ -2034,3 +2034,19 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - Old assets backed up to /tmp/old_logos_backup/.
 - Verified visually: Landing header + Login hero show new logo (teal-slate square with white hand+sparkles).
 
+
+
+### Feb 26, 2026 (Section 63 — Iteration 60) — Footer-only consolidated nav + saved-ecards refactor + SW push
+- **BottomNav consolidation (User request: "ponlo en el footer, mantén lo más importante de cada nav bar en uno solo")**
+  - BottomNav is now the PRIMARY navigation, visible on **all** screen sizes (was mobile-only).
+  - Mobile (<md): 5 items in grid-cols-5 with tiny labels.
+  - Desktop (≥md): 6–8 items horizontally in pill buttons with full labels.
+  - Items adapt per user role:
+    - Guest: Inicio · Buscar · Comunidad · Chambas · Galería · Planes · Entrar
+    - Client: Inicio · Buscar · Comunidad · Chambas · Galería · Guardadas · Mensajes · Mi cuenta
+    - Provider: Inicio · Panel · Buscar · Comunidad · Chambas · Galería · Mensajes
+  - Hidden on /admin/*, /login, /register, /verificar-correo, /verify-email, /forgot-password, /reset-password.
+- **Header stripped down to identity-only**: logo + brand + lang toggle + NotificationBell (logged) + avatar pill (logged) / Sign-in button (guest). All primary nav links (Explorar, Comunidad, Galería, Planes, Guardadas, Mensajes) REMOVED — they live only in BottomNav now. Mobile drawer kept for secondary actions (lang, profile, logout, legal). Header height reduced md:h-20 → md:h-16. ComunidadLayout pill bar offset adjusted accordingly.
+- **Backend refactor (D)**: `/api/saved-ecards/*` endpoints extracted from `server.py` into new module `/app/backend/routes/saved_ecards.py` (170 lines). 5 endpoints (PUT/DELETE/GET state/GET me/PUT note) preserved with identical behavior. Wired via `_make_saved_ecards_router(db, User, get_current_user)` near line 9748 of server.py.
+- **PWA + Service Worker (E)**: Added `push`, `notificationclick`, and `pushsubscriptionchange` event handlers to `/app/frontend/public/service-worker.js`. Supports `title/body/icon/badge/url/tag/renotify/requireInteraction` payload. Click focuses existing tab or opens new one to `url`. CACHE_VERSION bumped to `v3-push` to invalidate stale SW for installed PWAs. **Note**: server-side VAPID + `/api/push/subscribe` endpoint still pending (when ready, can plug into real Web Push delivery).
+- Tests: `/app/test_reports/iteration_60.json` — backend 15/15 pass, frontend 100% on acceptance criteria. 1 minor cosmetic finding (Spanish label can briefly point to /banner-gallery alias before lang re-renders, both URLs work via aliases).
