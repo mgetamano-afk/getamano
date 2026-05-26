@@ -21,6 +21,7 @@ import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ReportModal from "../components/ReportModal";
 import SaveECardButtons from "../components/SaveECardButtons";
+import MilestoneConfetti from "../components/MilestoneConfetti";
 import GalleryGrid from "../components/GalleryGrid";
 import CategoryIcon from "../components/CategoryIcon";
 import BookingModal from "../components/BookingModal";
@@ -162,6 +163,27 @@ export default function ProviderECard() {
         image={p.logo_url ? buildFileUrl(p.logo_url) : undefined}
       />
       <Header />
+
+      {/* Section 63 — Milestone confetti only fires for the OWNER's own eCard view */}
+      {user && user.user_id === p.user_id && (
+        <>
+          <MilestoneConfetti
+            metric="likes"
+            value={(p.like_count || 0) + (p.likes_count || 0)}
+            providerKey={p.provider_id}
+          />
+          <MilestoneConfetti
+            metric="reviews"
+            value={p.rating_count || 0}
+            providerKey={`${p.provider_id}-rev`}
+          />
+          <MilestoneConfetti
+            metric="bookmarks"
+            value={p.bookmark_count || 0}
+            providerKey={`${p.provider_id}-bm`}
+          />
+        </>
+      )}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10" data-testid="provider-ecard">
         {/* Section 32 — Floating header with back / like / share */}
         <ECardFloatingHeader provider={p} lang={lang} />

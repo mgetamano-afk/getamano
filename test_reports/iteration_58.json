@@ -1,0 +1,47 @@
+{
+  "summary": "Sections 62 + 63 frontend visual/behavioral testing. Section 62 (Comunidad nav consolidation): TabBar slim white version with 4 items (feed/explorar/ranking/wall-of-fame), Chambas correctly removed, auto-hide on scroll WORKS (-translate-y-full applied), lg:hidden correctly hides on desktop, BottomNav unchanged (5 items). Section 63 (MilestoneConfetti): fires correctly for OWNER on /p/maria-cleaning-services-sallisaw-ok with '10 hearts reached!' headline + 50 confetti pieces + localStorage anti-spam (gtm:milestone:prov_10b9f21bf971:likes=10) + refresh dedup verified. Client (non-owner) correctly sees NO confetti. Regressions: save-ecard-like-btn, comunidad-post-like-* (10 elements), gallery-like-* (10 elements) all present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ComunidadPage LeftNav (desktop)",
+        "issue": "LeftNav NEVER renders for /comunidad routes on desktop. Root cause in /app/frontend/src/App.js line 148/155: <Route index element={<ComunidadPage embedded />} /> passes embedded=true, and ComunidadPage.jsx line 861 says `{!embedded && <LeftNav />}`. Therefore NONE of the requested testids (comunidad-nav-feed, comunidad-nav-explorar, comunidad-nav-ranking, comunidad-nav-wall) appear on desktop (1440x900). Since the new slim TabBar is hidden on lg+ via lg:hidden, desktop users have NO sub-section navigation at all in /comunidad — this is worse than before the refactor.",
+        "selector": "[data-testid='comunidad-nav-feed']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "MilestoneConfetti close button",
+        "issue": "X close button [data-testid='milestone-banner-close'] fails Playwright actionability check because the sibling <div class='text-4xl mb-1 animate-bounce'>🎉</div> intercepts pointer events. Playwright error: 'animate-bounce subtree intercepts pointer events'. Standard click times out; force=True bypasses but does NOT fire the React onClick handler. Real users can still click (visually the X is clear in top-right), and the 5.5s auto-dismiss is a safety net, but UX is brittle. Fix: add `pointer-events-none` to the inner <div className='relative'> content wrapper at MilestoneConfetti.jsx line 148 (everything inside is presentational; the close button is a sibling), OR move the close button to be the last child with `z-10`.",
+        "selector": "[data-testid='milestone-banner-close']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "MilestoneConfetti banner (provider eCard)", "issues": ["Visual: banner gradient screenshot shows what appears to be teal-to-pink instead of the spec'd amber→orange→pink (bg-gradient-to-br from-amber-400 via-orange-500 to-pink-500). Could be a screenshot color profile artifact, but worth a manual visual confirm at /p/maria-cleaning-services-sallisaw-ok logged in as demo.provider with cleared localStorage."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(HIGH) /app/frontend/src/App.js — remove `embedded` prop from the /comunidad and /community Route element, OR teach ComunidadLayout to render LeftNav itself when on lg+. Without one of these, desktop users on /comunidad have zero sub-section nav. The TabBar is correctly lg:hidden, but the LeftNav side never mounts.",
+    "(MEDIUM) /app/frontend/src/components/MilestoneConfetti.jsx line 148 — add `pointer-events-none` to the <div className='relative'> content wrapper (the one containing 🎉 + headline + text). The animate-bounce 🎉 currently blocks the close button from receiving real React clicks.",
+    "(LOW) Visually verify the banner gradient on a real device — spec says amber→orange→pink but the screenshot reads more teal/pink. May just be Playwright/PNG rendering."
+  ],
+  "critical_code_review_comments": [
+    "Routing bug masks the LeftNav intent: App.js passes embedded=true so the painstakingly updated LeftNav (4 items at /comunidad lines 708-712) never reaches the DOM. The original Section 62 PR removed Chambas/Search from LeftNav but missed the gating prop. Net effect: desktop /comunidad has no in-section nav.",
+    "MilestoneConfetti is otherwise solid — single useEffect, finds highest crossed milestone via [...MILESTONES].reverse().find(), persists per (providerKey, metric), guards against double-fire on refresh. Owner-only gating in ProviderECard.jsx line 168 (`user && user.user_id === p.user_id`) verified by negative test (client login sees no banner).",
+    "Confetti CSS animation uses css custom props (--rot-start, --rot-end) for per-piece rotation — clean, no JS animation loop, GPU-friendly.",
+    "ComunidadLayout TabBar correctly uses useSmartNav hook — verified -translate-y-full toggles on scroll down/up. transition-transform duration-300 gives smooth slide. bg-white/95 backdrop-blur-md border-b border-slate-200/80 all confirmed in DOM classList.",
+    "Three MilestoneConfetti instances (likes/reviews/bookmarks) share providerKey but with `-rev` / `-bm` suffix to keep localStorage keys distinct — correct.",
+    "MILESTONE thresholds [10,25,50,100,250,500,1000,2500,5000] are reasonable but tightly clustered at low end (10→25→50). For a small business at 11 likes that creeps to 24 over a week, they only see ONE celebration. Maybe fine for MVP.",
+    "ProviderECard sums (p.like_count || 0) + (p.likes_count || 0) — confirmed both fields exist; in test, like_count=10 + likes_count=3 = 13 ≥ 10 milestone fires. Good defensive handling of dual count fields."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not tested)", "frontend": "Section 62 TabBar: 100% · Section 62 LeftNav (desktop): 0% (route-prop bug) · Section 63 Confetti: 90% (close-button actionability nit) · Regressions: 100%"},
+  "test_credentials": "demo.provider@getamano.com/provider123 (like_count=10, likes_count=3, rating_count=0, bookmark_count=1) · demo.client@getamano.com/client123 — both verified",
+  "seed_data_creation": "None. Tests clear localStorage between owner-view checks to enable re-fire.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Provider eCard URL is /p/{slug} (NOT /services/{slug} — that's the SEO category route). Slug = maria-cleaning-services-sallisaw-ok. To force MilestoneConfetti re-fire: `await page.evaluate('localStorage.clear()')` BEFORE goto /p/{slug}. Confetti has 50 pieces with class .gtm-confetti-piece, animation duration 1.8-3s — assert presence within 2s of page load. Banner auto-dismisses at 5.5s. For LeftNav fix verification, after main agent removes the embedded prop, check that all 4 testids (comunidad-nav-feed/explorar/ranking/wall) render on viewport>=1024px. The TabBar lg:hidden is correct — don't double-render. BottomNav uses testid bottom-nav-empleos (not bottom-nav-gigs/chambas — the label is 'Chambas' but data-testid is 'empleos').",
+  "rca of the issue": "LeftNav non-render RCA: ComunidadLayout was added in an earlier section (39) as a persistent wrapper. To prevent ComunidadPage from rendering its OWN duplicate header/nav inside the wrapper, App.js was given `<ComunidadPage embedded />` so the page skipped its top h1 + leftnav. In Section 62, the LeftNav was updated to the new 4-item set (Feed/Explorar/Ranking/HoF) but the `embedded` flag was not revisited — so the new LeftNav is effectively dead code on the /comunidad routes. Fix path: either (a) drop `embedded` prop from the index route and let ComunidadPage render its own LeftNav (will require removing the duplicate h1 from ComunidadPage), or (b) move the LeftNav rendering into ComunidadLayout itself (alongside TabBar) and use lg:block / lg:hidden to split them by breakpoint."
+}

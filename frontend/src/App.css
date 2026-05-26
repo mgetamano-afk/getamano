@@ -199,3 +199,22 @@
 .gtm-like-btn[data-liked="1"]:hover .gtm-heart {
   transform: scale(1.05);
 }
+
+/* ─── Section 63 — Milestone Confetti shower ─── */
+@keyframes gtm-confetti-fall {
+  0% {
+    transform: translateY(-20px) rotate(var(--rot-start, 0deg));
+    opacity: 0;
+  }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% {
+    transform: translateY(110vh) rotate(var(--rot-end, 360deg));
+    opacity: 0;
+  }
+}
+.gtm-confetti-piece {
+  animation-name: gtm-confetti-fall;
+  animation-timing-function: cubic-bezier(0.18, 0.62, 0.46, 0.96);
+  animation-fill-mode: forwards;
+}

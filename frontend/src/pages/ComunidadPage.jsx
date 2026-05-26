@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   MessageCircle, Share2, Trash2, Trophy, Image as ImageIcon,
   Search, Bell, Users, Sparkles, Bookmark, Settings, X, Send,
-  Home as HomeIcon, Briefcase, Loader2, Globe, MapPin, ArrowUp, RefreshCw, HeartHandshake
+  Home as HomeIcon, Briefcase, Loader2, Globe, MapPin, ArrowUp, RefreshCw, HeartHandshake, Compass
 } from "lucide-react";
 import { toast } from "sonner";
 import Header from "../components/Header";
@@ -702,10 +702,12 @@ function PostFeed() {
 // ─── Left Nav (desktop only) ────────────────────────────────────────────
 function LeftNav() {
   const { user } = useAuth();
+  // Section 62 — mirrors the new mobile TabBar (Feed / Explorar / Ranking / HoF).
+  // "Chambas" removed (already accessible from Header + BottomNav as "Empleos/Gigs").
+  // Renamed "Comunidad" → "Feed" so the sub-section is named consistently.
   const items = [
-    { to: "/comunidad", icon: HeartHandshake, label: "Comunidad", testid: "comunidad-nav-feed" },
-    { to: "/search", icon: Search, label: "Explorar", testid: "comunidad-nav-search" },
-    { to: "/empleos", icon: Briefcase, label: "Chambas", testid: "comunidad-nav-empleos" },
+    { to: "/comunidad", icon: HeartHandshake, label: "Feed", testid: "comunidad-nav-feed" },
+    { to: "/comunidad/explorar", icon: Compass, label: "Explorar", testid: "comunidad-nav-explorar" },
     { to: "/ranking", icon: Trophy, label: "Ranking", testid: "comunidad-nav-ranking" },
     { to: "/wall", icon: Sparkles, label: "Wall of Fame", testid: "comunidad-nav-wall" },
   ];
