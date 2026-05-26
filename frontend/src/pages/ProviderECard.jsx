@@ -438,12 +438,22 @@ export default function ProviderECard() {
               {p.reviews?.length > 0 ? (
                 <div className="space-y-4">
                   {p.reviews.map(r => (
-                    <div key={r.review_id} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0">
-                      <div className="flex items-center gap-2">
+                    <div key={r.review_id} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0" data-testid={`review-item-${r.review_id}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-slate-900">{r.user_name}</span>
                         <div className="flex">
                           {[...Array(r.rating)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-orange-500 text-orange-500" />)}
                         </div>
+                        {r.verified && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border"
+                            style={{ backgroundColor: "#ECFDF5", color: "#047857", borderColor: "#A7F3D0" }}
+                            title={`Reseña verificada · ${r.verification_source === "appointment" ? "tras cita confirmada" : r.verification_source === "service_request" ? "tras solicitud de cotización" : "tras conversación con el proveedor"}`}
+                            data-testid={`review-verified-${r.review_id}`}
+                          >
+                            <ShieldCheck className="w-3 h-3" /> Verificada
+                          </span>
+                        )}
                       </div>
                       {r.comment && <p className="text-slate-600 text-sm mt-1">{r.comment}</p>}
                     </div>

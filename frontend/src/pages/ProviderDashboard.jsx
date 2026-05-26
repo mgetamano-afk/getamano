@@ -6,7 +6,7 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import MilestoneCelebration from "../components/MilestoneCelebration";
@@ -31,12 +31,15 @@ import LeaderboardWidget from "../components/LeaderboardWidget";
 import CouponsCard from "../components/CouponsCard";
 import ProviderLeftNav from "../components/ProviderLeftNav";  // eslint-disable-line no-unused-vars -- kept for fast rollback (Section 44)
 import ECardPreviewModal from "../components/ECardPreviewModal";
+import BannerGenerator from "../components/BannerGenerator";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
 import EcardHealth from "../components/EcardHealth";
 import WeeklyHealthEmailPreview from "../components/WeeklyHealthEmailPreview";
 import WaitingClientsBadge from "../components/WaitingClientsBadge";
 import DescriptionFieldWithAI from "../components/DescriptionFieldWithAI";
 import CitySearchInput from "../components/CitySearchInput";
+import ChipInput from "../components/ChipInput";
+import ServiceAreasInput from "../components/ServiceAreasInput";
 import BusinessCardScanner from "../components/BusinessCardScanner";
 import { ScanLine } from "lucide-react";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
@@ -47,6 +50,7 @@ const TABS = [
   { id: "perfil", label: "Perfil", Icon: Settings },
   { id: "tarifas", label: "Mis Tarifas", Icon: DollarSign },
   { id: "galeria", label: "Galería", Icon: ImageIcon },
+  { id: "banner", label: "Banner Pro", Icon: Sparkles },
   { id: "citas", label: "Citas", Icon: Calendar },
   { id: "solicitudes", label: "Solicitudes", Icon: Inbox },
   { id: "mensajes", label: "Mensajes", Icon: MessageCircle },
@@ -452,11 +456,29 @@ export default function ProviderDashboard() {
                       <Field label="ZIP" value={form.zip_code} onChange={v => update("zip_code", v)} testid="form-zip" />
                     </>
                   )}
-                  <Field full label="Zonas de servicio (separadas por comas)" value={(form.service_areas || []).join(", ")} onChange={v => updateList("service_areas", v)} testid="form-service-areas" />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Zonas de servicio</label>
+                    <ServiceAreasInput
+                      value={form.service_areas || []}
+                      onChange={(arr) => setForm(f => ({ ...f, service_areas: arr }))}
+                      stateFilter={form.state}
+                      stateName={form.state}
+                      testid="form-service-areas"
+                    />
+                  </div>
                 </Section>
 
                 <Section title="Servicios y horarios">
-                  <Field full label="Servicios ofrecidos (separados por comas)" value={(form.services || []).join(", ")} onChange={v => updateList("services", v)} testid="form-services" />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Servicios ofrecidos</label>
+                    <ChipInput
+                      value={form.services || []}
+                      onChange={(arr) => setForm(f => ({ ...f, services: arr }))}
+                      placeholder="Escribe un servicio y presiona Enter o coma para añadir"
+                      max={20}
+                      testid="form-services"
+                    />
+                  </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-700 mb-2">Horarios</label>
                     <div className="grid md:grid-cols-2 gap-2">
@@ -505,6 +527,10 @@ export default function ProviderDashboard() {
 
             {tab === "galeria" && (
               <DashboardGallery profile={profile} setProfile={setProfile} />
+            )}
+
+            {tab === "banner" && (
+              <BannerGenerator profile={profile} />
             )}
 
             {tab === "citas" && (

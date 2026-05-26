@@ -104,10 +104,16 @@ export default function ImageUpload({ value, onChange, label, testid, aspect = "
  *  - remaining (int|null) -> when set, caps the batch to this many files
  *  - testid
  */
-export function GalleryUpload({ onUploaded, disabled = false, remaining = null, testid = "gallery-upload" }) {
+export function GalleryUpload({ onUploaded, disabled = false, remaining = null, testid = "gallery-upload", variant = "button", className = "" }) {
   const inputRef = useRef(null);
   const [items, setItems] = useState([]); // [{name, size, progress, status, error}]
   const [isBusy, setIsBusy] = useState(false);
+
+  // Allow callers to trigger the same file picker from a different UI element (e.g. "+" tile inside grid).
+  const openPicker = () => {
+    if (disabled || isBusy) return;
+    inputRef.current?.click();
+  };
 
   const handleFiles = async (fileList) => {
     if (!fileList?.length) return;
@@ -197,6 +203,70 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
       setItems(prev => prev.some(it => it.status === "error") ? prev : []);
     }, 2500);
   };
+
+  // Variant "tile" — renders a 1:1 aspect-ratio "+" plate matching the gallery grid
+  if (variant === "tile") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={openPicker}
+          disabled={disabled || isBusy}
+          className={`relative aspect-square w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+          style={{ borderColor: "#2F9D94", backgroundColor: "#F0FBFA", color: "#025F67" }}
+          data-testid={testid}
+          aria-label="Añadir más fotos"
+        >
+          {isBusy ? (
+            <Loader2 className="w-8 h-8 animate-spin" />
+          ) : (
+            <>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: "#2F9D94" }}>+</div>
+              <span className="text-xs font-medium">Añadir más fotos</span>
+            </>
+          )}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPTED_IMAGE_MIME}
+          multiple
+          hidden
+          onChange={e => handleFiles(e.target.files)}
+          data-testid={`${testid}-input`}
+        />
+        {items.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 col-span-2 md:col-span-3 lg:col-span-4 mt-2" data-testid="gallery-upload-progress-tile">
+            {items.map((it, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{
+                  backgroundColor: it.status === "done" ? "#DCFCE7" : it.status === "error" ? "#FEE2E2" : "#F1F5F9",
+                }}>
+                  {it.status === "done" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                  {it.status === "error" && <AlertCircle className="w-4 h-4 text-red-600" />}
+                  {(it.status === "uploading" || it.status === "compressing") && <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-medium text-slate-700 truncate">{it.name}</span>
+                    <span className="text-xs text-slate-400 ml-2 flex-shrink-0">
+                      {it.status === "error" ? it.error : it.status === "done" ? "Listo" : `${it.progress}%`}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full transition-all" style={{
+                      width: `${it.progress}%`,
+                      backgroundColor: it.status === "error" ? "#DC2626" : it.status === "done" ? "#10B981" : "#2F9D94",
+                    }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="space-y-3">

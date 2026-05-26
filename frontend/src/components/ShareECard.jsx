@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Share2, Facebook, MessageCircle, MessageSquare, Link as LinkIcon, X, Mail } from "lucide-react";
+import { Share2, Facebook, MessageCircle, MessageSquare, Link as LinkIcon, X, Mail, Twitter, Instagram } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ShareECard({ businessName, slug, description }) {
@@ -23,6 +23,13 @@ export default function ShareECard({ businessName, slug, description }) {
       href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(businessName)}`,
     },
     {
+      id: "x",
+      label: "X",
+      Icon: Twitter,
+      color: "bg-sky-50 text-sky-700 hover:bg-sky-100",
+      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
+    },
+    {
       id: "sms",
       label: "SMS",
       Icon: MessageSquare,
@@ -41,6 +48,18 @@ export default function ShareECard({ businessName, slug, description }) {
   const copy = async () => {
     await navigator.clipboard.writeText(url);
     toast.success("Enlace copiado");
+  };
+
+  const copyForInstagram = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Texto copiado · pégalo en tu historia o bio de Instagram");
+      const isMobile = /Mobi|Android|iPhone|iPad/.test(navigator.userAgent);
+      if (isMobile) setTimeout(() => { window.location.href = "instagram://camera"; }, 600);
+      setOpen(false);
+    } catch {
+      toast.error("No se pudo copiar");
+    }
   };
 
   const nativeShare = async () => {
@@ -78,6 +97,10 @@ export default function ShareECard({ businessName, slug, description }) {
                   <span className="text-xs font-medium">{o.label}</span>
                 </a>
               ))}
+              <button onClick={copyForInstagram} className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition bg-pink-50 text-pink-700 hover:bg-pink-100" data-testid="share-option-instagram">
+                <Instagram className="w-6 h-6" />
+                <span className="text-xs font-medium">Instagram</span>
+              </button>
             </div>
             <button onClick={copy} className="mt-4 w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-200 hover:border-blue-600 hover:text-blue-600 text-sm font-medium text-slate-700" data-testid="share-copy-link">
               <LinkIcon className="w-4 h-4" /> Copiar enlace

@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import Header from "../components/Header";
 import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload from "../components/ImageUpload";
+import ChipInput from "../components/ChipInput";
+import ServiceAreasInput from "../components/ServiceAreasInput";
 import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import BusinessCardScanner from "../components/BusinessCardScanner";
@@ -254,13 +256,32 @@ export default function ProviderOnboarding() {
                 </div>
               )}
 
-              <Field label="Zonas que cubres (separadas por comas)" value={form.service_areas.join(", ")} onChange={v => updateList("service_areas", v)} testid="onboarding-service-areas" placeholder="ej. Sallisaw OK, Muldrow OK, Fort Smith AR" />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Zonas que cubres</label>
+                <ServiceAreasInput
+                  value={form.service_areas || []}
+                  onChange={(arr) => setForm(f => ({ ...f, service_areas: arr }))}
+                  stateFilter={form.state}
+                  stateName={form.state}
+                  testid="onboarding-service-areas"
+                />
+              </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="mt-6 space-y-5">
-              <Field label="Servicios ofrecidos (separados por comas)" value={form.services.join(", ")} onChange={v => updateList("services", v)} testid="onboarding-services" placeholder="ej. Limpieza profunda, Limpieza regular, Post-construcción" />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Servicios ofrecidos</label>
+                <ChipInput
+                  value={form.services || []}
+                  onChange={(arr) => setForm(f => ({ ...f, services: arr }))}
+                  placeholder="ej. Limpieza profunda, presiona Enter o coma para añadir"
+                  max={20}
+                  testid="onboarding-services"
+                />
+                <p className="text-xs text-slate-400 mt-1">Escribe un servicio y presiona <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">Enter</kbd> o coma para añadirlo</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Horarios</label>
                 <div className="grid md:grid-cols-2 gap-2">

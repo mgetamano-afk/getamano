@@ -201,6 +201,16 @@ export default function DashboardGallery({ profile, setProfile }) {
               </div>
             </div>
           ))}
+
+          {/* Section 52 — "+" tile inside grid to add more photos */}
+          {!isFreeLimitReached && (
+            <GalleryUpload
+              variant="tile"
+              onUploaded={onUploaded}
+              remaining={limit?.remaining}
+              testid="gallery-add-tile"
+            />
+          )}
         </div>
       ) : (
         <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center text-slate-500" data-testid="gallery-empty">

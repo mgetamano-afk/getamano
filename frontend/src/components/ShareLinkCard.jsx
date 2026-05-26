@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X } from "lucide-react";
+import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 
@@ -53,6 +53,43 @@ export default function ShareLinkCard({ slug, businessName }) {
   const shareEmail = () => {
     window.location.href = `mailto:?subject=${encodeURIComponent(`Mi negocio en getamano · ${businessName}`)}&body=${encodeURIComponent(shareText)}`;
     _trackShare("email");
+  };
+
+  // Section 50 — Multi-channel eCard sharing: Facebook, X/Twitter, SMS, Instagram
+  const shareFacebook = () => {
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shortUrl)}&quote=${encodeURIComponent(shareText)}`;
+    window.open(fbUrl, "_blank", "width=600,height=500");
+    _trackShare("facebook");
+  };
+
+  const shareTwitter = () => {
+    const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(xUrl, "_blank", "width=600,height=500");
+    _trackShare("x");
+  };
+
+  const shareSMS = () => {
+    // Universal sms: link; iOS uses sms:&body=, Android uses sms:?body=
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const sep = isIOS ? "&" : "?";
+    window.location.href = `sms:${sep}body=${encodeURIComponent(shareText)}`;
+    _trackShare("sms");
+  };
+
+  const shareInstagram = async () => {
+    // Instagram no permite share por URL directo · copiamos texto+link y abrimos la app
+    try {
+      await navigator.clipboard.writeText(shareText);
+      toast.success("Texto copiado. Pégalo en tu historia o bio de Instagram.");
+      _trackShare("instagram");
+      // Si está en móvil intentamos abrir la app
+      const isMobile = /Mobi|Android|iPhone|iPad/.test(navigator.userAgent);
+      if (isMobile) {
+        setTimeout(() => { window.location.href = "instagram://camera"; }, 600);
+      }
+    } catch {
+      toast.error("No se pudo copiar — intenta de nuevo");
+    }
   };
 
   const nativeShare = async () => {
@@ -121,9 +158,25 @@ export default function ShareLinkCard({ slug, businessName }) {
           <MessageCircle className="w-4 h-4 text-green-400" />
           <span className="text-[11px]">WhatsApp</span>
         </button>
+        <button onClick={shareSMS} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-sms">
+          <MessageSquare className="w-4 h-4 text-emerald-300" />
+          <span className="text-[11px]">SMS</span>
+        </button>
         <button onClick={shareEmail} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-email">
           <Mail className="w-4 h-4 text-blue-300" />
           <span className="text-[11px]">Email</span>
+        </button>
+        <button onClick={shareFacebook} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-facebook">
+          <Facebook className="w-4 h-4 text-blue-400" />
+          <span className="text-[11px]">Facebook</span>
+        </button>
+        <button onClick={shareTwitter} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-x">
+          <Twitter className="w-4 h-4 text-sky-300" />
+          <span className="text-[11px]">X</span>
+        </button>
+        <button onClick={shareInstagram} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-instagram">
+          <Instagram className="w-4 h-4 text-pink-300" />
+          <span className="text-[11px]">Instagram</span>
         </button>
         <button onClick={() => setShowQr(true)} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-qr">
           <QrCode className="w-4 h-4 text-orange-300" />
@@ -131,7 +184,7 @@ export default function ShareLinkCard({ slug, businessName }) {
         </button>
         <button onClick={nativeShare} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-native">
           <Smartphone className="w-4 h-4 text-purple-300" />
-          <span className="text-[11px]">Compartir</span>
+          <span className="text-[11px]">Más...</span>
         </button>
       </div>
 

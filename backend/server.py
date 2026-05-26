@@ -1523,12 +1523,58 @@ async def create_review(payload: ReviewIn, user: User = Depends(get_current_user
     existing = await db.reviews.find_one({"provider_id": payload.provider_id, "user_id": user.user_id})
     if existing:
         raise HTTPException(status_code=400, detail="You already reviewed this provider")
+
+    # Section 50 — Verified Reviews:
+    # A review is "verified" when there's documented prior interaction between
+    # the reviewer and the provider — i.e. an existing conversation, a service
+    # request submitted, or a booked appointment.
+    is_verified = False
+    verification_source = None
+    try:
+        prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0, "user_id": 1})
+        provider_user_id = prof.get("user_id") if prof else None
+
+        # 1. Conversation (in-app message exchange)
+        conv = await db.conversations.find_one({
+            "provider_id": payload.provider_id,
+            "client_id": user.user_id,
+        }, {"_id": 0, "conversation_id": 1})
+        if conv:
+            is_verified = True
+            verification_source = "messaging"
+
+        # 2. Service request (quote requested)
+        if not is_verified:
+            req = await db.service_requests.find_one({
+                "provider_id": payload.provider_id,
+                "client_id": user.user_id,
+            }, {"_id": 0, "request_id": 1})
+            if req:
+                is_verified = True
+                verification_source = "service_request"
+
+        # 3. Appointment (booking)
+        if not is_verified and provider_user_id:
+            appt = await db.appointments.find_one({
+                "$or": [
+                    {"provider_id": payload.provider_id, "client_user_id": user.user_id},
+                    {"provider_user_id": provider_user_id, "client_user_id": user.user_id},
+                ]
+            }, {"_id": 0, "appointment_id": 1})
+            if appt:
+                is_verified = True
+                verification_source = "appointment"
+    except Exception as e:
+        logger.warning(f"verified-review-check failed: {e}")
+
     review = {
         "review_id": f"rev_{uuid.uuid4().hex[:10]}",
         "provider_id": payload.provider_id,
         "user_id": user.user_id, "user_name": user.name,
         "rating": payload.rating, "comment": payload.comment or "",
         "paid_amount_range": payload.paid_amount_range,
+        "verified": is_verified,
+        "verification_source": verification_source,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.reviews.insert_one(review)
@@ -8337,6 +8383,124 @@ async def track_provider_share_event(payload: ShareEventIn, request: Request,
         },
     )
     return {"ok": True}
+
+
+# ============ SECTION 49 — AI Banner Generator ============
+
+class BannerGenerateIn(BaseModel):
+    color: str = Field(default="#2F9D94", min_length=4, max_length=9)
+    style: Literal["modern", "festive", "professional", "minimal", "warm"] = "modern"
+    keywords: Optional[str] = Field(default=None, max_length=200)
+
+
+@api_router.post("/providers/me/generate-banner")
+async def generate_banner_background(payload: BannerGenerateIn,
+                                      user: User = Depends(get_current_user)):
+    """Section 49 — Generate an AI-powered banner background image for the
+    provider's professional digital banner. Uses gpt-image-1 via Emergent LLM Key.
+
+    Returns: { image_base64, dimensions, style, color }
+
+    The frontend composes this background with the business name, contact, QR
+    code, and logo overlay using HTML Canvas / html2canvas.
+    """
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores pueden generar banners.")
+
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "business_name": 1, "category_id": 1, "city": 1, "state": 1, "plan": 1, "banner_generations_count": 1, "banner_last_generated_at": 1},
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+
+    # Rate-limit: max 10 banners per day per provider to control API costs
+    now = datetime.now(timezone.utc)
+    today_start_iso = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    today_count = profile.get("banner_generations_count", 0)
+    last_at = profile.get("banner_last_generated_at", "")
+    if last_at and last_at >= today_start_iso and today_count >= 10:
+        raise HTTPException(status_code=429, detail="Límite diario de 10 banners alcanzado. Intenta mañana.")
+
+    # Build category context for richer image
+    category_label = ""
+    if profile.get("category_id"):
+        cat = await db.categories.find_one({"category_id": profile["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+        if cat:
+            category_label = cat.get("name_es") or cat.get("name_en") or ""
+
+    style_descriptions = {
+        "modern": "modern, clean, minimalist with bold geometric shapes and gradient",
+        "festive": "festive, joyful, celebratory with confetti, soft sparkles, warm latin party vibes",
+        "professional": "professional, corporate, elegant with subtle textures and refined composition",
+        "minimal": "ultra-minimalist, lots of negative space, single accent shape, calm composition",
+        "warm": "warm and welcoming, soft sunset gradient, friendly inviting feeling, latin community pride",
+    }
+    style_desc = style_descriptions.get(payload.style, style_descriptions["modern"])
+
+    # Compose prompt for the image generator
+    base_keywords = (payload.keywords or "").strip()
+    prompt_parts = [
+        f"A {style_desc} abstract background banner image for a small business banner card.",
+        f"Predominant brand color: {payload.color}.",
+        "No text, no letters, no numbers, no words — purely abstract decorative background.",
+        "Composition leaves the LEFT side relatively clean for overlaying text and a logo.",
+        "Suitable for a professional business card / social media banner.",
+    ]
+    if category_label:
+        prompt_parts.append(f"Subtle visual hints related to: {category_label}.")
+    if base_keywords:
+        prompt_parts.append(f"Additional theme: {base_keywords}.")
+    prompt_parts.append("High quality, polished, social-media-ready, no people faces.")
+    final_prompt = " ".join(prompt_parts)
+
+    try:
+        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+        image_gen = OpenAIImageGeneration(api_key=os.environ.get("EMERGENT_LLM_KEY"))
+        images = await image_gen.generate_images(
+            prompt=final_prompt,
+            model="gpt-image-1",
+            number_of_images=1,
+        )
+        if not images:
+            raise HTTPException(status_code=502, detail="No se pudo generar el banner. Intenta de nuevo.")
+        import base64 as _b64
+        image_base64 = _b64.b64encode(images[0]).decode("utf-8")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"banner-gen failed: {e}")
+        raise HTTPException(status_code=502, detail="Error al generar la imagen. Reintenta.")
+
+    # Counter update (idempotent per day)
+    update_doc = {
+        "banner_last_generated_at": now.isoformat(),
+        "banner_last_style": payload.style,
+        "banner_last_color": payload.color,
+    }
+    inc_doc = {"banner_generations_count": 1}
+    if not last_at or last_at < today_start_iso:
+        # Reset daily counter
+        update_doc["banner_generations_count"] = 1
+        await db.provider_profiles.update_one(
+            {"user_id": user.user_id},
+            {"$set": update_doc},
+        )
+    else:
+        await db.provider_profiles.update_one(
+            {"user_id": user.user_id},
+            {"$set": update_doc, "$inc": inc_doc},
+        )
+
+    return {
+        "image_base64": image_base64,
+        "mime": "image/png",
+        "style": payload.style,
+        "color": payload.color,
+        "business_name": profile.get("business_name", ""),
+        "city": profile.get("city", ""),
+        "state": profile.get("state", ""),
+    }
 
 
 @api_router.post("/providers/track-share-view")
