@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { api } from "../lib/api";
+import EmptyState from "../components/EmptyState";
+import StoriesCarousel from "../components/StoriesCarousel";
 import { useAuth } from "../contexts/AuthContext";
 import { getDicebearAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
@@ -659,11 +661,17 @@ function PostFeed() {
         </button>
       )}
 
+      {/* Section 60 — Stories carousel (24h ephemeral) — appears first */}
+      <StoriesCarousel />
       <NewPostBox onPosted={onPosted} />
-      {posts.length === 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500 text-sm" data-testid="comunidad-empty">
-          Sé el primero en publicar algo. ¡La comunidad te espera!
-        </div>
+      {posts.length === 0 && !loading && (
+        <EmptyState
+          testid="comunidad-empty"
+          icon={<HeartHandshake className="w-9 h-9" />}
+          title="¡La comunidad te espera!"
+          subtitle="Sé el primero en publicar algo. Comparte un trabajo, una recomendación o pregunta lo que necesites — los demás latinos están aquí para ayudarte."
+          tip="💡 Tip: las publicaciones con foto reciben 3× más respuestas"
+        />
       )}
       {posts.map(p => (
         <PostCard

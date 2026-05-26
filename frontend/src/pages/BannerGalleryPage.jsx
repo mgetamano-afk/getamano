@@ -7,6 +7,7 @@ import { useI18n } from "../contexts/I18nContext";
 import { Sparkles, Heart, Loader2, ChevronRight, ShieldCheck, ArrowRight, X, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { buildFileUrl } from "../components/ImageUpload";
+import EmptyState from "../components/EmptyState";
 
 const STYLE_FILTERS = [
   { id: "", emoji: "✨", labelEs: "Todos", labelEn: "All" },
@@ -188,18 +189,23 @@ export default function BannerGalleryPage() {
         )}
 
         {!loading && items.length === 0 && (
-          <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-16 text-center max-w-2xl mx-auto" data-testid="gallery-empty">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="w-10 h-10 text-pink-500" />
-            </div>
-            <h3 className="font-display font-bold text-xl text-slate-700 mb-1">
-              {lang === "en" ? "No banners yet in this category" : "Aún no hay banners en esta categoría"}
-            </h3>
-            <p className="text-sm text-slate-500 max-w-md mx-auto">
-              {lang === "en"
+          <div className="max-w-2xl mx-auto" data-testid="gallery-empty-wrap">
+            <EmptyState
+              testid="gallery-empty"
+              icon={<Sparkles className="w-9 h-9" />}
+              title={lang === "en" ? "No banners yet in this category" : "Aún no hay banners en esta categoría"}
+              subtitle={lang === "en"
                 ? "Be the first to publish — generate your own banner from the Pro Banner tab in your dashboard."
                 : "Sé el primero en publicar — genera tu propio banner desde la pestaña Banner Pro en tu panel."}
-            </p>
+              primaryAction={user?.role === "provider" ? {
+                label: lang === "en" ? "Create my banner" : "Crear mi banner",
+                onClick: () => { window.location.href = "/dashboard/provider"; },
+              } : null}
+              tags={STYLE_FILTERS.filter(f => f.id && f.id !== filter).slice(0, 3).map(f => ({
+                label: `${f.emoji} ${lang === "en" ? f.labelEn : f.labelEs}`,
+                onClick: () => setFilter(f.id),
+              }))}
+            />
           </div>
         )}
 

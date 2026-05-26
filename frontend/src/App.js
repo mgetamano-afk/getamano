@@ -4,7 +4,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { I18nProvider } from "./contexts/I18nContext";
 import { PwaInstallProvider } from "./contexts/PwaInstallContext";
 import { Toaster } from "sonner";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
 import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
@@ -12,6 +12,17 @@ import BottomNav from "./components/BottomNav";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { registerServiceWorker } from "./lib/pwa";
 import { trackIOSFirstLaunchOnce } from "./lib/deviceDetection";
+
+// Section 58 — Lightweight chunk-loading fallback (gradient dots)
+const ChunkFallback = () => (
+  <div className="min-h-[40vh] flex items-center justify-center bg-gradient-to-b from-slate-50 to-white">
+    <div className="flex items-center gap-3 text-slate-400">
+      <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+      <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+      <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+    </div>
+  </div>
+);
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -33,44 +44,45 @@ import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
-import SavedECardsPage from "./pages/SavedECardsPage";
-import BannerGalleryPage from "./pages/BannerGalleryPage";
-import RankingPage from "./pages/RankingPage";
+const SavedECardsPage = lazy(() => import("./pages/SavedECardsPage"));
+const BannerGalleryPage = lazy(() => import("./pages/BannerGalleryPage"));
+import NotFoundPage from "./pages/NotFoundPage";
+const RankingPage = lazy(() => import("./pages/RankingPage"));
 import ComunidadLayout from "./components/ComunidadLayout";
 import ComunidadExplorar from "./pages/ComunidadExplorar";
 import QuickActionsFAB from "./components/QuickActionsFAB";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import AdminOpsPage from "./pages/AdminOpsPage";
+const AdminOpsPage = lazy(() => import("./pages/AdminOpsPage"));
 
-// Admin Zone 4
-import AdminOverview from "./pages/admin/AdminOverview";
-import AdminCEO from "./pages/admin/AdminCEO";
-import AdminQuizFunnel from "./pages/admin/AdminQuizFunnel";
-import AdminLeadsInbox from "./pages/admin/AdminLeadsInbox";
+// Admin Zone 4 — all code-split (rarely on critical path)
+const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
+const AdminCEO = lazy(() => import("./pages/admin/AdminCEO"));
+const AdminQuizFunnel = lazy(() => import("./pages/admin/AdminQuizFunnel"));
+const AdminLeadsInbox = lazy(() => import("./pages/admin/AdminLeadsInbox"));
 import SplashScreen from "./components/SplashScreen";
-import AdminPricingIntelligence from "./pages/admin/AdminPricingIntelligence";
-import AdminQueue from "./pages/admin/AdminQueue";
-import AdminProviders from "./pages/admin/AdminProviders";
-import AdminReviews from "./pages/admin/AdminReviews";
-import AdminCatalog from "./pages/admin/AdminCatalog";
-import AdminAudit from "./pages/admin/AdminAudit";
+const AdminPricingIntelligence = lazy(() => import("./pages/admin/AdminPricingIntelligence"));
+const AdminQueue = lazy(() => import("./pages/admin/AdminQueue"));
+const AdminProviders = lazy(() => import("./pages/admin/AdminProviders"));
+const AdminReviews = lazy(() => import("./pages/admin/AdminReviews"));
+const AdminCatalog = lazy(() => import("./pages/admin/AdminCatalog"));
+const AdminAudit = lazy(() => import("./pages/admin/AdminAudit"));
 
-// Legal pages
-import Terms from "./pages/legal/Terms";
-import Privacy from "./pages/legal/Privacy";
-import ReviewsPolicy from "./pages/legal/ReviewsPolicy";
-import Cookies from "./pages/legal/Cookies";
+// Legal pages — code-split (low-traffic, large content)
+const Terms = lazy(() => import("./pages/legal/Terms"));
+const Privacy = lazy(() => import("./pages/legal/Privacy"));
+const ReviewsPolicy = lazy(() => import("./pages/legal/ReviewsPolicy"));
+const Cookies = lazy(() => import("./pages/legal/Cookies"));
 
-// SEO hub pages
-import SeoServicesIndex from "./pages/seo/SeoServicesIndex";
-import SeoCitiesIndex from "./pages/seo/SeoCitiesIndex";
-import SeoCityDetail from "./pages/seo/SeoCityDetail";
-import SeoCategoryDetail from "./pages/seo/SeoCategoryDetail";
-import SeoPage from "./pages/seo/SeoPage";
+// SEO hub pages — code-split (mostly bot-traffic)
+const SeoServicesIndex = lazy(() => import("./pages/seo/SeoServicesIndex"));
+const SeoCitiesIndex = lazy(() => import("./pages/seo/SeoCitiesIndex"));
+const SeoCityDetail = lazy(() => import("./pages/seo/SeoCityDetail"));
+const SeoCategoryDetail = lazy(() => import("./pages/seo/SeoCategoryDetail"));
+const SeoPage = lazy(() => import("./pages/seo/SeoPage"));
 
 // Admin: bidirectional reports
-import AdminReportsBidirectional from "./pages/admin/AdminReportsBidirectional";
+const AdminReportsBidirectional = lazy(() => import("./pages/admin/AdminReportsBidirectional"));
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function AppRouter() {
@@ -79,6 +91,7 @@ function AppRouter() {
     return <AuthCallback />;
   }
   return (
+    <Suspense fallback={<ChunkFallback />}>
     <Routes>
       {/* Zone 1: Landing */}
       <Route path="/" element={<Landing />} />
@@ -202,7 +215,11 @@ function AppRouter() {
       <Route path="/services/:categorySlug/:citySlug" element={<SeoPage />} />
       <Route path="/cities" element={<SeoCitiesIndex />} />
       <Route path="/cities/:citySlug" element={<SeoCityDetail />} />
+
+      {/* Section 59 — Elegant 404 catch-all (MUST be last route). */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
   );
 }
 

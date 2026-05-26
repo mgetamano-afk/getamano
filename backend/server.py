@@ -593,6 +593,26 @@ async def seed():
         await db.banner_shares.create_index([("is_public", 1), ("likes", -1), ("created_at", -1)])
         await db.banner_shares.create_index([("provider_user_id", 1), ("created_at", -1)])
         await db.banner_likes.create_index([("share_id", 1), ("user_id", 1)], unique=True)
+        # ── Section 60 / Stories — Instagram-style ephemeral 24h stories ──
+        await db.stories.create_index("story_id", unique=True)
+        await db.stories.create_index([("expires_at", 1)], expireAfterSeconds=0)  # TTL → auto-delete
+        await db.stories.create_index([("provider_user_id", 1), ("created_at", -1)])
+        await db.stories.create_index([("is_public", 1), ("created_at", -1)])
+        await db.story_views.create_index([("story_id", 1), ("viewer_user_id", 1)], unique=True)
+        # Section 58 — extra indexes for scale (60M-user readiness)
+        await db.reviews.create_index([("provider_id", 1), ("created_at", -1)])
+        await db.reviews.create_index([("provider_id", 1), ("rating", -1)])
+        await db.service_requests.create_index([("provider_id", 1), ("created_at", -1)])
+        await db.service_requests.create_index([("client_id", 1), ("created_at", -1)])
+        await db.messages.create_index([("conversation_id", 1), ("status", 1)])
+        await db.share_events.create_index([("provider_user_id", 1), ("created_at", -1)])
+        await db.exit_leads.create_index([("status", 1), ("created_at", -1)])
+        await db.favorites.create_index([("user_id", 1), ("provider_id", 1)])
+        await db.notification_queue.create_index([("user_id", 1), ("created_at", -1)])
+        await db.audit_log.create_index([("user_id", 1), ("created_at", -1)])
+        # Geo provider lookups (city + state) — already partially covered by compound idx above
+        await db.provider_profiles.create_index([("verification_status", 1), ("rating_avg", -1)])
+        await db.provider_profiles.create_index([("plan", 1), ("rating_avg", -1)])
         await db.quote_requests.create_index([("provider_id", 1), ("created_at", -1)])
         # Section 35/36 — community feed indexes
         await db.community_posts.create_index([("created_at", -1)])
@@ -8860,6 +8880,147 @@ async def get_banner_like_state(share_id: str, user: User = Depends(get_current_
 async def track_banner_view(share_id: str):
     """Fire-and-forget public view counter. No auth required."""
     await db.banner_shares.update_one({"share_id": share_id, "is_public": True}, {"$inc": {"views": 1}})
+    return {"ok": True}
+
+
+# ============ SECTION 60 — Provider Stories (24h ephemeral) ============
+# Instagram-style: provider posts a photo + short caption, story auto-expires
+# in 24h via MongoDB TTL index. Visible to anyone viewing the Community feed
+# in a horizontal carousel.
+
+class StoryCreateIn(BaseModel):
+    image_url: str = Field(..., min_length=4, max_length=600)
+    caption: Optional[str] = Field(default=None, max_length=140)
+
+
+@api_router.post("/stories")
+async def create_story(payload: StoryCreateIn, user: User = Depends(get_current_user)):
+    """Create a 24h ephemeral story. Providers only."""
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores pueden crear historias.")
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "provider_id": 1, "slug": 1, "business_name": 1, "logo_url": 1,
+         "verification_status": 1},
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+
+    # Throttle: max 5 active stories per provider at any time
+    now = datetime.now(timezone.utc)
+    active = await db.stories.count_documents({
+        "provider_user_id": user.user_id,
+        "expires_at": {"$gt": now},
+    })
+    if active >= 5:
+        raise HTTPException(status_code=429, detail="Límite de 5 historias activas alcanzado.")
+
+    story_id = f"sto_{uuid.uuid4().hex[:12]}"
+    doc = {
+        "story_id": story_id,
+        "provider_user_id": user.user_id,
+        "provider_id": profile.get("provider_id"),
+        "provider_slug": profile.get("slug"),
+        "business_name": profile.get("business_name"),
+        "logo_url": profile.get("logo_url"),
+        "verified": profile.get("verification_status") == "approved",
+        "image_url": payload.image_url,
+        "caption": (payload.caption or "").strip() or None,
+        "views_count": 0,
+        "is_public": True,
+        "created_at": now,
+        "expires_at": now + timedelta(hours=24),
+    }
+    await db.stories.insert_one(doc)
+    out = {**doc}
+    out["created_at"] = out["created_at"].isoformat()
+    out["expires_at"] = out["expires_at"].isoformat()
+    out.pop("_id", None)
+    return out
+
+
+@api_router.get("/stories/active")
+async def list_active_stories(limit: int = 30):
+    """Public — return active (non-expired) stories grouped by provider.
+
+    Returns one entry per provider with their LATEST story (Instagram pattern:
+    one tile per author, tap to see the rest). Limit caps the number of providers,
+    not the number of stories.
+    """
+    limit = max(1, min(60, limit))
+    now = datetime.now(timezone.utc)
+    pipeline = [
+        {"$match": {"is_public": True, "expires_at": {"$gt": now}}},
+        {"$sort": {"created_at": -1}},
+        {"$group": {
+            "_id": "$provider_user_id",
+            "latest": {"$first": "$$ROOT"},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"latest.created_at": -1}},
+        {"$limit": limit},
+        {"$project": {
+            "_id": 0,
+            "provider_user_id": "$_id",
+            "stories_count": "$count",
+            "latest_story_id": "$latest.story_id",
+            "provider_slug": "$latest.provider_slug",
+            "business_name": "$latest.business_name",
+            "logo_url": "$latest.logo_url",
+            "verified": "$latest.verified",
+            "image_url": "$latest.image_url",
+            "caption": "$latest.caption",
+            "created_at": "$latest.created_at",
+        }},
+    ]
+    rows = await db.stories.aggregate(pipeline).to_list(limit)
+    for r in rows:
+        if isinstance(r.get("created_at"), datetime):
+            r["created_at"] = r["created_at"].isoformat()
+    return rows
+
+
+@api_router.get("/stories/by-provider/{provider_user_id}")
+async def stories_by_provider(provider_user_id: str):
+    """Return all active stories from one provider, oldest first (for carousel playback)."""
+    now = datetime.now(timezone.utc)
+    rows = await db.stories.find(
+        {"provider_user_id": provider_user_id, "is_public": True, "expires_at": {"$gt": now}},
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(20)
+    for r in rows:
+        if isinstance(r.get("created_at"), datetime):
+            r["created_at"] = r["created_at"].isoformat()
+        if isinstance(r.get("expires_at"), datetime):
+            r["expires_at"] = r["expires_at"].isoformat()
+    return rows
+
+
+@api_router.post("/stories/{story_id}/view")
+async def track_story_view(story_id: str, user: User = Depends(get_current_user)):
+    """Count a unique view per (story, viewer). Idempotent via unique index."""
+    try:
+        await db.story_views.insert_one({
+            "story_id": story_id,
+            "viewer_user_id": user.user_id,
+            "viewed_at": datetime.now(timezone.utc),
+        })
+        await db.stories.update_one({"story_id": story_id}, {"$inc": {"views_count": 1}})
+    except Exception:
+        pass  # duplicate view — already counted
+    return {"ok": True}
+
+
+@api_router.delete("/stories/{story_id}")
+async def delete_story(story_id: str, user: User = Depends(get_current_user)):
+    """Owner or admin deletes a story manually before expiry."""
+    s = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "provider_user_id": 1})
+    if not s:
+        raise HTTPException(status_code=404, detail="Historia no encontrada.")
+    if user.role != "admin" and s["provider_user_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="No puedes eliminar esta historia.")
+    await db.stories.delete_one({"story_id": story_id})
+    await db.story_views.delete_many({"story_id": story_id})
     return {"ok": True}
 
 
