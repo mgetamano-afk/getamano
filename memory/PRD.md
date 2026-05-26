@@ -2011,3 +2011,13 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **Sec 60 / Stories**: Backend with TTL auto-expire, 5 REST endpoints. Frontend Instagram-style gradient carousel + fullscreen viewer with auto-progress + creator modal. Wired into ComunidadPage above feed.
 - Tests: `/app/test_reports/iteration_56.json` backend 9/9, frontend partially pass (login form auto-submit Playwright edge case — fixed with `type="button"` on OAuth/header buttons).
 
+
+### May 26, 2026 (7th drop) — Section 61: Universal Like Animations
+- New reusable `LikeButton.jsx` with heart-pulse + 6 radial particles + "+1" floater + haptic vibration.
+- Applied universally across 5 surfaces: Banner Gallery cards/modal, SaveECardButtons (eCard), Community posts, Story viewer.
+- Story Viewer: owner sees Eye+views + Heart+likes + Delete; non-owner sees floating LikeButton.
+- New backend POST/GET `/api/stories/{id}/like` + `/like-state` endpoints + `story_likes` collection with unique idx.
+- Bug fixes: datetime tzinfo comparison, StoryViewer fullscreen via createPortal.
+- Renamed old LikeButton.jsx → RecommendButton.jsx.
+- Tests: `/app/test_reports/iteration_57.json` backend 7/7, frontend 95%.
+

@@ -2,6 +2,54 @@
 
 Append-only log of major work shipped per session.
 
+## May 26, 2026 (7th drop) — Section 61: Universal Like Animations + Story Likes/Views
+
+### Universal Like Animations
+- **New `LikeButton.jsx`** — reusable heart-based component with celebration animation:
+  - `gtm-heart-pulse` keyframe (scale 1→1.55→1.1→1.35→1.05→1 over 700ms) with `gtm-heart-color` color burst (gray→pink→red with drop-shadow)
+  - **6 floating heart particles** burst radially outward via `gtm-heart-particle` (CSS custom props `--dx`, `--dy`, `--scale`, `animationDelay`)
+  - **"+1" floating text** rising + fading via `gtm-plus-one`
+  - **Subtle haptic** (15ms vibrate on supported devices)
+  - Variants: `pill` (default), `ghost`, `floating`
+  - Sizes: `sm` (28px), `md` (40px), `lg` (48px)
+  - Props: `liked, count, onClick, disabled, size, showCount, variant, testid, ariaLabel, disabledTitle`
+- **Applied across 5 surfaces** of the app:
+  - **Banner Gallery** card likes (`gallery-like-{share_id}`)
+  - **Banner Gallery** lightbox modal like (`gallery-modal-like`)
+  - **SaveECardButtons** on every public eCard (`save-ecard-like-btn`)
+  - **Community feed** post likes (`comunidad-post-like-{id}`, variant=ghost)
+  - **Story Viewer** (non-owner) floating like at bottom-left (`story-viewer-like`, variant=floating)
+
+### Story Views Counter + Story Likes
+- **Backend**: 2 new endpoints:
+  - `POST /api/stories/{id}/like` — toggle. Self-like → 400. Expired → 410. Idempotent via unique index `(story_id, user_id)` on new `story_likes` collection.
+  - `GET /api/stories/{id}/like-state` — `{liked: bool}` for hydration on viewer open.
+- **Story counters**: `views_count` (existing) + `likes_count` (new) auto-maintained via `$inc` on toggle.
+- **Frontend StoryViewer**:
+  - **Owner sees**: Eye icon + views count + Heart icon + likes count + Delete button at bottom of viewer
+  - **Non-owner sees**: floating LikeButton with animation at bottom-left
+  - Auto-hydrates like state for each story on mount
+  - Optimistic UI with revert on error
+  - Caption moved up to `bottom-20` to make space for counters at `bottom-4`
+
+### Bug fixes
+- **Datetime tzinfo bug** in `toggle_story_like`: MongoDB strips tzinfo on read. Added defensive `if exp.tzinfo is None: exp = exp.replace(tzinfo=timezone.utc)` before comparing to `datetime.now(timezone.utc)`.
+- **StoryViewer modal sizing bug**: parent container in ComunidadLayout created a containing block, breaking `position: fixed`. Fixed by wrapping the modal JSX in `createPortal(..., document.body)`. Modal now correctly fills `100vh × 100vw` (verified rect 1440×900).
+- **StoryCreator modal** also moved to `createPortal` for the same reason.
+
+### Renaming
+- `LikeButton.jsx` (old, thumbs-up "Recomiendo este negocio") renamed to **`RecommendButton.jsx`** to free up the name for the universal heart-based one. Single import in ProviderECard.jsx updated.
+
+### Testing
+- `/app/test_reports/iteration_57.json` — backend **7/7 pass (100%)**, frontend **95% pass**. No critical bugs. Two LOW-priority observations (story image `/api/files/` auth quirk in Playwright + recommend reading count after 1.2s wait).
+- Test file: `/app/backend/tests/test_iter57_story_likes.py`.
+
+### Code-review notes (deferred backlog)
+- **P2**: Cascade-delete `story_likes` rows when a story is manually deleted (currently orphans accumulate until TTL).
+- **P2**: Investigate `/api/files/getamano/uploads/...` auth — story images render black in some Playwright sessions while UI controls work.
+- **P2**: Add `gtm-like-btn` hover effect to BannerOfTheWeek likes badge (rendered but not verified visually because banner wasn't currently the weekly winner).
+
+
 ## May 26, 2026 (6th drop) — Sections 58 + 59 + Stories (24h)
 
 ### Section 58 — Infrastructure for 60M users (scale-ready foundations)
