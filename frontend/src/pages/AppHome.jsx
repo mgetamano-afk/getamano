@@ -36,31 +36,39 @@ const POPULAR_CATEGORIES = [
 
 export default function AppHome() {
   const { user } = useAuth();
-  const { lang, t } = useI18n();
+  const { lang } = useI18n();
   const navigate = useNavigate();
   const [featured, setFeatured] = useState([]);
   const [recentJobs, setRecentJobs] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [providerSlug, setProviderSlug] = useState("");
 
   const isProvider = user?.role === "provider";
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || (user?.email || "").split("@")[0];
 
-  // Pull featured + recent jobs in parallel on mount
+  // Featured + jobs — runs once, guest-safe.
   useEffect(() => {
     api.get("/providers/featured").then(r => setFeatured(Array.isArray(r.data) ? r.data.slice(0, 6) : [])).catch(() => {});
     api.get("/jobs", { params: { limit: 3, sort: "recent" } })
       .then(r => setRecentJobs(Array.isArray(r.data) ? r.data : (r.data?.items || [])))
       .catch(() => setRecentJobs([]));
-    if (user) {
-      api.get("/notifications").then(r => {
-        const list = Array.isArray(r.data) ? r.data : (r.data?.items || []);
-        setUnreadNotifications(list.filter(n => !n.read).length);
-      }).catch(() => {});
-      api.get("/conversations").then(r => {
-        const list = Array.isArray(r.data) ? r.data : [];
-        setUnreadMessages(list.filter(c => c.unread).length);
-      }).catch(() => {});
+  }, []);
+
+  // Auth-dependent fetches: notifications, conversations, and provider slug.
+  useEffect(() => {
+    if (!user) { setUnreadNotifications(0); setUnreadMessages(0); setProviderSlug(""); return; }
+    api.get("/notifications").then(r => {
+      const list = Array.isArray(r.data) ? r.data : (r.data?.items || []);
+      setUnreadNotifications(list.filter(n => !n.read).length);
+    }).catch(() => {});
+    api.get("/conversations").then(r => {
+      const list = Array.isArray(r.data) ? r.data : [];
+      setUnreadMessages(list.filter(c => c.unread).length);
+    }).catch(() => {});
+    // Fetch provider slug so QA4 'My eCard' can route to /p/{slug}.
+    if (user.role === "provider") {
+      api.get("/providers/me").then(r => setProviderSlug(r.data?.slug || "")).catch(() => {});
     }
   }, [user]);
 
@@ -202,8 +210,7 @@ export default function AppHome() {
             bgColor="#FFFBEB"
             onClick={() => {
               if (isProvider) {
-                const slug = user?.slug || user?.provider_slug;
-                if (slug) navigate(`/p/${slug}`);
+                if (providerSlug) navigate(`/p/${providerSlug}`);
                 else navigate("/dashboard/provider");
               } else {
                 navigate("/register?intent=provider");

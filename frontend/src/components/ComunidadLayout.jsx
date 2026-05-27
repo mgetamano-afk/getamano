@@ -3,22 +3,16 @@ import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import { Newspaper, Compass, Trophy, Award, IdCard } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 import Header from "./Header";
-import useSmartNav from "../hooks/useSmartNav";
 
 /**
- * ComunidadLayout — Section 62 (Navigation consolidation).
+ * ComunidadLayout — Section 62 + 63 (Navigation consolidation).
  *
  * Persistent wrapper around all /comunidad sub-routes. Renders the global
  * Header once at the top, a SECONDARY pill bar with the comunidad-specific
- * sub-sections (Feed · Explorar · Ranking · HoF), and the active sub-route
- * via <Outlet />.
+ * sub-sections (Feed · Explorar · Ranking · eCards · HoF), and the active
+ * sub-route via <Outlet />.
  *
- * Section 62 — UX consolidation:
- *  · Removed "Chambas" tab (was duplicating "Gigs" already present in BottomNav).
- *  · Renamed "Comunidad" → "Feed" (the dedicated comunidad-section namespace).
- *  · Visual: lighter (white + bottom border) instead of solid teal block.
- *  · Behavior: hides on scroll-down via useSmartNav (no longer permanently
- *    static); reappears on scroll-up.
+ * Section 63 — STICKY tab bar (no auto-hide). Always visible during scroll.
  */
 const buildTabs = (lang) => [
   { id: "feed",         label: lang === "en" ? "Feed"        : "Feed",        shortLabel: "Feed",    Icon: Newspaper, path: "/comunidad" },
@@ -34,7 +28,6 @@ export default function ComunidadLayout() {
   const navigate = useNavigate();
   const scrollPositions = useRef({});
   const prevPath = useRef(location.pathname);
-  const isVisible = useSmartNav();
   const COMUNIDAD_TABS = buildTabs(lang);
 
   // Restore / save window scroll per pathname (unchanged from before).

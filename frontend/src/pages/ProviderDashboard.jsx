@@ -9,6 +9,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
+import ProviderSideNav from "../components/ProviderSideNav";
 import MilestoneCelebration from "../components/MilestoneCelebration";
 import AchievementJournal from "../components/AchievementJournal";
 import ShareLinkCard from "../components/ShareLinkCard";
@@ -47,6 +48,7 @@ import { US_STATES, getStateByAbbr } from "../data/usLocations";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TAB_KEYS = [
+  { id: "dashboard", labelKey: "tabs.dashboard", Icon: Home },
   { id: "perfil", labelKey: "tabs.profile", Icon: Settings },
   { id: "tarifas", labelKey: "tabs.rates", Icon: DollarSign },
   { id: "galeria", labelKey: "tabs.gallery", Icon: ImageIcon },
@@ -69,7 +71,7 @@ export default function ProviderDashboard() {
   const [unread, setUnread] = useState(0);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("perfil");
+  const [tab, setTab] = useState("dashboard");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [ecardPreviewOpen, setEcardPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -192,10 +194,16 @@ export default function ProviderDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" data-testid="provider-dashboard">
         <MilestoneCelebration />
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
-          {/* Section 44 — Removed ProviderLeftNav (duplicate top menu).
-              Single source of truth is the TABS bar below ("Dashboard / Mensajes /
-              Citas / Solicitudes / Referidos / Mi Diario / Suscripción"). */}
+        <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
+          {/* Section 64 — Vertical sidebar (desktop only) */}
+          <div className="hidden lg:block">
+            <ProviderSideNav
+              tab={tab}
+              onChange={setTab}
+              unreadMessages={unread}
+              pendingRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
+            />
+          </div>
 
           {/* COLUMNA CENTRO — Contenido principal scrolleable */}
           <section className="min-w-0 space-y-6" data-testid="provider-dashboard-center">

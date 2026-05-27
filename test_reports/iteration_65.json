@@ -1,0 +1,29 @@
+{
+  "summary": "Section 64 — Provider Dashboard Redesign frontend testing. All 10 acceptance criteria passed on desktop (1920x900) and mobile (390x800). Vertical left sidebar (ProviderSideNav) renders 8 items in correct order with default 'dashboard' active state (teal-50/teal-700/ring). Tab clicks switch main content with aria-current=page and component markers present. Mensajes badge shows '3'. Header shows 'María'. Right sidebar with EcardHealth(95), ReferralPanel, etc. renders on desktop. Mobile correctly hides sidebar and shows dashboard-tabs fallback + 5-item BottomNav. i18n toggles labels (Inicio↔Home, Perfil↔Profile). Regression: AppHome loads, comunidad-tab-ecards exists, /comunidad/ecards grid loads.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL: One 401 console error observed during dashboard load (likely a background polling endpoint) — non-blocking, dashboard renders fully. Worth investigating which endpoint returns 401 once.",
+    "OPTIONAL (not in scope this iteration): Plan badge in header was deferred per spec.",
+    "OPTIONAL: 'Cupones' string was not found in body text — CouponsCard component might render empty/conditional when no coupons. Verify it shows something meaningful for providers with no active coupons."
+  ],
+  "critical_code_review_comments": [
+    "ProviderDashboard.jsx is 710 lines — well past the 700-line guideline. Consider splitting the giant <form> for tab='perfil' into a separate ProviderProfileForm component to keep ProviderDashboard.jsx a thin orchestrator.",
+    "TAB_KEYS in ProviderDashboard.jsx still contains 'referidos', 'diario', 'suscripcion' as legacy fallback for the horizontal dashboard-tabs bar — but ProviderSideNav (the new primary nav on lg+) does NOT expose them. On desktop these tabs are essentially unreachable now unless a child component calls onTabChange('suscripcion'). Either expose them via a secondary affordance (e.g., 'More' menu) or remove the dead branches.",
+    "ProviderSideNav.jsx renders the badge inside the button via `<button><span>`. Currently the badge for 'solicitudes' is conditionally rendered (badge > 0). When pendingRequests===0 the testid 'provider-sidenav-solicitudes-badge' is absent — confirmed in test. Document this contract.",
+    "Section 64 right sidebar uses `[&_li]:!flex-col [&_li]:!items-stretch [&_li]:!gap-2` global selectors which leak into ANY nested <ul><li> inside the sidebar children (e.g., a coupons list). Risky — prefer scoping these utilities to a wrapper class on the specific component that needs col layout."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (10/10 acceptance criteria + regression checks)"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (logged in via /api/auth/login through page.request — UI form login was flaky in headless playwright, may be a React onChange detection issue but not a real user issue).",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "ProviderSideNav has 8 items: dashboard, perfil, tarifas, galeria, banner, citas, solicitudes, mensajes. Default tab is 'dashboard'. Sidebar visible on lg+ (>=1024px) only, hidden below (uses 'hidden lg:block' wrapper). The horizontal dashboard-tabs bar remains as fallback on mobile and still lists 11 tabs (including legacy referidos/diario/suscripcion). For UI-driven login, the form fill via page.fill may not propagate to React state reliably — prefer API login + cookie reuse via page.request.post(/api/auth/login). The session_token cookie is httpOnly and SameSite=None.",
+  "rca of the issue": "n/a — no blocking issues. The 401 console error is from a background endpoint (likely /api/messaging/unread-count once or a notifications call) that fires before the auth cookie is fully populated; it self-recovers on the 30s poll. Not user-visible."
+}
