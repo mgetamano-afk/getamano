@@ -88,6 +88,95 @@ async def record_commission_credit(
     return doc
 
 
+async def _celebrate_applied_credit(db, user_id: str, applied_cents: int, applied_count: int) -> None:
+    """Section 71 — When N credits are moved from pending → applied (a Stripe
+    invoice received the discount), fire BOTH an in-app notification AND a
+    Web Push so the provider gets a "double dopamine" moment:
+      1. Stripe receipt arrives in their inbox showing the credit applied.
+      2. getamano notification + push celebrates it: "we just gave you $XX off
+         this month — thanks for referring allies".
+
+    Reduces churn (justifies the subscription cost mentally) and reinforces
+    the referral loop ("oh, getamano really does pay me back").
+
+    Best-effort: never raises. Caller doesn't have to wrap in try/except.
+    """
+    import uuid as _uuid
+    if applied_cents <= 0 or applied_count <= 0:
+        return
+    amount_label = f"${applied_cents / 100:.2f}"
+    title = f"🎉 Te ahorramos {amount_label} este mes"
+    body = (
+        f"Aplicamos tu crédito por {applied_count} referido{'s' if applied_count != 1 else ''} "
+        f"como descuento en tu factura. ¡Gracias por compartir getamano con aliados!"
+    )
+    cta_url = "/dashboard/provider?tab=red&subtab=earnings"
+
+    # 1. In-app notification (read in the bell dropdown)
+    try:
+        await db.notifications.insert_one({
+            "notification_id": f"notif_{_uuid.uuid4().hex[:12]}",
+            "user_id": user_id,
+            "category": "credits",
+            "title": title,
+            "body": body,
+            "cta_label": "Ver desglose",
+            "cta_url": cta_url,
+            "icon": "trophy",
+            "priority": "high",
+            "is_read": False,
+            "dismissed_at": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
+
+    # 2. Web Push delivery (works only if the user has subscribed via VAPID)
+    try:
+        from routes.push import send_push_to_user
+        await send_push_to_user(db, user_id, {
+            "title": title,
+            "body": body,
+            "url": cta_url,
+            "tag": "credits-applied",
+            "icon": "/icon-192x192.png",
+        })
+    except Exception:
+        pass
+
+
+async def _mark_credits_applied(
+    db,
+    *,
+    user_id: str,
+    credit_ids: list,
+    stripe_txn_id: str = "manual",
+) -> dict:
+    """Mark a set of pending credits as applied (used by both the Stripe sync
+    path and the dev-only simulate endpoint). Fires the celebration after.
+
+    Returns {applied_count, applied_cents}.
+    """
+    if not credit_ids:
+        return {"applied_count": 0, "applied_cents": 0}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # Sum cents before updating
+    pre = await db.commission_credits.aggregate([
+        {"$match": {"credit_id": {"$in": credit_ids}, "status": "pending", "user_id": user_id}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount_cents"}, "n": {"$sum": 1}}},
+    ]).to_list(1)
+    applied_cents = int((pre[0] or {}).get("total", 0)) if pre else 0
+    applied_count = int((pre[0] or {}).get("n", 0)) if pre else 0
+    if applied_count == 0:
+        return {"applied_count": 0, "applied_cents": 0}
+    await db.commission_credits.update_many(
+        {"credit_id": {"$in": credit_ids}, "status": "pending", "user_id": user_id},
+        {"$set": {"status": "applied", "applied_to": stripe_txn_id, "applied_at": now_iso}},
+    )
+    await _celebrate_applied_credit(db, user_id, applied_cents, applied_count)
+    return {"applied_count": applied_count, "applied_cents": applied_cents}
+
+
 def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
@@ -242,8 +331,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             {"_id": 0},
         ).to_list(500)
 
-        synced = 0
-        synced_cents = 0
+        synced_ids = []
         for row in pending_rows:
             try:
                 # NEGATIVE amount creates a credit on the customer balance.
@@ -261,18 +349,55 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
                         "applied_at": datetime.now(timezone.utc).isoformat(),
                     }},
                 )
-                synced += 1
-                synced_cents += int(row["amount_cents"])
+                synced_ids.append(row["credit_id"])
             except Exception:  # noqa: BLE001
                 # Keep going — partial sync is better than failing the whole batch.
-                # Surface failures in admin logs (TBD: write to error_log collection).
                 continue
+
+        # ONE celebration notification covering the whole batch (not one
+        # notification per credit — that would feel spammy).
+        applied_cents = 0
+        for cid in synced_ids:
+            r = await db.commission_credits.find_one({"credit_id": cid}, {"_id": 0, "amount_cents": 1})
+            applied_cents += int((r or {}).get("amount_cents", 0))
+        if synced_ids:
+            await _celebrate_applied_credit(db, me.user_id, applied_cents, len(synced_ids))
 
         return {
             "ok": True,
-            "synced": synced,
-            "synced_cents": synced_cents,
+            "synced": len(synced_ids),
+            "synced_cents": applied_cents,
             "mode": "stripe",
         }
+
+    @router.post("/credits/me/simulate-apply")
+    async def simulate_apply(me: User = Depends(get_current_user)) -> dict:
+        """DEV-ONLY: simulate applying all pending credits without hitting
+        Stripe. Marks them as applied with stripe_txn_id='dev-simulated' and
+        fires the celebration notification + push. Disabled in production.
+
+        Useful for:
+          - QA-ing the celebration flow before Stripe is configured
+          - Demo videos / screenshots
+          - Manually clearing the ledger if needed during testing
+        """
+        if os.environ.get("STRIPE_SECRET_KEY"):
+            raise HTTPException(
+                status_code=400,
+                detail="Simulación deshabilitada en producción. Usa /credits/sync-stripe.",
+            )
+        pending = await db.commission_credits.find(
+            {"user_id": me.user_id, "status": "pending"},
+            {"_id": 0, "credit_id": 1},
+        ).to_list(500)
+        if not pending:
+            return {"ok": True, "applied_count": 0, "applied_cents": 0, "note": "No hay créditos pending."}
+        result = await _mark_credits_applied(
+            db,
+            user_id=me.user_id,
+            credit_ids=[r["credit_id"] for r in pending],
+            stripe_txn_id="dev-simulated",
+        )
+        return {"ok": True, **result, "mode": "dev-simulated"}
 
     return router
