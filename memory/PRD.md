@@ -2102,3 +2102,19 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **Bug fixed (iter 62 → iter 63)**: MediaChooser Upload originalmente hacía POST /upload + PUT /providers/me, pero PUT requería business_name + category_id obligatorios → 422. Resuelto con endpoint dedicado upload-asset.
 - **Tests**: iteration 62 = 16/16 backend, 95% frontend (1 minor); iteration 63 = 11/11 backend, 100% frontend. 0 regresiones.
 - **UX gain**: providers nuevos tienen un único punto de activación que combina AI + upload sin obligarlos a elegir. Driver de activación significativo (logo → bio → banner → galería → share → reseña).
+
+
+### Feb 26, 2026 — Section 63 (App-first home + Comunidad eCards + sticky tabs)
+- **NEW `<AppHome>` page** at route `/` replacing the legacy Landing. Mobile-first layout: sticky header (logo + bell/messages icons for logged-in users with badges), teal hero with personalized greeting (`Hi, {name}` for users, `Welcome to getamano` for guests), prominent search trigger button → /search, LIVE activity ticker, 4 quick-action tiles (Search/Jobs/Community/[BeAProvider|MyEcard]), horizontal scroll "Popular categories" with emoji icons, horizontal scroll "Featured providers" cards, recent jobs list, "Become a provider" CTA banner. Landing.jsx moved to `/landing-legacy`.
+- **NEW `/comunidad/ecards` tab** inserted between Ranking and Hall of Fame. Renders `<ComunidadECards>` directory of all approved providers (sorted by ranking) as card tiles with VERIFICADO badge + rating + city. 5 tabs total in Comunidad: Feed · Explorar · Ranking · eCards · Hall of Fame.
+- **ComunidadLayout tab bar made STICKY** (no longer auto-hides on scroll). Removed useSmartNav.
+- **EcardHealth review CTA** now opens Web Share API (or clipboard fallback) with a pre-filled WhatsApp message linking to `{origin}/p/{slug}#resenas` when the next-step link contains "review/reseña". Significantly improves activation of the first review.
+- **Iteration 64 testing**: 100% acceptance pass, 0 regressions, 0 console errors.
+
+### Feb 26, 2026 — Section 64 (Provider Dashboard SPA-style redesign)
+- **NEW `<ProviderSideNav>`** — vertical left sidebar (220px) for `/dashboard/provider` on lg+. 8 items: Home · Profile · Pricing · Gallery · Banner Pro · Appointments · Requests · Messages. Selected item: teal-50 bg + teal-700 text + ring. Mensajes/Requests show count badges when >0.
+- **Dashboard layout** changed to 3-column grid: `[220px sidebar][1fr main][320px right column]`. Mobile collapses to single column with existing horizontal tab bar as fallback.
+- **Default tab changed** from "perfil" → "dashboard" (Inicio overview). New tab "dashboard" doesn't render any custom switch block — it shows the always-visible overview content (ProviderGreeting, StreakWidget, LeaderboardWidget, MarketPulseCard, ShareLinkCard, etc.) which sits above the tab switch.
+- **i18n new key**: `tabs.dashboard` → ES "Inicio" / EN "Home".
+- **Visual outcome** (verified): Hola María 👋 hero (cream gradient) + #1 ranking card + 95/100 health gauge + checklist + share rewards + chambas pulse — feels like a real SaaS dashboard.
+- **Iteration 65 testing**: 100% (10/10 acceptance + regression). 0 blocking issues.

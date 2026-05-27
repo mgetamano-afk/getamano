@@ -24,6 +24,10 @@ import { useI18n } from "../contexts/I18nContext";
  *   unreadMessages: badge for the "mensajes" item
  *   pendingRequests: badge for the "solicitudes" item
  *   onSignOut(): optional, sign out CTA at the bottom
+ *
+ * NOTE: badges are rendered ONLY when their value > 0. Tests that look
+ * for `provider-sidenav-{id}-badge` must guard for absence when the
+ * badge is zero — this is intentional to avoid cluttering the UI.
  */
 const ITEMS = [
   { id: "dashboard",   Icon: Home,           labelEs: "Inicio",       labelEn: "Home" },
