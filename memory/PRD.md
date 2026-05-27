@@ -2268,3 +2268,40 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - Cero costo adicional, cero APIs nuevas — pura CSS.
 
 **Files**: `/app/frontend/src/pages/PrintCard.jsx` (+~100 LOC).
+
+
+### Iteration 72 (May 27, 2026) — Section 71: Commission Credits Ledger + Earnings Widget
+**Goal del usuario:** opción (b) — Stripe Customer Balance como mecanismo, con ledger interno mientras tanto. "esas comisiones descontadas en su mes de suscripción" → automático vía `customer.balance`.
+
+**Decisión operativa**: el 5% de comisión por referrals **NO se paga en cash**, **NO es discount code** — se acumula como **crédito en `customer.balance` de Stripe**, que se descuenta automáticamente del próximo cobro mensual. Acumulable (si comisiones > suscripción → rollover), nativo de Stripe (1 fuente de verdad), visible en el recibo oficial.
+
+**Implementación:**
+
+1. **`/app/backend/routes/credits.py`** (NEW, ~260 LOC) — ledger interno + endpoints:
+   - Colección `commission_credits`: `{credit_id, user_id, source, source_id, amount_cents, currency, status: pending|applied|expired, applied_to (stripe txn id), applied_at, note, created_at}`.
+   - Función helper `record_commission_credit()` — idempotente por (source, source_id, user_id). Llamada desde referral_jobs.complete.
+   - `GET /api/credits/me/summary` — balance pendiente + this-month + last-month + delta % + next_action contextual + stripe_configured flag.
+   - `GET /api/credits/me` — lista paginada del ledger por status (pending/applied/expired).
+   - `POST /api/credits/sync-stripe` — en dev: no-op informativo. En producción: `stripe.Customer.create_balance_transaction(customer_id, amount=-cents, currency='usd', description='getamano referral commission')` por cada credit pending → mueve a status='applied' con txn id.
+
+2. **`/app/backend/routes/referral_jobs.py`** — hook agregado: cuando `complete_referral()` cierra un trabajo, escribe automáticamente al ledger vía `_record_credit()` (lazy import). Try/except → la lógica de referrals nunca falla por el ledger.
+
+3. **`/app/backend/scripts/backfill_commission_credits.py`** — script idempotente que escanea referral_jobs completados y crea las filas faltantes en commission_credits. Ejecutado una vez: 2 credits creados (María: $20 + $12.50 = **$32.50 pending**).
+
+4. **`/app/frontend/src/components/EarningsWidget.jsx`** (NEW, ~110 LOC) — Card con gradiente teal getamano. Hero number "Available credit $XX.XX" + comparativa "This month vs last month" con delta pill (▲/▼ % colored emerald/rose) + next_action contextual + nota "Demo mode" mientras no haya Stripe. Auto-hide cuando credits_count === 0. Click → /dashboard/provider?tab=red&subtab=earnings.
+
+5. **`AppHome.jsx`** — widget montado entre Quick Actions y Popular Categories. Solo visible para isProvider.
+
+**Verificación E2E**:
+- Backend: `/api/credits/me/summary` → pending $32.50, this_month $32.50, credits_count 2, stripe_configured false ✓
+- Backend: `/api/credits/sync-stripe` en dev-fallback → `{mode: "dev-fallback", pending_count: 2}` ✓
+- Frontend: widget renderiza "$32.50" + "This month $32.50" + mensajes ES/EN.
+- Existing endpoints intactos: notifications/conversations/follows/referrals todos 200.
+
+**Cuando llegen las Stripe keys**:
+1. Configurar STRIPE_SECRET_KEY en /app/backend/.env.
+2. Agregar campo stripe_customer_id al schema users (cuando user se suscribe vía Stripe Checkout, se guarda).
+3. Configurar webhook invoice.upcoming → llamar a /api/credits/sync-stripe antes del cobro.
+4. (Opcional) Cron diario que llama sync-stripe para todos los users con saldo > 0.
+
+**Lint**: All checks passed ✓

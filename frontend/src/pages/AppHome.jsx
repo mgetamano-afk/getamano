@@ -15,6 +15,7 @@ import { api } from "../lib/api";
 import LiveActivityTicker from "../components/LiveActivityTicker";
 import FoundingCounter from "../components/FoundingCounter";
 import NotificationBell from "../components/NotificationBell";
+import EarningsWidget from "../components/EarningsWidget";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -213,6 +214,15 @@ export default function AppHome() {
           />
         </div>
       </section>
+
+      {/* ── Earnings widget (providers with credits only) ─────────────── */}
+      {isProvider && (
+        <section className="pt-4 md:pt-6" data-testid="apphome-earnings-section">
+          <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <EarningsWidget />
+          </div>
+        </section>
+      )}
 
       {/* ── Popular categories scroll ─────────────────────────────────── */}
       <section className="pt-6 md:pt-8" data-testid="apphome-categories-section">

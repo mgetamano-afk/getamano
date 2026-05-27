@@ -54,6 +54,27 @@ class CompleteJobIn(BaseModel):
 def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
+    async def _record_credit(referrer_user_id: str, referral_id: str, commission_amount: float, client_name: str):
+        """Section 71 — Append a row to the commission_credits ledger when a
+        referral closes. Imported lazily so this module stays decoupled.
+        Idempotent on (source, source_id) — re-runs are safe.
+        """
+        try:
+            from routes.credits import record_commission_credit
+            cents = int(round(commission_amount * 100))
+            note = f"5% comisión por trabajo de {client_name}"
+            await record_commission_credit(
+                db,
+                user_id=referrer_user_id,
+                source_id=referral_id,
+                amount_cents=cents,
+                note=note,
+            )
+        except Exception:
+            # Never block the user flow if ledger write fails — the
+            # referral_jobs row is the source of truth and can be replayed.
+            pass
+
     async def _notify(user_id: str, title: str, body: str, cta_url: str, icon: str):
         try:
             await db.notifications.insert_one({
@@ -219,6 +240,14 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
                 # Convenience: also mark accepted_at if it was skipped.
                 "accepted_at": row.get("accepted_at") or now_iso,
             }},
+        )
+        # Section 71 — Append commission to the credits ledger so it shows
+        # up in the EarningsWidget and can be synced to Stripe later.
+        await _record_credit(
+            row["referrer_user_id"],
+            rid,
+            commission_amount,
+            row["client_name"],
         )
         completer_name = (getattr(me, "name", "") or "El aliado").strip().split()[0] or "El aliado"
         await _notify(
