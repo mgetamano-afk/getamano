@@ -612,6 +612,39 @@ def make_router(*, db, audit_log, get_current_user, PUBLIC_GUARD) -> APIRouter:
     )
     router = APIRouter(prefix="/community", tags=["community"])
 
+    @router.get("/posts/top-milestones-week")
+    async def top_milestones_week(limit: int = 3) -> list:
+        """Section 81 — Top milestone posts from the last 7 days, ranked by
+        engagement (likes + comments * 2). Used by the AppHome / community
+        sidebar to surface social proof + drive more reactions back to the
+        original referrer.
+        """
+        limit = max(1, min(10, limit))
+        seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        # Aggregate to compute engagement score
+        pipeline = [
+            {"$match": {
+                "type": "milestone",
+                "is_hidden": {"$ne": True},
+                "created_at": {"$gte": seven_days_ago},
+            }},
+            {"$addFields": {
+                "engagement_score": {
+                    "$add": [
+                        {"$ifNull": ["$likes_count", 0]},
+                        {"$multiply": [{"$ifNull": ["$comments_count", 0]}, 2]},
+                    ]
+                }
+            }},
+            {"$sort": {"engagement_score": -1, "created_at": -1}},
+            {"$limit": limit},
+            {"$project": {"_id": 0}},
+        ]
+        rows = await deps.db.community_posts.aggregate(pipeline).to_list(limit)
+        # Reuse hydrate_posts to attach author info + viewer's liked_by_me state
+        rows = await hydrate_posts(deps.db, rows, None)
+        return rows
+
     # Posts
     @router.get("/posts")
     async def list_posts(limit: int = 20, before: Optional[str] = None, filter: Optional[str] = None):

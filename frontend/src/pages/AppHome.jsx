@@ -18,6 +18,7 @@ import NotificationBell from "../components/NotificationBell";
 import EarningsWidget from "../components/EarningsWidget";
 import ReferralProgressCard from "../components/ReferralProgressCard";
 import MilestoneCelebrationModal from "../components/MilestoneCelebrationModal";
+import MilestoneOfTheWeekWidget from "../components/MilestoneOfTheWeekWidget";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -86,9 +87,12 @@ export default function AppHome() {
         data-testid="apphome-header"
       >
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
-          <Link to="/" className="font-display font-extrabold text-[22px] tracking-tight" style={{ letterSpacing: "-0.5px" }}>
-            <span style={{ color: "#025F67" }}>get</span>
-            <span style={{ color: "#111827" }}>amano</span>
+          <Link to="/" className="flex items-center gap-2 font-display font-extrabold text-[22px] tracking-tight" style={{ letterSpacing: "-0.5px" }}>
+            <img src="/getamano-logo-mark.png" alt="" className="w-9 h-9 object-contain flex-shrink-0" />
+            <span>
+              <span style={{ color: "#025F67" }}>get</span>
+              <span style={{ color: "#111827" }}>amano</span>
+            </span>
           </Link>
           <div className="flex items-center gap-3">
             {user ? (
@@ -227,6 +231,16 @@ export default function AppHome() {
           <div className="max-w-7xl mx-auto px-4 md:px-6 grid md:grid-cols-2 gap-4">
             <EarningsWidget />
             <ReferralProgressCard />
+          </div>
+        </section>
+      )}
+
+      {/* ── Milestone of the week — visible to all authenticated users
+            (clients can also "cheer" providers and reinforce the loop) ─ */}
+      {user && (
+        <section className="pt-4" data-testid="apphome-milestone-week-section">
+          <div className="max-w-7xl mx-auto px-4 md:px-6">
+            <MilestoneOfTheWeekWidget />
           </div>
         </section>
       )}
