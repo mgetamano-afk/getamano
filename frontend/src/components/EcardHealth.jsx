@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import {
   Image as ImageIcon,
   Type,
@@ -61,6 +62,7 @@ function ringStrokeColor(score) {
 
 export default function EcardHealth() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -100,6 +102,28 @@ export default function EcardHealth() {
   const ringDash = (score / 100) * ringCirc;
 
   const go = (link) => {
+    // Section 63 Block 1 — Special-case the "first review" CTA: instead of
+    // simply navigating, open the WhatsApp share sheet with a pre-filled
+    // message pointing to the provider's eCard reviews anchor. Falls back
+    // to clipboard copy if Web Share API is unavailable.
+    if (link && /review|resena|reseña/i.test(link)) {
+      const slug = data?.slug || user?.slug;
+      if (slug) {
+        const url = `${window.location.origin}/p/${slug}#resenas`;
+        const msg = `¡Hola! ¿Te quedaste contento con mi servicio? Me ayudarías muchísimo con una reseña corta en mi eCard 👇\n${url}`;
+        if (navigator.share) {
+          navigator.share({ title: "Mi eCard en getamano", text: msg, url }).catch(() => {});
+        } else if (navigator.clipboard) {
+          navigator.clipboard.writeText(msg).then(() => {
+            // best-effort toast hint (no toast lib import here on purpose)
+            window.alert("Mensaje copiado — pégalo en WhatsApp");
+          }).catch(() => navigate(link));
+        } else {
+          navigate(link);
+        }
+        return;
+      }
+    }
     navigate(link);
   };
 

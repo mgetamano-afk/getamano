@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
-import { Newspaper, Compass, Trophy, Award } from "lucide-react";
+import { Newspaper, Compass, Trophy, Award, IdCard } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 import Header from "./Header";
 import useSmartNav from "../hooks/useSmartNav";
@@ -24,6 +24,7 @@ const buildTabs = (lang) => [
   { id: "feed",         label: lang === "en" ? "Feed"        : "Feed",        shortLabel: "Feed",    Icon: Newspaper, path: "/comunidad" },
   { id: "explorar",     label: lang === "en" ? "Explore"     : "Explorar",    shortLabel: lang === "en" ? "Explore" : "Explorar", Icon: Compass,   path: "/comunidad/explorar" },
   { id: "ranking",      label: lang === "en" ? "Ranking"     : "Ranking",     shortLabel: "Ranking", Icon: Trophy,    path: "/comunidad/ranking" },
+  { id: "ecards",       label: lang === "en" ? "eCards"      : "eCards",      shortLabel: "eCards",  Icon: IdCard,    path: "/comunidad/ecards" },
   { id: "wall-of-fame", label: lang === "en" ? "Hall of Fame": "Hall of Fame", shortLabel: "HoF",    Icon: Award,     path: "/comunidad/wall-of-fame" },
 ];
 
@@ -69,13 +70,10 @@ export default function ComunidadLayout() {
     <div className="min-h-screen bg-slate-50" data-testid="comunidad-layout">
       <Header />
 
-      {/* Section 62 — Slim pill bar on mobile/tablet only; hidden on desktop (LeftNav takes over). Auto-hides on scroll down. */}
+      {/* Section 63 — Sticky tab bar (always visible, no auto-hide). */}
       <div
-        className={`fixed top-14 md:top-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-transform duration-300 lg:hidden ${
-          isVisible ? "translate-y-0" : "-translate-y-full"
-        }`}
+        className="fixed top-14 md:top-16 left-0 right-0 z-30 bg-white border-b border-slate-200 lg:hidden"
         data-testid="comunidad-tabbar"
-        aria-hidden={!isVisible}
       >
         <nav
           className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-none"

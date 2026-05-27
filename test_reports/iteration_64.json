@@ -1,0 +1,35 @@
+{
+  "summary": "Section 63 (Blocks 2/3/5 + regression) frontend testing on mobile viewport 390x800. AppHome at / renders correctly for guest, client, and provider with personalized greetings + correct QA4 behavior + correct banner gating. Comunidad has the new 5th tab 'eCards' with sticky tabbar (verified at scrollY=800: bbox.y=56, visible). ComunidadECards grid renders with 1 verified Maria tile linking to /p/maria-cleaning-services-sallisaw-ok. Search-trigger, quick-action navigations, and provider banner CTA all work. One minor real issue: provider 'My eCard' quick-action falls back to /dashboard/provider instead of the public eCard URL because /api/auth/me does not expose user.slug / user.provider_slug.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/me", "issue": "Response does NOT include `slug` or `provider_slug` for provider users. AppHome relies on user.slug/user.provider_slug to route the 'My eCard' QA4 to /p/{slug}. Without it the code falls back to /dashboard/provider — meaning the new home QA4 never reaches the public eCard for the provider."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AppHome QuickAction 'My eCard' (provider)", "issue": "Falls back to /dashboard/provider instead of /p/{slug}. user.slug is undefined in AuthContext because /api/auth/me does not return it. Either backend adds provider_slug to /api/auth/me, or AppHome fetches /api/providers/by-user/me (or similar) on mount when role=provider and caches the slug for routing.", "selector": "[data-testid=\"apphome-qa-ecard\"]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Provider QA4 routing: expose provider_slug in /api/auth/me response (or in AuthContext via a follow-up fetch) so AppHome can route 'My eCard' to /p/{slug} as specified, instead of falling back to /dashboard/provider.",
+    "Optional polish: AppHome's /api/jobs call returns 404 currently — note already acknowledged by main agent. Catch already gracefully sets [], so no user impact."
+  ],
+  "critical_code_review_comments": [
+    "ComunidadLayout.jsx still imports useSmartNav and assigns isVisible but never uses it (Section 63 dropped auto-hide). Dead variable — remove the hook call to avoid confusion and unnecessary scroll listeners.",
+    "AppHome.jsx: useEffect dependency [user] re-fires all 4 API calls on every login/logout. Two of them are guest-safe (featured/jobs) and could move to a separate effect with [] deps to avoid double-fetch on auth change.",
+    "AppHome.jsx imports `t` from useI18n but never uses it (only `lang`). Minor unused import.",
+    "ComunidadECards.jsx filter `(p.verification_status || 'approved')` defaults missing field to 'approved' — could mask un-approved providers if backend ever omits the field. Safer to filter explicitly `=== 'approved'` only when field is present."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only scope)", "frontend": "Block 5 ~95% (1 minor routing fallback), Block 2 100%, Block 3 100%"},
+  "test_credentials": "admin/admin123 not used this iter; client + provider used (demo.client@getamano.com, demo.provider@getamano.com)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "AppHome lives at route /. Use viewport 390x800. Guest greeting='getamano — Latino services'. Client greeting='What do you need today?' with 'Hola, Carlos 👋' subline. Provider greeting same + 'Hi, María 👋'. Provider banner is hidden for role=provider only. /api/auth/me lacks slug — main agent will likely either patch /api/auth/me to include provider_slug or change AppHome to do a side fetch. Comunidad tabbar uses position:fixed top-14 — confirmed sticky across scroll. The new tab data-testid is comunidad-tab-ecards and route /comunidad/ecards loads ComunidadECards (data-testid='comunidad-ecards-grid'). Maria tile links to /p/maria-cleaning-services-sallisaw-ok (NOT /p/verified-providers-2 — that string in the spec was the app subdomain, not a slug).",
+  "rca of the issue": "Provider 'My eCard' QA4 routing fallback: AppHome.jsx (line ~205) reads `user?.slug || user?.provider_slug`. AuthContext fills `user` from /api/auth/me, but that endpoint returns only {user_id, email, name, role, picture, phone, language, country, created_at} — no slug. Hence the if-branch hits the else and routes to /dashboard/provider. Fix: backend should include provider_slug for role=provider in /api/auth/me, OR AppHome fires GET /api/providers/by-user/{user_id} (existing) on mount when role===provider and caches slug locally before routing."
+}

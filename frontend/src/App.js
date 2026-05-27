@@ -26,6 +26,7 @@ const ChunkFallback = () => (
 );
 
 import Landing from "./pages/Landing";
+import AppHome from "./pages/AppHome";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AuthCallback from "./pages/AuthCallback";
@@ -52,6 +53,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 const RankingPage = lazy(() => import("./pages/RankingPage"));
 import ComunidadLayout from "./components/ComunidadLayout";
 import ComunidadExplorar from "./pages/ComunidadExplorar";
+import ComunidadECards from "./pages/ComunidadECards";
 import QuickActionsFAB from "./components/QuickActionsFAB";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -96,7 +98,8 @@ function AppRouter() {
     <Suspense fallback={<ChunkFallback />}>
     <Routes>
       {/* Zone 1: Landing */}
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={<AppHome />} />
+      <Route path="/landing-legacy" element={<Landing />} />
 
       {/* PWA install landing — share-friendly URL for QR codes / WhatsApp links */}
       <Route path="/instalar" element={<Install />} />
@@ -151,6 +154,7 @@ function AppRouter() {
         <Route path="explorar" element={<ComunidadExplorar />} />
         <Route path="chambas" element={<EmpleosPage embedded />} />
         <Route path="ranking" element={<RankingPage embedded />} />
+        <Route path="ecards" element={<ComunidadECards />} />
         <Route path="wall-of-fame" element={<Community embedded />} />
       </Route>
       <Route path="/community" element={<ComunidadLayout />}>
@@ -158,6 +162,7 @@ function AppRouter() {
         <Route path="explorar" element={<ComunidadExplorar />} />
         <Route path="chambas" element={<EmpleosPage embedded />} />
         <Route path="ranking" element={<RankingPage embedded />} />
+        <Route path="ecards" element={<ComunidadECards />} />
         <Route path="wall-of-fame" element={<Community embedded />} />
       </Route>
 
