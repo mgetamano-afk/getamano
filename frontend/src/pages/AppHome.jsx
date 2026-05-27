@@ -179,12 +179,10 @@ export default function AppHome() {
         <LiveActivityTicker />
       </div>
 
-      {/* ── Founding 50 promo banner (guests + non-providers) ─────────── */}
-      {!isProvider && (
-        <div className="max-w-7xl mx-auto px-3 md:px-5 mt-3" data-testid="apphome-founding-banner">
-          <FoundingCounter variant="banner" />
-        </div>
-      )}
+      {/* ── Founding 50 promo banner (always visible on AppHome) ─────── */}
+      <div className="max-w-7xl mx-auto px-3 md:px-5 mt-3" data-testid="apphome-founding-banner">
+        <FoundingCounter variant="banner" />
+      </div>
 
       {/* ── Quick actions grid 4 cols ─────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-5 pt-5 md:pt-7" data-testid="apphome-quick-actions">
