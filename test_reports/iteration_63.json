@@ -1,0 +1,35 @@
+{
+  "summary": "Iter 63 — FIX VERIFICATION for MediaChooser Upload-mode 422 bug (carried over from iter 62). Both backend (11/11 pytest) and end-to-end UI flow now pass. New endpoint POST /api/providers/me/upload-asset works correctly: validates auth/role/target/content-type/size, persists file to storage, updates provider profile in a single round-trip, returns {url, file_id, target}. Regressions verified: generate-logo, save-ai-image, /providers/by-slug all still working.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter63_upload_asset.py",
+    "/app/test_reports/pytest/iter63_results.xml",
+    "/app/backend/scripts/toggle_demo_logo.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 10,156 lines — well past the 700-line guideline. Strongly recommend splitting into routers (e.g., providers_router.py, files_router.py, ai_router.py). This will reduce regression risk for future changes.",
+    "upload_provider_asset endpoint (line ~8602) uses correct multipart pattern, validates content-type and 10MB size, uses Literal['logo','banner'] for target — clean implementation.",
+    "MediaChooser.handleFile now sends single FormData POST — eliminates the prior PUT /providers/me 422 issue caused by missing required fields. Good fix.",
+    "Demo provider's logo/banner are public Unsplash URLs. For long-term test stability consider seeding internal /api/files/ URLs so DB-based fixtures don't depend on third-party hosts."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter63_upload_asset.py (new)",
+    "/app/backend/scripts/toggle_demo_logo.py (new helper)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (end-to-end upload flow)"},
+  "test_credentials": "provider: demo.provider@getamano.com / provider123 (used)",
+  "seed_data_creation": "Temporarily unset demo.provider.logo_url to make the FirstSteps logo step PENDING for UI testing; restored after test via scripts/toggle_demo_logo.py restore. No persistent test data left in DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "MediaChooser Upload-mode is now fully functional. The new POST /api/providers/me/upload-asset endpoint handles file+target in one multipart call and updates provider_profiles atomically. To re-test UI when steps are completed: use /app/backend/scripts/toggle_demo_logo.py unset to clear logo_url, then restore after test. Login via fetch('/api/auth/login', {credentials:'include'}) then reload page to pick up cookie. The first-step-logo testid is on the <li>; the actual click target is the <button> inside — use page.evaluate to find the inner button or click the li with force=True.",
+  "rca of the issue": "Original (iter 62) issue: MediaChooser uploaded the raw image via POST /upload, then attempted PUT /providers/me with only {logo_url} — but PUT validator required business_name & category_id, returning 422. Fix: collapsed both operations into a single POST /providers/me/upload-asset endpoint that accepts multipart file+target, saves to storage, and applies the URL onto provider_profiles in one Motor call. Frontend MediaChooser.handleFile now sends one FormData POST. Verified: status 200, profile updated, chooser closes, FirstStepsPanel re-renders with logo step now ✅."
+}

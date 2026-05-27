@@ -103,10 +103,11 @@ export default function MediaChooser({ target = "logo", onSaved, onCancel, initi
     try {
       const fd = new FormData();
       fd.append("file", f);
-      const { data: uploaded } = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      const field = target === "logo" ? "logo_url" : "banner_url";
-      await api.put("/providers/me", { [field]: uploaded.url });
-      onSaved?.(uploaded.url, uploaded.file_id);
+      fd.append("target", target);
+      const { data } = await api.post("/providers/me/upload-asset", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      onSaved?.(data.url, data.file_id);
     } catch (e2) {
       setError(e2?.response?.data?.detail || (lang === "en" ? "Upload failed." : "Falló la subida."));
     } finally {

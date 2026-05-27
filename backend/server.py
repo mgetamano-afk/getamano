@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query, UploadFile, File, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query, UploadFile, File, Form, Header
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -8597,6 +8597,58 @@ async def save_ai_image(payload: SaveAiImageIn, user: User = Depends(get_current
         {"$set": {field: url, "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
     return {"url": url, "file_id": file_id, "target": payload.target}
+
+
+@api_router.post("/providers/me/upload-asset")
+async def upload_provider_asset(
+    file: UploadFile = File(...),
+    target: Literal["logo", "banner"] = Form("logo"),
+    user: User = Depends(get_current_user),
+):
+    """Upload a logo or banner image and assign it to the provider profile
+    in a single round-trip. Avoids the ProviderProfileIn partial-update issue.
+    Used by the FirstSteps MediaChooser when the provider uploads their own
+    image instead of generating it with AI.
+    """
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    profile = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Solo imágenes.")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="Imagen supera 10 MB.")
+    if not data:
+        raise HTTPException(status_code=400, detail="Archivo vacío.")
+    ext = (file.filename or "image.png").rsplit(".", 1)[-1].lower()
+    if ext not in {"png", "jpg", "jpeg", "webp", "gif"}:
+        ext = "png"
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/uploads/{user.user_id}/{file_id}.{ext}"
+    try:
+        result = put_object(path, data, file.content_type or "image/png")
+    except Exception as e:
+        logger.exception("upload-asset failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    await db.files.insert_one({
+        "file_id": file_id,
+        "user_id": user.user_id,
+        "storage_path": result["path"],
+        "original_filename": file.filename or f"{target}.{ext}",
+        "content_type": file.content_type or "image/png",
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    url = f"/api/files/{result['path']}"
+    field = "logo_url" if target == "logo" else "banner_url"
+    await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {field: url, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"url": url, "file_id": file_id, "target": target}
 
 
 @api_router.post("/providers/me/generate-banner")
