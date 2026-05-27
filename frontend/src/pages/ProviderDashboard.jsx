@@ -18,6 +18,7 @@ import ShareStatsCard from "../components/ShareStatsCard";
 import ShareRewardsCard from "../components/ShareRewardsCard";
 import ProviderRates from "../components/ProviderRates";
 import MarketPulseCard from "../components/MarketPulseCard";
+import UploadPhotoBanner from "../components/UploadPhotoBanner";
 import DashboardGallery from "../components/DashboardGallery";
 import ProfileCompletion from "../components/ProfileCompletion";
 import ReferralsTab from "../components/ReferralsTab";
@@ -216,6 +217,21 @@ export default function ProviderDashboard() {
                 profile={profile}
                 unreadMessages={unread}
                 newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
+              />
+            </div>
+
+            {/* Section 84 — soft nudge to upload a real photo when the
+                provider is still using a default illustrated avatar. Hides
+                itself automatically once a real photo is on file. */}
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "40ms" }}>
+              <UploadPhotoBanner
+                profile={profile}
+                onUploaded={async () => {
+                  try {
+                    const r = await api.get("/providers/me");
+                    setProfile(r.data);
+                  } catch (_e) { /* ignore — banner already showed success state */ }
+                }}
               />
             </div>
 
