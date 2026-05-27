@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, UserPlus, MapPin, Star, ShieldCheck } from "lucide-react";
+import { Users, UserPlus, MapPin, Star, ShieldCheck, DollarSign } from "lucide-react";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
 import FollowButton from "../components/FollowButton";
+import EarningsPanel from "../components/EarningsPanel";
 import EmptyState from "../components/EmptyState";
 
 /**
@@ -21,6 +22,7 @@ const TABS = [
   { id: "following",   labelEs: "Sigo a",     labelEn: "Following" },
   { id: "followers",   labelEs: "Me siguen",  labelEn: "Followers" },
   { id: "suggestions", labelEs: "Sugerencias", labelEn: "Suggestions" },
+  { id: "earnings",    labelEs: "Ganancias",   labelEn: "Earnings" },
 ];
 
 export default function MiRedPage() {
@@ -40,11 +42,13 @@ export default function MiRedPage() {
     following: following?.length ?? network?.following_count ?? 0,
     followers: followers?.length ?? network?.followers_count ?? 0,
     suggestions: network?.suggestions?.length || 0,
+    earnings: 0,
   };
 
   const data = tab === "following" ? following
              : tab === "followers" ? followers
-             : (network?.suggestions || null);
+             : tab === "suggestions" ? (network?.suggestions || null)
+             : null; // earnings handled by EarningsPanel
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" data-testid="mi-red-page">
@@ -99,7 +103,9 @@ export default function MiRedPage() {
 
       {/* Body */}
       <div className="p-3">
-        {data === null ? (
+        {tab === "earnings" ? (
+          <EarningsPanel network={network} />
+        ) : data === null ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />

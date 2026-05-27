@@ -15,11 +15,13 @@ import {
   ArrowRight,
   Lightbulb,
   Rocket,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import FirstStepsPanel, { isFirstStepsSkipped } from "./FirstStepsPanel";
+import { ensurePushSubscription, pushSupported, pushPermission } from "../lib/push";
 
 /**
  * SmartActionHub — Section 64.
@@ -54,7 +56,7 @@ const STORAGE_KEY = "gtm_dismissed_nudges_v1";
 const DISMISS_TTL_MS = 7 * 24 * 3600 * 1000;
 
 const ICONS = {
-  MessageCircle, UserCog, Image: ImageIcon, Crown, Calendar, Star, Inbox, Bookmark, Search, Lightbulb, Rocket,
+  MessageCircle, UserCog, Image: ImageIcon, Crown, Calendar, Star, Inbox, Bookmark, Search, Lightbulb, Rocket, Bell,
 };
 
 function loadDismissed() {
@@ -171,12 +173,30 @@ export default function SmartActionHub() {
     }
   }
 
+  // Section 68 — Push opt-in nudge (logged-in users on supported browsers)
+  let pushNudge = null;
+  if (user && pushSupported() && pushPermission() === "default") {
+    pushNudge = {
+      id: "enable-push",
+      type: "settings",
+      priority: 3,
+      title: lang === "en" ? "Enable instant notifications" : "Activa notificaciones al instante",
+      message: lang === "en"
+        ? "Get a ping when clients message you or refer a job."
+        : "Recibe un aviso cuando un cliente te escriba o te refieran un trabajo.",
+      cta_label: lang === "en" ? "Enable" : "Activar",
+      cta_url: "#enable-push",
+      icon: "Bell",
+    };
+  }
+
   // Don't double-display: if the FirstSteps nudge owns the profile flow,
   // hide the standalone "complete-profile" and "add-gallery-photos" nudges.
   let mergedNudges = nudges;
   if (firstStepsNudge) {
     mergedNudges = nudges.filter((n) => n.type !== "profile" && n.type !== "media");
   }
+  if (pushNudge) mergedNudges = [pushNudge, ...mergedNudges];
 
   const merged = firstStepsNudge ? [firstStepsNudge, ...mergedNudges] : mergedNudges;
   const visible = merged.filter((n) => !dismissed[n.id]);
@@ -192,6 +212,12 @@ export default function SmartActionHub() {
     setOpen(false);
     if (n.cta_url === "#first-steps") {
       setStepsOpen(true);
+    } else if (n.cta_url === "#enable-push") {
+      ensurePushSubscription().then((r) => {
+        if (r?.ok) {
+          // Dismiss the nudge — re-renders will skip it (permission != default)
+        }
+      });
     } else {
       navigate(n.cta_url);
     }

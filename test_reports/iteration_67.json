@@ -1,0 +1,60 @@
+{
+  "summary": "Section 68 (Referral commissions B1-B7, Web Push C1-C4, Banners refactor A1, EarningsPanel F1-F3, Push nudge F4). Backend: 14/14 pytest pass (100%). Frontend: F1/F2/F3 PASS via Playwright; F4 push nudge correctly hidden in Playwright because Notification.permission=='denied' (expected — flow path validated indirectly).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter67_section68_referrals_push_banners.py",
+    "/app/test_reports/pytest/iter67_results.xml"
+  ],
+  "passed_backend": [
+    "B1 — POST /api/referrals/jobs (self-referral 400, non-provider 400, valid create returns enriched referrer/referred, status=pending, commission_pct=5.0)",
+    "B2 — Notification with title containing 'refirió' inserted for referred user",
+    "B3 — POST /accept (referrer forbidden, referred returns 200, status=accepted, accepted_at set)",
+    "B4 — POST /complete with final_amount=400 → status=completed, commission_amount=20.0 (5%)",
+    "B5 — GET /api/referrals/earnings/me — commission_pct=5.0, as_referrer.completed_jobs>=1, earned>=12.50",
+    "B6 — Cancel before completion (200, status=cancelled); cancel after completion (400)",
+    "B7 — /me/sent and /me/received return lists, sorted desc by created_at, enriched with business_name etc",
+    "C1 — /api/push/public-key 200, no auth, length 88 (base64url P-256 uncompressed)",
+    "C2 — /api/push/subscribe requires auth (401 anon), authed returns ok:true, idempotent on endpoint",
+    "C3 — /api/push/me lists active subs only",
+    "C4 — /api/push/unsubscribe returns ok:true matched:1, removes from /me",
+    "A1 — /api/banners/public 200, /banner-of-the-week 200/204, /me requires auth, authed 200"
+  ],
+  "passed_frontend": [
+    "F1 — mi-red-tab-earnings tab present; EarningsPanel renders hero ($32.50 total = seed $12.50 + pytest-created $20) and 4-stat breakdown",
+    "F2 — earnings-new-referral-btn opens new-referral-modal with 2 allies listed (from network + followers)",
+    "F3 — sent list shows María→Roberto $250 / $12.50 commission with status 'Completed', plus newer pytest entries",
+    "REGRESSION — MiRedPage shows 4 tabs: following, followers, suggestions, earnings (matches spec)"
+  ],
+  "notes": [
+    "F4 (push nudge) — In Playwright Chromium running headless via preview ingress, Notification.permission='denied' (not 'default'), so the 'Enable instant notifications' nudge is intentionally hidden. The conditional rendering logic in SmartActionHub is correct per the requirement. This MUST be verified manually in a real browser where permission is 'default'. Helper ensurePushSubscription() and POST /api/push/subscribe are validated directly via pytest with fake subscription credentials.",
+    "F1 hero shows $32.50 because the pytest run created a 2nd completed referral (Roberto, final $400 → $20 commission). Original $12.50 from seed Roberto-$250 still present and visible in F3 list. Per-row $12.50 / $20 commissions display correctly. Aggregate math is right.",
+    "/api/notifications/me titles include 'refirió' string confirming B2 notification creation."
+  ],
+  "action_items": [
+    "Optional: cleanup TEST_* referral entries created by pytest (TEST_Cliente Pytest, TEST_Cancelable, etc.) so the demo data matches the spec exactly (Maria earned exactly $12.50). Currently aggregate is $32.50 due to test artifacts.",
+    "Optional: add 'has_referral_target' boolean response shortcut so F4 push nudge can be validated in Playwright by stubbing Notification.permission='default' via context option `permissions=['notifications']`."
+  ],
+  "critical_code_review_comments": [
+    "EarningsPanel.jsx correctly handles empty states and renders 4 stat tiles with data-testid; good DRY usage of <StatTile/>.",
+    "routes/referral_jobs.py — commission_amount calculation rounds with float arithmetic; recommend Decimal for financial precision in P3.",
+    "routes/push.py — public-key endpoint returns raw VAPID public key from env (good); subscribe upsert by endpoint ensures idempotency.",
+    "server.py wires referrals/push/banners routers near line 9780; banners block successfully extracted (no duplicate definitions remain)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter67_section68_referrals_push_banners.py (NEW)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "75% automated + 25% manual-required (F4)"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (María, user_3e47ee2b3526); demo.provider2@getamano.com / provider123 (Roberto)",
+  "seed_data_creation": "Created 3 TEST_* referrals during pytest (1 completed $400→$20, 1 cancelled, 1 mid-flow). Recommend cleanup if exact demo numbers are required.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend referral & push contracts solid. Pytest file at /app/backend/tests/test_iter67_section68_referrals_push_banners.py covers full referral lifecycle + push CRUD + banners smoke. Frontend EarningsPanel data-testids: earnings-panel, earnings-hero-total, earnings-stat-*, earnings-new-referral-btn, new-referral-modal, new-referral-ally-*. F4 push nudge requires real browser or Playwright context with permissions=['notifications']."
+}

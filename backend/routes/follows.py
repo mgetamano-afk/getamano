@@ -97,16 +97,19 @@ def make_router(*, db, User, get_current_user, get_optional_user=None) -> APIRou
         # first follow, never on idempotent re-follow).
         if upsert_res.upserted_id is not None:
             follower_name = (getattr(me, "name", "") or "Alguien").strip().split()[0] or "Alguien"
+            title = f"{follower_name} te empezó a seguir"
+            body = "Tienes un nuevo seguidor en tu red. ¡Devuélvele el follow!"
+            cta_url = "/dashboard/provider"
             try:
                 await db.notifications.insert_one({
                     "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
                     "notification_key": f"follow:{me.user_id}->{user_id}",
                     "user_id": user_id,
                     "category": "follow",
-                    "title": f"{follower_name} te empezó a seguir",
-                    "body": "Tienes un nuevo seguidor en tu red. ¡Devuélvele el follow!",
+                    "title": title,
+                    "body": body,
                     "cta_label": "Ver perfil",
-                    "cta_url": "/dashboard/provider",
+                    "cta_url": cta_url,
                     "icon": "UserPlus",
                     "priority": "medium",
                     "is_read": False,
@@ -116,6 +119,18 @@ def make_router(*, db, User, get_current_user, get_optional_user=None) -> APIRou
                 })
             except Exception:
                 pass  # never fail the follow if notification write fails
+            # Best-effort Web Push — Section 68.
+            try:
+                from routes.push import send_push_to_user
+                await send_push_to_user(db, user_id, {
+                    "title": title,
+                    "body": body,
+                    "url": cta_url,
+                    "tag": "follow",
+                    "icon": "/icon-192x192.png",
+                })
+            except Exception:
+                pass
         followers = await db.follows.count_documents({"followed_user_id": user_id})
         following = await db.follows.count_documents({"follower_user_id": me.user_id})
         return {"following": True, "followers_count": followers, "following_count": following}
