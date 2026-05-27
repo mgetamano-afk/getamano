@@ -206,12 +206,34 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             {"$set": {"status": "accepted", "accepted_at": now_iso}},
         )
         accepter_name = (getattr(me, "name", "") or "El aliado").strip().split()[0] or "El aliado"
+
+        # Section 71b — Commission projection in the accept notification.
+        # If the referrer included an estimated_amount, show the projected
+        # 5% commission so they get a "preview" of upcoming earnings (a
+        # second dopamine hit before the job is even closed). This
+        # reinforces the referral loop: "Roberto accepted → I'm about to
+        # earn ~$X" → "let me refer more jobs".
+        estimated = row.get("estimated_amount")
+        commission_pct = row.get("commission_pct") or DEFAULT_COMMISSION_PCT
+        if estimated and estimated > 0:
+            projected = round(float(estimated) * (commission_pct / 100.0), 2)
+            title = f"🚀 {accepter_name} aceptó · proyección ~${projected:.2f}"
+            body = (
+                f"Cliente: {row['client_name']} (est. ${float(estimated):.2f}). "
+                f"Tu {commission_pct:.0f}% se activa cuando cierre el trabajo."
+            )
+        else:
+            # No estimate provided — show the generic message but keep the
+            # icon/emoji that signals "earning incoming".
+            title = f"🚀 {accepter_name} aceptó tu referencia"
+            body = f"Cliente: {row['client_name']}. Tu {commission_pct:.0f}% se activa cuando cierre el trabajo."
+
         await _notify(
             row["referrer_user_id"],
-            f"{accepter_name} aceptó tu referencia",
-            f"Cliente: {row['client_name']}. Comisión 5% se activa al completar.",
+            title,
+            body,
             "/dashboard/provider?tab=red&subtab=sent",
-            "CheckCircle",
+            "Rocket",
         )
         row["status"] = "accepted"
         row["accepted_at"] = now_iso
