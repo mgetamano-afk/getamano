@@ -19,6 +19,7 @@ import EarningsWidget from "../components/EarningsWidget";
 import ReferralProgressCard from "../components/ReferralProgressCard";
 import MilestoneCelebrationModal from "../components/MilestoneCelebrationModal";
 import MilestoneOfTheWeekWidget from "../components/MilestoneOfTheWeekWidget";
+import OnboardingTour from "../components/OnboardingTour";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -377,6 +378,11 @@ export default function AppHome() {
           onClose={() => { /* user dismissed — already persisted */ }}
         />
       )}
+
+      {/* Section 81c — Gentle 3-step tour for first-time providers. Auto-skips
+          if localStorage marker is present or if the celebration modal is
+          already showing. */}
+      {isProvider && <OnboardingTour role="provider" />}
     </div>
   );
 }
