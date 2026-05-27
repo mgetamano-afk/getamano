@@ -2206,3 +2206,44 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - Push notifications: backend listo (VAPID), frontend listo (banner + service worker). Próximo paso: integrar `send_push_to_user(db, user_id, payload)` en los hooks de mensajes/citas/reseñas para disparar push reales (actualmente solo se dispara en follows desde Section 65).
 
 **Limitación conocida**: la app sigue siendo SPA, así que si un usuario copia manualmente `/p/{slug}` de la barra de URL y lo pega en WhatsApp, el bot va al frontend SPA (HTML genérico). Los botones in-app Compartir / WhatsApp / SMS / Email / Facebook YA usan `/api/og/p/{slug}` correctamente. Una solución 100% (Cloudflare Worker rewriting bot UAs) requiere infra externa fuera del Emergent preview env.
+
+
+### Iteration 69 (May 27, 2026) — Section 69: Physical Business Cards `/dashboard/print-card`
+**Goal del usuario:** "Ok dale con ello" (en respuesta a la propuesta de `/print-card` cierre del loop digital→físico para adquisición offline).
+
+**Implementación:**
+- **Nueva página `pages/PrintCard.jsx`** (~340 LOC) — generador de tarjetas físicas imprimibles directamente desde el navegador (PDF gratis vía "Guardar como PDF").
+- **Diseño profesional Avery-style**:
+  - Formato US estándar: 3.5" × 2" (89 × 51 mm) — compatible con plantillas Avery 5371 / mostly business card printers.
+  - Hoja A4 con 10 tarjetas en grid 2×5, márgenes de 13.5mm × 11mm, sin espacios entre tarjetas (corte continuo).
+  - Líneas dashed grises hairline (0.1mm) como guías de corte.
+  - Gradiente teal de marca getamano (`#063154 → #0A4D5E → #025F67`) + franja accent `#2F9D94` izquierda.
+  - Badge verde "✓ Verified" SVG-pure en esquina superior derecha (solo si `verification_status === "approved"`).
+  - QR code grande (130×130 → 32mm × 32mm) encodea **la URL OG-rich `/api/og/p/{slug}`** así cuando alguien escanea + re-comparte en WhatsApp, el bot fetcha el preview personalizado de la Sección 65.
+  - Textos: `getamano` (uppercase tracking 1.4pt accent), business name (12pt bold, line-clamp 2), categoría · ciudad, CTA "Mírame en getamano →", URL legible.
+  - `-webkit-print-color-adjust: exact` + `print-color-adjust: exact` para que los colores no se "ahorren" en print preview.
+- **2 layouts toggleables**:
+  - **Sheet** (10 por A4) → para imprimir/enviar a imprenta.
+  - **Single (preview)** → muestra UNA tarjeta escalada 2.2x con shadow drop para evaluación rápida del diseño.
+- **`@media print`** con `@page size: A4 portrait; margin: 0` + `page-break-after: always` → la toolbar/header se oculta (`pc-no-print`) y solo se imprime la grilla limpia.
+- **Sin libs de PDF**: Chrome/Safari/Firefox/Edge tienen "Save as PDF" nativo en su print dialog → cero dependencias adicionales.
+- **i18n full**: español + inglés (auto-detecta de `useI18n().lang`).
+- **Rutas** registradas en `App.js`: `/dashboard/print-card` + alias `/print-card`. Lazy-loaded para no afectar critical path.
+- **CTA prominente** en `ShareLinkCard.jsx` (QR modal): nuevo botón "🖨️ Imprimir tarjetas físicas" debajo del download QR — descubrible desde el flujo natural de "compartir mi eCard".
+
+**Validación visual** (Playwright + screenshot):
+- Login como `demo.provider@getamano.com` → navega a `/dashboard/print-card` → renderiza 10 tarjetas en grilla sheet view.
+- Toggle a "1 large (preview)" → muestra tarjeta gigante con QR, nombre, categoría, ciudad, badge Verified, CTA y URL.
+- Sin overflow horizontal, sin elementos rotos, BottomNav coexiste correctamente.
+
+**Por qué importa** (estrategia):
+- Cierra el loop digital→físico de adquisición. Cada proveedor puede imprimir 10 tarjetas en una hoja A4 común (~$0.10 en una imprenta) y repartirlas en mercados, ferias, vecindario.
+- El QR codifica el URL OG-rich, así cuando un cliente escanea, abre la eCard en su celular Y si luego comparte ese link en WhatsApp, el preview personalizado de Sección 65 hace su trabajo. La tarjeta física se vuelve un canal viral.
+- Sin costo para el proveedor: solo necesita el papel y una impresora doméstica (o llevar el PDF generado a una imprenta local). No requiere keys ni integración con proveedor de print-on-demand.
+
+**Lint Python + JS**: `All checks passed!` + `No issues found ✅`.
+
+**Files**:
+- `/app/frontend/src/pages/PrintCard.jsx` (NEW)
+- `/app/frontend/src/App.js` (added route + lazy import)
+- `/app/frontend/src/components/ShareLinkCard.jsx` (added "Imprimir tarjetas físicas" button to QR modal)

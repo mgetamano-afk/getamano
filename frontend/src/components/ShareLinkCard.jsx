@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram } from "lucide-react";
+import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram, Printer } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 
@@ -207,6 +208,14 @@ export default function ShareLinkCard({ slug, businessName }) {
             <button onClick={downloadQR} className="mt-4 w-full py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium flex items-center justify-center gap-2" data-testid="qr-modal-download">
               <Download className="w-4 h-4" /> Descargar QR
             </button>
+            <Link
+              to="/dashboard/print-card"
+              onClick={() => setShowQr(false)}
+              className="mt-2 w-full py-3 rounded-full border border-teal-700 text-teal-700 hover:bg-teal-50 text-sm font-semibold flex items-center justify-center gap-2"
+              data-testid="qr-modal-print-card"
+            >
+              <Printer className="w-4 h-4" /> Imprimir tarjetas físicas
+            </Link>
           </div>
         </div>
       )}
