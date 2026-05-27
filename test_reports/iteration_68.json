@@ -1,0 +1,60 @@
+{
+  "summary": "Iteration 68 — Section 65 dynamic OG (PNG/SVG/HTML) + Stories/Banners refactor + Push wiring. Backend pytest 19/19 PASS. Frontend Playwright: Landing loads, eCard renders, ShareECardBlock Copy button correctly copies /api/og/p/{slug} URL to clipboard, PushOptInBanner correctly suppressed (waits 20s + 600px scroll). All review request items validated.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter68_section65_og_refactor.py",
+    "/app/test_reports/pytest/iter68_results.xml"
+  ],
+  "passed_backend": [
+    "Section 65 — GET /api/og-image/{slug}.png returns 200 image/png 1200x630 (142KB) for existing slug maria-cleaning-services-sallisaw-ok",
+    "Section 65 — GET /api/og-image/{nonexistent}.png also returns 200 image/png (fallback works)",
+    "Section 65 — GET /api/og-image/{slug}.svg returns 200 image/svg+xml (fallback path intact)",
+    "Section 65 — GET /api/og/p/{slug} HTML contains <meta property='og:image' content='...png'> and og:image:type=image/png (PNG-first confirmed)",
+    "Section 65 — User-Agent: WhatsApp/2.0 still receives OG-rich HTML with og:image + og:title",
+    "Stories refactor (routes/stories.py) — /api/stories/active 200, /by-provider/{user_id} 200, POST without auth 401/403/422, DELETE without auth 401/403/404",
+    "Banners refactor (routes/banners.py) — /api/banners/public 200, /banner-of-the-week 200/204, POST /publish without auth 401/403",
+    "Push — GET /api/push/public-key 200 (no auth) returns 88-char base64url VAPID key",
+    "Push — POST /api/push/subscribe without auth → 401; with auth → 200 {ok:true} AND persists in MongoDB push_subscriptions (verified directly: doc with user_id=user_3e47ee2b3526, is_active=true, subscription_id present)",
+    "Auth — POST /api/auth/login demo.provider@getamano.com → 200 with access_token (JWT)",
+    "Regression — /api/providers 200, /api/categories 200, /api/follows/me/feed (auth) 200"
+  ],
+  "passed_frontend": [
+    "Landing (/) loads correctly — title 'getamano — Marketplace latino en USA', body content rendered (Welcome to + getamano hero + Founding members + categories + featured providers)",
+    "eCard (/p/maria-cleaning-services-sallisaw-ok) loads with full content — title shows María's Cleaning Services, sections visible (header, contact actions, recommendations, reviews, share block)",
+    "ShareECardBlock data-testid='ecard-share-block' renders with 4 action buttons: ecard-share-copy, ecard-share-native, ecard-share-qr, ecard-share-nfc",
+    "Copy button (ecard-share-copy) writes correct OG-rich URL to clipboard: https://verified-providers-2.preview.emergentagent.com/api/og/p/maria-cleaning-services-sallisaw-ok — verified via navigator.clipboard.readText() with permissions granted",
+    "ShareECardBlock visible input shows the human-facing /p/{slug} URL (for QR/display) per Section 65 spec — share URL (OG) used only on action handlers (correct dual-URL pattern)",
+    "PushOptInBanner correctly NOT rendered on initial load — gating logic (20s timer + 600px scroll + Notification.permission==='default') working as designed; does not break renderer"
+  ],
+  "notes": [
+    "ShareECardBlock.jsx lines 26-27 confirm intentional split: humanUrl (/p/{slug}) is the visible input, shareUrl ({backend}/api/og/p/{slug}) is used for clipboard.writeText, navigator.share, and NFC.write — matches Section 65 requirement",
+    "PushOptInBanner verified absent in Playwright at t<5s as expected. Same caveat as iteration 67: Notification.permission may be 'denied' in headless Chromium so the gating may keep banner hidden even after 20s; the integration is correct and verified via direct pytest on /api/push/subscribe",
+    "Console errors observed during page load were 401s (likely /api/auth/me + favorites for anonymous user) and 404s for optional resources — these are expected/non-blocking pre-login state and not caused by this iteration's changes",
+    "cairosvg PNG generation: verified working end-to-end. Existing slug PNG = 142875 bytes 1200x630; non-existent slug PNG also generated (fallback). Backend started cleanly with cairosvg+cairocffi+cssselect2+tinycss2+defusedxml+webencodings deps"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/stories.py + routes/banners.py + routes/push.py extracted successfully — server.py no longer contains duplicate route definitions for these features (no collision detected during pytest)",
+    "ShareECardBlock.jsx correctly uses a dual-URL pattern: humanUrl for display/QR (clean /p/{slug}) and shareUrl for clipboard/native share/NFC (/api/og/p/{slug}). Good UX — sharers get OG-rich preview, visitors see clean URL",
+    "OG endpoint (server.py ~9620-9870) PNG-first strategy is solid; both PNG and SVG endpoints return 200 even for non-existent slugs (graceful fallback). og:image:type=image/png + og:image points to .png confirmed by parsing rendered HTML",
+    "Push subscribe endpoint correctly upserts by endpoint key in MongoDB push_subscriptions collection (idempotency preserved across iter67+68 testing without dup entries)",
+    "Optional cleanup: TEST_iter68_endpoint subscription persists in MongoDB push_subscriptions for user_3e47ee2b3526 — recommend a periodic janitor for TEST_* prefixed subs"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter68_section65_og_refactor.py (NEW — 19 test cases)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% (all review-request items validated)"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (provider_id=user_3e47ee2b3526)",
+  "seed_data_creation": "Created TEST_iter68 push subscription doc in push_subscriptions for user_3e47ee2b3526 (endpoint suffix TEST_iter68_endpoint). Safe to delete; idempotent on re-run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Section 65 OG dynamic (PNG+SVG+HTML) is solid and PNG-first. Refactor of stories/banners/push to /app/backend/routes/* is regression-safe. Frontend ShareECardBlock uses dual-URL pattern (humanUrl visible, shareUrl=/api/og/p/ for actions). Pytest file at /app/backend/tests/test_iter68_section65_og_refactor.py covers OG + stories + banners + push + auth + general regression. Re-run with: REACT_APP_BACKEND_URL=<url> pytest backend/tests/test_iter68_section65_og_refactor.py -v"
+}

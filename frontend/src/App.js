@@ -10,6 +10,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
 import BottomNav from "./components/BottomNav";
 import SmartActionHub from "./components/SmartActionHub";
+import PushOptInBanner from "./components/PushOptInBanner";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { registerServiceWorker } from "./lib/pwa";
 import { trackIOSFirstLaunchOnce } from "./lib/deviceDetection";
@@ -254,6 +255,7 @@ function App() {
               <BottomNav />
               <QuickActionsFAB />
               <SmartActionHub />
+              <PushOptInBanner />
             </BrowserRouter>
           </PwaInstallProvider>
         </AuthProvider>

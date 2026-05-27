@@ -18,14 +18,23 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
   const [showQR, setShowQR] = useState(false);
   const [nfcState, setNfcState] = useState("idle"); // idle | writing | success | unsupported
 
-  const url = `${window.location.origin}/p/${provider?.slug}`;
+  // Section 65 — humans see the canonical /p/{slug} (e.g. in the QR code,
+  // and in the URL displayed under the buttons). Native-share and clipboard
+  // payloads use the OG-rich backend URL so WhatsApp / iMessage / Facebook
+  // crawlers fetch the dynamic preview before the SPA loads.
+  const backend = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+  const humanUrl = `${window.location.origin}/p/${provider?.slug}`;
+  const shareUrl = `${backend}/api/og/p/${provider?.slug}`;
+  // Keep the visible URL pretty (human-readable) — the OG redirect happens
+  // transparently on click.
+  const url = humanUrl;
   const title = lang === "en"
     ? `${provider?.business_name} on getamano`
     : `${provider?.business_name} en getamano`;
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
       toast.success(lang === "en" ? "Link copied!" : "¡Enlace copiado!");
@@ -40,7 +49,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
       return;
     }
     try {
-      await navigator.share({ title, text: title, url });
+      await navigator.share({ title, text: title, url: shareUrl });
     } catch (e) {
       if (e?.name !== "AbortError") copy();
     }
@@ -60,7 +69,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
       // eslint-disable-next-line no-undef
       const ndef = new window.NDEFReader();
       await ndef.write({
-        records: [{ recordType: "url", data: url }],
+        records: [{ recordType: "url", data: shareUrl }],
       });
       setNfcState("success");
       toast.success(lang === "en"

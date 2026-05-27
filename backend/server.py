@@ -8762,199 +8762,17 @@ async def generate_banner_background(payload: BannerGenerateIn,
 
 
 # ============ MARKETPLACE DE BANNERS (Public gallery + Like voting) ============
-# After a provider finishes composing their banner on the client side, they can
-# opt-in to publish the final PNG to a public showcase. Other providers see it
-# as inspiration ("yo quiero uno así"), visitors discover real businesses, and
-# liking drives a viral loop back to the BannerGenerator tool.
-
-class BannerPublishIn(BaseModel):
-    image_url: str = Field(..., min_length=4, max_length=600)
-    style: Literal["modern", "festive", "professional", "minimal", "warm"]
-    color: str = Field(..., min_length=4, max_length=9)
-    keywords: Optional[str] = Field(default=None, max_length=200)
-
-
-# Section 68 — all /api/banners/* endpoints moved to routes/banners.py
-# (publish, public, me, delete, like, like-state, view, banner-of-the-week).
+# Section 68 — All /api/banners/* endpoints (publish, public, me, delete, like,
+# like-state, view, banner-of-the-week) live in routes/banners.py. The
+# BannerPublishIn model and supporting logic moved with them. This comment is
+# the breadcrumb in server.py to discover the routes.
 
 
 # ============ SECTION 60 — Provider Stories (24h ephemeral) ============
-# Instagram-style: provider posts a photo + short caption, story auto-expires
-# in 24h via MongoDB TTL index. Visible to anyone viewing the Community feed
-# in a horizontal carousel.
-
-class StoryCreateIn(BaseModel):
-    image_url: str = Field(..., min_length=4, max_length=600)
-    caption: Optional[str] = Field(default=None, max_length=140)
-
-
-@api_router.post("/stories")
-async def create_story(payload: StoryCreateIn, user: User = Depends(get_current_user)):
-    """Create a 24h ephemeral story. Providers only."""
-    if user.role != "provider":
-        raise HTTPException(status_code=403, detail="Solo proveedores pueden crear historias.")
-    profile = await db.provider_profiles.find_one(
-        {"user_id": user.user_id},
-        {"_id": 0, "provider_id": 1, "slug": 1, "business_name": 1, "logo_url": 1,
-         "verification_status": 1},
-    )
-    if not profile:
-        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
-
-    # Throttle: max 5 active stories per provider at any time
-    now = datetime.now(timezone.utc)
-    active = await db.stories.count_documents({
-        "provider_user_id": user.user_id,
-        "expires_at": {"$gt": now},
-    })
-    if active >= 5:
-        raise HTTPException(status_code=429, detail="Límite de 5 historias activas alcanzado.")
-
-    story_id = f"sto_{uuid.uuid4().hex[:12]}"
-    doc = {
-        "story_id": story_id,
-        "provider_user_id": user.user_id,
-        "provider_id": profile.get("provider_id"),
-        "provider_slug": profile.get("slug"),
-        "business_name": profile.get("business_name"),
-        "logo_url": profile.get("logo_url"),
-        "verified": profile.get("verification_status") == "approved",
-        "image_url": payload.image_url,
-        "caption": (payload.caption or "").strip() or None,
-        "views_count": 0,
-        "is_public": True,
-        "created_at": now,
-        "expires_at": now + timedelta(hours=24),
-    }
-    await db.stories.insert_one(doc)
-    out = {**doc}
-    out["created_at"] = out["created_at"].isoformat()
-    out["expires_at"] = out["expires_at"].isoformat()
-    out.pop("_id", None)
-    return out
-
-
-@api_router.get("/stories/active")
-async def list_active_stories(limit: int = 30):
-    """Public — return active (non-expired) stories grouped by provider.
-
-    Returns one entry per provider with their LATEST story (Instagram pattern:
-    one tile per author, tap to see the rest). Limit caps the number of providers,
-    not the number of stories.
-    """
-    limit = max(1, min(60, limit))
-    now = datetime.now(timezone.utc)
-    pipeline = [
-        {"$match": {"is_public": True, "expires_at": {"$gt": now}}},
-        {"$sort": {"created_at": -1}},
-        {"$group": {
-            "_id": "$provider_user_id",
-            "latest": {"$first": "$$ROOT"},
-            "count": {"$sum": 1},
-        }},
-        {"$sort": {"latest.created_at": -1}},
-        {"$limit": limit},
-        {"$project": {
-            "_id": 0,
-            "provider_user_id": "$_id",
-            "stories_count": "$count",
-            "latest_story_id": "$latest.story_id",
-            "provider_slug": "$latest.provider_slug",
-            "business_name": "$latest.business_name",
-            "logo_url": "$latest.logo_url",
-            "verified": "$latest.verified",
-            "image_url": "$latest.image_url",
-            "caption": "$latest.caption",
-            "created_at": "$latest.created_at",
-        }},
-    ]
-    rows = await db.stories.aggregate(pipeline).to_list(limit)
-    for r in rows:
-        if isinstance(r.get("created_at"), datetime):
-            r["created_at"] = r["created_at"].isoformat()
-    return rows
-
-
-@api_router.get("/stories/by-provider/{provider_user_id}")
-async def stories_by_provider(provider_user_id: str):
-    """Return all active stories from one provider, oldest first (for carousel playback)."""
-    now = datetime.now(timezone.utc)
-    rows = await db.stories.find(
-        {"provider_user_id": provider_user_id, "is_public": True, "expires_at": {"$gt": now}},
-        {"_id": 0},
-    ).sort("created_at", 1).to_list(20)
-    for r in rows:
-        if isinstance(r.get("created_at"), datetime):
-            r["created_at"] = r["created_at"].isoformat()
-        if isinstance(r.get("expires_at"), datetime):
-            r["expires_at"] = r["expires_at"].isoformat()
-    return rows
-
-
-@api_router.post("/stories/{story_id}/view")
-async def track_story_view(story_id: str, user: User = Depends(get_current_user)):
-    """Count a unique view per (story, viewer). Idempotent via unique index."""
-    try:
-        await db.story_views.insert_one({
-            "story_id": story_id,
-            "viewer_user_id": user.user_id,
-            "viewed_at": datetime.now(timezone.utc),
-        })
-        await db.stories.update_one({"story_id": story_id}, {"$inc": {"views_count": 1}})
-    except Exception:
-        pass  # duplicate view — already counted
-    return {"ok": True}
-
-
-@api_router.post("/stories/{story_id}/like")
-async def toggle_story_like(story_id: str, user: User = Depends(get_current_user)):
-    """Like/unlike a story. Idempotent per user. Story owner cannot like own."""
-    story = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "provider_user_id": 1, "expires_at": 1})
-    if not story:
-        raise HTTPException(status_code=404, detail="Historia no encontrada.")
-    if story["provider_user_id"] == user.user_id:
-        raise HTTPException(status_code=400, detail="No puedes dar like a tu propia historia.")
-    if isinstance(story.get("expires_at"), datetime):
-        exp = story["expires_at"]
-        # MongoDB strips tzinfo on read; treat as UTC if naive
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        if exp < datetime.now(timezone.utc):
-            raise HTTPException(status_code=410, detail="La historia expiró.")
-    existing = await db.story_likes.find_one({"story_id": story_id, "user_id": user.user_id}, {"_id": 0})
-    if existing:
-        await db.story_likes.delete_one({"story_id": story_id, "user_id": user.user_id})
-        await db.stories.update_one({"story_id": story_id}, {"$inc": {"likes_count": -1}})
-        liked = False
-    else:
-        await db.story_likes.insert_one({
-            "story_id": story_id,
-            "user_id": user.user_id,
-            "created_at": datetime.now(timezone.utc),
-        })
-        await db.stories.update_one({"story_id": story_id}, {"$inc": {"likes_count": 1}})
-        liked = True
-    fresh = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "likes_count": 1})
-    return {"liked": liked, "likes_count": (fresh or {}).get("likes_count", 0)}
-
-
-@api_router.get("/stories/{story_id}/like-state")
-async def get_story_like_state(story_id: str, user: User = Depends(get_current_user)):
-    existing = await db.story_likes.find_one({"story_id": story_id, "user_id": user.user_id}, {"_id": 0})
-    return {"liked": bool(existing)}
-
-
-@api_router.delete("/stories/{story_id}")
-async def delete_story(story_id: str, user: User = Depends(get_current_user)):
-    """Owner or admin deletes a story manually before expiry."""
-    s = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "provider_user_id": 1})
-    if not s:
-        raise HTTPException(status_code=404, detail="Historia no encontrada.")
-    if user.role != "admin" and s["provider_user_id"] != user.user_id:
-        raise HTTPException(status_code=403, detail="No puedes eliminar esta historia.")
-    await db.stories.delete_one({"story_id": story_id})
-    await db.story_views.delete_many({"story_id": story_id})
-    return {"ok": True}
+# All /api/stories/* endpoints moved to routes/stories.py. Kept here as a
+# breadcrumb so future contributors can find the implementation. The TTL
+# index `stories.expires_at_1` is still configured at backend startup
+# alongside the other indices.
 
 
 @api_router.post("/providers/track-share-view")
@@ -9588,6 +9406,7 @@ from routes.follows import make_router as _make_follows_router  # noqa: E402
 from routes.referral_jobs import make_router as _make_referral_jobs_router  # noqa: E402
 from routes.push import make_router as _make_push_router  # noqa: E402
 from routes.banners import make_router as _make_banners_router  # noqa: E402
+from routes.stories import make_router as _make_stories_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9690,6 +9509,14 @@ api_router.include_router(
     )
 )
 
+api_router.include_router(
+    _make_stories_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
+    )
+)
+
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.
 app.include_router(api_router)
@@ -9730,13 +9557,44 @@ def _request_public_url(request: Request) -> str:
     return (os.environ.get("PUBLIC_URL") or "https://getamano.us").rstrip("/")
 
 
-def _build_og_image_svg(provider: dict) -> str:
-    """Section 56 — Render a 1200×630 SVG card with provider info.
+async def _fetch_logo_data_uri(logo_url: str, timeout: float = 4.0) -> str:
+    """Section 65 — Fetch the provider logo and return a base64 data URI.
+
+    Used to embed the avatar *inside* the SVG so that:
+      (1) SVG renders correctly when served standalone, and
+      (2) Cairosvg can convert SVG→PNG without depending on remote fetch
+          (some hosts block cairo's user-agent, some logos are CORS-locked).
+
+    Returns empty string on any failure — the SVG falls back to the initials
+    avatar so social previews never render a broken image icon.
+    """
+    if not logo_url or not logo_url.startswith(("http://", "https://", "data:")):
+        return ""
+    if logo_url.startswith("data:"):
+        return logo_url
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            r = await client.get(logo_url)
+            if r.status_code != 200:
+                return ""
+            ctype = (r.headers.get("content-type") or "image/jpeg").split(";")[0].strip().lower()
+            if ctype not in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"):
+                ctype = "image/jpeg"  # safest default for unknown
+            import base64 as _b64
+            b64 = _b64.b64encode(r.content).decode("ascii")
+            return f"data:{ctype};base64,{b64}"
+    except Exception:
+        return ""
+
+
+def _build_og_image_svg(provider: dict, embedded_logo_uri: str = "") -> str:
+    """Section 56/65 — Render a 1200×630 SVG card with provider info.
 
     SVG is intentionally lightweight (no external fonts beyond system stack)
     and includes:
       - Teal getamano gradient background
-      - Circular avatar (initials fallback if no logo)
+      - Circular avatar (initials fallback if no logo) — accepts pre-fetched
+        data URI for reliable PNG conversion (Section 65)
       - Verified ribbon
       - Business name (truncated)
       - Category · City, State
@@ -9754,7 +9612,10 @@ def _build_og_image_svg(provider: dict) -> str:
     review_count = provider.get("rating_count") or 0
     plan = (provider.get("plan") or "free").lower()
     is_verified = (provider.get("verification_status") == "approved")
-    logo_url = provider.get("logo_url") or ""
+    # Section 65 — prefer pre-fetched data URI (PNG-conversion friendly) over
+    # the raw remote URL. When embedded_logo_uri is empty we still allow the
+    # raw URL so the SVG endpoint keeps working standalone.
+    logo_for_svg = embedded_logo_uri or (provider.get("logo_url") or "")
 
     # Initials fallback (max 2 chars)
     initials = "".join([w[0] for w in name.split()[:2] if w]).upper() or "G"
@@ -9770,36 +9631,39 @@ def _build_og_image_svg(provider: dict) -> str:
     cat_safe = e(cat)
     city_safe = e(", ".join(p for p in [city, state] if p))
     initials_safe = e(initials)
-    logo_safe = e(logo_url)
+    logo_safe = e(logo_for_svg)
 
     # Pre-build conditional blocks (use safe values only)
+    # Note: emoji glyphs render as boxes in cairo (no emoji font). We use
+    # SVG path geometry for the checkmark + bold typography for the badges.
     verified_block = (
         '<g transform="translate(880,80)">'
         '<rect width="180" height="36" rx="18" fill="#10B981"/>'
-        '<text x="90" y="24" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="16" font-weight="700" fill="white">✓ Verificado</text>'
+        '<path d="M18 18 L26 26 L40 12" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<text x="105" y="24" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="16" font-weight="700" fill="white">Verificado</text>'
         '</g>'
     ) if is_verified else ""
 
     pro_badge = (
         '<g transform="translate(880,140)">'
         '<rect width="100" height="32" rx="16" fill="#F59E0B"/>'
-        '<text x="50" y="22" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="white">⭐ Pro</text>'
+        '<text x="50" y="22" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="800" letter-spacing="2" fill="white">PRO</text>'
         '</g>'
     ) if plan in ("pro", "premium") else ""
 
     rating_block = (
-        f'<text x="80" y="445" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="#FCD34D">{star_line}</text>'
+        f'<text x="80" y="445" font-family="system-ui,-apple-system,sans-serif" font-size="38" font-weight="700" fill="#FCD34D">{star_line}</text>'
         f'<text x="80" y="490" font-family="system-ui,-apple-system,sans-serif" font-size="22" fill="rgba(255,255,255,0.92)">{rating:.1f} de 5 · {review_count} reseña{"s" if review_count != 1 else ""}</text>'
     ) if rating > 0 else (
         '<text x="80" y="475" font-family="system-ui,-apple-system,sans-serif" font-size="22" fill="rgba(255,255,255,0.6)">Sin reseñas todavía</text>'
     )
 
     # Avatar: either circular image clip or initials
-    if logo_url:
+    if logo_for_svg:
         avatar = (
             f'<defs><clipPath id="avatarClip"><circle cx="980" cy="380" r="110"/></clipPath></defs>'
             f'<circle cx="980" cy="380" r="115" fill="white"/>'
-            f'<image href="{logo_safe}" x="870" y="270" width="220" height="220" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>'
+            f'<image href="{logo_safe}" xlink:href="{logo_safe}" x="870" y="270" width="220" height="220" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>'
         )
     else:
         avatar = (
@@ -9807,7 +9671,7 @@ def _build_og_image_svg(provider: dict) -> str:
             f'<text x="980" y="420" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="80" font-weight="800" fill="white">{initials_safe}</text>'
         )
 
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#063154"/>
@@ -9852,17 +9716,15 @@ def _build_og_image_svg(provider: dict) -> str:
     return svg
 
 
-@app.get("/api/og-image/{slug}.svg")
-async def og_image(slug: str):
-    """Section 56 — Dynamic 1200×630 SVG used as og:image for the eCard.
+async def _load_og_provider(slug: str) -> dict:
+    """Section 65 — Resolve a slug to the provider dict used by OG renderers.
 
-    Cached aggressively because the data changes rarely (rating, name).
-    24h max-age + stale-while-revalidate.
+    Returns a generic fallback so social previews never 404. Enriches the
+    category name in Spanish (legacy stored only category_id).
     """
     provider = await db.provider_profiles.find_one({"slug": slug}, {"_id": 0})
     if not provider:
-        # Generic fallback so social previews don't 404
-        provider = {
+        return {
             "business_name": "getamano",
             "category": {"name_es": "Marketplace latino"},
             "city": "USA",
@@ -9870,17 +9732,71 @@ async def og_image(slug: str):
             "rating_avg": 0,
             "rating_count": 0,
         }
-    else:
-        # enrich category name if needed
-        if provider.get("category_id"):
-            cat = await db.categories.find_one({"category_id": provider["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
-            if cat:
-                provider["category"] = {"name_es": cat.get("name_es") or cat.get("name_en")}
+    if provider.get("category_id"):
+        cat = await db.categories.find_one({"category_id": provider["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+        if cat:
+            provider["category"] = {"name_es": cat.get("name_es") or cat.get("name_en")}
+    return provider
 
+
+@app.get("/api/og-image/{slug}.svg")
+async def og_image(slug: str):
+    """Section 56 — Dynamic 1200×630 SVG used as og:image fallback.
+
+    Note: most social crawlers (WhatsApp, iMessage, FB) do not render SVG —
+    Section 65 added `/api/og-image/{slug}.png` as the primary asset. SVG is
+    kept for browsers, Twitter Cards (which accept SVG), and debug tools.
+    """
+    provider = await _load_og_provider(slug)
     svg = _build_og_image_svg(provider)
     return _OGResponse(
         content=svg,
         media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@app.get("/api/og-image/{slug}.png")
+async def og_image_png(slug: str):
+    """Section 65 — Dynamic 1200×630 PNG used as og:image for social previews.
+
+    WhatsApp, iMessage, Facebook and most other crawlers expect PNG/JPEG
+    (NOT SVG). We render the SVG, embed the provider logo as a base64 data
+    URI so the rasteriser doesn't need network fetch, then convert via
+    cairosvg.
+
+    Heavy HTTP caching (24h max-age + 7d stale-while-revalidate) keeps the
+    cost negligible: identical responses are served by the edge, only
+    deep-link first-touches hit cairo.
+    """
+    import cairosvg as _cairosvg  # local import keeps cold-start lean
+    provider = await _load_og_provider(slug)
+    logo_uri = await _fetch_logo_data_uri(provider.get("logo_url") or "")
+    svg = _build_og_image_svg(provider, embedded_logo_uri=logo_uri)
+    try:
+        png_bytes = _cairosvg.svg2png(
+            bytestring=svg.encode("utf-8"),
+            output_width=1200,
+            output_height=630,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # If conversion fails (corrupt logo, malformed SVG), fall back to
+        # a logo-less render so the social preview still gets the data.
+        try:
+            fallback_svg = _build_og_image_svg(provider, embedded_logo_uri="")
+            png_bytes = _cairosvg.svg2png(
+                bytestring=fallback_svg.encode("utf-8"),
+                output_width=1200,
+                output_height=630,
+            )
+        except Exception:
+            raise HTTPException(status_code=500, detail=f"og-image render failed: {exc}")
+    return _OGResponse(
+        content=png_bytes,
+        media_type="image/png",
         headers={
             "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
             "X-Content-Type-Options": "nosniff",
@@ -9913,7 +9829,11 @@ def _build_og_html(provider: dict, public_url: str, slug: str) -> str:
 
     title = f"{name} | getamano"
     profile_url = f"{public_url}/p/{slug}"
-    og_image_url = f"{public_url}/api/og-image/{slug}.svg"
+    # Section 65 — PNG is the primary OG image. WhatsApp, iMessage and most
+    # crawlers refuse SVG. We still expose the SVG variant as a secondary
+    # asset for Twitter Cards and debug tools.
+    og_image_png = f"{public_url}/api/og-image/{slug}.png"
+    og_image_svg = f"{public_url}/api/og-image/{slug}.svg"
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -9930,9 +9850,9 @@ def _build_og_html(provider: dict, public_url: str, slug: str) -> str:
   <meta property="og:locale:alternate" content="en_US">
   <meta property="og:title" content="{e(title)}">
   <meta property="og:description" content="{e(description)}">
-  <meta property="og:image" content="{e(og_image_url)}">
-  <meta property="og:image:secure_url" content="{e(og_image_url)}">
-  <meta property="og:image:type" content="image/svg+xml">
+  <meta property="og:image" content="{e(og_image_png)}">
+  <meta property="og:image:secure_url" content="{e(og_image_png)}">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="{e(name)} en getamano">
@@ -9942,13 +9862,15 @@ def _build_og_html(provider: dict, public_url: str, slug: str) -> str:
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{e(title)}">
   <meta name="twitter:description" content="{e(description)}">
-  <meta name="twitter:image" content="{e(og_image_url)}">
+  <meta name="twitter:image" content="{e(og_image_png)}">
   <meta name="twitter:image:alt" content="{e(name)} en getamano">
 
   <!-- Fallback redirect for human visitors -->
   <meta http-equiv="refresh" content="0; url={e(profile_url)}">
   <link rel="alternate" hreflang="es" href="{e(profile_url)}">
   <link rel="alternate" hreflang="en" href="{e(public_url)}/provider/{e(slug)}">
+  <!-- Secondary asset for debug tools that prefer SVG -->
+  <link rel="image_src" href="{e(og_image_svg)}">
 </head>
 <body style="font-family:system-ui,sans-serif;background:#063154;color:white;padding:40px;text-align:center;">
   <h1>{e(name)}</h1>
