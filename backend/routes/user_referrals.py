@@ -126,6 +126,45 @@ async def _award_milestone_credit(db, referrer_user_id: str, milestone_index: in
     except Exception:
         pass
 
+    # Section 77 — Auto-post to community feed so other providers see the
+    # achievement. Creates social proof + viral signal ("se puede ganar
+    # gratis aquí"). Idempotent: only insert if no prior milestone post
+    # exists for the same (user, milestone).
+    try:
+        existing_post = await db.community_posts.find_one(
+            {"user_id": referrer_user_id, "type": "milestone", "milestone_index": milestone_index},
+            {"_id": 0, "post_id": 1},
+        )
+        if not existing_post:
+            user_doc = await db.users.find_one(
+                {"user_id": referrer_user_id},
+                {"_id": 0, "name": 1},
+            ) or {}
+            first_name = (user_doc.get("name") or "").split(" ")[0] or "alguien"
+            paid_count = REFEREES_PER_MILESTONE * milestone_index
+            month_label = "1 mes gratis" if milestone_index == 1 else f"{milestone_index} meses gratis"
+            content = (
+                f"🏆 ¡Acabo de ganar {month_label} en getamano! Refiriendo a {paid_count} "
+                f"amigos suscritos. La app me devuelve lo que aporto a la comunidad — "
+                f"esta app es nuestra. ¿Quién se anima a invitar más?"
+            )
+            post_doc = {
+                "post_id": f"post_{uuid.uuid4().hex[:14]}",
+                "user_id": referrer_user_id,
+                "content": content,
+                "image_url": None,
+                "type": "milestone",                  # new field — distinguishes from regular posts
+                "milestone_index": milestone_index,
+                "milestone_paid_count": paid_count,
+                "likes_count": 0,
+                "comments_count": 0,
+                "is_hidden": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.community_posts.insert_one(post_doc)
+    except Exception:
+        pass
+
 
 async def _extend_referee_pro(db, referee_user_id: str) -> str:
     """Grant the referee 30 days of Pro by extending pro_referral_until.
@@ -308,6 +347,15 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         needed_for_next = next_milestone_at - paid_count  # 1 or 2
         milestones_earned = paid_count // REFEREES_PER_MILESTONE
 
+        # Section 77 — Latest milestone metadata. Frontend uses this combined
+        # with localStorage to detect "unseen" milestones and fire the
+        # confetti modal exactly once per new unlock.
+        latest_milestone = await db.commission_credits.find_one(
+            {"user_id": me.user_id, "source": "user_referral_milestone"},
+            {"_id": 0, "credit_id": 1, "source_id": 1, "created_at": 1, "amount_cents": 1},
+            sort=[("created_at", -1)],
+        )
+
         # Public share URL — frontend resolves window.location.origin
         return {
             "ref_code": code,
@@ -320,6 +368,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "ratio": REFEREES_PER_MILESTONE,
             "referee_free_days": REFEREE_FREE_DAYS,
             "free_month_value_cents": FREE_MONTH_CENTS,
+            "latest_milestone": latest_milestone,
             "headline": (
                 f"Tienes {paid_count} amigo{'s' if paid_count != 1 else ''} suscrito{'s' if paid_count != 1 else ''}. "
                 + (

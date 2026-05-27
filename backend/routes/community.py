@@ -168,11 +168,14 @@ def _paginated(items: list[dict], limit: int, key: str, *, asc: bool = False) ->
 
 
 # ─── Handler bodies ─────────────────────────────────────────────────────
-async def _list_posts(deps, limit: int, before: Optional[str], current_user_id: Optional[str]):
+async def _list_posts(deps, limit: int, before: Optional[str], current_user_id: Optional[str], filter: Optional[str] = None):
     limit = max(1, min(limit, 50))
     q: dict = {"is_hidden": {"$ne": True}}
     if before:
         q["created_at"] = {"$lt": before}
+    # Section 77 — `?filter=hitos` shows only milestone celebration posts.
+    if filter == "hitos":
+        q["type"] = "milestone"
     rows = await deps.db.community_posts.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     rows = await hydrate_posts(deps.db, rows, current_user_id)
     return _paginated(rows, limit, "created_at")
@@ -467,12 +470,12 @@ def make_router(*, db, audit_log, get_current_user, PUBLIC_GUARD) -> APIRouter:
 
     # Posts
     @router.get("/posts")
-    async def list_posts(limit: int = 20, before: Optional[str] = None):
-        return await _list_posts(deps, limit, before, None)
+    async def list_posts(limit: int = 20, before: Optional[str] = None, filter: Optional[str] = None):
+        return await _list_posts(deps, limit, before, None, filter=filter)
 
     @router.get("/posts/feed")
-    async def list_posts_authenticated(limit: int = 20, before: Optional[str] = None, user=Depends(get_current_user)):
-        return await _list_posts(deps, limit, before, user.user_id)
+    async def list_posts_authenticated(limit: int = 20, before: Optional[str] = None, filter: Optional[str] = None, user=Depends(get_current_user)):
+        return await _list_posts(deps, limit, before, user.user_id, filter=filter)
 
     @router.post("/posts")
     async def create_post(payload: NewPostIn, request: Request, user=Depends(get_current_user)):

@@ -17,6 +17,7 @@ import FoundingCounter from "../components/FoundingCounter";
 import NotificationBell from "../components/NotificationBell";
 import EarningsWidget from "../components/EarningsWidget";
 import ReferralProgressCard from "../components/ReferralProgressCard";
+import MilestoneCelebrationModal from "../components/MilestoneCelebrationModal";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -45,6 +46,7 @@ export default function AppHome() {
   const [recentJobs, setRecentJobs] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [providerSlug, setProviderSlug] = useState("");
+  const [referralSummary, setReferralSummary] = useState(null);
 
   const isProvider = user?.role === "provider";
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || (user?.email || "").split("@")[0];
@@ -69,6 +71,9 @@ export default function AppHome() {
     // Fetch provider slug so QA4 'My eCard' can route to /p/{slug}.
     if (user.role === "provider") {
       api.get("/providers/me").then(r => setProviderSlug(r.data?.slug || "")).catch(() => {});
+      // Section 77 — fetch referral summary so we can detect new milestones
+      // and fire MilestoneCelebrationModal exactly once per unlock.
+      api.get("/user-referrals/me").then(r => setReferralSummary(r.data)).catch(() => {});
     }
   }, [user]);
 
@@ -348,6 +353,16 @@ export default function AppHome() {
             : "Servicios latinos reales, verificados en todo EE.UU."}
         </p>
       </div>
+
+      {/* Section 77 — Confetti celebration when a new milestone is unlocked.
+          Reads `latest_milestone.credit_id` from the summary and compares
+          against localStorage to fire exactly once per new unlock. */}
+      {isProvider && referralSummary?.latest_milestone && (
+        <MilestoneCelebrationModal
+          summary={referralSummary}
+          onClose={() => { /* user dismissed — already persisted */ }}
+        />
+      )}
     </div>
   );
 }

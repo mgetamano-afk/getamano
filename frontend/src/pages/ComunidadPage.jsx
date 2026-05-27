@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   MessageCircle, Share2, Trash2, Trophy, Image as ImageIcon,
   Search, Bell, Users, Sparkles, Bookmark, Settings, X, Send,
@@ -367,8 +367,26 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
   const a = post.author || {};
   const avatar = a.picture || getDicebearAvatar(a.business_name || a.name || "U");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  // Section 77 — milestone posts get a celebratory ring + badge for social proof.
+  const isMilestone = post.type === "milestone";
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 mb-3 hover:border-slate-300 transition" data-testid={`comunidad-post-${post.post_id}`}>
+    <article
+      className={`rounded-2xl bg-white p-4 mb-3 hover:border-slate-300 transition ${isMilestone ? "border-2 border-amber-300 shadow-[0_8px_24px_-12px_rgba(245,158,11,0.35)]" : "border border-slate-200"}`}
+      style={isMilestone ? { background: "linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 60%)" } : {}}
+      data-testid={`comunidad-post-${post.post_id}`}
+    >
+      {isMilestone && (
+        <div className="-mt-1 -mx-1 mb-3 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm" data-testid="milestone-post-badge">
+            🏆 Hito de la comunidad
+          </span>
+          {post.milestone_paid_count != null && (
+            <span className="text-[10px] font-semibold text-amber-700">
+              {post.milestone_paid_count} amigos suscritos
+            </span>
+          )}
+        </div>
+      )}
       <header className="flex items-start gap-3">
         <Link to={a.slug ? `/provider/${a.slug}` : "#"} className="flex-shrink-0">
           <img src={avatar} alt={a.name} className="w-10 h-10 rounded-full object-cover" loading="lazy" />
@@ -466,6 +484,8 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
 // ─── Post Feed ──────────────────────────────────────────────────────────
 function PostFeed() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const activeFilter = searchParams.get("filter") || "";
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nextBefore, setNextBefore] = useState(null);
@@ -486,6 +506,8 @@ function PostFeed() {
   const load = (before = null) => {
     const params = { limit: 10 };
     if (before) params.before = before;
+    // Section 77 — propagate ?filter=hitos to backend
+    if (activeFilter) params.filter = activeFilter;
     return api.get(endpoint, { params }).then(r => r.data);
   };
 
@@ -524,6 +546,7 @@ function PostFeed() {
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     load().then(d => {
       if (!alive) return;
       setPosts(d.items || []);
@@ -531,8 +554,9 @@ function PostFeed() {
       lastFetchRef.current = Date.now();
     }).catch(() => {}).finally(() => alive && setLoading(false));
     return () => { alive = false; };
+  // Re-fetch when the user logs in OR when the ?filter= query param changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.user_id]);
+  }, [user?.user_id, activeFilter]);
 
   // CAPA 1 — Visibility API: refresh on tab-return after 2+ min
   useEffect(() => {
