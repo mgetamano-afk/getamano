@@ -106,6 +106,26 @@ async def _award_milestone_credit(db, referrer_user_id: str, milestone_index: in
     except Exception:
         pass
 
+    # Section 73 — also deliver via WhatsApp / SMS (sandbox-safe).
+    # The wrapper picks the right channel based on the user's profile
+    # (provider+es → WhatsApp, client+en → SMS). No-op if no phone on file.
+    try:
+        from integrations.messaging import deliver_notification
+        user_doc = await db.users.find_one(
+            {"user_id": referrer_user_id},
+            {"_id": 0, "name": 1},
+        ) or {}
+        first_name = (user_doc.get("name") or "").split(" ")[0] or "amigo"
+        paid_count = REFEREES_PER_MILESTONE * milestone_index
+        await deliver_notification(
+            db,
+            user_id=referrer_user_id,
+            template_name="referral_milestone_unlocked",
+            variables={"name": first_name, "paid_count": paid_count, "url": "/dashboard/provider?tab=red"},
+        )
+    except Exception:
+        pass
+
 
 async def _extend_referee_pro(db, referee_user_id: str) -> str:
     """Grant the referee 30 days of Pro by extending pro_referral_until.
@@ -184,6 +204,27 @@ async def mark_referral_paid(db, referee_user_id: str) -> Optional[dict]:
             "dismissed_at": None,
             "created_at": now_iso,
         })
+    except Exception:
+        pass
+
+    # Section 73 — also deliver via WhatsApp / SMS (sandbox-safe).
+    try:
+        from integrations.messaging import deliver_notification
+        referee_doc = await db.users.find_one(
+            {"user_id": referee_user_id},
+            {"_id": 0, "name": 1},
+        ) or {}
+        referee_first_name = (referee_doc.get("name") or "").split(" ")[0] or "amigo"
+        await deliver_notification(
+            db,
+            user_id=referee_user_id,
+            template_name="referral_first_month_free",
+            variables={
+                "name": referee_first_name,
+                "referrer_name": referrer_name,
+                "url": "/dashboard/provider?tab=cuenta",
+            },
+        )
     except Exception:
         pass
 

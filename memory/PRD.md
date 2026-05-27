@@ -2305,3 +2305,56 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 4. (Opcional) Cron diario que llama sync-stripe para todos los users con saldo > 0.
 
 **Lint**: All checks passed ✓
+
+
+### Iteration 76 (May 27, 2026) — Section 73: sent.dm Messaging Integration (sandbox-ready, key-free)
+**User decision**: usar **sent.dm** (no Twilio) para SMS + WhatsApp. Resend se mantiene para email. Mecánica: latinos→WhatsApp, americanos→SMS.
+
+**Por qué sent.dm sobre Twilio**:
+- Pricing predecible ($0.015/contacto/mes plano)
+- SMS + WhatsApp + RCS en una sola API
+- WhatsApp template approval workflow nativo
+- Sandbox mode oficial
+- SDK Python oficial
+
+**Arquitectura — wrapper abstracto + sandbox 100% funcional sin keys**:
+
+1. **`integrations/messaging_templates.py`** (NEW, 9 templates bilingües ES/EN × 2 canales): welcome_provider, referral_milestone_unlocked, referral_first_month_free, commission_earned, credit_applied_to_invoice, new_message_received, new_quote_request, otp_code, booking_confirmed. Función `render(template, channel, lang, vars)` con str.format. `get_template_id_wa()` placeholder hoy → real cuando submitas templates en sent.dm dashboard.
+
+2. **`integrations/messaging.py`** (NEW, ~280 LOC):
+   - `send_whatsapp(...)` / `send_sms(...)` → sandbox: log + persist `messages` collection con status='sandbox_queued'. Producción: llama sent.dm SDK (función `_send_via_sentdm()` con NotImplementedError hasta tener key).
+   - `send_otp(to, code, lang)` → siempre SMS.
+   - `deliver_notification(db, user_id, template, vars)` → router inteligente: provider→WhatsApp, client→SMS. Skip si user no tiene phone.
+   - `_normalize_phone()` → E.164 (10-digit US auto-prefix +1).
+   - Mode toggle: `_is_sandbox()` → True si no hay SENT_DM_API_KEY o APP_ENV != production.
+
+3. **`routes/messaging_admin.py`** (NEW): GET /messaging/templates (admin), GET /messaging/messages (admin log), POST /messaging/test-send (admin sandbox test), POST /webhooks/sentdm/status (public + optional HMAC).
+
+4. **Hooks en 3 flujos críticos**:
+   - `_award_milestone_credit` → WhatsApp al referrer cuando desbloquea cada hito.
+   - `mark_referral_paid` → WhatsApp al referido cuando confirma primer pago.
+   - `_celebrate_applied_credit` → WhatsApp al provider cuando customer.balance aplica el descuento.
+
+**Verificación E2E completa (sandbox)**:
+- Login admin → GET /messaging/templates → 9 templates con metadata correcta.
+- POST /messaging/test-send → sandbox queue + persist con sandbox_queued status.
+- Flow milestone: 2 referidos via simulate-paid → backend disparó **3 WhatsApps automáticamente**:
+  1. WA a Referee1: "🎁 ¡Hola Referee1! Como llegaste por María, tu primer mes Pro va GRATIS"
+  2. WA a Referee2: idem
+  3. WA a María: "🎉 ¡Hola María! Ganaste 1 mes gratis Pro — 2 amigos se suscribieron..."
+- Todos persistidos en `messages` collection con channel, language, body, recipient, template_name, status_history.
+
+**Para activar producción**:
+1. Crear cuenta en https://sent.dm/ → obtener API key.
+2. Set en `.env`: `SENT_DM_API_KEY`, `SENT_DM_WEBHOOK_SECRET`, `APP_ENV=production`.
+3. `pip install sent-dm-python` (nombre exacto a confirmar).
+4. Habilitar `_send_via_sentdm()` en messaging.py (código preparado, descomentar).
+5. Submit templates en sent.dm dashboard → mapear IDs en `template_id_wa`.
+6. Configurar webhook URL: `https://{dominio}/api/webhooks/sentdm/status`.
+
+**Limpieza colateral**: Set phone=+15555550100 + preferred_language=es para María. 34 mensajes huérfanos limpiados.
+
+**Lint**: All checks passed ✓.
+
+**Files NEW**: integrations/__init__.py, integrations/messaging.py, integrations/messaging_templates.py, routes/messaging_admin.py.
+**Files MODIFIED**: server.py (router), user_referrals.py (2 hooks), credits.py (1 hook), test_credentials.md.

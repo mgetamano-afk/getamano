@@ -144,6 +144,19 @@ async def _celebrate_applied_credit(db, user_id: str, applied_cents: int, applie
     except Exception:
         pass
 
+    # 3. Section 73 — WhatsApp/SMS delivery via sent.dm (sandbox-safe).
+    try:
+        from integrations.messaging import deliver_notification
+        amount_label = f"{applied_cents / 100:.2f}"
+        await deliver_notification(
+            db,
+            user_id=user_id,
+            template_name="credit_applied_to_invoice",
+            variables={"amount": amount_label, "credits_count": applied_count},
+        )
+    except Exception:
+        pass
+
 
 async def _mark_credits_applied(
     db,

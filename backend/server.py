@@ -9405,6 +9405,7 @@ from routes.follows import make_router as _make_follows_router  # noqa: E402
 from routes.referral_jobs import make_router as _make_referral_jobs_router  # noqa: E402
 from routes.credits import make_router as _make_credits_router  # noqa: E402
 from routes.user_referrals import make_router as _make_user_referrals_router  # noqa: E402
+from routes.messaging_admin import make_router as _make_messaging_admin_router  # noqa: E402
 from routes.push import make_router as _make_push_router  # noqa: E402
 from routes.banners import make_router as _make_banners_router  # noqa: E402
 from routes.stories import make_router as _make_stories_router  # noqa: E402
@@ -9528,6 +9529,14 @@ api_router.include_router(
 
 api_router.include_router(
     _make_user_referrals_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
+    )
+)
+
+api_router.include_router(
+    _make_messaging_admin_router(
         db=db,
         User=User,
         get_current_user=get_current_user,
