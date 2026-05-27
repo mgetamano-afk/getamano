@@ -68,41 +68,64 @@ export default function LiveActivityTicker() {
 
   return (
     <div
-      className="relative bg-black/40 backdrop-blur border-t border-white/10 py-3 overflow-hidden"
+      className="relative overflow-hidden rounded-2xl border border-emerald-400/20 shadow-2xl"
+      style={{
+        background:
+          "radial-gradient(ellipse at top left, rgba(16,185,129,0.18) 0%, transparent 55%), " +
+          "radial-gradient(ellipse at bottom right, rgba(2,95,103,0.30) 0%, transparent 60%), " +
+          "linear-gradient(135deg, #050a14 0%, #0b1220 60%, #050a14 100%)",
+        boxShadow:
+          "0 12px 40px -10px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05), inset 0 0 60px rgba(16,185,129,0.06)",
+      }}
       data-testid="live-activity-ticker"
     >
+      {/* Subtle animated dot grid for "live" feel */}
       <div
-        className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1.5 bg-emerald-500/25 border border-emerald-400/40 backdrop-blur-md rounded-full px-2.5 py-1 text-[10px] font-bold text-emerald-100 tracking-widest pointer-events-none"
-        data-testid="live-activity-badge"
-      >
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-        </span>
-        {lang === "es" ? "EN VIVO" : "LIVE"}
-      </div>
-      {/* Left fade — hides marquee text sliding under the EN VIVO badge */}
-      <div className="absolute left-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-r from-black/80 via-black/60 to-transparent pointer-events-none" aria-hidden />
+        className="absolute inset-0 opacity-[0.06] pointer-events-none"
+        style={{
+          backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
+        }}
+        aria-hidden
+      />
 
-      <div
-        className="flex gap-12 whitespace-nowrap pl-36 hover:[animation-play-state:paused]"
-        style={{ animation: `scroll-x ${MARQUEE_DURATION_S}s linear infinite`, width: "max-content" }}
-      >
-        {doubled.map((row, i) => (
-          <Link
-            key={`${row.text}-${i}`}
-            to={row.link}
-            className="text-sm text-orange-300/90 flex-shrink-0 hover:text-orange-200 transition-colors inline-flex items-center gap-1.5"
-            data-testid={`live-activity-row-${i}`}
-          >
-            <span aria-hidden>{row.icon}</span>
-            <span>{row.text}</span>
-            {row.rel && (
-              <span className="text-white/40 text-xs ml-1">· {row.rel}</span>
-            )}
-            <span className="ml-12 text-white/30">·</span>
-          </Link>
-        ))}
+      <div className="relative py-3">
+        <div
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1.5 bg-emerald-500/30 border border-emerald-400/50 backdrop-blur-md rounded-full px-2.5 py-1 text-[10px] font-extrabold text-emerald-100 tracking-[0.2em] pointer-events-none shadow-lg"
+          style={{ boxShadow: "0 0 16px rgba(16,185,129,0.45)" }}
+          data-testid="live-activity-badge"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+          </span>
+          {lang === "es" ? "EN VIVO" : "LIVE"}
+        </div>
+        {/* Left fade — hides marquee text sliding under the EN VIVO badge */}
+        <div className="absolute left-0 top-0 bottom-0 w-36 z-10 bg-gradient-to-r from-[#050a14] via-[#050a14]/80 to-transparent pointer-events-none" aria-hidden />
+        {/* Right fade — symmetrical edge softening */}
+        <div className="absolute right-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-l from-[#050a14] via-[#050a14]/70 to-transparent pointer-events-none" aria-hidden />
+
+        <div
+          className="flex gap-12 whitespace-nowrap pl-36 pr-16 hover:[animation-play-state:paused]"
+          style={{ animation: `scroll-x ${MARQUEE_DURATION_S}s linear infinite`, width: "max-content" }}
+        >
+          {doubled.map((row, i) => (
+            <Link
+              key={`${row.text}-${i}`}
+              to={row.link}
+              className="text-sm text-amber-200/95 flex-shrink-0 hover:text-amber-100 transition-colors inline-flex items-center gap-1.5 drop-shadow-[0_0_8px_rgba(252,211,77,0.25)]"
+              data-testid={`live-activity-row-${i}`}
+            >
+              <span aria-hidden>{row.icon}</span>
+              <span>{row.text}</span>
+              {row.rel && (
+                <span className="text-white/50 text-xs ml-1">· {row.rel}</span>
+              )}
+              <span className="ml-12 text-emerald-400/40">◆</span>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

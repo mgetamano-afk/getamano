@@ -2136,3 +2136,11 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - FollowButton inlined on eCard hero `/p/{slug}` — hidden for owner, shown for everyone else.
 - **Iteration 66 testing**: 15/15 backend pytest + 9/9 frontend Playwright, 0 bugs, 0 regressions.
 - **UX gain**: providers can build a verified network of allies, follow peers, get smart category-based suggestions. Foundation laid for future referral-commission flow.
+
+
+### Feb 26, 2026 — Section 66 (Auth-gate + dark live ticker + Founding banner)
+- **NEW `<AuthGate>` component** wraps high-value actions. Logged-in users pass through; guests get a friendly bottom-sheet/modal asking to Sign in or Create free account. Preserves redirect path. Action-specific copy for: message, quote, book, apply, contact, phone, default. Applied to: WhatsApp call/CTA, Call button, Chat button, Quote button, Book button, "Pedir cotización exacta" link, "I recommend" button on `/p/{slug}`.
+- **LiveActivityTicker dark overhaul**: rebuilt with radial-gradient layered background (emerald + teal glows on near-black `#050a14`), subtle dot grid (opacity 0.06), glowing green LIVE badge with box-shadow, amber-gold marquee text with drop-shadow, dual fade edges (left + right). Inner shadow + outer shadow for depth.
+- **FoundingCounter banner restored** in AppHome (route `/`) — preserved from legacy Landing. Shows "50 DE 50 / FOUNDING MEMBERS / Plan Pro gratis hasta 2027 con código GETAMANO50". Live polling `/api/promo-codes/founding-status` every 20s; hidden for users with role=provider.
+- **No backend changes** — pure frontend enhancement of UX + access gating.
+- Visual verification (Playwright): guest at `/p/maria-cleaning-services-sallisaw-ok` clicking the green WhatsApp CTA opens the auth-gate modal "Sign in to call / Only registered users can view the number" with both Sign in + Create free account options. Clicking Quote shows "Sign in to request a quote".

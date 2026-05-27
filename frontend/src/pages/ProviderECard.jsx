@@ -17,6 +17,7 @@ import ECardModal from "../components/ECardModal";
 import ECardFloatingHeader from "../components/ECardFloatingHeader";
 import ShareECardBlock from "../components/ShareECardBlock";
 import FollowButton from "../components/FollowButton";
+import AuthGate from "../components/AuthGate";
 import EngagementBadges from "../components/EngagementBadges";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
@@ -267,37 +268,49 @@ export default function ProviderECard() {
               </div>
             </div>
 
-            {/* Section 32 — Primary CTA: WhatsApp full-width green */}
+            {/* Section 32 — Primary CTA: WhatsApp full-width green. Auth-gated per Section 66. */}
             <div className="mt-6 space-y-2.5">
               {p.phone ? (
-                <WhatsAppButton phone={p.phone} businessName={p.business_name} testid="ecard-whatsapp-button" variant="primary" />
+                <AuthGate action="phone">
+                  <WhatsAppButton phone={p.phone} businessName={p.business_name} testid="ecard-whatsapp-button" variant="primary" />
+                </AuthGate>
               ) : (
-                <button
-                  onClick={() => { setShowMessage(true); setMode("message"); }}
-                  className="w-full flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3.5 px-6 rounded-2xl transition active:scale-[0.98] shadow-md"
-                  data-testid="ecard-message-primary-button"
-                >
-                  <MessageSquare className="w-5 h-5" /> {lang === "en" ? "Send message" : "Enviar mensaje"}
-                </button>
+                <AuthGate action="message">
+                  <button
+                    onClick={() => { setShowMessage(true); setMode("message"); }}
+                    className="w-full flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold py-3.5 px-6 rounded-2xl transition active:scale-[0.98] shadow-md"
+                    data-testid="ecard-message-primary-button"
+                  >
+                    <MessageSquare className="w-5 h-5" /> {lang === "en" ? "Send message" : "Enviar mensaje"}
+                  </button>
+                </AuthGate>
               )}
 
-              {/* 2x2 grid of secondary CTAs */}
+              {/* 2x2 grid of secondary CTAs — each auth-gated */}
               <div className="grid grid-cols-2 gap-2" data-testid="ecard-secondary-cta-grid">
                 {p.phone && (
-                  <a href={`tel:${p.phone}`} onClick={trackClick} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-call-button">
-                    <Phone className="w-4 h-4 text-teal-700" /> {t("provider.call")}
-                  </a>
+                  <AuthGate action="phone">
+                    <a href={`tel:${p.phone}`} onClick={trackClick} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-call-button">
+                      <Phone className="w-4 h-4 text-teal-700" /> {t("provider.call")}
+                    </a>
+                  </AuthGate>
                 )}
-                <button onClick={() => { setShowMessage(true); setMode("message"); }} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-message-button">
-                  <MessageSquare className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Chat" : "Mensaje"}
-                </button>
-                <button onClick={() => setShowQuote(true)} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-quote-button">
-                  <FileText className="w-4 h-4 text-amber-600" /> {lang === "en" ? "Quote" : "Cotizar"}
-                </button>
-                {p.calendar_active ? (
-                  <button onClick={() => setShowBooking(true)} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-book-button">
-                    <Calendar className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Book" : "Reservar"}
+                <AuthGate action="message">
+                  <button onClick={() => { setShowMessage(true); setMode("message"); }} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-message-button">
+                    <MessageSquare className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Chat" : "Mensaje"}
                   </button>
+                </AuthGate>
+                <AuthGate action="quote">
+                  <button onClick={() => setShowQuote(true)} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-quote-button">
+                    <FileText className="w-4 h-4 text-amber-600" /> {lang === "en" ? "Quote" : "Cotizar"}
+                  </button>
+                </AuthGate>
+                {p.calendar_active ? (
+                  <AuthGate action="book">
+                    <button onClick={() => setShowBooking(true)} className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-teal-300 text-slate-700 font-semibold py-3 px-4 rounded-xl transition active:scale-[0.98] text-sm" data-testid="ecard-book-button">
+                      <Calendar className="w-4 h-4 text-teal-700" /> {lang === "en" ? "Book" : "Reservar"}
+                    </button>
+                  </AuthGate>
                 ) : (
                   <button
                     onClick={() => document.querySelector('[data-testid="ecard-gallery"], [data-testid="ecard-rates"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
@@ -309,17 +322,19 @@ export default function ProviderECard() {
                 )}
               </div>
 
-              {/* Tertiary actions — recommend + map + view eCard */}
+              {/* Tertiary actions — recommend + map + view eCard. "Recommend" requires auth (Section 66). */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button
-                  onClick={() => setShowRecommend(true)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 hover:bg-red-50 transition"
-                  style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", color: "#B91C1C" }}
-                  data-testid="ecard-recommend-button"
-                >
-                  <Heart className="w-3.5 h-3.5 fill-red-500" />
-                  {lang === "en" ? "I recommend" : "Lo/la recomiendo"}
-                </button>
+                <AuthGate action="default">
+                  <button
+                    onClick={() => setShowRecommend(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 hover:bg-red-50 transition"
+                    style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", color: "#B91C1C" }}
+                    data-testid="ecard-recommend-button"
+                  >
+                    <Heart className="w-3.5 h-3.5 fill-red-500" />
+                    {lang === "en" ? "I recommend" : "Lo/la recomiendo"}
+                  </button>
+                </AuthGate>
                 {!p.is_home_based && p.city && (
                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700 transition" data-testid="ecard-map-button">
                     <MapPin className="w-3.5 h-3.5" /> {t("provider.map")}
@@ -394,7 +409,9 @@ export default function ProviderECard() {
                   <h3 className="font-display font-semibold text-slate-900 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-orange-500" /> Tarifas referenciales
                   </h3>
-                  <button onClick={() => setShowQuote(true)} className="text-xs text-orange-600 font-semibold hover:underline" data-testid="ecard-rates-quote-cta">{lang === "en" ? "Request exact quote →" : "Pedir cotización exacta →"}</button>
+                  <AuthGate action="quote">
+                    <button onClick={() => setShowQuote(true)} className="text-xs text-orange-600 font-semibold hover:underline" data-testid="ecard-rates-quote-cta">{lang === "en" ? "Request exact quote →" : "Pedir cotización exacta →"}</button>
+                  </AuthGate>
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {rates.map(r => (

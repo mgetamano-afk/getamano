@@ -14,6 +14,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import LiveActivityTicker from "../components/LiveActivityTicker";
+import FoundingCounter from "../components/FoundingCounter";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -177,6 +178,13 @@ export default function AppHome() {
       <div className="max-w-7xl mx-auto px-2 -mt-3 relative z-10">
         <LiveActivityTicker />
       </div>
+
+      {/* ── Founding 50 promo banner (guests + non-providers) ─────────── */}
+      {!isProvider && (
+        <div className="max-w-7xl mx-auto px-3 md:px-5 mt-3" data-testid="apphome-founding-banner">
+          <FoundingCounter variant="banner" />
+        </div>
+      )}
 
       {/* ── Quick actions grid 4 cols ─────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-5 pt-5 md:pt-7" data-testid="apphome-quick-actions">
