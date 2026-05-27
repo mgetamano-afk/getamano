@@ -112,7 +112,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
     @router.get("/push/public-key")
-    async def get_public_key():
+    async def get_public_key() -> dict:
         """Return the VAPID public key (base64url) for browser subscribe().
         Public on purpose — the key is meant to be shared with clients.
         """
@@ -122,7 +122,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"public_key": pk}
 
     @router.post("/push/subscribe")
-    async def subscribe(payload: PushSubscribeIn, me: User = Depends(get_current_user)):
+    async def subscribe(payload: PushSubscribeIn, me: User = Depends(get_current_user)) -> dict:
         """Register or refresh a Web Push subscription for the current user."""
         now_iso = datetime.now(timezone.utc).isoformat()
         await db.push_subscriptions.update_one(
@@ -148,7 +148,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"ok": True}
 
     @router.post("/push/unsubscribe")
-    async def unsubscribe(payload: PushUnsubscribeIn, me: User = Depends(get_current_user)):
+    async def unsubscribe(payload: PushUnsubscribeIn, me: User = Depends(get_current_user)) -> dict:
         res = await db.push_subscriptions.update_one(
             {"endpoint": payload.endpoint, "user_id": me.user_id},
             {"$set": {"is_active": False, "invalidated_at": datetime.now(timezone.utc).isoformat()}},
@@ -156,7 +156,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"ok": True, "matched": res.matched_count}
 
     @router.get("/push/me")
-    async def list_my_subscriptions(me: User = Depends(get_current_user)):
+    async def list_my_subscriptions(me: User = Depends(get_current_user)) -> list:
         rows = await db.push_subscriptions.find(
             {"user_id": me.user_id, "is_active": True},
             {"_id": 0, "endpoint": 1, "user_agent": 1, "created_at": 1, "last_seen_at": 1},

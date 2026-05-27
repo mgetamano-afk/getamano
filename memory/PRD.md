@@ -2157,3 +2157,52 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **ComunidadPage Feed tabs** — `[Todos] [Siguiendo]` toggle above the post feed. data-testid `comunidad-feed-tabs / -tab-all / -tab-following`. Guest sees a friendly "Sign in to see your feed" prompt.
 - **Verified** (Playwright + curl): Carlos follows María → María's bell shows "Carlos te empezó a seguir" notification. Carlos's `/comunidad` "Siguiendo" tab shows 11 cards (María's stories + banners).
 - Future work: real-time SW push notification (when SW backend `/api/push/subscribe` is built), comment notifications, mention notifications.
+
+
+### Iteration 68 (May 27, 2026) — Section 65 Dynamic OG eCard + Stories/Banners refactor + Push wiring + Type hints
+**Goal del usuario:** "trabaja con ese prompt primero (Sección 65 OG eCard social) y después ejecuta a) refactor server.py, b) push frontend wiring, c) limpiar duplicados, d) type hints — toma tu tiempo".
+
+**Sección 65 — Open Graph dinámico para eCards compartidas:**
+- **Problema**: Al compartir `/p/{slug}` en WhatsApp/Facebook/iMessage/Twitter aparecía el logo genérico de getamano (mano blanca) en lugar de los datos del proveedor. Diagnóstico: la SPA de React inyecta meta tags vía JS, pero los crawlers de redes sociales no ejecutan JavaScript.
+- **PNG endpoint nuevo** `GET /api/og-image/{slug}.png` — convierte el SVG existente a PNG via cairosvg (instalado). WhatsApp/iMessage/Facebook NO renderizan SVG; necesitan PNG/JPEG. Cacheado 24h + stale-while-revalidate 7d. Tamaño típico ~142KB para 1200×630.
+- **Helper `_fetch_logo_data_uri(logo_url)`** — fetcha el logo del proveedor (4s timeout) y lo embebe como base64 data URI dentro del SVG ANTES de la conversión PNG. Así cairosvg no depende de fetch remoto (algunos CDN bloquean user-agent de cairo, otros tienen CORS restrictivo). Si falla, fallback a iniciales en círculo (nunca rompe el preview).
+- **`_build_og_image_svg(provider, embedded_logo_uri="")`** — acepta el data URI pre-fetcheado. Badges "Verificado" y "PRO" reemplazados de emoji (✓ ⭐ — renderizaban como rectángulos vacíos en cairo) a SVG path + texto puro (checkmark drawn con `<path stroke="white">`). Estrellas Unicode ★ ☆ se mantienen (son glyphs de texto regulares, no emojis).
+- **`_load_og_provider(slug)`** — DRY helper: resuelve slug → dict con fallback genérico + enriquece `category.name_es` de la colección `categories`. Reusado por ambos endpoints (SVG + PNG).
+- **`_build_og_html` actualizado**: `og:image` ahora apunta a `.png` (no `.svg`), `og:image:type=image/png`. SVG queda como `<link rel="image_src">` para herramientas de debug. Mejora dramática en preview de WhatsApp.
+- **Frontend `ShareECardBlock.jsx`** — fix: las 3 acciones (Copy / Native Share / NFC write) ahora usan `shareUrl = ${backend}/api/og/p/{slug}` (URL OG-rich, redirige humanos a `/p/{slug}` vía meta-refresh + JS) en lugar de la URL canónica. El URL visible y el QR siguen usando `humanUrl = /p/{slug}` (limpio para lectura). Patrón dual-URL ya usado por ShareECard y ShareLinkCard.
+
+**Refactor server.py (Phase a):**
+- **Stories** (Section 60) — 7 endpoints + modelo `StoryCreateIn` movidos de `server.py:8771-8947` a `/app/backend/routes/stories.py` (211 LOC). Registrado con `_make_stories_router(db, User, get_current_user)`. server.py bajó 10,024 → 9,942 LOC.
+- **Banners** ya estaba completo desde sesión anterior (`/app/backend/routes/banners.py`, 196 LOC). Removed duplicado `BannerPublishIn` definido en server.py (líneas 8770-8774 — el modelo real vive en banners.py).
+- Router registration order preserved at the end of `api_router.include_router()` block.
+
+**Push Notifications Frontend Wiring (Phase b):**
+- **`PushOptInBanner.jsx` reescrito** — antes usaba `pushNotifications.js` (polling-based, sin VAPID); ahora usa `push.js` con `ensurePushSubscription()` que:
+  1. Pide permiso de Notification
+  2. Registra Service Worker (ya estaba en `/public/service-worker.js` con handlers `push` + `notificationclick` desde Section 63)
+  3. Fetch del VAPID public key vía `GET /api/push/public-key`
+  4. `pushManager.subscribe({applicationServerKey: ...})` con Web Push real
+  5. `POST /api/push/subscribe` con `{endpoint, keys:{p256dh,auth}, user_agent}` → guardado en MongoDB `push_subscriptions`
+- **UX gating preservado**: solo aparece después de 20s + 600px scroll + usuario autenticado + permission==="default" + no descartado en últimos 30 días.
+- **Montado en `App.js`** debajo de `<SmartActionHub />` (ambos coexisten — SmartActionHub también ofrece push como nudge contextual).
+- **Backend VAPID keys** ya configuradas en `.env`: `VAPID_PUBLIC_KEY` (BGNT...), `VAPID_PRIVATE_KEY_B64` (PEM b64), `VAPID_SUBJECT=mailto:contact@getamano.com`.
+
+**Type Hints (Phase d) — focalizado a los 3 routers extraídos esta sesión:**
+- `routes/stories.py` — 7 handlers: `-> dict` o `-> list`
+- `routes/banners.py` — 8 handlers: `-> dict | Optional[dict] | list`
+- `routes/push.py` — 4 handlers: `-> dict | list` + helper `send_push_to_user` ya tenía `-> dict`
+- No tocado: handlers más complejos en `follows.py`, `referral_jobs.py`, `nudges.py` (mantenimiento futuro, bajo prioridad).
+
+**Testing** (iteration 68 — 100% PASS):
+- Backend: 19/19 pytest pass — OG PNG/SVG/HTML + Stories + Banners + Push subscribe (con verificación directa en MongoDB) + Auth + regresión `/providers /categories /follows`.
+- Frontend: Playwright validó landing carga, eCard renderea, `ShareECardBlock` Copy escribe URL `/api/og/p/{slug}` al clipboard, PushOptInBanner correctamente suprimido por gating de 20s+scroll. Cero issues críticos, cero issues menores, cero regresiones.
+- Visual verificado por screenshot: PNG OG 1200×630 muestra logo de María (circular clipped), badge teal "Verificado" con SVG check, badge naranja "PRO", "María's Cleaning Services" en blanco grande, "Limpieza · Sallisaw, OK", "Sin reseñas todavía", CTA "Ver eCard completa →" y footer "getamano.us".
+
+**Stack changes**:
+- Backend deps: `cairosvg==2.9.0` + transitive (`cairocffi`, `cssselect2`, `tinycss2`, `defusedxml`, `webencodings`). `requirements.txt` regenerado con `pip freeze`.
+
+**Activación en producción**:
+- OG dinámico ya está LIVE. Cuando se configure dominio real `getamano.com`, los previews mostrarán automáticamente el dominio correcto (el endpoint detecta `X-Forwarded-Host`).
+- Push notifications: backend listo (VAPID), frontend listo (banner + service worker). Próximo paso: integrar `send_push_to_user(db, user_id, payload)` en los hooks de mensajes/citas/reseñas para disparar push reales (actualmente solo se dispara en follows desde Section 65).
+
+**Limitación conocida**: la app sigue siendo SPA, así que si un usuario copia manualmente `/p/{slug}` de la barra de URL y lo pega en WhatsApp, el bot va al frontend SPA (HTML genérico). Los botones in-app Compartir / WhatsApp / SMS / Email / Facebook YA usan `/api/og/p/{slug}` correctamente. Una solución 100% (Cloudflare Worker rewriting bot UAs) requiere infra externa fuera del Emergent preview env.

@@ -37,7 +37,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
     @router.get("/banners/banner-of-the-week")
-    async def banner_of_the_week():
+    async def banner_of_the_week() -> Optional[dict]:
         """Most-liked public banner from the last 7 days (with all-time fallback)."""
         week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
         pipeline = [
@@ -57,7 +57,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return rows[0]
 
     @router.post("/banners/publish")
-    async def publish_banner(payload: BannerPublishIn, user: User = Depends(get_current_user)):
+    async def publish_banner(payload: BannerPublishIn, user: User = Depends(get_current_user)) -> dict:
         if user.role != "provider":
             raise HTTPException(status_code=403, detail="Solo proveedores pueden publicar banners.")
         profile = await db.provider_profiles.find_one(
@@ -113,7 +113,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         sort: Literal["popular", "recent"] = "popular",
         limit: int = 24,
         offset: int = 0,
-    ):
+    ) -> dict:
         limit = max(1, min(60, limit))
         offset = max(0, offset)
         query: dict = {"is_public": True}
@@ -132,7 +132,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         }
 
     @router.get("/banners/me")
-    async def my_published_banners(user: User = Depends(get_current_user)):
+    async def my_published_banners(user: User = Depends(get_current_user)) -> list:
         if user.role != "provider":
             return []
         rows = await db.banner_shares.find(
@@ -142,7 +142,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return rows
 
     @router.delete("/banners/{share_id}")
-    async def unpublish_banner(share_id: str, user: User = Depends(get_current_user)):
+    async def unpublish_banner(share_id: str, user: User = Depends(get_current_user)) -> dict:
         existing = await db.banner_shares.find_one({"share_id": share_id}, {"_id": 0, "provider_user_id": 1})
         if not existing:
             raise HTTPException(status_code=404, detail="Banner no encontrado.")
@@ -153,7 +153,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"ok": True}
 
     @router.post("/banners/{share_id}/like")
-    async def toggle_banner_like(share_id: str, user: User = Depends(get_current_user)):
+    async def toggle_banner_like(share_id: str, user: User = Depends(get_current_user)) -> dict:
         banner = await db.banner_shares.find_one({"share_id": share_id}, {"_id": 0, "provider_user_id": 1, "is_public": 1})
         if not banner or not banner.get("is_public"):
             raise HTTPException(status_code=404, detail="Banner no encontrado o no es público.")
@@ -176,7 +176,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"liked": liked, "likes": (fresh or {}).get("likes", 0)}
 
     @router.get("/banners/{share_id}/like-state")
-    async def get_banner_like_state(share_id: str, user: User = Depends(get_current_user)):
+    async def get_banner_like_state(share_id: str, user: User = Depends(get_current_user)) -> dict:
         existing = await db.banner_likes.find_one(
             {"share_id": share_id, "user_id": user.user_id},
             {"_id": 0},
@@ -184,7 +184,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"liked": bool(existing)}
 
     @router.post("/banners/{share_id}/view")
-    async def track_banner_view(share_id: str):
+    async def track_banner_view(share_id: str) -> dict:
         """Fire-and-forget public view counter. No auth required."""
         await db.banner_shares.update_one(
             {"share_id": share_id, "is_public": True},

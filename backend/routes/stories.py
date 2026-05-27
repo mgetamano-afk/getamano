@@ -33,7 +33,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
     @router.post("/stories")
-    async def create_story(payload: StoryCreateIn, user: User = Depends(get_current_user)):
+    async def create_story(payload: StoryCreateIn, user: User = Depends(get_current_user)) -> dict:
         """Create a 24h ephemeral story. Providers only."""
         if user.role != "provider":
             raise HTTPException(status_code=403, detail="Solo proveedores pueden crear historias.")
@@ -78,7 +78,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return out
 
     @router.get("/stories/active")
-    async def list_active_stories(limit: int = 30):
+    async def list_active_stories(limit: int = 30) -> list:
         """Public — return active (non-expired) stories grouped by provider.
 
         Returns one entry per provider with their LATEST story (Instagram
@@ -118,7 +118,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return rows
 
     @router.get("/stories/by-provider/{provider_user_id}")
-    async def stories_by_provider(provider_user_id: str):
+    async def stories_by_provider(provider_user_id: str) -> list:
         """Return all active stories from one provider, oldest first (carousel playback)."""
         now = datetime.now(timezone.utc)
         rows = await db.stories.find(
@@ -133,7 +133,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return rows
 
     @router.post("/stories/{story_id}/view")
-    async def track_story_view(story_id: str, user: User = Depends(get_current_user)):
+    async def track_story_view(story_id: str, user: User = Depends(get_current_user)) -> dict:
         """Count a unique view per (story, viewer). Idempotent via unique index."""
         try:
             await db.story_views.insert_one({
@@ -147,7 +147,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"ok": True}
 
     @router.post("/stories/{story_id}/like")
-    async def toggle_story_like(story_id: str, user: User = Depends(get_current_user)):
+    async def toggle_story_like(story_id: str, user: User = Depends(get_current_user)) -> dict:
         """Like/unlike a story. Idempotent per user. Story owner cannot like own."""
         story = await db.stories.find_one(
             {"story_id": story_id},
@@ -183,7 +183,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"liked": liked, "likes_count": (fresh or {}).get("likes_count", 0)}
 
     @router.get("/stories/{story_id}/like-state")
-    async def get_story_like_state(story_id: str, user: User = Depends(get_current_user)):
+    async def get_story_like_state(story_id: str, user: User = Depends(get_current_user)) -> dict:
         existing = await db.story_likes.find_one(
             {"story_id": story_id, "user_id": user.user_id},
             {"_id": 0},
@@ -191,7 +191,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         return {"liked": bool(existing)}
 
     @router.delete("/stories/{story_id}")
-    async def delete_story(story_id: str, user: User = Depends(get_current_user)):
+    async def delete_story(story_id: str, user: User = Depends(get_current_user)) -> dict:
         """Owner or admin deletes a story manually before expiry."""
         s = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "provider_user_id": 1})
         if not s:
