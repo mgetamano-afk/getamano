@@ -31,6 +31,7 @@ import RecommendModal from "../components/RecommendModal";
 import RecommendationsSection from "../components/RecommendationsSection";
 import { LicenseBadge } from "../components/LicenseSection";
 import { formatRate } from "../components/ProviderRates";
+import ReviewThankYouModal from "../components/ReviewThankYouModal";
 import { toast } from "sonner";
 
 export default function ProviderECard() {
@@ -117,6 +118,8 @@ export default function ProviderECard() {
   const share = null;
 
   const [paidRange, setPaidRange] = useState("");
+  // Section 82 — Review thank-you modal state (fires only on 5⭐)
+  const [showReviewThanks, setShowReviewThanks] = useState(false);
   const submitReview = async (e) => {
     e.preventDefault();
     if (!user) { toast.error("Inicia sesión para reseñar"); return; }
@@ -127,6 +130,11 @@ export default function ProviderECard() {
       const r = await api.get(`/providers/by-slug/${slug}`);
       setP(r.data);
       setComment(""); setPaidRange("");
+      // Section 82 — Surface the share-amplification modal for 5⭐ reviews
+      // only. Lower ratings skip it (avoid asking unhappy clients to share).
+      if (rating === 5) {
+        setShowReviewThanks(true);
+      }
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Error");
     } finally {
@@ -577,6 +585,12 @@ export default function ProviderECard() {
           targetRole="provider"
           targetName={p.business_name}
           context={{ provider_slug: p.slug }}
+        />
+        <ReviewThankYouModal
+          open={showReviewThanks}
+          provider={p}
+          onClose={() => setShowReviewThanks(false)}
+          rating={5}
         />
       </main>
       <Footer />
