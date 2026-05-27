@@ -53,7 +53,7 @@ export default function ECardFloatingHeader({ provider, lang = "es" }) {
   };
 
   const share = async () => {
-    const url = `${window.location.origin}/provider/${provider?.slug}`;
+    const url = `${window.location.origin}/p/${provider?.slug}`;
     const title = lang === "en" ? `${provider?.business_name} on getamano` : `${provider?.business_name} en getamano`;
     const text = lang === "en"
       ? `Check out ${provider?.business_name} on getamano — the Latino services marketplace`

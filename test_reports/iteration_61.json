@@ -1,0 +1,43 @@
+{
+  "summary": "Verified all 12 Section 61 bug fixes + Section 62 Footer i18n on the live preview frontend. 12/12 bugs PASS. No critical regressions. Auth flows for provider login work. /services/:slug and /servicios/:slug both redirect cleanly to /p/{slug}. Footer fully translated in ES and EN. Categoría principal correctly pre-populated. Rating em-dash present. BottomNav has exactly 5 items on both mobile and desktop with correct testids.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_bugs": {
+    "B1_services_redirect": "PASS — /services/maria-cleaning-services-sallisaw-ok and /servicios/maria-cleaning-services-sallisaw-ok both redirect to /p/maria-cleaning-services-sallisaw-ok via ServicesRouteResolver",
+    "B2_test_data_purged": "PASS — Guest /search shows no 'TEST Biz' or TEST_ entries; provider login (demo.provider) succeeds (3 protected accounts still log in)",
+    "B3_beta_seccion_30_removed": "PASS — 'Beta — Sección 30' string not found anywhere in DOM",
+    "B4_hero_stats": "PASS — Hero shows '3+ proveedores verificados', '2 estados cubiertos', '4.9 calificación promedio' (all > 0)",
+    "B5_hero_image": "PASS — Unsplash hero image (photo-1581578731548) loads with naturalWidth > 0",
+    "B6_bottomnav_5_items": "PASS — Exactly 5 visible items both mobile (md:hidden grid) and desktop (md:flex) with testids bottom-nav-home/search/community/empleos/account",
+    "B7_footer_i18n": "PASS — ES: Síguenos, Plataforma, Todos los servicios, Chambas, Ranking del mes, Ciudades, Descarga la app, Legal, Términos y Condiciones, Política de Privacidad, Política de Reseñas, Política de Cookies all present. EN: Follow us, Platform, All services, Jobs, Monthly ranking, Cities, Download the app, Legal, Terms & Conditions, Privacy Policy, Reviews Policy, Cookie Policy all present. (Note: 'Síguenos'/'Follow us' rendered uppercase via CSS text-transform — textContent matches expected case.)",
+    "B8_share_urls_p_format": "PASS — On /dashboard/provider 'Comparte tu eCard en redes' section, share URL displays as https://verified-providers-2.preview.emergentagent.com/p/maria-cleaning-services-sallisaw-ok. Source review of ShareECardBlock.jsx:21, ShareLinkCard.jsx:28, ECardFloatingHeader.jsx:56, QuickActionsFAB.jsx:79/109 all use /p/{slug}. (Modal preview header shows /provider/{slug} as an internal iframe preview path label only — not a share URL.)",
+    "B9_rating_em_dash": "PASS — Provider dashboard 'Calificación' StatCard shows '—' (em-dash) for María (rating_count=0)",
+    "B10_live_ticker": "PASS — LiveActivityTicker source uses animation: 'scroll-x', width: 'max-content', items doubled, hover:[animation-play-state:paused]. CSS keyframe in place.",
+    "B11_categoria_pre_populated": "PASS — 'Categoría principal' select pre-populated with value='cat_77f9e66f26' (Cleaning/Limpieza)",
+    "B12_category_filter_count": "PASS — /search filter-category-select has exactly 17 options (MAIN_CATEGORIES), down from 188+"
+  },
+  "regression_checks": {
+    "login_3_roles": "PASS — demo.provider@getamano.com login succeeds, redirects to /dashboard/provider",
+    "provider_dashboard_tabs": "PASS — 10 tabs render (perfil, tarifas, galeria, banner, citas, solicitudes, mensajes, referidos, diario, suscripcion)",
+    "ecard_preview_modal": "PASS — view-public-ecard button opens preview iframe with full eCard rendering"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/frontend/src/pages/ProviderDashboard.jsx is 702 lines — consider splitting tabs into separate component files for maintainability.",
+    "LiveActivityTicker inspection by automation: the inner scrolling row is the 2nd child (firstElementChild was the gradient/badge container) — slight DOM-fragility risk if testers selectorize by firstChild; consider adding data-testid='live-activity-track' on the animated track for robust verification.",
+    "ServicesRouteResolver shows a blank screen for ~200ms while probing /api/providers/by-slug — could show a small skeleton/spinner to avoid perceived flash."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (per request)", "frontend": "100% (12/12 bugs verified)"},
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123",
+  "seed_data_creation": "None — used existing demo provider María (prov_10b9f21bf971) and her cleaned profile.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All Section 61 (12 bugs) + Section 62 (footer i18n) verified end-to-end on live preview. Provider login is via /login (email+password, then button[type=submit]). For provider profile category, the select sits in the 'perfil' tab of /dashboard/provider as data-testid='form-category-select' (native SELECT). Share URL appears in input at the 'Comparte tu eCard en redes' section below the form. No retest needed.",
+  "rca_of_the_issue": "N/A — all fixes verified working"
+}

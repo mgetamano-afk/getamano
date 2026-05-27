@@ -18,7 +18,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
   const [showQR, setShowQR] = useState(false);
   const [nfcState, setNfcState] = useState("idle"); // idle | writing | success | unsupported
 
-  const url = `${window.location.origin}/provider/${provider?.slug}`;
+  const url = `${window.location.origin}/p/${provider?.slug}`;
   const title = lang === "en"
     ? `${provider?.business_name} on getamano`
     : `${provider?.business_name} en getamano`;

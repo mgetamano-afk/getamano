@@ -293,7 +293,13 @@ export default function ProviderDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCard icon={Eye} label="Vistas" value={profile.views || 0} color="text-blue-600" testid="stat-views" />
           <StatCard icon={Phone} label="Contactos" value={profile.contact_clicks || 0} color="text-orange-500" testid="stat-clicks" />
-          <StatCard icon={Star} label="Calificación" value={(profile.rating_avg || 0).toFixed(1)} color="text-yellow-500" testid="stat-rating" />
+          <StatCard
+            icon={Star}
+            label="Calificación"
+            value={(profile.rating_count || 0) > 0 ? (profile.rating_avg || 0).toFixed(1) : "—"}
+            color="text-yellow-500"
+            testid="stat-rating"
+          />
           <StatCard icon={ShieldCheck} label="Estado" value={profile.verification_status} color="text-green-600" capitalize testid="stat-status" />
         </div>
 

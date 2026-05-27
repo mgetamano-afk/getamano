@@ -85,8 +85,8 @@ export default function LiveActivityTicker() {
       <div className="absolute left-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-r from-black/80 via-black/60 to-transparent pointer-events-none" aria-hidden />
 
       <div
-        className="flex gap-12 whitespace-nowrap pl-36"
-        style={{ animation: `scroll-x ${MARQUEE_DURATION_S}s linear infinite` }}
+        className="flex gap-12 whitespace-nowrap pl-36 hover:[animation-play-state:paused]"
+        style={{ animation: `scroll-x ${MARQUEE_DURATION_S}s linear infinite`, width: "max-content" }}
       >
         {doubled.map((row, i) => (
           <Link

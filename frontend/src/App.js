@@ -47,6 +47,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
 const SavedECardsPage = lazy(() => import("./pages/SavedECardsPage"));
 const BannerGalleryPage = lazy(() => import("./pages/BannerGalleryPage"));
+const ServicesRouteResolver = lazy(() => import("./pages/ServicesRouteResolver"));
 import NotFoundPage from "./pages/NotFoundPage";
 const RankingPage = lazy(() => import("./pages/RankingPage"));
 import ComunidadLayout from "./components/ComunidadLayout";
@@ -206,13 +207,13 @@ function AppRouter() {
 
       {/* SEO hub routes */}
       <Route path="/servicios" element={<SeoServicesIndex />} />
-      <Route path="/servicios/:categorySlug" element={<SeoCategoryDetail />} />
+      <Route path="/servicios/:categorySlug" element={<ServicesRouteResolver />} />
       <Route path="/servicios/:categorySlug/:citySlug" element={<SeoPage />} />
       <Route path="/ciudades" element={<SeoCitiesIndex />} />
       <Route path="/ciudades/:citySlug" element={<SeoCityDetail />} />
       {/* English canonical aliases for SEO i18n — same components, hreflang annotated */}
       <Route path="/services" element={<SeoServicesIndex />} />
-      <Route path="/services/:categorySlug" element={<SeoCategoryDetail />} />
+      <Route path="/services/:categorySlug" element={<ServicesRouteResolver />} />
       <Route path="/services/:categorySlug/:citySlug" element={<SeoPage />} />
       <Route path="/cities" element={<SeoCitiesIndex />} />
       <Route path="/cities/:citySlug" element={<SeoCityDetail />} />

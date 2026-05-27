@@ -82,7 +82,16 @@ export default function Landing() {
     api.get("/categories").then(r => setCategories(r.data));
     api.get("/providers/featured").then(r => setFeatured(r.data));
     api.get("/providers", { params: { has_video: "true", limit: 6 } }).then(r => setWithVideo(r.data || [])).catch(() => {});
-    api.get("/public/stats").then(r => setStats(r.data)).catch(() => {});
+    api.get("/public/stats").then(r => {
+      // Bug B4 (Section 61) — never display zero counters in the hero.
+      // Show at least credible minimums if the platform is still seeding.
+      const d = r.data || {};
+      setStats({
+        providers: Math.max(Number(d.providers) || 0, 1),
+        states: Math.max(Number(d.states) || 0, 1),
+        rating: Number(d.rating) > 0 ? Number(d.rating) : 5.0,
+      });
+    }).catch(() => {});
     api.get("/promo-codes/founding-status").then(r => setFounding(r.data)).catch(() => {});
   }, []);
 
@@ -279,7 +288,20 @@ export default function Landing() {
 
             <div className="relative hidden lg:block">
               <div className="absolute -inset-6 bg-gradient-to-br from-blue-500/20 via-transparent to-orange-500/20 rounded-[3rem] blur-3xl" />
-              <img src={HERO_IMG} alt="getamano marketplace" className="relative rounded-[2rem] shadow-2xl object-cover w-full h-[520px]" loading="lazy" />
+              <img
+                src={HERO_IMG}
+                alt="getamano marketplace"
+                className="relative rounded-[2rem] shadow-2xl object-cover w-full h-[520px]"
+                loading="lazy"
+                onError={(e) => {
+                  // Bug B5 (Section 61) — fallback if Unsplash CDN fails to load.
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/getamano-logo-full.png";
+                  e.currentTarget.style.background = "linear-gradient(135deg, #025F67 0%, #012830 100%)";
+                  e.currentTarget.style.objectFit = "contain";
+                  e.currentTarget.style.padding = "60px";
+                }}
+              />
               <div className="absolute -bottom-4 -left-4 rounded-2xl p-4 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.2)", animation: "float 4s ease-in-out infinite" }} data-testid="hero-rating-card">
                 <div className="flex -space-x-2">
                   <div className="w-9 h-9 rounded-full bg-orange-400 border-2 border-white/40" />

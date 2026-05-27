@@ -6,11 +6,6 @@ import {
   HeartHandshake,
   User,
   Briefcase,
-  Sparkles,
-  Bookmark,
-  MessageCircle,
-  LogIn,
-  CreditCard,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
@@ -94,48 +89,38 @@ export default function BottomNav() {
     return pathname.startsWith(path);
   };
 
-  // Build items per user role. Each item: {path, icon, label, testid, badge?, mobile, animate?}
-  // `mobile: true` = shown also on mobile (max 5). All items always shown ≥md.
-  const galleryPath = lang === "en" ? "/banner-gallery" : "/galeria-banners";
-  const savedPath = lang === "en" ? "/my-saved" : "/mis-guardadas";
-
+  // Build items per user role. Each item: {path, icon, label, testid, badge?, animate?}
+  // Section 61 Bug B6: EXACTLY 5 items, identical on mobile and desktop.
+  // Secondary destinations (Gallery, Plans, Saved, Inbox) live inside "Mi cuenta".
   let items;
   if (!user) {
     items = [
-      { path: "/",                icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home",      mobile: true },
-      { path: "/search",          icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search",    mobile: true },
-      { path: "/comunidad",       icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", mobile: true, animate: "heartbeat" },
-      { path: "/empleos",         icon: Briefcase,       label: lang === "en" ? "Gigs"      : "Chambas",   testid: "bottom-nav-empleos",   mobile: false },
-      { path: galleryPath,        icon: Sparkles,        label: lang === "en" ? "Gallery"   : "Galería",   testid: "bottom-nav-gallery",   mobile: true },
-      { path: "/plans",           icon: CreditCard,      label: lang === "en" ? "Plans"     : "Planes",    testid: "bottom-nav-plans",     mobile: false },
-      { path: "/login",           icon: LogIn,           label: lang === "en" ? "Sign in"   : "Entrar",    testid: "bottom-nav-login",     mobile: true },
+      { path: "/",          icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
+      { path: "/search",    icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
+      { path: "/comunidad", icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
+      { path: "/empleos",   icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
+      { path: "/login",     icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta", testid: "bottom-nav-account" },
     ];
   } else if (user.role === "provider") {
     items = [
-      { path: "/",                       icon: Home,            label: lang === "en" ? "Home"      : "Inicio",     testid: "bottom-nav-home",      mobile: false },
-      { path: "/dashboard/provider",     icon: User,            label: lang === "en" ? "Panel"     : "Panel",      testid: "bottom-nav-dashboard", mobile: true },
-      { path: "/search",                 icon: Search,          label: lang === "en" ? "Search"    : "Buscar",     testid: "bottom-nav-search",    mobile: false },
-      { path: "/comunidad",              icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad",  testid: "bottom-nav-community", mobile: true, animate: "heartbeat" },
-      { path: "/empleos",                icon: Briefcase,       label: lang === "en" ? "Gigs"      : "Chambas",    testid: "bottom-nav-empleos",   mobile: true },
-      { path: galleryPath,               icon: Sparkles,        label: lang === "en" ? "Gallery"   : "Galería",    testid: "bottom-nav-gallery",   mobile: false },
-      { path: "/messages",               icon: MessageCircle,   label: lang === "en" ? "Inbox"     : "Mensajes",   testid: "bottom-nav-messages",  mobile: true, badge: unread },
+      { path: "/",                   icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
+      { path: "/search",             icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
+      { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
+      { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
+      { path: "/dashboard/provider", icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta", testid: "bottom-nav-account", badge: unread },
     ];
   } else {
-    // client (default)
     items = [
-      { path: "/",                       icon: Home,            label: lang === "en" ? "Home"      : "Inicio",     testid: "bottom-nav-home",      mobile: true },
-      { path: "/search",                 icon: Search,          label: lang === "en" ? "Search"    : "Buscar",     testid: "bottom-nav-search",    mobile: true },
-      { path: "/comunidad",              icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad",  testid: "bottom-nav-community", mobile: true, animate: "heartbeat" },
-      { path: "/empleos",                icon: Briefcase,       label: lang === "en" ? "Gigs"      : "Chambas",    testid: "bottom-nav-empleos",   mobile: false },
-      { path: galleryPath,               icon: Sparkles,        label: lang === "en" ? "Gallery"   : "Galería",    testid: "bottom-nav-gallery",   mobile: false },
-      { path: savedPath,                 icon: Bookmark,        label: lang === "en" ? "Saved"     : "Guardadas",  testid: "bottom-nav-saved",     mobile: false },
-      { path: "/messages",               icon: MessageCircle,   label: lang === "en" ? "Inbox"     : "Mensajes",   testid: "bottom-nav-messages",  mobile: false, badge: unread },
-      { path: "/dashboard",              icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta",  testid: "bottom-nav-dashboard", mobile: true, badge: unread },
+      { path: "/",                   icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
+      { path: "/search",             icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
+      { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
+      { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
+      { path: "/dashboard",          icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta", testid: "bottom-nav-account", badge: unread },
     ];
   }
 
-  const mobileItems = items.filter(i => i.mobile).slice(0, 5);
-  const desktopItems = items;
+  // EXACTLY 5 items everywhere — no mobile/desktop split.
+  const allItems = items.slice(0, 5);
 
   return (
     <nav
@@ -146,12 +131,12 @@ export default function BottomNav() {
     >
       {/* Mobile (<md): 5-column grid */}
       <ul className="md:hidden grid grid-cols-5 h-14">
-        {mobileItems.map((item) => renderItem(item, isActive, tappingPath, setTappingPath, /* compact */ true))}
+        {allItems.map((item) => renderItem(item, isActive, tappingPath, setTappingPath, /* compact */ true))}
       </ul>
 
-      {/* Tablet & desktop (≥md): centered horizontal row */}
+      {/* Tablet & desktop (≥md): centered horizontal row with the SAME 5 items */}
       <ul className="hidden md:flex items-center justify-center gap-1 lg:gap-3 max-w-7xl mx-auto h-16 px-4">
-        {desktopItems.map((item) => renderItem(item, isActive, tappingPath, setTappingPath, /* compact */ false))}
+        {allItems.map((item) => renderItem(item, isActive, tappingPath, setTappingPath, /* compact */ false))}
       </ul>
     </nav>
   );

@@ -131,7 +131,7 @@ export default function ChambasNearby({ city, role = "client", limit = 3 }) {
 
       <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
         <Briefcase className="w-3 h-3" />
-        <span>Beta — Sección 30</span>
+        <span>Chambas cerca de ti</span>
       </div>
     </div>
   );

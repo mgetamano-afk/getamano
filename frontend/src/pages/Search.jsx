@@ -12,6 +12,7 @@ import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import useGeolocation from "../hooks/useGeolocation";
 import { trackSearch } from "../lib/analytics";
+import { MAIN_CATEGORIES } from "../data/categoryMap";
 
 const IDENTITY_CHIPS = [
   { id: "", label: "Todos" },
@@ -470,7 +471,10 @@ export default function Search() {
                 <label className="block text-xs uppercase tracking-widest text-slate-500 mb-2">{t("filter.category")}</label>
                 <select value={category} onChange={e => { setCategory(e.target.value); setTimeout(() => doSearch(), 0); }} className="w-full h-10 px-3 rounded-xl border border-slate-200" data-testid="filter-category-select">
                   <option value="">Todas</option>
-                  {categories.map(c => createElement("option", { key: c.category_id, value: c.slug }, lang === "es" ? c.name_es : c.name_en))}
+                  {categories
+                    .filter(c => MAIN_CATEGORIES.includes(c.name_es))
+                    .sort((a, b) => MAIN_CATEGORIES.indexOf(a.name_es) - MAIN_CATEGORIES.indexOf(b.name_es))
+                    .map(c => createElement("option", { key: c.category_id, value: c.slug }, lang === "es" ? c.name_es : c.name_en))}
                 </select>
               </div>
               <div>

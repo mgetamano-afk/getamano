@@ -25,7 +25,7 @@ export default function ShareLinkCard({ slug, businessName }) {
   // to /p/{slug} via meta-refresh + window.location.replace.
   const shortUrl = `${backend}/api/og/p/${slug}${refParam}`;
   // Canonical SEO URL (kept clean for the "Ver mi eCard" preview)
-  const fullUrl = `${origin}/provider/${slug}`;
+  const fullUrl = `${origin}/p/${slug}`;
   const displayUrl = shortUrl.replace(/^https?:\/\//, "").replace(refParam, "").replace("/api/og/p/", "/p/");
 
   // Persuasive Spanish message — first-person, concrete, link last.

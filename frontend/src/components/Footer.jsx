@@ -29,7 +29,7 @@ export default function Footer() {
 
           {/* Section 28 — Social icons row */}
           <div className="mt-5 flex items-center gap-3" data-testid="footer-social-row">
-            <span className="text-xs uppercase font-semibold tracking-wider text-slate-500">Síguenos</span>
+            <span className="text-xs uppercase font-semibold tracking-wider text-slate-500">{t("footer.follow_us")}</span>
             {SOCIAL_LINKS.map(({ name, href, Icon, testid }) => (
               <a
                 key={name}
@@ -46,25 +46,25 @@ export default function Footer() {
           </div>
         </div>
         <div>
-          <h4 className="font-display font-semibold text-white mb-3">Plataforma</h4>
+          <h4 className="font-display font-semibold text-white mb-3">{t("footer.platform")}</h4>
           <ul className="space-y-2 text-sm">
             <li><Link to="/search" className="hover:text-white transition" data-testid="footer-explore">{t("nav.explore")}</Link></li>
-            <li><Link to="/servicios" className="hover:text-white transition" data-testid="footer-services">Todos los servicios</Link></li>
-            <li><Link to="/empleos" className="hover:text-white transition" data-testid="footer-empleos">Chambas</Link></li>
-            <li><Link to="/ranking" className="hover:text-white transition" data-testid="footer-ranking">Ranking del mes</Link></li>
-            <li><Link to="/ciudades" className="hover:text-white transition" data-testid="footer-cities">Ciudades</Link></li>
+            <li><Link to="/servicios" className="hover:text-white transition" data-testid="footer-services">{t("footer.all_services")}</Link></li>
+            <li><Link to="/empleos" className="hover:text-white transition" data-testid="footer-empleos">{t("footer.chambas")}</Link></li>
+            <li><Link to="/ranking" className="hover:text-white transition" data-testid="footer-ranking">{t("footer.ranking_month")}</Link></li>
+            <li><Link to="/ciudades" className="hover:text-white transition" data-testid="footer-cities">{t("footer.cities")}</Link></li>
             <li><Link to="/plans" className="hover:text-white transition" data-testid="footer-plans">{t("nav.plans")}</Link></li>
             <li><Link to="/register?intent=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>
-            <li><Link to="/instalar" className="hover:text-white transition inline-flex items-center gap-1" data-testid="footer-install"><span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" /> Descarga la app</Link></li>
+            <li><Link to="/instalar" className="hover:text-white transition inline-flex items-center gap-1" data-testid="footer-install"><span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" /> {t("footer.download_app")}</Link></li>
           </ul>
         </div>
         <div>
-          <h4 className="font-display font-semibold text-white mb-3">Legal</h4>
+          <h4 className="font-display font-semibold text-white mb-3">{t("footer.legal_section")}</h4>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/terminos" className="hover:text-white transition" data-testid="footer-link-terms">Términos y Condiciones</Link></li>
-            <li><Link to="/privacidad" className="hover:text-white transition" data-testid="footer-link-privacy">Política de Privacidad</Link></li>
-            <li><Link to="/politica-resenas" className="hover:text-white transition" data-testid="footer-link-reviews">Política de Reseñas</Link></li>
-            <li><Link to="/cookies" className="hover:text-white transition" data-testid="footer-link-cookies">Política de Cookies</Link></li>
+            <li><Link to="/terminos" className="hover:text-white transition" data-testid="footer-link-terms">{t("footer.terms")}</Link></li>
+            <li><Link to="/privacidad" className="hover:text-white transition" data-testid="footer-link-privacy">{t("footer.privacy")}</Link></li>
+            <li><Link to="/politica-resenas" className="hover:text-white transition" data-testid="footer-link-reviews">{t("footer.reviews_policy")}</Link></li>
+            <li><Link to="/cookies" className="hover:text-white transition" data-testid="footer-link-cookies">{t("footer.cookies")}</Link></li>
           </ul>
         </div>
       </div>
