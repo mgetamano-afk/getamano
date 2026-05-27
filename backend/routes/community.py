@@ -207,8 +207,137 @@ async def _do_create_post(deps, payload: NewPostIn, request: Request, user) -> d
     return hydrated[0] if hydrated else doc
 
 
+async def _notify_milestone_reaction(
+    deps, *, post: dict, reactor_user_id: str, kind: str, preview: str = ""
+) -> None:
+    """Section 78 — Smart batched notification for reactions on milestone posts.
+
+    Why this closes the social loop:
+      - When someone reacts to your "I unlocked a free month" post, you feel
+        the community celebrate with you.
+      - The notification CTA brings you back to the app → you see your post,
+        scroll the feed, maybe invite more friends. The unlock isn't a
+        one-off dopamine — it becomes recurring satisfaction.
+
+    Batching strategy: ONE notification per (post, author) within a 60-min
+    window. New reactions update the count + reactor_ids + body. After 60
+    min idle, a new notification is created (so the user can get a fresh
+    badge if they didn't open the previous one).
+
+    Notification document gains custom fields:
+      - notification_key: stable id used for upsert lookup
+      - reactors: list of latest reactor user_ids (capped at 10)
+      - reactions_count: total reactions in the window
+      - last_reaction_at: ISO timestamp, used to compute "freshness"
+    """
+    author_user_id = post["user_id"]
+    if author_user_id == reactor_user_id:
+        return  # never notify self
+
+    db = deps.db
+    now = datetime.now(timezone.utc)
+    sixty_min_ago = (now - timedelta(minutes=60)).isoformat()
+
+    # Look for an existing batched notif for this post in the last 60 min
+    notification_key = f"milestone_reaction::{post['post_id']}::{author_user_id}"
+    existing = await db.notifications.find_one(
+        {"notification_key": notification_key, "created_at": {"$gte": sixty_min_ago}},
+        {"_id": 0, "notification_id": 1, "reactions_count": 1, "reactors": 1},
+    )
+
+    # Get reactor's display name
+    reactor = await db.users.find_one(
+        {"user_id": reactor_user_id},
+        {"_id": 0, "name": 1},
+    ) or {}
+    profile = await db.provider_profiles.find_one(
+        {"user_id": reactor_user_id},
+        {"_id": 0, "business_name": 1, "logo_url": 1},
+    ) or {}
+    reactor_name = (reactor.get("name") or profile.get("business_name") or "Alguien").split(" ")[0]
+    reactor_avatar = profile.get("logo_url")
+
+    if existing:
+        # UPSERT: increment count + add reactor (deduped, capped at 10)
+        prev_reactors = existing.get("reactors") or []
+        new_reactors = prev_reactors
+        if reactor_user_id not in [r.get("user_id") for r in prev_reactors]:
+            new_reactors = ([{"user_id": reactor_user_id, "name": reactor_name, "avatar": reactor_avatar}] + prev_reactors)[:10]
+        new_count = (existing.get("reactions_count") or 1) + 1
+        # Build the new "X y N más" body
+        emoji = "❤️" if kind == "like" else "💬"
+        if new_count == 1:
+            body = f"{emoji} {reactor_name} reaccionó a tu hito"
+        elif new_count == 2:
+            other_name = next((r["name"] for r in new_reactors if r["user_id"] != reactor_user_id), "alguien")
+            body = f"{emoji} {reactor_name} y {other_name} reaccionaron a tu hito"
+        else:
+            body = f"{emoji} {reactor_name} y {new_count - 1} más reaccionaron a tu hito"
+        title = "👏 Tu comunidad celebra contigo"
+        await db.notifications.update_one(
+            {"notification_id": existing["notification_id"]},
+            {"$set": {
+                "title": title,
+                "body": body,
+                "reactions_count": new_count,
+                "reactors": new_reactors,
+                "last_reaction_at": now.isoformat(),
+                "last_reaction_kind": kind,
+                "is_read": False,
+                "preview": preview or None,
+            }},
+        )
+        return
+
+    # No recent batch — create a fresh notification
+    emoji = "❤️" if kind == "like" else "💬"
+    body = f"{emoji} {reactor_name} reaccionó a tu hito"
+    if kind == "comment" and preview:
+        body = f"💬 {reactor_name}: \"{preview}\""
+    await db.notifications.insert_one({
+        "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+        "notification_key": notification_key,
+        "user_id": author_user_id,
+        "category": "community",
+        "title": "👏 Tu comunidad celebra contigo",
+        "body": body,
+        "cta_label": "Ver hito",
+        "cta_url": f"/comunidad/post/{post['post_id']}",
+        "icon": "heart",
+        "priority": "high",
+        "is_read": False,
+        "dismissed_at": None,
+        "reactions_count": 1,
+        "reactors": [{"user_id": reactor_user_id, "name": reactor_name, "avatar": reactor_avatar}],
+        "last_reaction_at": now.isoformat(),
+        "last_reaction_kind": kind,
+        "post_id": post["post_id"],
+        "milestone_index": post.get("milestone_index"),
+        "preview": preview or None,
+        "created_at": now.isoformat(),
+    })
+
+    # Push + sent.dm (sandbox-safe) — only fire on FIRST reaction of a fresh
+    # batch to avoid push fatigue. Subsequent reactions update the in-app
+    # notification silently.
+    try:
+        from routes.push import send_push_to_user
+        await send_push_to_user(db, author_user_id, {
+            "title": "👏 Reaccionaron a tu hito",
+            "body": body,
+            "url": f"/comunidad/post/{post['post_id']}",
+            "tag": notification_key,  # browser dedupes by tag
+            "icon": "/icon-192x192.png",
+        })
+    except Exception:
+        pass
+
+
 async def _do_toggle_like(deps, post_id: str, user) -> dict:
-    post = await deps.db.community_posts.find_one({"post_id": post_id}, {"_id": 0, "post_id": 1, "user_id": 1})
+    post = await deps.db.community_posts.find_one(
+        {"post_id": post_id},
+        {"_id": 0, "post_id": 1, "user_id": 1, "type": 1, "milestone_index": 1, "milestone_paid_count": 1},
+    )
     if not post:
         raise HTTPException(status_code=404, detail="Post no encontrado.")
     existing = await deps.db.post_likes.find_one({"post_id": post_id, "user_id": user.user_id}, {"_id": 0})
@@ -222,6 +351,12 @@ async def _do_toggle_like(deps, post_id: str, user) -> dict:
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
     await deps.db.community_posts.update_one({"post_id": post_id}, {"$inc": {"likes_count": 1}})
+    # Section 78 — Notify the author when someone LIKES their milestone post.
+    # Smart batching prevents spam if many reactions arrive in quick succession.
+    if post.get("type") == "milestone" and post["user_id"] != user.user_id:
+        await _notify_milestone_reaction(
+            deps, post=post, reactor_user_id=user.user_id, kind="like",
+        )
     return {"liked": True}
 
 
@@ -410,7 +545,7 @@ async def _notify_comment(deps, post_owner: str, commenter_user_id: str, comment
 async def _do_create_comment(deps, post_id: str, payload: NewCommentIn, request: Request, user) -> dict:
     post = await deps.db.community_posts.find_one(
         {"post_id": post_id, "is_hidden": {"$ne": True}},
-        {"_id": 0, "post_id": 1, "user_id": 1},
+        {"_id": 0, "post_id": 1, "user_id": 1, "type": 1, "milestone_index": 1, "milestone_paid_count": 1},
     )
     if not post:
         raise HTTPException(status_code=404, detail="Post no encontrado.")
@@ -438,7 +573,16 @@ async def _do_create_comment(deps, post_id: str, payload: NewCommentIn, request:
         {"post_id": post_id, "comment_id": comment_id}, request,
     )
     if post["user_id"] != user.user_id:
-        await _notify_comment(deps, post["user_id"], user.user_id, comment_id, payload.content.strip())
+        # Section 78 — milestone posts use a batched "X people reacted" notif
+        # to drive the recurring social engagement loop. Regular posts keep
+        # the original 1:1 comment notification.
+        if post.get("type") == "milestone":
+            await _notify_milestone_reaction(
+                deps, post=post, reactor_user_id=user.user_id, kind="comment",
+                preview=payload.content.strip()[:80],
+            )
+        else:
+            await _notify_comment(deps, post["user_id"], user.user_id, comment_id, payload.content.strip())
     hydrated = await hydrate_comments(deps.db, [doc])
     return hydrated[0] if hydrated else doc
 

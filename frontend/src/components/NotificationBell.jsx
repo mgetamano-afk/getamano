@@ -129,6 +129,29 @@ export default function NotificationBell({ compact = false }) {
                           {!n.is_read && <span className={`flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${PRIO_DOT[n.priority] || "bg-amber-400"}`} />}
                         </div>
                         <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{n.body}</p>
+                        {/* Section 78 — stacked reactor avatars for milestone reaction batches */}
+                        {Array.isArray(n.reactors) && n.reactors.length > 0 && (
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <div className="flex -space-x-1.5">
+                              {n.reactors.slice(0, 4).map((r) => (
+                                <div
+                                  key={r.user_id}
+                                  className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-300 to-pink-400 ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-white"
+                                  title={r.name}
+                                >
+                                  {r.avatar ? (
+                                    <img src={r.avatar} alt={r.name} className="w-full h-full rounded-full object-cover" />
+                                  ) : (
+                                    (r.name || "?")[0].toUpperCase()
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {n.reactions_count > 4 && (
+                              <span className="text-[10px] text-slate-500 font-medium">+{n.reactions_count - 4}</span>
+                            )}
+                          </div>
+                        )}
                         {n.cta_label && n.cta_url && (
                           <Link
                             to={n.cta_url}
