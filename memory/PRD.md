@@ -2069,5 +2069,21 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
   - `admin/AdminPricingIntelligence.jsx` — states select (line 69)
 - **UX fix: Messages list showed "?" / "—"** for any conversation written with the new schema (no `client_name` field, only `participant_name`). `Messages.jsx` now falls back to `participant_name` and `last_message_preview` so all threads display the real contact name.
 - **Nudges schema fix** — unread-messages nudge now correctly counts both legacy and new conversation schemas via OR query.
+
+### Feb 26, 2026 — Section 61 (12 production bugs from user audit) + Section 62 (Footer i18n)
+- **B1 — Legacy `/services/:slug` route resolved**: New `<ServicesRouteResolver>` probes `/api/providers/by-slug/{slug}`. If it resolves → `<Navigate to="/p/{slug}" replace />`. Otherwise → renders `<SeoCategoryDetail />`. Applied to both `/services/:categorySlug` and `/servicios/:categorySlug` routes.
+- **B2 — Test data purged**: Executed `/app/backend/scripts/cleanup_test_data.py` — deleted 271 records (143 test users, 21 TEST_ provider profiles, 46 gigs, 12 reviews, 34 service_requests, 18 conversations, 15 notifications, 3 referrals). Protected accounts (admin, demo.provider, demo.client) preserved.
+- **B3 — "Beta — Sección 30" label removed**: `ChambasNearby.jsx:134` changed to "Chambas cerca de ti".
+- **B4 — Landing hero stats always ≥1**: `Landing.jsx:85` clamps providers/states to ≥1 and rating to ≥5.0 if backend returns 0. Currently shows 3+/2/4.9.
+- **B5 — Unsplash hero image with fallback**: `Landing.jsx:291` onError → `/getamano-logo-full.png` with teal-gradient bg + contain object-fit.
+- **B6 — BottomNav exactly 5 items**: Mobile and desktop now show identical 5 items: Inicio · Buscar · Comunidad · Chambas · Mi cuenta. Account destination per role: guest→/login, client→/dashboard, provider→/dashboard/provider. Removed Gallery/Plans/Saved/Inbox/LogIn from primary nav (still accessible via other entry points).
+- **B7 — Footer fully bilingual**: 14 new `footer.*` i18n keys (`platform`, `legal_section`, `follow_us`, `all_services`, `chambas`, `ranking_month`, `cities`, `download_app`, `terms`, `privacy`, `reviews_policy`, `cookies`) in both ES and EN. Verified: ES = "Síguenos / Plataforma / Términos y Condiciones", EN = "Follow us / Platform / Terms & Conditions".
+- **B8 — Share URLs unified to `/p/{slug}`**: Fixed in `ShareECardBlock.jsx:21`, `ShareLinkCard.jsx:28`, `ECardFloatingHeader.jsx:56`, `QuickActionsFAB.jsx:109` (previously `/provider/{slug}`).
+- **B9 — Rating "—" when no reviews**: `ProviderDashboard.jsx:296` StatCard now shows em-dash for `rating_count===0`, otherwise `rating_avg.toFixed(1)`.
+- **B10 — Live ticker seamless**: `LiveActivityTicker.jsx:89` added `width: max-content` and `hover:[animation-play-state:paused]`. Items already doubled + CSS `scroll-x` keyframe with translateX(0 → -50%).
+- **B11 — Category select pre-populated**: Already working via `initForm(p).category_id = p.category_id || ""`. María's "Limpieza" (cat_77f9e66f26) now correctly selected.
+- **B12 — Category filter grouped**: `Search.jsx` filters by `MAIN_CATEGORIES.includes(c.name_es)` reducing 188+ flat options to 17 parent categories sorted in MAIN_CATEGORIES order.
+- **Result**: Test iteration 61 = 12/12 bugs verified PASS, 0 regressions, 0 critical issues.
+
 - Result: 0 console errors, 0 backend 500s after fix verified via Playwright; provider can now actually open every conversation.
 

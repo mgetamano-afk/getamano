@@ -27,8 +27,16 @@ export default function ServicesRouteResolver() {
   }, [slug]);
 
   if (providerExists === null) {
-    // Lightweight probe loader — same height as SeoCategoryDetail's shell.
-    return <div className="min-h-screen" />;
+    // Lightweight skeleton while probing — avoids 200ms blank flash.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-pulse flex flex-col items-center gap-3">
+          <div className="w-16 h-16 rounded-full bg-slate-200" />
+          <div className="w-40 h-3 rounded-full bg-slate-200" />
+          <div className="w-28 h-2 rounded-full bg-slate-200" />
+        </div>
+      </div>
+    );
   }
   if (providerExists === true) {
     return <Navigate to={`/p/${slug}`} replace />;
