@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, createElement } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
@@ -470,7 +470,7 @@ export default function Search() {
                 <label className="block text-xs uppercase tracking-widest text-slate-500 mb-2">{t("filter.category")}</label>
                 <select value={category} onChange={e => { setCategory(e.target.value); setTimeout(() => doSearch(), 0); }} className="w-full h-10 px-3 rounded-xl border border-slate-200" data-testid="filter-category-select">
                   <option value="">Todas</option>
-                  {categories.map(c => <option key={c.category_id} value={c.slug}>{lang === "es" ? c.name_es : c.name_en}</option>)}
+                  {categories.map(c => createElement("option", { key: c.category_id, value: c.slug }, lang === "es" ? c.name_es : c.name_en))}
                 </select>
               </div>
               <div>

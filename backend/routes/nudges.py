@@ -41,10 +41,14 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
 
         # ---------- Common (any role) ----------
         try:
+            # Support both legacy and new conversation schemas. We count
+            # threads where this user has unread, on either side.
             unread_convs = await db.conversations.count_documents(
                 {"$or": [
-                    {"client_id": user.user_id, "client_unread": True},
-                    {"provider_user_id": user.user_id, "provider_unread": True},
+                    {"client_id": user.user_id, "unread_for_client": True},
+                    {"participant_user_id": user.user_id, "unread_count_participant": {"$gt": 0}},
+                    {"provider_user_id": user.user_id, "unread_for_provider": True},
+                    {"provider_user_id": user.user_id, "unread_count_provider": {"$gt": 0}},
                 ]}
             )
         except Exception:
@@ -69,8 +73,10 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             if profile:
                 # Profile completion sub-checks
                 missing = []
-                if not profile.get("logo_url"): missing.append("logo")
-                if not profile.get("cover_url") and not profile.get("banner_url"): missing.append("portada")
+                if not profile.get("logo_url"):
+                    missing.append("logo")
+                if not profile.get("cover_url") and not profile.get("banner_url"):
+                    missing.append("portada")
                 if not profile.get("description") or len(profile.get("description", "")) < 40:
                     missing.append("descripción")
                 if not profile.get("services") or len(profile.get("services", [])) == 0:

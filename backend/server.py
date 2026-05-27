@@ -2501,7 +2501,12 @@ async def reply_message(conversation_id: str, payload: MessageReplyIn, user: Use
 
 @api_router.get("/conversations")
 async def list_conversations(user: User = Depends(get_current_user)):
-    query = {"$or": [{"client_id": user.user_id}, {"provider_user_id": user.user_id}]}
+    # Match both legacy `client_id` and new `participant_user_id` schemas.
+    query = {"$or": [
+        {"client_id": user.user_id},
+        {"participant_user_id": user.user_id},
+        {"provider_user_id": user.user_id},
+    ]}
     convs = await db.conversations.find(query, {"_id": 0}).sort("last_at", -1).to_list(200)
     # mark which side I am
     for c in convs:
@@ -2517,12 +2522,20 @@ async def list_messages(conversation_id: str, user: User = Depends(get_current_u
     conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
     if not conv:
         raise HTTPException(status_code=404, detail="Not found")
-    is_provider = conv["provider_user_id"] == user.user_id
-    is_client = conv["client_id"] == user.user_id
+    # Conversations have two possible schemas:
+    #   · Old schema: {client_id, provider_user_id, unread_for_provider, unread_for_client}
+    #   · New schema: {participant_user_id, provider_user_id, unread_count_provider, unread_count_participant}
+    # We accept both to keep all historical threads readable.
+    is_provider = conv.get("provider_user_id") == user.user_id
+    is_client = (conv.get("client_id") == user.user_id) or (conv.get("participant_user_id") == user.user_id)
     if not (is_provider or is_client):
         raise HTTPException(status_code=403, detail="Not your conversation")
-    # mark read for the side viewing
-    update = {"unread_for_provider": False} if is_provider else {"unread_for_client": False}
+    # Mark read for the side viewing — write BOTH legacy fields so list_conversations
+    # picks it up regardless of schema. Harmless if the field doesn't exist.
+    if is_provider:
+        update = {"unread_for_provider": False, "unread_count_provider": 0}
+    else:
+        update = {"unread_for_client": False, "unread_count_participant": 0}
     await db.conversations.update_one({"conversation_id": conversation_id}, {"$set": update})
     msgs = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
     return {"conversation": conv, "messages": msgs}

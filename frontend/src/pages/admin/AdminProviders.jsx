@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createElement } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { api } from "../../lib/api";
 import { Search as SearchIcon, ExternalLink, Pause, Play, X } from "lucide-react";
@@ -114,7 +114,7 @@ export default function AdminProviders() {
               <div>
                 <label className="block text-xs uppercase text-slate-400 mb-1">Estado</label>
                 <select value={editing.verification_status} onChange={e => setEditing({ ...editing, verification_status: e.target.value })} className="w-full h-10 px-3 rounded-lg bg-slate-800 border border-slate-700 text-white" data-testid="admin-edit-status">
-                  {["pending","in_review","needs_info","approved","rejected","suspended"].map(s => <option key={s} value={s}>{s}</option>)}
+                  {["pending","in_review","needs_info","approved","rejected","suspended"].map(s => createElement("option", { key: s, value: s }, s))}
                 </select>
               </div>
             </div>

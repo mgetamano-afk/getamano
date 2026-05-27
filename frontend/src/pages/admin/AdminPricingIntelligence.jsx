@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createElement } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import { api } from "../../lib/api";
 import { TrendingUp, MapPin, Activity, Download, DollarSign, Users } from "lucide-react";
@@ -66,7 +66,7 @@ export default function AdminPricingIntelligence() {
           <div className="flex items-center gap-2">
             <select value={filters.state} onChange={e => setFilters({ ...filters, state: e.target.value })} className="h-9 px-3 rounded-full bg-white/10 text-white text-xs border border-white/20" data-testid="pricing-filter-state">
               <option value="">Todos los estados</option>
-              {states.map(s => <option key={s} value={s} className="text-slate-900">{s}</option>)}
+              {states.map(s => createElement("option", { key: s, value: s, className: "text-slate-900" }, s))}
             </select>
             <button onClick={downloadCsv} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs" data-testid="pricing-export">
               <Download className="w-3.5 h-3.5" /> Exportar CSV

@@ -2058,3 +2058,16 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - Hidden on `/admin/*`, auth pages, install pages, or when there are no nudges at all (zero clutter principle).
 - Tested via curl as provider (1 nudge: pending requests) and client (2 nudges: pending cotización + complete profile). Visual smoke test verified: FAB + panel + 2 cards rendered correctly without overlapping other widgets.
 - Wired in `App.js` next to `<QuickActionsFAB />` and `<BottomNav />`.
+
+
+### Feb 26, 2026 (Section 65) — Deep audit & fixes
+- **CRITICAL fix: 500 on `/conversations/{id}/messages`** — Endpoint blew up with `KeyError: 'client_id'` on any conversation written with the newer schema (`participant_user_id` + `unread_count_participant`). Rewrote `list_messages` and `list_conversations` to support BOTH schemas (legacy `client_id`/`unread_for_*` AND new `participant_user_id`/`unread_count_*`). Affected ~5 anon-style threads with provider María (test/Anon 1/2/3/TEST Pytest 4a60).
+- **CRITICAL fix: HTML hydration error on every ProviderDashboard load** — Visual Editor instrumentation was injecting `<span data-ve-dynamic>` inside `<option>` children, producing 51 invalid `<option><span>...</span></option>` pairs. HTML disallows non-text children inside `<option>`. Bypass: use `React.createElement("option", ..., textContent)` in:
+  - `ProviderDashboard.jsx` — state select (line 433) + SelectField helper (line 677)
+  - `Search.jsx` — category filter (line 473)
+  - `admin/AdminProviders.jsx` — verification status select (line 117)
+  - `admin/AdminPricingIntelligence.jsx` — states select (line 69)
+- **UX fix: Messages list showed "?" / "—"** for any conversation written with the new schema (no `client_name` field, only `participant_name`). `Messages.jsx` now falls back to `participant_name` and `last_message_preview` so all threads display the real contact name.
+- **Nudges schema fix** — unread-messages nudge now correctly counts both legacy and new conversation schemas via OR query.
+- Result: 0 console errors, 0 backend 500s after fix verified via Playwright; provider can now actually open every conversation.
+

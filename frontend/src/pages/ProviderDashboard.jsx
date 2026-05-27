@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createElement } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
@@ -429,9 +429,15 @@ export default function ProviderDashboard() {
                           data-testid="form-state"
                         >
                           <option value="">Selecciona un estado</option>
-                          {US_STATES.map((s) => (
-                            <option key={s.abbreviation} value={s.abbreviation}>{s.name} ({s.abbreviation})</option>
-                          ))}
+                          {US_STATES.map((s) => {
+                            // Use React.createElement to bypass JSX visual-editor wrapper
+                            // which otherwise injects <span data-ve-dynamic> inside <option>.
+                            return createElement(
+                              "option",
+                              { key: s.abbreviation, value: s.abbreviation },
+                              s.name + " (" + s.abbreviation + ")"
+                            );
+                          })}
                         </select>
                       </div>
                       <div>
@@ -674,7 +680,7 @@ function SelectField({ label, value, onChange, options, testid }) {
       <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200" data-testid={testid}>
         <option value="">Selecciona...</option>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {options.map(o => createElement("option", { key: o.value, value: o.value }, o.label))}
       </select>
     </div>
   );
