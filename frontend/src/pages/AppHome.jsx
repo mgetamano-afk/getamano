@@ -6,7 +6,6 @@ import {
   HeartHandshake,
   IdCard,
   ChevronRight,
-  Bell,
   MessageCircle,
   Sparkles,
 } from "lucide-react";
@@ -15,6 +14,7 @@ import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import LiveActivityTicker from "../components/LiveActivityTicker";
 import FoundingCounter from "../components/FoundingCounter";
+import NotificationBell from "../components/NotificationBell";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -41,7 +41,6 @@ export default function AppHome() {
   const navigate = useNavigate();
   const [featured, setFeatured] = useState([]);
   const [recentJobs, setRecentJobs] = useState([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [providerSlug, setProviderSlug] = useState("");
 
@@ -56,13 +55,11 @@ export default function AppHome() {
       .catch(() => setRecentJobs([]));
   }, []);
 
-  // Auth-dependent fetches: notifications, conversations, and provider slug.
+  // Auth-dependent fetches: conversations, and provider slug. (Notifications
+  // are now owned by the <NotificationBell /> component which has its own
+  // dropdown — no more navigate to a non-existent /notifications route.)
   useEffect(() => {
-    if (!user) { setUnreadNotifications(0); setUnreadMessages(0); setProviderSlug(""); return; }
-    api.get("/notifications").then(r => {
-      const list = Array.isArray(r.data) ? r.data : (r.data?.items || []);
-      setUnreadNotifications(list.filter(n => !n.read).length);
-    }).catch(() => {});
+    if (!user) { setUnreadMessages(0); setProviderSlug(""); return; }
     api.get("/conversations").then(r => {
       const list = Array.isArray(r.data) ? r.data : [];
       setUnreadMessages(list.filter(c => c.unread).length);
@@ -103,20 +100,10 @@ export default function AppHome() {
                     </span>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/notifications")}
-                  className="relative p-2 rounded-full hover:bg-slate-100"
-                  aria-label={lang === "en" ? "Notifications" : "Notificaciones"}
-                  data-testid="apphome-notifications-btn"
-                >
-                  <Bell className="w-[22px] h-[22px] text-slate-700" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-orange-500 text-white text-[10px] font-extrabold flex items-center justify-center ring-2 ring-white">
-                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                    </span>
-                  )}
-                </button>
+                {/* Bug fix: previously this navigated to /notifications which
+                    rendered the 404 page. Now uses NotificationBell which
+                    opens an in-place dropdown with the real list. */}
+                <NotificationBell />
               </>
             ) : (
               <Link to="/login" className="px-4 h-9 inline-flex items-center rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800" data-testid="apphome-login-btn">

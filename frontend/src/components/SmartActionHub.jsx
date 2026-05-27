@@ -54,6 +54,11 @@ const HIDE_RE = [
 
 const STORAGE_KEY = "gtm_dismissed_nudges_v1";
 const DISMISS_TTL_MS = 7 * 24 * 3600 * 1000;
+// Section 70 — "seen this session" flag mutes the pulsing halo once the user
+// has acknowledged the FAB (opened the panel at least once). Resets on tab
+// close so we still draw attention on a fresh visit, but never within the
+// same browsing session.
+const SESSION_SEEN_KEY = "gtm_smart_hub_seen_session";
 
 const ICONS = {
   MessageCircle, UserCog, Image: ImageIcon, Crown, Calendar, Star, Inbox, Bookmark, Search, Lightbulb, Rocket, Bell,
@@ -92,6 +97,13 @@ export default function SmartActionHub() {
   const [dismissed, setDismissed] = useState(loadDismissed);
   const [provider, setProvider] = useState(null);
   const [stepsOpen, setStepsOpen] = useState(false);
+  // Bug fix (user feedback "se siente fastidioso"): mute the pulse halo once
+  // the user has opened the panel at least once this session. The badge
+  // counter stays so they can still find the FAB, but the constant pulsing
+  // animation stops.
+  const [seenThisSession, setSeenThisSession] = useState(() => {
+    try { return sessionStorage.getItem(SESSION_SEEN_KEY) === "1"; } catch { return false; }
+  });
   const wrapperRef = useRef(null);
 
   const fetchNudges = useCallback(async () => {
@@ -119,7 +131,21 @@ export default function SmartActionHub() {
     } catch { setProvider(null); }
   }, [user]);
 
-  useEffect(() => { fetchNudges(); fetchProvider(); }, [fetchNudges, fetchProvider, location.pathname]);
+  // Bug fix (user feedback "te manda a cada rato notificaciones"): fetch
+  // nudges ONCE on mount / when auth changes — NOT on every navigation.
+  // The nudge list is server-side state and barely changes within a single
+  // browsing session. We still refetch after a user acts on a nudge
+  // (handleCta → fetchNudges) so completing one immediately updates the list.
+  useEffect(() => { fetchNudges(); fetchProvider(); }, [fetchNudges, fetchProvider]);
+
+  // Mark "seen this session" the first time the panel opens — kills the
+  // pulse halo so the FAB stops feeling like a fresh push notification.
+  useEffect(() => {
+    if (open && !seenThisSession) {
+      setSeenThisSession(true);
+      try { sessionStorage.setItem(SESSION_SEEN_KEY, "1"); } catch { /* ignore */ }
+    }
+  }, [open, seenThisSession]);
 
   // Close panel on outside click / escape
   useEffect(() => {
@@ -223,8 +249,13 @@ export default function SmartActionHub() {
     }
   };
 
-  const urgent = visible.filter((n) => n.priority <= 2).length;
-  const showPulse = urgent > 0;
+  // Pulse halo gating (Section 70): only call attention with the pulsing
+  // animation when (a) there is at least one urgent nudge AND (b) the user
+  // hasn't acknowledged the FAB this session. Once they've opened it, the
+  // counter badge alone communicates "you have suggestions" without the
+  // attention-grabbing animation.
+  const urgent = visible.filter((n) => n.priority === 1).length;
+  const showPulse = urgent > 0 && !seenThisSession;
 
   return (
     <div
