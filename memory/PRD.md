@@ -2118,3 +2118,21 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **i18n new key**: `tabs.dashboard` → ES "Inicio" / EN "Home".
 - **Visual outcome** (verified): Hola María 👋 hero (cream gradient) + #1 ranking card + 95/100 health gauge + checklist + share rewards + chambas pulse — feels like a real SaaS dashboard.
 - **Iteration 65 testing**: 100% (10/10 acceptance + regression). 0 blocking issues.
+
+
+### Feb 26, 2026 — Section 65 (Red de Aliados / Followers system)
+- **Backend** — NEW `routes/follows.py` (6 endpoints, ~180 lines):
+  - `POST /api/follows/{user_id}` (idempotent, forbids self-follow)
+  - `DELETE /api/follows/{user_id}`
+  - `GET /api/follows/{user_id}/state` (auth)
+  - `GET /api/follows/{user_id}/stats` (PUBLIC — used on eCards)
+  - `GET /api/follows/me/following` and `/me/followers` (enriched with provider profile)
+  - `GET /api/follows/me/network` (counts + smart suggestions: approved providers in same category, not me, not already-followed, sorted by rating, limit 8).
+  - Unique compound index `(follower_user_id, followed_user_id)`.
+- **Frontend** — NEW components:
+  - `<FollowButton>` reusable — optimistic state, hover-to-unfollow, compact and full variants, public `showCount` mode.
+  - `<MiRedPage>` — 3-tab view inside provider dashboard (Following · Followers · Suggestions). Empty state per tab.
+- Added "Mi red" item to ProviderSideNav (now 9 items) with Users icon.
+- FollowButton inlined on eCard hero `/p/{slug}` — hidden for owner, shown for everyone else.
+- **Iteration 66 testing**: 15/15 backend pytest + 9/9 frontend Playwright, 0 bugs, 0 regressions.
+- **UX gain**: providers can build a verified network of allies, follow peers, get smart category-based suggestions. Foundation laid for future referral-commission flow.
