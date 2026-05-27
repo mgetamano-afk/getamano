@@ -2247,3 +2247,24 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - `/app/frontend/src/pages/PrintCard.jsx` (NEW)
 - `/app/frontend/src/App.js` (added route + lazy import)
 - `/app/frontend/src/components/ShareLinkCard.jsx` (added "Imprimir tarjetas físicas" button to QR modal)
+
+
+### Iteration 70 (May 27, 2026) — Section 69b: Photo-Style Variant
+**Goal del usuario:** "Si" (en respuesta a la sugerencia de variante con foto de fondo).
+
+**Implementación:**
+- **Nuevo estilo `photo`** en `/dashboard/print-card?style=photo` — usa la foto del proveedor como fondo full-bleed (priority: `cover_url` → primera foto de gallery → `logo_url`).
+- **Overlay degradado teal** (`#063154 → #025F67`, 20% → 92% opacidad de arriba a abajo) para legibilidad perfecta del texto sin tapar la foto.
+- **Sombras de texto sutiles** (`text-shadow: 0 1pt 3pt rgba(0,0,0,0.55)`) en nombre/categoría/CTA/URL para contraste en cualquier foto.
+- **QR con borde blanco brillante** (box-shadow ring) para destacar sobre el fondo fotográfico.
+- **Toggle "Brand style / Photo style"** en la toolbar (con icono Palette / Image). Cuando el proveedor no tiene foto disponible, el botón Photo queda deshabilitado con tooltip explicativo + toast informativo.
+- **Persistencia URL**: `?style=photo` queryparam ↔ state, bookmarkable y compartible.
+- **Conservación total del Brand style**: la variante `brand` (teal gradient + accent stripe) sigue siendo el default y funciona igual.
+- **Verificado E2E** con Playwright (login + ambos layouts × ambos estilos = 4 combinaciones probadas, 10 tarjetas photo-style verificadas en sheet view).
+
+**Por qué importa:**
+- Proveedores con foto pro (banners, headshots, productos) ahora tienen una segunda plantilla con más impacto visual sin perder branding getamano.
+- Estética magazine-cover funciona excepcionalmente bien en servicios donde "verte trabajando" es parte de la confianza (limpieza, jardinería, peluquería, catering, mecánica).
+- Cero costo adicional, cero APIs nuevas — pura CSS.
+
+**Files**: `/app/frontend/src/pages/PrintCard.jsx` (+~100 LOC).

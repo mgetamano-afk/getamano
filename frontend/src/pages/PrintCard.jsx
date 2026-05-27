@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, Download, ArrowLeft, Info, Layers, CreditCard } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Printer, Download, ArrowLeft, Info, Layers, CreditCard, Image as ImageIcon, Palette } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
@@ -27,9 +27,26 @@ export default function PrintCard() {
   const { user, loading } = useAuth();
   const { lang } = useI18n();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [busy, setBusy] = useState(true);
   const [layout, setLayout] = useState("sheet"); // 'sheet' (10/A4) | 'single'
+  // Section 69b — visual style: 'brand' (teal gradient) | 'photo' (provider's cover photo)
+  const [style, setStyle] = useState(searchParams.get("style") === "photo" ? "photo" : "brand");
+
+  // Persist style choice to URL so providers can bookmark / share their preference
+  useEffect(() => {
+    const current = searchParams.get("style");
+    if (style === "photo" && current !== "photo") {
+      const next = new URLSearchParams(searchParams);
+      next.set("style", "photo");
+      setSearchParams(next, { replace: true });
+    } else if (style === "brand" && current === "photo") {
+      const next = new URLSearchParams(searchParams);
+      next.delete("style");
+      setSearchParams(next, { replace: true });
+    }
+  }, [style, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (loading) return;
@@ -50,6 +67,25 @@ export default function PrintCard() {
 
   const backend = process.env.REACT_APP_BACKEND_URL || (typeof window !== "undefined" ? window.location.origin : "");
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+  // Resolve the best background image for "photo" style. Priority:
+  //   cover_url → first gallery item → logo_url
+  // Some logo_urls live on Emergent object storage (path starts with /api/files/…)
+  // — those need to be served from REACT_APP_BACKEND_URL.
+  const photoBgUrl = useMemo(() => {
+    if (!profile) return "";
+    const raw = profile.cover_url
+      || (profile.gallery && profile.gallery[0]?.url)
+      || (profile.photos && profile.photos[0])
+      || profile.logo_url
+      || "";
+    if (!raw) return "";
+    if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:")) return raw;
+    if (raw.startsWith("/api/")) return `${backend}${raw}`;
+    return raw;
+  }, [profile, backend]);
+
+  const canPhoto = !!photoBgUrl;
 
   const { qrUrl, displayUrl } = useMemo(() => {
     if (!profile?.slug) return { qrUrl: "", displayUrl: "" };
@@ -85,6 +121,9 @@ export default function PrintCard() {
     layoutLabel: "Cantidad por hoja",
     layoutSheet: "10 por hoja A4",
     layoutSingle: "1 grande (preview)",
+    styleBrand: "Estilo Marca",
+    stylePhoto: "Estilo Foto",
+    photoMissing: "Sube una foto de portada (cover) o logo para usar el estilo Foto.",
     paperHint: "Imprime en papel rígido (250-300 g/m²) o lleva el PDF a una imprenta.",
     formatHint: "Tamaño estándar US: 3.5\" × 2\" (89 × 51 mm).",
     cutGuide: "Las líneas grises son guías de corte.",
@@ -104,6 +143,9 @@ export default function PrintCard() {
     layoutLabel: "Cards per sheet",
     layoutSheet: "10 per A4 sheet",
     layoutSingle: "1 large (preview)",
+    styleBrand: "Brand style",
+    stylePhoto: "Photo style",
+    photoMissing: "Upload a cover photo or logo to use Photo style.",
     paperHint: "Print on cardstock (250-300 g/m²) or take the PDF to a print shop.",
     formatHint: "Standard US size: 3.5\" × 2\" (89 × 51 mm).",
     cutGuide: "Gray lines are cut guides.",
@@ -261,6 +303,52 @@ export default function PrintCard() {
           outline: 0.1mm dashed #CBD5E1;
         }
 
+        /* PHOTO style — provider's cover_url as full-bleed background */
+        .pc-card.photo {
+          background: var(--brand-teal-dark);
+          color: white;
+          padding: 0;
+        }
+        .pc-card.photo .pc-photo-bg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+        }
+        .pc-card.photo .pc-photo-overlay {
+          position: absolute;
+          inset: 0;
+          /* Gradient: transparent top → opaque teal bottom for text legibility */
+          background: linear-gradient(180deg, rgba(6,49,84,0.20) 0%, rgba(6,49,84,0.55) 45%, rgba(2,95,103,0.92) 100%);
+        }
+        .pc-card.photo .pc-content {
+          position: relative;
+          z-index: 2;
+          width: 100%;
+          height: 100%;
+          padding: 3.5mm 4mm;
+          box-sizing: border-box;
+          display: flex;
+          gap: 3.5mm;
+        }
+        /* Reuse same .pc-left / .pc-qr-wrap / .pc-verified */
+        .pc-card.photo::before { display: none; }  /* hide left accent stripe — photo theme is full-bleed */
+        .pc-card.photo .pc-brand {
+          /* On photo background, the small label needs a touch more contrast */
+          text-shadow: 0 1pt 2pt rgba(0,0,0,0.4);
+        }
+        .pc-card.photo .pc-name,
+        .pc-card.photo .pc-meta,
+        .pc-card.photo .pc-cta,
+        .pc-card.photo .pc-url {
+          text-shadow: 0 1pt 3pt rgba(0,0,0,0.55);
+        }
+        .pc-card.photo .pc-qr-wrap {
+          /* Stronger white frame on photo background */
+          box-shadow: 0 0 0 0.4mm rgba(255,255,255,0.6);
+        }
+
         /* SINGLE layout — center one card with shadow for screen preview */
         .pc-single {
           padding: 60px 20px;
@@ -306,6 +394,32 @@ export default function PrintCard() {
             <ArrowLeft className="w-4 h-4" /> {T.back}
           </Link>
           <div className="flex items-center gap-2">
+            <div className="inline-flex bg-slate-100 rounded-full p-1" data-testid="print-card-style-toggle">
+              <button
+                type="button"
+                onClick={() => setStyle("brand")}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition flex items-center gap-1 ${style === "brand" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"}`}
+                data-testid="print-card-style-brand"
+              >
+                <Palette className="w-3.5 h-3.5" /> {T.styleBrand}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canPhoto) {
+                    toast.info(T.photoMissing);
+                    return;
+                  }
+                  setStyle("photo");
+                }}
+                disabled={!canPhoto}
+                title={!canPhoto ? T.photoMissing : ""}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition flex items-center gap-1 ${style === "photo" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"} ${!canPhoto ? "opacity-50 cursor-not-allowed" : ""}`}
+                data-testid="print-card-style-photo"
+              >
+                <ImageIcon className="w-3.5 h-3.5" /> {T.stylePhoto}
+              </button>
+            </div>
             <div className="inline-flex bg-slate-100 rounded-full p-1" data-testid="print-card-layout-toggle">
               <button
                 type="button"
@@ -374,6 +488,8 @@ export default function PrintCard() {
                   qrUrl={qrUrl}
                   displayUrl={displayUrl}
                   lang={lang}
+                  style={style}
+                  photoBgUrl={photoBgUrl}
                 />
               ))}
             </div>
@@ -385,6 +501,8 @@ export default function PrintCard() {
               qrUrl={qrUrl}
               displayUrl={displayUrl}
               lang={lang}
+              style={style}
+              photoBgUrl={photoBgUrl}
             />
           </div>
         )}
@@ -409,7 +527,7 @@ export default function PrintCard() {
   );
 }
 
-function CardFace({ profile, qrUrl, displayUrl, lang }) {
+function CardFace({ profile, qrUrl, displayUrl, lang, style = "brand", photoBgUrl = "" }) {
   const isVerified = profile?.verification_status === "approved";
   // Category label — server provides `category` (object with name_es/name_en) or `category_id`
   const catLabel = (profile.category && (lang === "en" ? profile.category.name_en : profile.category.name_es))
@@ -419,8 +537,10 @@ function CardFace({ profile, qrUrl, displayUrl, lang }) {
   const businessName = profile.business_name || "—";
   const cta = lang === "es" ? "Mírame en getamano" : "Find me on getamano";
 
-  return (
-    <div className="pc-card" data-testid="print-card-face">
+  const isPhoto = style === "photo" && !!photoBgUrl;
+
+  const content = (
+    <>
       {isVerified && (
         <div className="pc-verified">✓ {lang === "es" ? "Verificado" : "Verified"}</div>
       )}
@@ -450,6 +570,22 @@ function CardFace({ profile, qrUrl, displayUrl, lang }) {
           style={{ width: "32mm", height: "32mm" }}
         />
       </div>
+    </>
+  );
+
+  if (isPhoto) {
+    return (
+      <div className="pc-card photo" data-testid="print-card-face" data-style="photo">
+        <div className="pc-photo-bg" style={{ backgroundImage: `url("${photoBgUrl}")` }} />
+        <div className="pc-photo-overlay" />
+        <div className="pc-content">{content}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pc-card" data-testid="print-card-face" data-style="brand">
+      {content}
     </div>
   );
 }
