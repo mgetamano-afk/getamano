@@ -9752,6 +9752,7 @@ from routes.jobs import make_router as _make_jobs_router  # noqa: E402
 from routes.seo import make_router as _make_seo_router  # noqa: E402
 from routes.saved_ecards import make_router as _make_saved_ecards_router  # noqa: E402
 from routes.nudges import make_router as _make_nudges_router  # noqa: E402
+from routes.follows import make_router as _make_follows_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9816,6 +9817,14 @@ api_router.include_router(
 
 api_router.include_router(
     _make_nudges_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
+    )
+)
+
+api_router.include_router(
+    _make_follows_router(
         db=db,
         User=User,
         get_current_user=get_current_user,

@@ -10,6 +10,7 @@ import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCi
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import ProviderSideNav from "../components/ProviderSideNav";
+import MiRedPage from "./MiRedPage";
 import MilestoneCelebration from "../components/MilestoneCelebration";
 import AchievementJournal from "../components/AchievementJournal";
 import ShareLinkCard from "../components/ShareLinkCard";
@@ -328,6 +329,9 @@ export default function ProviderDashboard() {
           </div>
 
           <div className="p-6 md:p-8">
+            {tab === "red" && (
+              <MiRedPage />
+            )}
             {tab === "perfil" && (
               <form onSubmit={onSave} className="space-y-8" data-testid="provider-form">
                 {/* Media row */}

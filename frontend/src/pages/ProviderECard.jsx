@@ -16,6 +16,7 @@ import RecommendButton from "../components/RecommendButton";
 import ECardModal from "../components/ECardModal";
 import ECardFloatingHeader from "../components/ECardFloatingHeader";
 import ShareECardBlock from "../components/ShareECardBlock";
+import FollowButton from "../components/FollowButton";
 import EngagementBadges from "../components/EngagementBadges";
 import QuoteRequestModal from "../components/QuoteRequestModal";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
@@ -228,6 +229,7 @@ export default function ProviderECard() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900" data-testid="ecard-business-name">{p.business_name}</h1>
                   {verified && <span className="badge-verified" data-testid="ecard-verified-badge"><ShieldCheck className="w-3.5 h-3.5" /> {t("provider.verified")}</span>}
+                  <FollowButton targetUserId={p.user_id} showCount />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                   {p.category && (
