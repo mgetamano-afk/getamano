@@ -208,6 +208,8 @@ export default function ProviderDashboard() {
 
           {/* COLUMNA CENTRO — Contenido principal scrolleable */}
           <section className="min-w-0 space-y-6" data-testid="provider-dashboard-center">
+            {/* ── HOME (Inicio) overview — visible only when tab === "dashboard" ── */}
+            {tab === "dashboard" && (<>
             <div className="animate-fadeSlideUp" style={{ animationDelay: "0ms" }}>
               <ProviderGreeting
                 user={user}
@@ -311,6 +313,8 @@ export default function ProviderDashboard() {
           />
           <StatCard icon={ShieldCheck} label="Estado" value={profile.verification_status} color="text-green-600" capitalize testid="stat-status" />
         </div>
+        </>)}
+        {/* ── END Home overview ── */}
 
         {/* Tabs */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
