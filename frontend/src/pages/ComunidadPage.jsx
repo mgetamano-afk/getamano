@@ -440,6 +440,7 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
           size="sm"
           variant="ghost"
           testid={`comunidad-post-like-${post.post_id}`}
+          celebrationLevel={isMilestone ? "milestone" : "default"}
         />
         <button
           type="button"
