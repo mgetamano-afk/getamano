@@ -6695,14 +6695,69 @@ async def _track_referral_signup(referred_user_id: str, ref_code: str) -> None:
     exists = await db.referrals.find_one({"referred_user_id": referred_user_id}, {"_id": 0})
     if exists:
         return
+    now_iso = datetime.now(timezone.utc).isoformat()
     await db.referrals.insert_one({
         "referral_id": f"ref_{uuid.uuid4().hex[:14]}",
         "referrer_user_id": referrer["user_id"],
         "referred_user_id": referred_user_id,
         "ref_code": ref_code,
         "status": "registered",  # → "paid" when subscription pays → "credited" when month applied
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now_iso,
     })
+    # Sprint A — Section 84: persist the inviter attribution on the user
+    # doc so the AppHome welcome banner + "thank inviter" flow can render
+    # without re-querying the referrals collection on every page load.
+    try:
+        await db.users.update_one(
+            {"user_id": referred_user_id},
+            {"$set": {
+                "invited_by_user_id": referrer["user_id"],
+                "invited_via_ref_code": ref_code,
+                "invited_at": now_iso,
+            }},
+        )
+    except Exception:
+        pass
+    # Auto-follow: the referee follows the referrer so the social loop
+    # opens with a connection in place. Idempotent on the unique index
+    # (follower_user_id, followed_user_id).
+    try:
+        exists_follow = await db.follows.find_one(
+            {"follower_user_id": referred_user_id, "followed_user_id": referrer["user_id"]},
+            {"_id": 0, "follow_id": 1},
+        )
+        if not exists_follow:
+            await db.follows.insert_one({
+                "follow_id": f"fol_{uuid.uuid4().hex[:14]}",
+                "follower_user_id": referred_user_id,
+                "followed_user_id": referrer["user_id"],
+                "source": "referral_auto",
+                "created_at": now_iso,
+            })
+    except Exception:
+        pass
+    # Notify the referrer that someone just registered via their link
+    # (status = registered, not yet paid). Builds anticipation.
+    try:
+        await db.notifications.insert_one({
+            "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+            "user_id": referrer["user_id"],
+            "category": "referrals",
+            "title": "🌱 Alguien se registró con tu link",
+            "body": (
+                "Cuando active su plan Pro, sumás 1 paso hacia tu próximo "
+                "mes gratis. ¡Sigue compartiendo!"
+            ),
+            "cta_label": "Ver mi red",
+            "cta_url": "/dashboard/provider?tab=red",
+            "icon": "user-plus",
+            "priority": "normal",
+            "is_read": False,
+            "dismissed_at": None,
+            "created_at": now_iso,
+        })
+    except Exception:
+        pass
 
 
 async def _grant_referral_reward(referred_user_id: str) -> Optional[dict]:

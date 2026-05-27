@@ -80,6 +80,11 @@ export default function ReferralProgressCard() {
   const progressPct = (inCycle / summary.ratio) * 100;
   const milestonesEarned = summary.free_months_earned || 0;
 
+  // Sprint A — "Almost there" hot state: when only 1 more paid referee
+  // unlocks the next free month, surface a pulsing flame badge over the
+  // headline to create urgency in the highest-leverage moment.
+  const almostThere = summary.needed_for_next === 1;
+
   // Headline — replace the long server-generated one with a punchier copy
   const headlineCopy = summary.needed_for_next > 0
     ? T.motivateInitial(summary.needed_for_next)
@@ -172,6 +177,18 @@ export default function ReferralProgressCard() {
         >
           {headlineCopy}
         </h3>
+
+        {/* Sprint A — Pulsing "🔥 Te falta 1" urgency badge */}
+        {almostThere && (
+          <div
+            className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-300/95 text-amber-900 text-[10px] font-extrabold uppercase tracking-wider shadow-md ring-1 ring-yellow-200"
+            style={{ animation: "rpc-pulse 1.6s ease-in-out infinite" }}
+            data-testid="referral-card-almost-there"
+          >
+            <span className="text-sm leading-none">🔥</span>
+            {lang === "es" ? "¡Te falta 1!" : "1 to go!"}
+          </div>
+        )}
 
         {/* Progress with milestone dots */}
         <div className="mt-3" data-testid="referral-card-progress">
@@ -316,6 +333,10 @@ export default function ReferralProgressCard() {
         @keyframes rpc-shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(400%); }
+        }
+        @keyframes rpc-pulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 224, 71, 0.6); }
+          50% { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(253, 224, 71, 0); }
         }
       `}</style>
     </div>

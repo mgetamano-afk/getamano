@@ -283,6 +283,63 @@ async def mark_referral_paid(db, referee_user_id: str) -> Optional[dict]:
     for idx in range(existing_credits + 1, milestones_earned + 1):
         await _award_milestone_credit(db, referral["referrer_user_id"], idx)
 
+    # Sprint A — "Almost there" anticipation hook. Fires AFTER milestone
+    # checks so we don't fire it the moment the referrer EARNED the
+    # milestone (paid_count even). Only fire when paid_count is odd, i.e.
+    # they're one paid referee away from the next free month.
+    if paid_count % REFEREES_PER_MILESTONE != 0:
+        try:
+            next_milestone_n = (paid_count // REFEREES_PER_MILESTONE) + 1
+            notif_key = f"{referral['referrer_user_id']}::almost_there::m{next_milestone_n}"
+            already = await db.notifications.find_one(
+                {"notification_key": notif_key},
+                {"_id": 0, "notification_id": 1},
+            )
+            if not already:
+                await db.notifications.insert_one({
+                    "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+                    "notification_key": notif_key,
+                    "user_id": referral["referrer_user_id"],
+                    "category": "referrals",
+                    "title": "🔥 ¡Te falta 1 amigo para tu próximo mes gratis!",
+                    "body": (
+                        f"Llevas {paid_count} suscrito{'s' if paid_count != 1 else ''}. "
+                        f"Un amigo más y desbloqueas el hito #{next_milestone_n}. "
+                        "Comparte tu link ahora."
+                    ),
+                    "cta_label": "Compartir mi link",
+                    "cta_url": "/dashboard/provider?tab=red",
+                    "icon": "flame",
+                    "priority": "high",
+                    "is_read": False,
+                    "dismissed_at": None,
+                    "created_at": now_iso,
+                })
+            try:
+                from routes.push import send_push_to_user
+                await send_push_to_user(db, referral["referrer_user_id"], {
+                    "title": "🔥 Te falta 1 para tu próximo mes gratis",
+                    "body": "Comparte tu link ahora — el momento perfecto.",
+                    "url": "/dashboard/provider?tab=red",
+                    "tag": f"almost-there-m{next_milestone_n}",
+                    "icon": "/icon-192x192.png",
+                })
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    # Sprint A — "Thank your inviter" hook. Mark this referee as eligible
+    # to send a thank-you to their referrer. Frontend modal renders when
+    # this flag is set AND not yet acted on.
+    try:
+        await db.users.update_one(
+            {"user_id": referee_user_id},
+            {"$set": {"can_thank_inviter": True}},
+        )
+    except Exception:
+        pass
+
     return {
         **referral,
         "status": "paid",
@@ -432,5 +489,139 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             raise HTTPException(status_code=403, detail="No es tu referido.")
         updated = await mark_referral_paid(db, ref["referred_user_id"])
         return {"ok": True, "mode": "dev-simulated", "referral": updated}
+
+    # ─── Sprint A — Inviter attribution / Thank inviter ──────────────
+    @router.get("/user-referrals/me/inviter")
+    async def my_inviter(me: User = Depends(get_current_user)) -> dict:
+        """Section 84 — Return the user who invited me (if any), with the
+        flags the AppHome banner + ThankInviterModal need to render.
+
+        Response shape:
+          {
+            inviter: { user_id, name, business_name, slug, picture, logo_url } | null,
+            invited_at: ISO | null,
+            banner_dismissed: bool,          # did I close the welcome banner?
+            can_thank: bool,                  # have I paid AND not thanked yet?
+            already_thanked: bool,
+          }
+        """
+        u = await db.users.find_one(
+            {"user_id": me.user_id},
+            {"_id": 0,
+             "invited_by_user_id": 1,
+             "invited_at": 1,
+             "inviter_banner_dismissed_at": 1,
+             "can_thank_inviter": 1,
+             "thanked_inviter_at": 1},
+        ) or {}
+        inviter_user_id = u.get("invited_by_user_id")
+        if not inviter_user_id:
+            return {
+                "inviter": None,
+                "invited_at": None,
+                "banner_dismissed": True,
+                "can_thank": False,
+                "already_thanked": False,
+            }
+        # Enrich inviter from users + provider_profiles
+        inviter_user = await db.users.find_one(
+            {"user_id": inviter_user_id},
+            {"_id": 0, "user_id": 1, "name": 1, "picture": 1},
+        ) or {}
+        inviter_prof = await db.provider_profiles.find_one(
+            {"user_id": inviter_user_id},
+            {"_id": 0, "business_name": 1, "slug": 1, "logo_url": 1, "phone": 1},
+        ) or {}
+        return {
+            "inviter": {
+                "user_id": inviter_user_id,
+                "name": inviter_user.get("name"),
+                "business_name": inviter_prof.get("business_name"),
+                "slug": inviter_prof.get("slug"),
+                "picture": inviter_user.get("picture"),
+                "logo_url": inviter_prof.get("logo_url"),
+                "phone": inviter_prof.get("phone"),
+            },
+            "invited_at": u.get("invited_at"),
+            "banner_dismissed": bool(u.get("inviter_banner_dismissed_at")),
+            "can_thank": bool(u.get("can_thank_inviter")) and not u.get("thanked_inviter_at"),
+            "already_thanked": bool(u.get("thanked_inviter_at")),
+        }
+
+    @router.post("/user-referrals/me/dismiss-banner")
+    async def dismiss_inviter_banner(me: User = Depends(get_current_user)) -> dict:
+        """Mark the inviter welcome banner as seen so AppHome stops showing it."""
+        await db.users.update_one(
+            {"user_id": me.user_id},
+            {"$set": {"inviter_banner_dismissed_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        return {"ok": True}
+
+    @router.post("/user-referrals/me/send-thanks")
+    async def send_thanks_to_inviter(me: User = Depends(get_current_user)) -> dict:
+        """Close the social loop: notify the inviter that THIS referee just
+        thanked them. Sends in-app + push + WhatsApp/SMS (sandbox-safe).
+        Idempotent — once thanked, the action becomes a no-op."""
+        u = await db.users.find_one(
+            {"user_id": me.user_id},
+            {"_id": 0, "invited_by_user_id": 1, "thanked_inviter_at": 1, "name": 1},
+        ) or {}
+        inviter_user_id = u.get("invited_by_user_id")
+        if not inviter_user_id:
+            raise HTTPException(status_code=400, detail="No tienes invitador registrado.")
+        if u.get("thanked_inviter_at"):
+            return {"ok": True, "already_thanked": True}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        referee_first_name = (u.get("name") or "").split(" ")[0] or "tu invitado"
+        # 1. In-app notification for the inviter
+        try:
+            await db.notifications.insert_one({
+                "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+                "user_id": inviter_user_id,
+                "category": "referrals",
+                "title": f"💚 {referee_first_name} te agradeció por invitarlo",
+                "body": (
+                    "Tu invitado activó su plan Pro y se tomó el tiempo de "
+                    "agradecerte. ¡Estás construyendo la red latina!"
+                ),
+                "cta_label": "Ver mi red",
+                "cta_url": "/dashboard/provider?tab=red",
+                "icon": "heart",
+                "priority": "high",
+                "is_read": False,
+                "dismissed_at": None,
+                "created_at": now_iso,
+            })
+        except Exception:
+            pass
+        # 2. Web push
+        try:
+            from routes.push import send_push_to_user
+            await send_push_to_user(db, inviter_user_id, {
+                "title": f"💚 {referee_first_name} te agradeció",
+                "body": "Construyes la red latina. Sigue invitando.",
+                "url": "/dashboard/provider?tab=red",
+                "tag": "thank-received",
+                "icon": "/icon-192x192.png",
+            })
+        except Exception:
+            pass
+        # 3. WhatsApp/SMS via sent.dm sandbox
+        try:
+            from integrations.messaging import deliver_notification
+            await deliver_notification(
+                db,
+                user_id=inviter_user_id,
+                template_name="thank_received",
+                variables={"name": referee_first_name, "url": "/dashboard/provider?tab=red"},
+            )
+        except Exception:
+            pass
+        # 4. Mark thanked
+        await db.users.update_one(
+            {"user_id": me.user_id},
+            {"$set": {"thanked_inviter_at": now_iso, "can_thank_inviter": False}},
+        )
+        return {"ok": True, "thanked_at": now_iso}
 
     return router

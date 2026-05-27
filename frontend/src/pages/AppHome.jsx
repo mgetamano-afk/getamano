@@ -20,6 +20,8 @@ import ReferralProgressCard from "../components/ReferralProgressCard";
 import MilestoneCelebrationModal from "../components/MilestoneCelebrationModal";
 import MilestoneOfTheWeekWidget from "../components/MilestoneOfTheWeekWidget";
 import OnboardingTour from "../components/OnboardingTour";
+import InviterWelcomeBanner from "../components/InviterWelcomeBanner";
+import ThankInviterModal from "../components/ThankInviterModal";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -226,6 +228,14 @@ export default function AppHome() {
         </div>
       </section>
 
+      {/* ── Sprint A: Inviter welcome banner — shows ONCE to users who
+            signed up via a /r/{code} referral link. ────────────────────── */}
+      {user && (
+        <div className="max-w-7xl mx-auto px-4 md:px-6 pt-4" data-testid="apphome-inviter-banner-section">
+          <InviterWelcomeBanner />
+        </div>
+      )}
+
       {/* ── Earnings + Referral widgets (providers only) ─────────────── */}
       {isProvider && (
         <section className="pt-4 md:pt-6" data-testid="apphome-earnings-section">
@@ -383,6 +393,11 @@ export default function AppHome() {
           if localStorage marker is present or if the celebration modal is
           already showing. */}
       {isProvider && <OnboardingTour role="provider" />}
+
+      {/* Sprint A — ThankInviterModal: fires on AppHome ONCE when the
+          referee just paid their first month (can_thank). Mounted for all
+          authenticated users (clients can also have inviters). */}
+      {user && <ThankInviterModal />}
     </div>
   );
 }

@@ -2358,3 +2358,53 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 
 **Files NEW**: integrations/__init__.py, integrations/messaging.py, integrations/messaging_templates.py, routes/messaging_admin.py.
 **Files MODIFIED**: server.py (router), user_referrals.py (2 hooks), credits.py (1 hook), test_credentials.md.
+
+
+---
+
+## Section 84 — Sprint A: Close-the-loop social mechanics (2026-05-27)
+
+**Goal**: Optimize the referral retention loop by fixing 3 weak points:
+1. No urgency when 1 friend away from milestone.
+2. Referee didn't know who invited them.
+3. No "thank your inviter" prompt closing the gratitude loop.
+
+**Backend**
+- `_track_referral_signup` (server.py) now also: persists `invited_by_user_id`, `invited_via_ref_code`, `invited_at` on the user doc; auto-follows the referrer (idempotent on follows uniq index); inserts a "🌱 Alguien se registró con tu link" notification for the referrer.
+- `mark_referral_paid` (routes/user_referrals.py): when `paid_count % 2 == 1` after a milestone check, fires a "🔥 ¡Te falta 1!" in-app + push notification (idempotent on `notification_key`). Also flips `users.can_thank_inviter = true` on the referee.
+- **New endpoints**:
+  - `GET  /api/user-referrals/me/inviter` → `{inviter, invited_at, banner_dismissed, can_thank, already_thanked}`
+  - `POST /api/user-referrals/me/dismiss-banner` → marks `inviter_banner_dismissed_at`
+  - `POST /api/user-referrals/me/send-thanks` → notifies inviter (in-app + push + sent.dm `thank_received` template) + sets `thanked_inviter_at`. Idempotent.
+- New sent.dm template: `thank_received` (es/en, wa+sms).
+
+**Frontend**
+- New `InviterWelcomeBanner.jsx` mounted on AppHome (all auth users). One-tap dismiss, links to inviter's eCard, shows auto-follow status.
+- New `ThankInviterModal.jsx` — pop-up celebration on AppHome when `can_thank=true`. CTA: "Thank via WhatsApp" (prefilled) + "Thank in getamano" (internal). Dismissable via sessionStorage `thank_inviter_modal_dismissed_v1`.
+- `ReferralProgressCard.jsx` — added pulsing "🔥 ¡Te falta 1!" badge when `needed_for_next === 1` (Tailwind `rpc-pulse` keyframe).
+
+**E2E verified (curl + Playwright)**
+- New referee registered via `?ref=GRY9J9` → `invited_by_user_id` set, auto-follow row created, inviter banner renders with inviter's logo + name + "You follow them".
+- After provider `simulate-paid`: provider notified with "🔥 ¡Te falta 1!"; referee gets `can_thank=true`; ThankInviterModal opens after 1.2s delay on AppHome.
+- After referee `send-thanks`: idempotent (returns `already_thanked` on retry); provider receives "💚 X te agradeció por invitarlo" notification.
+
+**Lint**: All Python + JS checks passed ✓.
+
+**Files NEW**: components/InviterWelcomeBanner.jsx, components/ThankInviterModal.jsx.
+**Files MODIFIED**: server.py (`_track_referral_signup` enriched), routes/user_referrals.py (3 new endpoints + almost-there hook + can_thank toggle), integrations/messaging_templates.py (thank_received), components/ReferralProgressCard.jsx (badge + keyframe), pages/AppHome.jsx (mount banner + modal).
+
+**Launch readiness checklist** (P0 blockers — all external):
+1. Stripe production keys + webhook endpoint
+2. sent.dm production keys (replace sandbox)
+3. Resend API key + verified domain (emails)
+4. Production VAPID keys for Web Push
+5. Domain + SSL pointing to deployment
+6. Legal pages (Terms, Privacy, Cookies)
+7. Real `invoice.payment_succeeded` Stripe webhook → calls `mark_referral_paid()`
+
+**Backlog (Sprint B + C)**
+- Top Allies leaderboard widget (weekly)
+- "Share your link" onboarding step
+- Cold-streak nudge (>7d no shares) in SmartActionHub
+- Smart invite targets (suggest 5⭐ clients to convert to providers)
+

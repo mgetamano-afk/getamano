@@ -128,6 +128,19 @@ TEMPLATES = {
             "en": "✅ Booking confirmed {date_time} with {provider_name}: {url}",
         },
     },
+    # === Sprint A — Section 84: Thank-inviter close-the-loop ===
+    "thank_received": {
+        "category": "rewards",
+        "template_id_wa": "thank_received_v1",
+        "wa": {
+            "es": "💚 ¡{name} te agradeció por invitarlo a getamano! Activó su plan Pro y te tomaste el tiempo de reconocerte. Estás construyendo la red latina: {url}",
+            "en": "💚 {name} thanked you for inviting them to getamano! They activated Pro and took time to recognize you. You're building the Latino network: {url}",
+        },
+        "sms": {
+            "es": "💚 {name} te agradeció por invitarlo a getamano. ¡Sigue construyendo la red!: {url}",
+            "en": "💚 {name} thanked you for inviting them to getamano. Keep building!: {url}",
+        },
+    },
 }
 
 
