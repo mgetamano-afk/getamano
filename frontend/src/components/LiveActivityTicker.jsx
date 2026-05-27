@@ -79,6 +79,10 @@ export default function LiveActivityTicker() {
       }}
       data-testid="live-activity-ticker"
     >
+      {/* Section 67 — Self-contained keyframe so the ticker animates on any
+          page that mounts it (AppHome, Landing, etc.) without relying on a
+          parent's <style> block. */}
+      <style>{`@keyframes scroll-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
       {/* Subtle animated dot grid for "live" feel */}
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
