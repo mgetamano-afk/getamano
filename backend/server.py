@@ -1685,14 +1685,13 @@ async def admin_verify(provider_id: str, payload: VerificationActionIn, admin: U
                      "pending": "Tu perfil está pendiente de revisión."}.get(payload.status, f"Estado actualizado: {payload.status}")
             send_sms(prov_user["phone"], f"[getamano] {label}", event=f"verify_{payload.status}")
 
-        # SECTION 16C+ — On approval, trigger referral reward (idempotent)
-        if payload.status == "approved":
-            try:
-                reward = await _grant_referral_reward(provider["user_id"])
-                if reward:
-                    logger.info(f"referral reward granted for {provider['user_id']}: {reward}")
-            except Exception:
-                logger.exception("referral reward grant failed (non-blocking)")
+        # SECTION 72 — Verification no longer auto-grants a referral reward.
+        # The new model (2 paid referees = 1 free month) requires the referee
+        # to confirm a PAID subscription, not just verification. This is
+        # handled by `mark_referral_paid()` invoked from the Stripe webhook
+        # `invoice.payment_succeeded` (or the dev simulate endpoint).
+        # Legacy `_grant_referral_reward` is kept for backwards compatibility
+        # but no longer triggered here.
 
     return {"ok": True}
 
@@ -9405,6 +9404,7 @@ from routes.nudges import make_router as _make_nudges_router  # noqa: E402
 from routes.follows import make_router as _make_follows_router  # noqa: E402
 from routes.referral_jobs import make_router as _make_referral_jobs_router  # noqa: E402
 from routes.credits import make_router as _make_credits_router  # noqa: E402
+from routes.user_referrals import make_router as _make_user_referrals_router  # noqa: E402
 from routes.push import make_router as _make_push_router  # noqa: E402
 from routes.banners import make_router as _make_banners_router  # noqa: E402
 from routes.stories import make_router as _make_stories_router  # noqa: E402
@@ -9520,6 +9520,14 @@ api_router.include_router(
 
 api_router.include_router(
     _make_credits_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
+    )
+)
+
+api_router.include_router(
+    _make_user_referrals_router(
         db=db,
         User=User,
         get_current_user=get_current_user,

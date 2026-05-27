@@ -83,7 +83,7 @@ export default function Register() {
                   Te invita <span className="font-bold">{refPreview.referrer_name}</span> · <span className="opacity-80">{refPreview.business_name}</span>
                 </p>
                 <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                  🎁 Crea tu cuenta y al verificarte recibes <strong>1 mes gratis Pro</strong> — y {refPreview.referrer_name} también lo gana. Win-win.
+                  🎁 Crea tu cuenta y al confirmar tu primer mes Pro lo recibes <strong>gratis (30 días)</strong>. {refPreview.referrer_name} suma puntos para ganar su próximo mes gratis — cada 2 amigos suscritos = 1 mes para quien refiere.
                 </p>
               </div>
             </div>

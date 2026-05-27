@@ -16,6 +16,7 @@ import LiveActivityTicker from "../components/LiveActivityTicker";
 import FoundingCounter from "../components/FoundingCounter";
 import NotificationBell from "../components/NotificationBell";
 import EarningsWidget from "../components/EarningsWidget";
+import ReferralProgressCard from "../components/ReferralProgressCard";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -215,11 +216,12 @@ export default function AppHome() {
         </div>
       </section>
 
-      {/* ── Earnings widget (providers with credits only) ─────────────── */}
+      {/* ── Earnings + Referral widgets (providers only) ─────────────── */}
       {isProvider && (
         <section className="pt-4 md:pt-6" data-testid="apphome-earnings-section">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 grid md:grid-cols-2 gap-4">
             <EarningsWidget />
+            <ReferralProgressCard />
           </div>
         </section>
       )}

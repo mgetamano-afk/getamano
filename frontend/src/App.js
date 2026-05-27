@@ -60,6 +60,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 const AdminOpsPage = lazy(() => import("./pages/AdminOpsPage"));
 const PrintCard = lazy(() => import("./pages/PrintCard"));
+const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
 
 // Admin Zone 4 — all code-split (rarely on critical path)
 const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
@@ -173,6 +174,7 @@ function AppRouter() {
       <Route path="/dashboard/provider" element={<ProviderDashboard />} />
       <Route path="/dashboard/print-card" element={<PrintCard />} />
       <Route path="/print-card" element={<PrintCard />} />
+      <Route path="/r/:code" element={<ReferralLanding />} />
       <Route path="/dashboard/client" element={<ClientDashboard />} />
       <Route path="/provider/onboarding" element={<ProviderOnboarding />} />
       <Route path="/requests" element={<ServiceRequests />} />
