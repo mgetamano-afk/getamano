@@ -2087,3 +2087,18 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 
 - Result: 0 console errors, 0 backend 500s after fix verified via Playwright; provider can now actually open every conversation.
 
+
+
+### Feb 26, 2026 — Section 64: Smart Action Hub + First Steps onboarding (gamified)
+- **`<FirstStepsPanel>`** — Modal slide-up con 6 pasos gamificados para activar un proveedor nuevo: (1) Subir logo, (2) Escribir bio 40+ chars, (3) Subir banner, (4) Galería ≥3 fotos, (5) Compartir eCard, (6) Primera reseña. Progress bar gradient naranja → verde al completar. Steps completados se muestran tachados con check. "Skip for 30 days" guarda timestamp en localStorage (`gtm_first_steps_skipped_until`).
+- **`<MediaChooser>`** — Componente dual-mode reusable para logo y banner. Toggle entre:
+  - **AI mode**: estilos por tipo (4 logo / 5 banner), paleta de 8 colores, keywords opcionales. POST `/providers/me/generate-logo` o `/generate-banner` (rate-limit 10/día). Preview + "Use this" llama `/providers/me/save-ai-image`.
+  - **Upload mode**: dropzone con file picker (image/*, ≤10MB). POST `/providers/me/upload-asset` (multipart, fields: file + target).
+- **SmartActionHub integration**: inyecta nudge "first-steps" en la cima de la lista del hub para providers con `<6` pasos completados. Deduplica con los nudges individuales (oculta `complete-profile` y `add-gallery-photos` cuando first-steps está activo).
+- **Backend nuevos endpoints**:
+  - `POST /api/providers/me/generate-logo` — gpt-image-1, 4 estilos (icon/monogram/emblem/minimal), rate-limit 10/día.
+  - `POST /api/providers/me/save-ai-image` — guarda base64 → storage, asigna a logo_url o banner_url.
+  - `POST /api/providers/me/upload-asset` — multipart (file + target) + asigna en una llamada (resuelve 422 de PUT /providers/me).
+- **Bug fixed (iter 62 → iter 63)**: MediaChooser Upload originalmente hacía POST /upload + PUT /providers/me, pero PUT requería business_name + category_id obligatorios → 422. Resuelto con endpoint dedicado upload-asset.
+- **Tests**: iteration 62 = 16/16 backend, 95% frontend (1 minor); iteration 63 = 11/11 backend, 100% frontend. 0 regresiones.
+- **UX gain**: providers nuevos tienen un único punto de activación que combina AI + upload sin obligarlos a elegir. Driver de activación significativo (logo → bio → banner → galería → share → reseña).
