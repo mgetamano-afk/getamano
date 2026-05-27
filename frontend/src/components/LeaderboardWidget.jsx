@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Trophy, ChevronRight, Sparkles, Loader2, Crown, Medal } from "lucide-react";
 import { api } from "../lib/api";
-import { getDicebearAvatar } from "../lib/avatar";
+import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 
 /**
  * LeaderboardWidget — Section 35 (dashboard mini view).
@@ -183,7 +183,7 @@ export default function LeaderboardWidget() {
               >
                 <div className="relative">
                   <div className={`w-12 h-12 rounded-full overflow-hidden border-2 ${r.rank === 1 ? "border-amber-400 w-14 h-14" : "border-white"}`}>
-                    <img src={r.photo_url || getDicebearAvatar(r.business_name)} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={resolveAvatar({picture: r.photo_url, user_id: r.user_id || r.provider_id, name: r.business_name, gender: r.gender})} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />
                   </div>
                   <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center shadow ${r.rank === 1 ? "bg-amber-500" : r.rank === 2 ? "bg-slate-400" : "bg-orange-600"}`}>
                     {r.rank}

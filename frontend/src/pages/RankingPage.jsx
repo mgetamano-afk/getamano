@@ -4,7 +4,7 @@ import { Trophy, Crown, Medal, Star, MapPin, Sparkles, Info, ChevronLeft } from 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { api } from "../lib/api";
-import { getDicebearAvatar } from "../lib/avatar";
+import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 
 /**
  * RankingPage — Section 35 public page at /ranking.
@@ -85,7 +85,7 @@ export default function RankingPage({ embedded = false }) {
                 >
                   <div className="absolute top-2 right-2">{icon}</div>
                   <div className={`rounded-full overflow-hidden border-[3px] border-white shadow-lg ${isFirst ? "w-20 h-20 -translate-y-1" : "w-16 h-16"}`}>
-                    <img src={r.photo_url || getDicebearAvatar(r.business_name)} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={resolveAvatar({picture: r.photo_url, user_id: r.user_id || r.provider_id, name: r.business_name, gender: r.gender})} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />
                   </div>
                   <p className={`font-display font-bold mt-2 leading-tight text-center truncate w-full px-2 ${isFirst ? "text-base sm:text-lg" : "text-xs sm:text-sm"}`}>{r.business_name}</p>
                   <p className="text-[10px] sm:text-xs opacity-90 mt-0.5">{r.city || ""}</p>
@@ -109,7 +109,7 @@ export default function RankingPage({ embedded = false }) {
                   <Link to={`/provider/${r.slug}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition">
                     <span className="font-display font-bold text-lg text-slate-400 w-8 text-center flex-shrink-0">#{r.rank}</span>
                     <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-slate-200">
-                      <img src={r.photo_url || getDicebearAvatar(r.business_name)} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={resolveAvatar({picture: r.photo_url, user_id: r.user_id || r.provider_id, name: r.business_name, gender: r.gender})} alt={r.business_name} className="w-full h-full object-cover" loading="lazy" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-sm text-slate-900 truncate">{r.business_name}</p>

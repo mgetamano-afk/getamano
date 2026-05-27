@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Trophy, Heart, MessageCircle, Sparkles, ArrowUpRight } from "lucide-react";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
-import { getDicebearAvatar } from "../lib/avatar";
+import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 
 /**
  * MilestoneOfTheWeekWidget — Section 81.
@@ -101,7 +101,13 @@ export default function MilestoneOfTheWeekWidget() {
         {items.map((post, idx) => {
           const author = post.author || {};
           const name = author.business_name || author.name || "Proveedor";
-          const avatar = author.logo_url || author.picture || getDicebearAvatar(name);
+          const avatar = resolveAvatar({
+            logo_url: author.logo_url,
+            picture: author.picture,
+            user_id: author.user_id || author.provider_id,
+            name,
+            gender: author.gender,
+          });
           const milestoneIdx = post.milestone_index || 1;
           const paidCount = post.milestone_paid_count ?? 0;
           return (

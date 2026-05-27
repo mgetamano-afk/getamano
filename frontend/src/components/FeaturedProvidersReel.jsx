@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, MapPin, Star, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
-import { getDicebearAvatar } from "../lib/avatar";
+import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -79,7 +79,13 @@ function persistLikes(set) {
 function ReelCard({ provider, index, isLiked, onLike, onCardClick }) {
   const planInfo = PLAN_LABELS[provider.plan] || PLAN_LABELS.basic;
   const cover = COVER_GRADIENTS[index % COVER_GRADIENTS.length];
-  const avatar = provider.photo_url || getDicebearAvatar(provider.business_name);
+  const avatar = resolveAvatar({
+    picture: provider.photo_url,
+    logo_url: provider.logo_url,
+    user_id: provider.user_id || provider.provider_id,
+    name: provider.business_name,
+    gender: provider.gender,
+  });
   const ratingLabel = provider.rating ? provider.rating.toFixed(1) : "—";
 
   const likeBtnRef = useRef(null);

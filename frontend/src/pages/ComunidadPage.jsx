@@ -13,7 +13,7 @@ import EmptyState from "../components/EmptyState";
 import StoriesCarousel from "../components/StoriesCarousel";
 import LikeButton from "../components/LikeButton";
 import { useAuth } from "../contexts/AuthContext";
-import { getDicebearAvatar } from "../lib/avatar";
+import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
 import FollowingFeed from "../components/FollowingFeed";
 
@@ -60,7 +60,7 @@ function StoriesRow() {
           >
             <div className="relative p-[2px] rounded-full" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 40%, #F59E0B 100%)" }}>
               <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white bg-slate-100">
-                <img src={s.picture || getDicebearAvatar(s.business_name)} alt={s.business_name} className="w-full h-full object-cover" loading="lazy" />
+                <img src={resolveAvatar({picture: s.picture, user_id: s.user_id || s.provider_user_id, name: s.business_name, gender: s.gender})} alt={s.business_name} className="w-full h-full object-cover" loading="lazy" />
               </div>
             </div>
             <p className="text-[10px] font-semibold text-slate-700 mt-1 truncate w-full text-center">{(s.business_name || "").split(" ")[0]}</p>
@@ -145,7 +145,7 @@ function NewPostBox({ onPosted }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 mb-4" data-testid="comunidad-newpost">
       <div className="flex gap-3">
         <img
-          src={user.picture || getDicebearAvatar(user.name || "U")}
+          src={resolveAvatar({picture: user.picture, user_id: user.user_id, name: user.name, gender: user.gender})}
           alt={user.name}
           className="w-10 h-10 rounded-full object-cover flex-shrink-0"
         />
@@ -276,7 +276,7 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
           {comments.map(c => {
             const isOwn = c.user_id === user?.user_id;
             const a = c.author || {};
-            const avatar = a.picture || getDicebearAvatar(a.business_name || a.name || "U");
+            const avatar = resolveAvatar({picture: a.picture, logo_url: a.logo_url, user_id: a.user_id || a.provider_id, name: a.business_name || a.name, gender: a.gender});
             return (
               <li key={c.comment_id} className="flex gap-2.5" data-testid={`inline-comment-${c.comment_id}`}>
                 <Link to={a.slug ? `/provider/${a.slug}` : "#"} className="flex-shrink-0">
@@ -327,7 +327,7 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
       {/* Composer */}
       {user ? (
         <div className="flex items-end gap-2">
-          <img src={user.picture || getDicebearAvatar(user.name || "U")} alt={user.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+          <img src={resolveAvatar({picture: user.picture, user_id: user.user_id, name: user.name, gender: user.gender})} alt={user.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
           <div className="flex-1 min-w-0 flex items-end gap-2 bg-slate-50 rounded-2xl px-3 py-1.5">
             <textarea
               ref={inputRef}
@@ -365,7 +365,7 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
 function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged }) {
   const isOwn = post.user_id === currentUserId;
   const a = post.author || {};
-  const avatar = a.picture || getDicebearAvatar(a.business_name || a.name || "U");
+  const avatar = resolveAvatar({picture: a.picture, logo_url: a.logo_url, user_id: a.user_id || a.provider_id, name: a.business_name || a.name, gender: a.gender});
   const [commentsOpen, setCommentsOpen] = useState(false);
   // Section 77 — milestone posts get a celebratory ring + badge for social proof.
   const isMilestone = post.type === "milestone";
@@ -389,7 +389,25 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
       )}
       <header className="flex items-start gap-3">
         <Link to={a.slug ? `/provider/${a.slug}` : "#"} className="flex-shrink-0">
-          <img src={avatar} alt={a.name} className="w-10 h-10 rounded-full object-cover" loading="lazy" />
+          <img
+            src={avatar}
+            alt={a.name}
+            className="w-10 h-10 rounded-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              // Section 83 — if uploaded/OAuth photo fails (e.g. Google's
+              // googleusercontent 4xx, expired CDN url), fall back to our
+              // illustrated library. One retry only.
+              if (e.currentTarget.dataset.fb !== "1") {
+                e.currentTarget.dataset.fb = "1";
+                e.currentTarget.src = resolveAvatar({
+                  user_id: a.user_id || a.provider_id,
+                  name: a.business_name || a.name,
+                  gender: a.gender,
+                });
+              }
+            }}
+          />
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -841,7 +859,7 @@ function RightSidebar() {
                   <li key={p.provider_id} className="flex items-center gap-2.5" data-testid={`comunidad-suggested-${p.provider_id}`}>
                     <Link to={`/provider/${p.slug}`} className="flex-shrink-0">
                       <img
-                        src={p.logo_url || p.photo_url || getDicebearAvatar(p.business_name)}
+                        src={resolveAvatar({picture: p.photo_url, logo_url: p.logo_url, user_id: p.user_id || p.provider_id, name: p.business_name, gender: p.gender})}
                         alt={p.business_name}
                         className="w-10 h-10 rounded-full object-cover"
                         loading="lazy"
