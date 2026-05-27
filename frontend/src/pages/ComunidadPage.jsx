@@ -15,6 +15,7 @@ import LikeButton from "../components/LikeButton";
 import { useAuth } from "../contexts/AuthContext";
 import { getDicebearAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
+import FollowingFeed from "../components/FollowingFeed";
 
 const MAX_LEN = 500;
 
@@ -855,6 +856,7 @@ function RightSidebar() {
 
 // ─── Main page ──────────────────────────────────────────────────────────
 export default function ComunidadPage({ embedded = false }) {
+  const [feedTab, setFeedTab] = useState("all"); // "all" | "following"
   const body = (
     <main className={`flex-1 ${embedded ? "" : "max-w-7xl mx-auto"} px-4 sm:px-6 lg:px-8 py-6 w-full`}>
       <div className="flex gap-0">
@@ -867,7 +869,31 @@ export default function ComunidadPage({ embedded = false }) {
             </header>
           )}
           <StoriesRow />
-          <PostFeed />
+          {/* Section 67 — Feed source toggle: all vs following */}
+          <div className="flex gap-1.5 mb-3 mt-1" data-testid="comunidad-feed-tabs">
+            <button
+              type="button"
+              onClick={() => setFeedTab("all")}
+              className={`px-3.5 h-9 rounded-full text-[13px] font-semibold transition ${
+                feedTab === "all" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+              data-testid="comunidad-feed-tab-all"
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setFeedTab("following")}
+              className={`px-3.5 h-9 rounded-full text-[13px] font-semibold inline-flex items-center gap-1.5 transition ${
+                feedTab === "following" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+              data-testid="comunidad-feed-tab-following"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Siguiendo
+            </button>
+          </div>
+          {feedTab === "all" ? <PostFeed /> : <FollowingFeed />}
         </div>
         {!embedded && <RightSidebar />}
       </div>

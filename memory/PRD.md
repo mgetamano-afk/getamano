@@ -2144,3 +2144,16 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **FoundingCounter banner restored** in AppHome (route `/`) — preserved from legacy Landing. Shows "50 DE 50 / FOUNDING MEMBERS / Plan Pro gratis hasta 2027 con código GETAMANO50". Live polling `/api/promo-codes/founding-status` every 20s; hidden for users with role=provider.
 - **No backend changes** — pure frontend enhancement of UX + access gating.
 - Visual verification (Playwright): guest at `/p/maria-cleaning-services-sallisaw-ok` clicking the green WhatsApp CTA opens the auth-gate modal "Sign in to call / Only registered users can view the number" with both Sign in + Create free account options. Clicking Quote shows "Sign in to request a quote".
+
+
+### Feb 26, 2026 — Section 67 (Follow notifications + Following feed)
+- **NEW notification on follow** — POST `/api/follows/{user_id}` now emits a `category: "follow"` notification document to the followed user with title `"{firstname} te empezó a seguir"`, body, CTA, icon `UserPlus`, priority medium. Only fires on the FIRST follow (idempotent re-follow doesn't duplicate). `/api/notifications` now includes `"follow"` in its category whitelist.
+- **NEW `GET /api/follows/me/feed`** — personalized feed endpoint that aggregates recent activity from accounts the viewer follows. Sources:
+  - `community_posts` (last N from followed users)
+  - `stories` from followed providers
+  - `banner_shares` from followed providers
+  Each event is normalized to `{kind, id, actor_name, actor_avatar, actor_slug, summary_es/en, media, body_excerpt, url, created_at}`. Sorted by created_at desc. Returns [] when not following anyone.
+- **NEW `<FollowingFeed>`** component — Instagram-style feed cards with avatar + verb + media + body + relative time. Skeleton loader. EmptyState when no events.
+- **ComunidadPage Feed tabs** — `[Todos] [Siguiendo]` toggle above the post feed. data-testid `comunidad-feed-tabs / -tab-all / -tab-following`. Guest sees a friendly "Sign in to see your feed" prompt.
+- **Verified** (Playwright + curl): Carlos follows María → María's bell shows "Carlos te empezó a seguir" notification. Carlos's `/comunidad` "Siguiendo" tab shows 11 cards (María's stories + banners).
+- Future work: real-time SW push notification (when SW backend `/api/push/subscribe` is built), comment notifications, mention notifications.

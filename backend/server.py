@@ -3770,7 +3770,7 @@ async def get_notifications(user: User = Depends(get_current_user)):
     raw = await db.notifications.find(
         {
             "user_id": user.user_id,
-            "category": {"$in": ["gigs", "referrals", "streaks", "rewards", "community"]},
+            "category": {"$in": ["gigs", "referrals", "streaks", "rewards", "community", "follow"]},
             "dismissed_at": None,
         },
         {"_id": 0},
