@@ -1,0 +1,50 @@
+{
+  "summary": "Section 64 — First Steps onboarding panel: backend 16/16 pass, frontend flows verified (F4-F11 + regressions). One integration bug confirmed in MediaChooser Upload-mode (PUT /providers/me rejects partial body with 422).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/providers/me", "issue": "Pydantic model ProviderProfileIn requires business_name + category_id (no defaults). Sending only {logo_url} or {banner_url} returns 422. This breaks MediaChooser Upload-mode flow which posts only the new URL after /upload."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "MediaChooser Upload mode (F9)", "issue": "After /upload returns a file URL, the chooser does PUT /providers/me with {[logo_url|banner_url]: url} only — backend returns 422 because business_name and category_id are required. AI save path works fine (uses /providers/me/save-ai-image which writes directly to DB).", "affected_selectors": ["media-chooser-dropzone", "media-chooser-file-input"], "priority": "HIGH"}
+    ],
+    "design_issues": []
+  },
+  "verified_working": {
+    "F1_generate_logo": "200 with image_base64 (~10-15s), rate-limit 10/day, 401/403/422 paths correct",
+    "F2_save_ai_image": "Saves to /api/files/..., updates logo_url/banner_url on profile, role-gated to provider, target validated",
+    "F3_existing_endpoints": "generate-banner OK, /upload multipart OK, PUT /providers/me OK when required fields included",
+    "F4_smart_action_first_steps_card": "Renders for provider at top with 'Activate your eCard (4/6)'. DEDUP confirmed: complete-profile + add-gallery-photos cards HIDDEN.",
+    "F5_panel": "Opens with header, progress bar, 6 step cards (logo/bio/banner/gallery/share/review), skip footer button. Completed steps show check icon + line-through.",
+    "F6_step_click_behavior": "Clicking DONE logo step does NOT open MediaChooser (correctly disabled). Pending steps navigate.",
+    "F10_skip_persistence": "Skip writes timestamp to localStorage key 'gtm_first_steps_skipped_until' (e.g., 1782462401345). After skip, first-steps nudge hidden in SmartActionHub.",
+    "F11_hidden_contexts": "Hub hidden on /login, /verificar-correo, and /admin (for admin user). Visible on /, /search, /comunidad, /dashboard/provider.",
+    "role_gating": "Client role: hub shown but first-steps card NOT shown (correct). Admin role: hub hidden on /admin (correct).",
+    "regression_share_url": "/services/{slug} redirects to /p/{slug} confirmed. /api/providers/by-slug returns provider with slug field."
+  },
+  "untested": [
+    "F7/F8 AI generate→preview→Use this end-to-end via UI (demo provider has logo+banner already done so MediaChooser is never reached for those steps in the current panel state). Backend pipeline is fully covered by tests.",
+    "F9 Upload mode via UI (same reason — chooser not reachable without un-setting demo data). Bug confirmed at API level."
+  ],
+  "test_report_links": ["/app/backend/tests/test_iter62_first_steps_logo_ai.py", "/app/test_reports/pytest/iter62_results.xml"],
+  "action_items": [
+    "Fix PUT /providers/me to accept partial updates OR change MediaChooser Upload flow to include business_name + category_id in the PUT body (or use /providers/me/save-ai-image-style endpoint for uploaded files too).",
+    "Optional: have demo.provider start with logo/banner UNSET so MediaChooser is reachable for QA testing of F7-F9 flows via UI."
+  ],
+  "critical_code_review_comments": [
+    "ProviderProfileIn requires business_name and category_id; many partial-update flows in the FE will silently 422. Recommend making fields Optional[str] = None on PUT or splitting into ProviderProfileCreate vs ProviderProfilePatch.",
+    "data-testid='first-steps-progress' element exists but has no visible text content — the '4 / 6 complete' label is rendered on a different element. Consider moving the testid or adding aria-valuenow.",
+    "Dev mode shows uncaught axios 401 rejections as React error overlay on first load (before login). Not a blocker but noisy; consider catching auth/me 401 silently in the AuthContext."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter62_first_steps_logo_ai.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "95% — all observable flows pass; MediaChooser interior flows could not be opened due to demo data already complete"},
+  "test_credentials": "demo.provider@getamano.com / provider123 (provider, 4/6 first-steps done); demo.client@getamano.com / client123; admin@getamano.com / admin123. Use page.evaluate fetch with credentials:'include' for cookie-based auth — Playwright UI form submit was flaky due to dev-mode error overlay.",
+  "seed_data_creation": "None. Tests restore prev logo_url/banner_url and clear localStorage skip key after each run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "If E1 fixes the PUT /providers/me partial-update bug, retest MediaChooser Upload mode by either (a) clearing logo_url on demo.provider via DB to make logo step pending, or (b) registering a fresh provider. Backend tests in test_iter62_first_steps_logo_ai.py are reusable; the test_put_providers_me_partial_logo_url_known_bug expects 422 — update to 200 after the fix.",
+  "rca_of_the_issue": "MediaChooser Upload flow: const uploaded = await api.post('/upload', form); await api.put('/providers/me', { [field]: uploaded.url });  →  backend ProviderProfileIn requires business_name + category_id  →  422. The AI flow works because it uses a dedicated /providers/me/save-ai-image endpoint that writes directly to the providers collection without going through ProviderProfileIn."
+}

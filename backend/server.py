@@ -8443,6 +8443,162 @@ class BannerGenerateIn(BaseModel):
     keywords: Optional[str] = Field(default=None, max_length=200)
 
 
+# ============ SECTION 64 — AI Logo Generator (square, branded) ============
+class LogoGenerateIn(BaseModel):
+    color: str = Field(default="#2F9D94", min_length=4, max_length=9)
+    style: Literal["icon", "monogram", "emblem", "minimal"] = "icon"
+    keywords: Optional[str] = Field(default=None, max_length=200)
+
+
+@api_router.post("/providers/me/generate-logo")
+async def generate_logo_ai(payload: LogoGenerateIn, user: User = Depends(get_current_user)):
+    """Generate a square brand logo for the provider via gpt-image-1.
+    Used by the FirstStepsPanel when the provider does not have a logo yet.
+
+    Style guide:
+      · icon     — flat icon mark, single subject, brand color, rounded shapes
+      · monogram — initials in a circular badge, elegant typography (but we
+                   instruct NO LETTERS so the result is purely visual; the
+                   final letters are composed client-side over the badge)
+      · emblem   — vintage-style hexagonal emblem, decorative border
+      · minimal  — single geometric shape, maximum negative space
+    """
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores pueden generar logo.")
+
+    profile = await db.provider_profiles.find_one(
+        {"user_id": user.user_id},
+        {"_id": 0, "business_name": 1, "category_id": 1, "logo_generations_count": 1, "logo_last_generated_at": 1},
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+
+    now = datetime.now(timezone.utc)
+    today_start_iso = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    today_count = profile.get("logo_generations_count", 0)
+    last_at = profile.get("logo_last_generated_at", "")
+    # Rate-limit: 10 logo generations per day
+    if last_at and last_at >= today_start_iso and today_count >= 10:
+        raise HTTPException(status_code=429, detail="Límite diario alcanzado. Intenta mañana.")
+
+    category_label = ""
+    if profile.get("category_id"):
+        cat = await db.categories.find_one({"category_id": profile["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+        if cat:
+            category_label = cat.get("name_es") or cat.get("name_en") or ""
+
+    style_descriptions = {
+        "icon":     "flat vector icon logo, single bold subject centered, friendly rounded shapes, simple silhouette, clean negative space",
+        "monogram": "circular badge logo with thick border and central decorative pattern, premium feeling, brand mark composition",
+        "emblem":   "vintage hexagonal emblem logo with subtle decorative border, polished modern-classic balance",
+        "minimal":  "ultra-minimal geometric logo, single shape on solid background, lots of negative space, calm and balanced",
+    }
+    style_desc = style_descriptions.get(payload.style, style_descriptions["icon"])
+
+    prompt_parts = [
+        f"A {style_desc} for a small business.",
+        f"Brand color: {payload.color}. White or neutral solid background.",
+        "Square 1:1 composition, centered subject, even padding.",
+        "No text, no letters, no numbers, no words anywhere — purely visual symbol/icon.",
+        "Crisp, professional, social-media-ready, suitable for use as a circular avatar.",
+    ]
+    if category_label:
+        prompt_parts.append(f"Visual hints relating to: {category_label}.")
+    if (payload.keywords or "").strip():
+        prompt_parts.append(f"Additional theme: {payload.keywords.strip()}.")
+    final_prompt = " ".join(prompt_parts)
+
+    try:
+        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+        image_gen = OpenAIImageGeneration(api_key=os.environ.get("EMERGENT_LLM_KEY"))
+        images = await image_gen.generate_images(
+            prompt=final_prompt,
+            model="gpt-image-1",
+            number_of_images=1,
+        )
+        if not images:
+            raise HTTPException(status_code=502, detail="No se pudo generar el logo. Intenta de nuevo.")
+        import base64 as _b64
+        image_base64 = _b64.b64encode(images[0]).decode("utf-8")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"logo-gen failed: {e}")
+        raise HTTPException(status_code=502, detail="Error al generar el logo. Reintenta.")
+
+    update_doc = {
+        "logo_last_generated_at": now.isoformat(),
+        "logo_last_style": payload.style,
+        "logo_last_color": payload.color,
+    }
+    if not last_at or last_at < today_start_iso:
+        update_doc["logo_generations_count"] = 1
+        await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": update_doc})
+    else:
+        await db.provider_profiles.update_one(
+            {"user_id": user.user_id},
+            {"$set": update_doc, "$inc": {"logo_generations_count": 1}},
+        )
+
+    return {
+        "image_base64": image_base64,
+        "mime": "image/png",
+        "style": payload.style,
+        "color": payload.color,
+    }
+
+
+class SaveAiImageIn(BaseModel):
+    """Save a base64 AI-generated image (logo or banner) to storage and
+    return its persistent URL. Optionally updates the provider profile field.
+    """
+    image_base64: str = Field(..., min_length=100)
+    mime: str = Field(default="image/png")
+    target: Literal["logo", "banner"] = "logo"
+
+
+@api_router.post("/providers/me/save-ai-image")
+async def save_ai_image(payload: SaveAiImageIn, user: User = Depends(get_current_user)):
+    if user.role != "provider":
+        raise HTTPException(status_code=403, detail="Solo proveedores.")
+    profile = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "provider_id": 1})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+    import base64 as _b64
+    try:
+        data = _b64.b64decode(payload.image_base64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Imagen base64 inválida.")
+    if len(data) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail="Imagen supera 10 MB.")
+    ext = "png" if payload.mime.endswith("png") else payload.mime.split("/")[-1] or "png"
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/uploads/{user.user_id}/{file_id}.{ext}"
+    try:
+        result = put_object(path, data, payload.mime)
+    except Exception as e:
+        logger.exception("save-ai-image failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    await db.files.insert_one({
+        "file_id": file_id,
+        "user_id": user.user_id,
+        "storage_path": result["path"],
+        "original_filename": f"ai-{payload.target}.png",
+        "content_type": payload.mime,
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    url = f"/api/files/{result['path']}"
+    # Auto-assign to the provider profile
+    field = "logo_url" if payload.target == "logo" else "banner_url"
+    await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {field: url, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"url": url, "file_id": file_id, "target": payload.target}
+
+
 @api_router.post("/providers/me/generate-banner")
 async def generate_banner_background(payload: BannerGenerateIn,
                                       user: User = Depends(get_current_user)):

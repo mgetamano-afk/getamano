@@ -14,10 +14,12 @@ import {
   Search,
   ArrowRight,
   Lightbulb,
+  Rocket,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
+import FirstStepsPanel, { isFirstStepsSkipped } from "./FirstStepsPanel";
 
 /**
  * SmartActionHub — Section 64.
@@ -52,7 +54,7 @@ const STORAGE_KEY = "gtm_dismissed_nudges_v1";
 const DISMISS_TTL_MS = 7 * 24 * 3600 * 1000;
 
 const ICONS = {
-  MessageCircle, UserCog, Image: ImageIcon, Crown, Calendar, Star, Inbox, Bookmark, Search, Lightbulb,
+  MessageCircle, UserCog, Image: ImageIcon, Crown, Calendar, Star, Inbox, Bookmark, Search, Lightbulb, Rocket,
 };
 
 function loadDismissed() {
@@ -86,6 +88,8 @@ export default function SmartActionHub() {
   const [open, setOpen] = useState(false);
   const [nudges, setNudges] = useState([]);
   const [dismissed, setDismissed] = useState(loadDismissed);
+  const [provider, setProvider] = useState(null);
+  const [stepsOpen, setStepsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
   const fetchNudges = useCallback(async () => {
@@ -98,7 +102,22 @@ export default function SmartActionHub() {
     }
   }, [user]);
 
-  useEffect(() => { fetchNudges(); }, [fetchNudges, location.pathname]);
+  // Provider profile + onboarding signals (only when role=provider)
+  const fetchProvider = useCallback(async () => {
+    if (!user || user.role !== "provider") { setProvider(null); return; }
+    try {
+      const [p, s] = await Promise.all([
+        api.get("/providers/me"),
+        api.get("/providers/me/share-rewards").catch(() => ({ data: {} })),
+      ]);
+      // Gallery already lives inside the provider response (`gallery` field).
+      const galleryLen = Array.isArray(p.data?.gallery) ? p.data.gallery.length : 0;
+      const totalShares = s.data?.total_shares || 0;
+      setProvider({ ...p.data, __gallery_count: galleryLen, __total_shares: totalShares });
+    } catch { setProvider(null); }
+  }, [user]);
+
+  useEffect(() => { fetchNudges(); fetchProvider(); }, [fetchNudges, fetchProvider, location.pathname]);
 
   // Close panel on outside click / escape
   useEffect(() => {
@@ -121,8 +140,47 @@ export default function SmartActionHub() {
   if (!user) return null;
   if (HIDE_RE.some((re) => re.test(location.pathname))) return null;
 
-  const visible = nudges.filter((n) => !dismissed[n.id]);
-  if (visible.length === 0) return null;
+  // Build first-steps nudge (only for providers with pending tasks)
+  let firstStepsNudge = null;
+  if (provider && user.role === "provider" && !isFirstStepsSkipped()) {
+    const hasBio = (provider.description || "").trim().length >= 40;
+    const completed = [
+      !!provider.logo_url,
+      hasBio,
+      !!provider.banner_url || !!provider.cover_url,
+      (provider.__gallery_count || 0) >= 3,
+      (provider.__total_shares || 0) > 0,
+      (provider.rating_count || 0) > 0,
+    ].filter(Boolean).length;
+
+    if (completed < 6) {
+      firstStepsNudge = {
+        id: "first-steps",
+        type: "onboarding",
+        priority: 1,
+        title: lang === "en"
+          ? `Activate your eCard (${completed}/6)`
+          : `Activa tu eCard (${completed}/6)`,
+        message: lang === "en"
+          ? "Logo, bio, banner, photos, share & first review — guided onboarding."
+          : "Logo, descripción, banner, fotos, compartir y reseña — todo guiado.",
+        cta_label: lang === "en" ? "Continue setup" : "Continuar",
+        cta_url: "#first-steps",
+        icon: "Rocket",
+      };
+    }
+  }
+
+  // Don't double-display: if the FirstSteps nudge owns the profile flow,
+  // hide the standalone "complete-profile" and "add-gallery-photos" nudges.
+  let mergedNudges = nudges;
+  if (firstStepsNudge) {
+    mergedNudges = nudges.filter((n) => n.type !== "profile" && n.type !== "media");
+  }
+
+  const merged = firstStepsNudge ? [firstStepsNudge, ...mergedNudges] : mergedNudges;
+  const visible = merged.filter((n) => !dismissed[n.id]);
+  if (visible.length === 0 && !stepsOpen) return null;
 
   const dismissOne = (id) => {
     const next = { ...dismissed, [id]: Date.now() };
@@ -132,7 +190,11 @@ export default function SmartActionHub() {
 
   const handleCta = (n) => {
     setOpen(false);
-    navigate(n.cta_url);
+    if (n.cta_url === "#first-steps") {
+      setStepsOpen(true);
+    } else {
+      navigate(n.cta_url);
+    }
   };
 
   const urgent = visible.filter((n) => n.priority <= 2).length;
@@ -278,6 +340,14 @@ export default function SmartActionHub() {
           />
         )}
       </button>
+
+      {/* First-Steps onboarding modal (providers only) */}
+      <FirstStepsPanel
+        provider={provider}
+        open={stepsOpen}
+        onClose={() => setStepsOpen(false)}
+        onProfileUpdated={(p) => { setProvider(p); fetchNudges(); }}
+      />
     </div>
   );
 }
