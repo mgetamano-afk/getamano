@@ -154,6 +154,7 @@ const dict = {
     "tabs.messages": "Mensajes",
     "tabs.referrals": "Referidos",
     "tabs.journal": "Mi diario",
+    "tabs.versions": "Versiones",
     "tabs.subscription": "Suscripción",
 
     // Header / nav

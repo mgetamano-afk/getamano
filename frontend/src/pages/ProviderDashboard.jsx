@@ -44,7 +44,8 @@ import CitySearchInput from "../components/CitySearchInput";
 import ChipInput from "../components/ChipInput";
 import ServiceAreasInput from "../components/ServiceAreasInput";
 import BusinessCardScanner from "../components/BusinessCardScanner";
-import { ScanLine } from "lucide-react";
+import ProfileVersionsPanel from "../components/ProfileVersionsPanel";
+import { ScanLine, History } from "lucide-react";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { US_STATES, getStateByAbbr } from "../data/usLocations";
 
@@ -60,6 +61,7 @@ const TAB_KEYS = [
   { id: "mensajes", labelKey: "tabs.messages", Icon: MessageCircle },
   { id: "referidos", labelKey: "tabs.referrals", Icon: Trophy },
   { id: "diario", labelKey: "tabs.journal", Icon: Trophy },
+  { id: "versiones", labelKey: "tabs.versions", Icon: History },
   { id: "suscripcion", labelKey: "tabs.subscription", Icon: CreditCard },
 ];
 
@@ -634,6 +636,10 @@ export default function ProviderDashboard() {
 
             {tab === "diario" && (
               <AchievementJournal businessNameProp={profile?.business_name} logoUrl={profile?.logo_url} />
+            )}
+
+            {tab === "versiones" && (
+              <ProfileVersionsPanel />
             )}
 
             {tab === "suscripcion" && (

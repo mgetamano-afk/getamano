@@ -1541,6 +1541,15 @@ async def update_my_provider(payload: ProviderProfileIn, user: User = Depends(ge
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.provider_profiles.update_one({"user_id": user.user_id}, {"$set": update})
     doc = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
+    # Section 70 — Auto-snapshot AFTER the update lands. The helper de-dupes
+    # against the most recent version and trims to the user's plan quota,
+    # so this stays cheap even on chatty save patterns. Errors here must NEVER
+    # block the response — losing a snapshot is annoying, losing the save is
+    # catastrophic.
+    try:
+        await _profile_auto_snapshot(db, user.user_id, source="auto")
+    except Exception as e:
+        logger.warning(f"profile auto-snapshot failed for {user.user_id}: {e}")
     return doc
 
 @api_router.post("/providers/{provider_id}/contact-click")
@@ -1717,20 +1726,104 @@ async def list_plans():
     return [
         {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0, "price_annual": 0, "annual_savings": 0,
          "badge": None, "highlight": False,
-         "features_es": ["eCard básica con enlace único", "1 categoría de servicio", "Hasta 20 fotos en tu galería", "Analytics básicos", "Formulario de contacto"],
-         "features_en": ["Basic eCard with unique link", "1 service category", "Up to 20 photos in your gallery", "Basic analytics", "Contact form"]},
+         "features_es": [
+             "eCard básica con enlace único",
+             "1 categoría de servicio",
+             "Hasta 20 fotos en tu galería",
+             "Analytics básicos",
+             "Formulario de contacto",
+             "Última versión de tu perfil guardada",
+         ],
+         "features_en": [
+             "Basic eCard with unique link",
+             "1 service category",
+             "Up to 20 photos in your gallery",
+             "Basic analytics",
+             "Contact form",
+             "Last profile version saved",
+         ]},
         {"id": "basic", "name": "Básico", "name_en": "Basic", "price_monthly": 10, "price_annual": 100, "annual_savings": 20,
          "badge": "Básico", "badge_color": "#94a3b8", "highlight": False,
-         "features_es": ["Todo lo de Gratis +", "Hasta 3 categorías", "Fotos ilimitadas en tu galería", "Analytics mejorados", "Responder reseñas", "1 boost mensual de visibilidad"],
-         "features_en": ["Everything in Free +", "Up to 3 categories", "Unlimited gallery photos", "Enhanced analytics", "Respond to reviews", "1 visibility boost/month"]},
+         "features_es": [
+             "Todo lo de Gratis +",
+             "Hasta 3 categorías",
+             "Fotos ilimitadas en tu galería",
+             "Analytics mejorados",
+             "Responder reseñas",
+             "1 boost mensual de visibilidad",
+             "Historial de 5 versiones (últimos 7 días) + restaurar",
+             "Insignia de proveedor verificado",
+         ],
+         "features_en": [
+             "Everything in Free +",
+             "Up to 3 categories",
+             "Unlimited gallery photos",
+             "Enhanced analytics",
+             "Respond to reviews",
+             "1 visibility boost/month",
+             "5-version history (last 7 days) + restore",
+             "Verified provider badge",
+         ]},
         {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 15, "price_annual": 150, "annual_savings": 30,
          "badge": "Pro", "badge_color": "#F97316", "highlight": True, "label": "Más popular",
-         "features_es": ["Todo lo de Básico +", "Hasta 5 categorías", "Fotos ilimitadas + 1 video de presentación", "Mejor posición en búsquedas", "Notificaciones en tiempo real", "Botón WhatsApp directo", "3 boosts mensuales", "Soporte prioritario"],
-         "features_en": ["Everything in Basic +", "Up to 5 categories", "Unlimited photos + 1 presentation video", "Better search ranking", "Real-time notifications", "Direct WhatsApp button", "3 visibility boosts/month", "Priority support"]},
+         "features_es": [
+             "Todo lo de Básico +",
+             "Hasta 5 categorías",
+             "Fotos ilimitadas + 1 video de presentación",
+             "Mejor posición en búsquedas",
+             "Notificaciones en tiempo real",
+             "Botón WhatsApp directo",
+             "3 boosts mensuales",
+             "Soporte prioritario",
+             "Historial de 30 versiones (30 días) + etiquetas manuales",
+             "Calendario de citas avanzado con sincronización",
+             "Auto-respuestas inteligentes",
+         ],
+         "features_en": [
+             "Everything in Basic +",
+             "Up to 5 categories",
+             "Unlimited photos + 1 presentation video",
+             "Better search ranking",
+             "Real-time notifications",
+             "Direct WhatsApp button",
+             "3 visibility boosts/month",
+             "Priority support",
+             "30-version history (30 days) + manual labels",
+             "Advanced booking calendar with sync",
+             "Smart auto-replies",
+         ]},
         {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 25, "price_annual": 250, "annual_savings": 50,
          "badge": "Premium", "badge_color": "#D97706", "highlight": False, "label": "Mejor valor",
-         "features_es": ["Todo lo de Pro +", "Categorías ilimitadas", "Fotos ilimitadas + 1 video de presentación", "Posición TOP en búsquedas", "Aparece en homepage", "Campañas mensuales", "QR personalizado descargable", "eCard premium con branding", "Reportes avanzados", "5 boosts mensuales"],
-         "features_en": ["Everything in Pro +", "Unlimited categories", "Unlimited photos + 1 presentation video", "TOP search position", "Featured on homepage", "Monthly campaigns", "Downloadable custom QR", "Premium eCard", "Advanced reports", "5 visibility boosts/month"]},
+         "features_es": [
+             "Todo lo de Pro +",
+             "Categorías ilimitadas",
+             "Fotos ilimitadas + 1 video de presentación",
+             "Posición TOP en búsquedas",
+             "Aparece en homepage",
+             "Campañas mensuales",
+             "QR personalizado descargable",
+             "eCard premium con branding",
+             "Reportes avanzados",
+             "5 boosts mensuales",
+             "Historial de versiones ilimitado",
+             "Acceso a API para integraciones",
+             "Manager de campañas de marketing",
+         ],
+         "features_en": [
+             "Everything in Pro +",
+             "Unlimited categories",
+             "Unlimited photos + 1 presentation video",
+             "TOP search position",
+             "Featured on homepage",
+             "Monthly campaigns",
+             "Downloadable custom QR",
+             "Premium eCard",
+             "Advanced reports",
+             "5 visibility boosts/month",
+             "Unlimited version history",
+             "API access for integrations",
+             "Marketing campaign manager",
+         ]},
     ]
 
 
@@ -9464,6 +9557,10 @@ from routes.messaging_admin import make_router as _make_messaging_admin_router  
 from routes.push import make_router as _make_push_router  # noqa: E402
 from routes.banners import make_router as _make_banners_router  # noqa: E402
 from routes.stories import make_router as _make_stories_router  # noqa: E402
+from routes.profile_versions import (  # noqa: E402
+    build_profile_versions_router as _make_profile_versions_router,
+    auto_snapshot as _profile_auto_snapshot,
+)
 
 api_router.include_router(
     _make_community_router(
@@ -9570,6 +9667,14 @@ api_router.include_router(
     _make_stories_router(
         db=db,
         User=User,
+        get_current_user=get_current_user,
+    )
+)
+
+# Section 70 — Profile Versions / version history (Google-Docs-style).
+api_router.include_router(
+    _make_profile_versions_router(
+        db=db,
         get_current_user=get_current_user,
     )
 )

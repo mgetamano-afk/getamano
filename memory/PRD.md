@@ -2551,3 +2551,52 @@ All checks passed.
 - Public eCard no longer shows Dueño Latino badge.
 - Live ticker shows real recent events (no evergreen filler).
 
+
+
+---
+
+## Section 70 — Profile version history ("dónde quedó") (2026-05-27)
+
+User pain point: providers spend time editing their profile and sometimes lose work or want to undo a change. Solution = Google-Docs-style version history scoped by plan tier.
+
+### Backend — `routes/profile_versions.py` (new)
+- Collection: `profile_versions` { version_id, user_id, provider_id, snapshot, label, source ("auto"|"manual"|"restored"), created_at, restored_from }
+- **Plan quotas** (PLAN_QUOTA dict, single source of truth):
+  - free: 1 version, no restore
+  - basic: 5 versions, 7-day TTL, restore
+  - pro: 30 versions, 30-day TTL, restore, manual labels
+  - premium: ∞ versions, restore, manual labels
+- **`auto_snapshot(db, user_id, source, label)`** helper — dedupes by fingerprint (ignores updated_at / ratings / view counters that change without user intent), trims to plan quota, spares manually-labeled versions from auto-eviction.
+- **Endpoints** (all behind `get_current_user`):
+  - `GET    /api/providers/me/versions/quota` → plan, max, retention, can_restore/can_label, current count
+  - `GET    /api/providers/me/versions` → list (snapshot field excluded for bandwidth)
+  - `GET    /api/providers/me/versions/{vid}` → full version with snapshot
+  - `POST   /api/providers/me/versions/snapshot` { label? } → manual save (labels silently dropped on tiers that can't use them)
+  - `POST   /api/providers/me/versions/{vid}/restore` → 402 if plan can't restore; otherwise takes a "Antes de restaurar" safety snapshot first, then merges the snapshot back into provider_profiles (protected fields preserved: provider_id, user_id, founding_member, verification_status, ratings, counters)
+  - `DELETE /api/providers/me/versions/{vid}`
+- **Auto-snapshot hook** in `PUT /providers/me` — calls `_profile_auto_snapshot` AFTER the live profile update lands; wrapped in try/except so a snapshot failure NEVER blocks the save response.
+
+### `/api/plans` — feature list expanded
+All 4 tiers kept (Free / Basic $10 / Pro $15 / Premium $25). Feature counts: 6 → 8 → 11 → 13. New tier-gated features:
+- Free: "Última versión de tu perfil guardada"
+- Basic: "Historial de 5 versiones (7 días) + restaurar" + "Insignia verificado"
+- Pro: "Historial de 30 versiones (30 días) + etiquetas manuales" + "Calendario sync" + "Auto-respuestas"
+- Premium: "Historial ilimitado" + "Acceso a API" + "Manager de campañas"
+
+### Frontend
+- **`components/ProfileVersionsPanel.jsx`** — full UI: safe banner ("Tu trabajo está guardado"), manual save form with label input (disabled on tiers that can't label), version list with source pills (Auto/Manual/Restored color-coded), Restore button (or Lock+"Pro" badge on free tier), Delete, Restore-confirm modal with safety note, quota footer with upgrade nudge for Free users. Bilingual ES/EN.
+- **`components/ProviderSideNav.jsx`** — added "Versions / Versiones" item with `History` icon.
+- **`pages/ProviderDashboard.jsx`** — registered `versiones` tab + render of `<ProfileVersionsPanel />`.
+- **`contexts/I18nContext.jsx`** — `tabs.versions` ES + EN.
+
+### Verified E2E
+- Quota endpoint returns plan-correct limits.
+- Manual snapshot creates version with label.
+- PUT /providers/me triggers auto-snapshot (dedupe verified — repeated saves don't fork versions).
+- Restore endpoint returns 402 on Free; succeeds on Pro and creates the "Antes de restaurar" safety snapshot.
+- Frontend: panel renders, "Save version now" creates manual version, list updates, Restore modal shows confirmation with safety language, Quota footer shows "1 of 30 versions · PRO plan".
+
+### Files
+**NEW**: `backend/routes/profile_versions.py`, `frontend/src/components/ProfileVersionsPanel.jsx`
+**MODIFIED**: `backend/server.py` (import + router wiring + PUT hook + /api/plans expanded), `frontend/src/components/ProviderSideNav.jsx`, `frontend/src/pages/ProviderDashboard.jsx`, `frontend/src/contexts/I18nContext.jsx`
+

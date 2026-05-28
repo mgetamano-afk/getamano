@@ -8,6 +8,7 @@ import {
   Inbox,
   MessageCircle,
   Users,
+  History,
 } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 
@@ -40,6 +41,7 @@ const ITEMS = [
   { id: "solicitudes", Icon: Inbox,          labelEs: "Solicitudes",  labelEn: "Requests" },
   { id: "mensajes",    Icon: MessageCircle,  labelEs: "Mensajes",     labelEn: "Messages" },
   { id: "red",         Icon: Users,          labelEs: "Mi red",       labelEn: "My network" },
+  { id: "versiones",   Icon: History,        labelEs: "Versiones",    labelEn: "Versions" },
 ];
 
 export default function ProviderSideNav({ tab, onChange, unreadMessages = 0, pendingRequests = 0 }) {
