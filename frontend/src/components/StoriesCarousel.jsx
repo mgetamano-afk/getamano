@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2, Heart, Clock } from "lucide-react";
+import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2, Heart, Clock, Phone, Flame, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
@@ -539,6 +539,15 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
             draggable={false}
           />
 
+          {/* Section 78 — Sticker overlays positioned on the image canvas.
+              These render on the SAME aspect-fit container as the image so
+              percentage coords (0-100) translate to pixel-accurate spots. */}
+          {Array.isArray(active.stickers) && active.stickers.length > 0 && (
+            <div className="absolute inset-0 z-[5] pointer-events-none" data-testid="story-viewer-stickers">
+              {active.stickers.map(s => <StickerOverlay key={s.id} sticker={s} />)}
+            </div>
+          )}
+
           {/* Giant center-screen heart burst on like (Instagram-style) */}
           {centerHeart > 0 && (
             <CenterHeartBurst key={centerHeart} />
@@ -636,6 +645,74 @@ function CenterHeartBurst() {
 }
 
 /**
+ * StickerVisual — renders a single sticker in the same way for both the
+ * editor preview and the published story viewer. Three flavors:
+ *   · phone : green tap-to-call pill with a 📞 icon, text shows phone digits.
+ *   · promo : rose gradient pill with 🔥 icon + bold text — animated shimmer.
+ *   · tip   : amber pill with ✨ icon — calmer.
+ *
+ * Designed to be readable on any photo (drop-shadow + opaque background).
+ * Renders the same DOM for editor + viewer so positioning at runtime is
+ * pixel-identical to what the provider saw while editing.
+ */
+function StickerVisual({ sticker }) {
+  const { type } = sticker;
+  if (type === "phone") {
+    return (
+      <div className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-emerald-500 text-white text-sm font-bold shadow-xl ring-2 ring-white/70 whitespace-nowrap">
+        <Phone className="w-4 h-4" fill="currentColor" strokeWidth={0} />
+        <span>{sticker.phone || "+1 ___"}</span>
+      </div>
+    );
+  }
+  if (type === "promo") {
+    return (
+      <div className="relative inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-white text-sm font-extrabold shadow-xl ring-2 ring-white/70 whitespace-nowrap overflow-hidden gtm-sticker-promo" style={{ background: "linear-gradient(120deg, #ec4899, #f97316, #ef4444)" }}>
+        <Flame className="w-4 h-4 relative z-10" fill="currentColor" strokeWidth={0} />
+        <span className="relative z-10">{sticker.text || "Promo"}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-amber-400 text-amber-950 text-sm font-bold shadow-xl ring-2 ring-white/70 whitespace-nowrap">
+      <Sparkles className="w-4 h-4" />
+      <span>{sticker.text || "Pro tip"}</span>
+    </div>
+  );
+}
+
+/**
+ * StickerOverlay — what the VIEWER (clients) sees on a published story.
+ * Same `StickerVisual` body, but wrapped in a tap target that:
+ *   · phone → opens a `tel:` link (native iOS/Android dialer)
+ *   · promo / tip → no-op (visual only)
+ */
+function StickerOverlay({ sticker }) {
+  const common = {
+    style: { left: `${sticker.x}%`, top: `${sticker.y}%`, transform: "translate(-50%, -50%)" },
+    className: "absolute pointer-events-auto",
+    "data-testid": `story-sticker-${sticker.type}`,
+  };
+  if (sticker.type === "phone" && sticker.phone) {
+    return (
+      <a
+        href={`tel:${sticker.phone.replace(/[^+0-9]/g, "")}`}
+        {...common}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`Llamar ${sticker.phone}`}
+      >
+        <StickerVisual sticker={sticker} />
+      </a>
+    );
+  }
+  return (
+    <div {...common} role="presentation">
+      <StickerVisual sticker={sticker} />
+    </div>
+  );
+}
+
+/**
  * ExpiryBadge — pill showing "Expira en Xh" (or "Xm" / "Xs") so the
  * story owner knows how much time is left before MongoDB TTL deletes
  * it (24h after creation). Updates every 30s while open.
@@ -686,7 +763,10 @@ function StoryCreator({ onClose, onCreated }) {
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [stickers, setStickers] = useState([]); // Section 78
+  const [editingStickerId, setEditingStickerId] = useState(null);
   const inputRef = useRef(null);
+  const canvasRef = useRef(null);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -712,11 +792,78 @@ function StoryCreator({ onClose, onCreated }) {
     }
   };
 
+  // Section 78 — Sticker helpers
+  const addSticker = (type) => {
+    if (stickers.length >= 3) {
+      toast.message(lang === "en" ? "Max 3 stickers" : "Máximo 3 stickers");
+      return;
+    }
+    const id = `sti_${Date.now().toString(36)}`;
+    const defaults = {
+      phone:  { text: null, phone: "" },
+      promo:  { text: lang === "en" ? "20% OFF Today" : "20% OFF Hoy", phone: null },
+      tip:    { text: lang === "en" ? "Pro tip" : "Pro tip", phone: null },
+    }[type];
+    setStickers((cur) => [...cur, { id, type, x: 50, y: 50, ...defaults }]);
+    setEditingStickerId(id);
+  };
+  const removeSticker = (id) => {
+    setStickers((cur) => cur.filter(s => s.id !== id));
+    if (editingStickerId === id) setEditingStickerId(null);
+  };
+  const updateSticker = (id, patch) => {
+    setStickers((cur) => cur.map(s => s.id === id ? { ...s, ...patch } : s));
+  };
+
+  // Drag handler — converts pointer coords into 0-100% within the canvas
+  const dragSticker = (id, e) => {
+    if (uploading || creating) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const move = (ev) => {
+      const cx = ev.touches?.[0]?.clientX ?? ev.clientX;
+      const cy = ev.touches?.[0]?.clientY ?? ev.clientY;
+      const x = ((cx - rect.left) / rect.width) * 100;
+      const y = ((cy - rect.top) / rect.height) * 100;
+      updateSticker(id, { x: Math.max(4, Math.min(96, x)), y: Math.max(4, Math.min(96, y)) });
+    };
+    const end = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", end);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", end);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", end);
+  };
+
   const submit = async () => {
     if (!imageUrl) return;
+    // Pre-validate sticker payloads
+    for (const s of stickers) {
+      if (s.type === "phone" && !(s.phone || "").trim()) {
+        toast.error(lang === "en" ? "Phone sticker needs a number" : "El sticker de teléfono necesita un número");
+        return;
+      }
+      if (s.type !== "phone" && !(s.text || "").trim()) {
+        toast.error(lang === "en" ? "Promo/Tip sticker needs text" : "El sticker necesita texto");
+        return;
+      }
+    }
     setCreating(true);
     try {
-      await api.post("/stories", { image_url: imageUrl, caption: caption.trim() || null });
+      await api.post("/stories", {
+        image_url: imageUrl,
+        caption: caption.trim() || null,
+        stickers: stickers.length ? stickers.map(s => ({
+          id: s.id, type: s.type, x: s.x, y: s.y,
+          text: s.text || null, phone: s.phone || null,
+        })) : null,
+      });
       toast.success(lang === "en" ? "Story posted!" : "¡Historia publicada!");
       onCreated();
     } catch (e) {
@@ -756,8 +903,8 @@ function StoryCreator({ onClose, onCreated }) {
               <p className="text-xs">{lang === "en" ? "Max 8MB · JPG/PNG/WebP" : "Máx 8MB · JPG/PNG/WebP"}</p>
             </button>
           ) : (
-            <div className="relative aspect-[4/5] rounded-2xl bg-slate-100 overflow-hidden">
-              <img src={preview} alt="preview" className="w-full h-full object-cover" />
+            <div ref={canvasRef} className="relative aspect-[4/5] rounded-2xl bg-slate-100 overflow-hidden select-none" data-testid="story-creator-canvas">
+              <img src={preview} alt="preview" className="w-full h-full object-cover pointer-events-none" />
               {uploading && (
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
                   <Loader2 className="w-8 h-8 animate-spin" />
@@ -767,14 +914,39 @@ function StoryCreator({ onClose, onCreated }) {
               {!uploading && (
                 <button
                   type="button"
-                  onClick={() => { setPreview(""); setImageUrl(""); }}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center"
+                  onClick={() => { setPreview(""); setImageUrl(""); setStickers([]); }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-20"
                   data-testid="story-creator-clear"
                   aria-label="Remove"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
+
+              {/* Section 78 — Draggable sticker overlays on the editor canvas */}
+              {stickers.map(s => (
+                <div
+                  key={s.id}
+                  className={`absolute z-10 cursor-move touch-none ${editingStickerId === s.id ? "ring-2 ring-white ring-offset-2 ring-offset-black/30 rounded-2xl" : ""}`}
+                  style={{ left: `${s.x}%`, top: `${s.y}%`, transform: "translate(-50%, -50%)" }}
+                  onMouseDown={(e) => { setEditingStickerId(s.id); dragSticker(s.id, e); }}
+                  onTouchStart={(e) => { setEditingStickerId(s.id); dragSticker(s.id, e); }}
+                  data-testid={`story-creator-sticker-${s.type}`}
+                >
+                  <StickerVisual sticker={s} />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeSticker(s.id); }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shadow"
+                    aria-label="Eliminar sticker"
+                    data-testid={`story-creator-sticker-remove-${s.id}`}
+                  >
+                    <X className="w-3 h-3" strokeWidth={3} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           <input
@@ -786,6 +958,57 @@ function StoryCreator({ onClose, onCreated }) {
             data-testid="story-creator-input"
           />
         </div>
+
+        {/* Section 78 — Sticker toolbar + per-sticker editors.
+            Only shown when an image is loaded. */}
+        {imageUrl && !uploading && (
+          <div className="mb-4" data-testid="story-creator-sticker-toolbar">
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{lang === "en" ? "Add stickers" : "Stickers"} <span className="text-slate-400 normal-case">({stickers.length}/3)</span></p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" onClick={() => addSticker("phone")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-40 transition" data-testid="story-add-sticker-phone">
+                <Phone className="w-3.5 h-3.5" /> {lang === "en" ? "Call me" : "Llámame"}
+              </button>
+              <button type="button" onClick={() => addSticker("promo")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 disabled:opacity-40 transition" data-testid="story-add-sticker-promo">
+                <Flame className="w-3.5 h-3.5" /> {lang === "en" ? "Promo" : "Promo"}
+              </button>
+              <button type="button" onClick={() => addSticker("tip")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100 disabled:opacity-40 transition" data-testid="story-add-sticker-tip">
+                <Sparkles className="w-3.5 h-3.5" /> {lang === "en" ? "Pro tip" : "Pro tip"}
+              </button>
+            </div>
+            {stickers.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {stickers.map(s => (
+                  <div key={s.id} className="flex items-center gap-2" data-testid={`story-sticker-editor-${s.id}`}>
+                    <span className="text-[11px] font-bold uppercase tracking-wide w-12 text-slate-500">{s.type}</span>
+                    {s.type === "phone" ? (
+                      <input
+                        value={s.phone || ""}
+                        onChange={(e) => updateSticker(s.id, { phone: e.target.value })}
+                        placeholder="+1 555 123 4567"
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                        data-testid={`story-sticker-input-${s.id}`}
+                        inputMode="tel"
+                        maxLength={24}
+                      />
+                    ) : (
+                      <input
+                        value={s.text || ""}
+                        onChange={(e) => updateSticker(s.id, { text: e.target.value })}
+                        placeholder={s.type === "promo" ? (lang === "en" ? "20% OFF Today" : "20% OFF Hoy") : (lang === "en" ? "Insider tip" : "Tip pro")}
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                        data-testid={`story-sticker-input-${s.id}`}
+                        maxLength={40}
+                      />
+                    )}
+                  </div>
+                ))}
+                <p className="text-[10px] text-slate-400 italic">{lang === "en" ? "Drag stickers on the photo to position." : "Arrastra los stickers en la foto para posicionarlos."}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Caption */}
         <div className="mb-4">

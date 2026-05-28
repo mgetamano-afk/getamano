@@ -2895,3 +2895,58 @@ User asked for both enhancements at once: smart background refresh AND polish th
 ### Files
 - **NEW**: `frontend/src/components/AutoRefreshOnReturn.jsx`, `backend/tests/test_iter77_autorefresh_swipe.py`
 - **MODIFIED**: `frontend/src/App.js`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`
+
+---
+
+## Section 78 — Interactive story stickers (2026-02-28)
+
+### Why
+Stories were pure visuals — no monetizable CTA. User asked to turn them into mini-ads with three interactive stickers a provider can drop onto the canvas: 📞 phone, 🔥 promo, ✨ pro tip.
+
+### Backend (`routes/stories.py`)
+- New Pydantic models:
+  - `StickerIn`: `id?`, `type: "phone"|"promo"|"tip"`, `x/y: 0-100`, `text?: ≤40`, `phone?: ≤24` (validator strips non-digits, requires ≥7 digits).
+  - `StoryCreateIn.stickers: List[StickerIn] | None` (max 3 items, Pydantic `max_length=3`).
+- `POST /stories` normalizes each sticker (auto-id `sti_xxxxxxxx`, rounds coords, strips text). Returns 422 if:
+  - phone sticker missing `phone`
+  - promo/tip missing `text`
+  - >3 stickers
+  - coords outside [0, 100]
+- `GET /stories/by-provider/{uid}` returns stickers as stored (round-trip preserved).
+- `/stories/active` carousel feed deliberately does NOT include stickers (~saves ~6KB on a 30-tile feed); viewer fetches full payload via `/by-provider`.
+
+### Frontend (`StoriesCarousel.jsx`)
+- **`StoryCreator`** upgraded with a sticker editor:
+  - Toolbar (after image is uploaded) with 3 buttons: 📞 Llámame / 🔥 Promo / ✨ Pro tip.
+  - Per-sticker input field below (phone number for phone, text for promo/tip).
+  - Sticker overlays render ON the preview image. Drag (mouse + touch) to reposition; coords clamped to [4, 96] so they never hug the edge.
+  - "×" button to remove.
+  - Validation before POST: phone sticker needs number, promo/tip needs text.
+- **`StoryViewer`** renders `StickerOverlay` on top of the image.
+  - Phone sticker → wraps in `<a href="tel:...">` (native dialer on iOS/Android), pointer-events enabled.
+  - Promo / Tip → visual only.
+- **`StickerVisual`** shared between creator and viewer for pixel-identical preview.
+- Promo sticker uses CSS `gtm-sticker-promo` shimmer keyframe (3.2s linear infinite) for visual punch.
+
+### CSS (`App.css`)
+- New `@keyframes gtm-sticker-promo-shimmer` + `.gtm-sticker-promo` class (200% gradient background sliding 0%→200%).
+
+### Tests
+- **NEW** `backend/tests/test_iter78_story_stickers.py` — 8 tests:
+  1. Create story with phone sticker; verify normalization + ID generation.
+  2. Create story with all 3 sticker types simultaneously.
+  3. 4 stickers rejected (422).
+  4. Phone sticker without number rejected (422).
+  5. Promo sticker without text rejected (422).
+  6. Coords out of range rejected (422).
+  7. Phone too short (3 digits) rejected (422).
+  8. Round-trip: stickers stored in POST come back identically via `/by-provider`.
+
+### Verification
+- 58 backend tests passing (iter71/72/73/75/77/78 + iter56/57). No regressions.
+- Mobile screenshot: creator modal renders cleanly @ 480×900, hidden toolbar until image uploaded.
+- Older stories without stickers: `Array.isArray(active.stickers)` guard prevents render crash; viewer falls back to bare image.
+
+### Files
+- **NEW**: `backend/tests/test_iter78_story_stickers.py`
+- **MODIFIED**: `backend/routes/stories.py`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`

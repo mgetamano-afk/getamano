@@ -18,15 +18,46 @@ Endpoints (all `/api/stories/*`):
 
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+# ─── Section 78 — Interactive story stickers ─────────────────────────
+# Stickers are positioned overlays that providers add to their stories
+# to turn passive content into a CTA: tap-to-call, tap-for-promo, etc.
+# All stickers share x/y (0-100 percentage of canvas), a type, and a
+# small payload validated below.
+StickerType = Literal["phone", "promo", "tip"]
+
+
+class StickerIn(BaseModel):
+    """One sticker overlaid on a story. Coords are 0-100 percent of
+    the image canvas so they render identically across viewport sizes."""
+    id: Optional[str] = None
+    type: StickerType
+    x: float = Field(..., ge=0, le=100)
+    y: float = Field(..., ge=0, le=100)
+    text: Optional[str] = Field(default=None, max_length=40)
+    phone: Optional[str] = Field(default=None, max_length=24)
+
+    @field_validator("phone")
+    @classmethod
+    def _digits_only(cls, v):
+        if v is None:
+            return v
+        # Strip everything except digits + leading "+"
+        cleaned = "".join(c for c in v if c.isdigit() or c == "+")
+        if len(cleaned) < 7:
+            raise ValueError("phone too short")
+        return cleaned
 
 
 class StoryCreateIn(BaseModel):
     image_url: str = Field(..., min_length=4, max_length=600)
     caption: Optional[str] = Field(default=None, max_length=140)
+    stickers: Optional[List[StickerIn]] = Field(default=None, max_length=3)
 
 
 # Like-count thresholds that trigger a one-time celebration push.
@@ -119,6 +150,23 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             raise HTTPException(status_code=429, detail="Límite de 5 historias activas alcanzado.")
 
         story_id = f"sto_{uuid.uuid4().hex[:12]}"
+        # Section 78 — Normalize stickers: ensure each has a stable id
+        # and that phone stickers actually carry a phone, promo/tip carry text.
+        stickers_out = []
+        for s in (payload.stickers or []):
+            if s.type == "phone" and not s.phone:
+                raise HTTPException(status_code=422, detail="Sticker 'phone' requiere número.")
+            if s.type in ("promo", "tip") and not (s.text or "").strip():
+                raise HTTPException(status_code=422, detail=f"Sticker '{s.type}' requiere texto.")
+            stickers_out.append({
+                "id": s.id or f"sti_{uuid.uuid4().hex[:8]}",
+                "type": s.type,
+                "x": round(float(s.x), 2),
+                "y": round(float(s.y), 2),
+                "text": (s.text or "").strip() or None,
+                "phone": s.phone,
+            })
+
         doc = {
             "story_id": story_id,
             "provider_user_id": user.user_id,
@@ -129,6 +177,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "verified": profile.get("verification_status") == "approved",
             "image_url": payload.image_url,
             "caption": (payload.caption or "").strip() or None,
+            "stickers": stickers_out,
             "views_count": 0,
             "is_public": True,
             "created_at": now,
