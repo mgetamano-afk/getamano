@@ -122,6 +122,7 @@ export default function ReferralProgressCard() {
       style={{
         background: "linear-gradient(135deg, #FB923C 0%, #F97316 55%, #EA580C 100%)",
         boxShadow: "0 8px 24px -10px rgba(234, 88, 12, 0.45)",
+        contain: "layout paint",
       }}
       data-testid="referral-progress-card"
     >
@@ -182,7 +183,13 @@ export default function ReferralProgressCard() {
         {almostThere && (
           <div
             className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-300/95 text-amber-900 text-[10px] font-extrabold uppercase tracking-wider shadow-md ring-1 ring-yellow-200"
-            style={{ animation: "rpc-pulse 1.6s ease-in-out infinite" }}
+            style={{
+              animation: "rpc-pulse 1.6s ease-in-out infinite",
+              willChange: "transform, box-shadow",
+              transformOrigin: "center",
+              backfaceVisibility: "hidden",
+              contain: "layout paint",
+            }}
             data-testid="referral-card-almost-there"
           >
             <span className="text-sm leading-none">🔥</span>
@@ -335,8 +342,8 @@ export default function ReferralProgressCard() {
           100% { transform: translateX(400%); }
         }
         @keyframes rpc-pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(253, 224, 71, 0.6); }
-          50% { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(253, 224, 71, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(253, 224, 71, 0.6); }
+          50% { box-shadow: 0 0 0 8px rgba(253, 224, 71, 0); }
         }
       `}</style>
     </div>

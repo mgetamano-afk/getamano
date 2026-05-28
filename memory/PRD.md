@@ -2457,3 +2457,21 @@ All JavaScript + Python lint passed.
 - Sitemap.xml regeneration with English category-city URLs (current SEO routes /services/*, /cities/* already EN-canonical).
 - Bilingual hreflang on every page (already partially handled via `EN_PATH_PREFIXES` in I18nContext).
 
+
+
+---
+
+## Hotfix — Home page widget overlap + scroll shake (2026-05-27)
+
+**Bug 1 — Overlap "Ver detalle ↗" vs "MODO DEMO" badge**:
+The `EarningsWidget` had its "See details" link in the header flex AND an absolutely-positioned "MODO DEMO" badge at `top-2.5 right-2.5`. Both wanted the top-right corner → text mashed together ("VeMQDQ_REMO").
+- **Fix**: moved the DEMO badge inline next to the "YOUR EARNINGS" title in the header flex group. Removed the absolute positioning. Now both elements have their own slot, no z-overlap possible.
+
+**Bug 2 — Scroll shake**:
+The Sprint A "🔥 ¡Te falta 1!" pulsing badge used `transform: scale(1.06)` in its keyframe, causing the surrounding container to re-paint on every pulse and visually "shake" during scroll.
+- **Fix**: keyframe `rpc-pulse` now animates ONLY `box-shadow` (no scale transform). Added `will-change: transform, box-shadow`, `transform-origin: center`, `backface-visibility: hidden`, and `contain: layout paint` to the badge.
+- Added `contain: layout paint` to both `EarningsWidget` and `ReferralProgressCard` root containers so their internal animations stay isolated from the surrounding scroll paint chain.
+
+**Files modified**: `EarningsWidget.jsx`, `ReferralProgressCard.jsx`.
+**Verified**: Lint passed + screenshot confirms no header overlap, no scroll jank.
+
