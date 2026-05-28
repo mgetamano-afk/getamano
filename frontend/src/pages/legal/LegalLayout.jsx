@@ -36,7 +36,7 @@ export default function LegalLayout({ title, lastUpdated, children, testId }) {
           <article className="legal-prose" style={{ color: "#333", fontSize: "16px", lineHeight: 1.7 }}>
             {children}
           </article>
-          <p className="text-xs text-slate-400 mt-12 text-center">© 2026 getamano — Marketplace latino en USA</p>
+          <p className="text-xs text-slate-400 mt-12 text-center">© 2026 getamano — Latino-built · America-wide</p>
         </div>
       </main>
       <Footer />

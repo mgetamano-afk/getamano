@@ -48,7 +48,7 @@ const dict = {
     "faq.q4": "¿Tienen app móvil?",
     "faq.a4": "Pronto en iOS y Android. Por ahora la web funciona perfecto en cualquier celular.",
     "footer.legal": "© 2026 getamano. Todos los derechos reservados.",
-    "footer.tagline": "El marketplace de productos y servicios latinos. Frescos, reales, verificados — en todo Estados Unidos.",
+    "footer.tagline": "Latino-built · America-wide. El marketplace de servicios profesionales verificados en USA — para todas las familias y todos los proveedores.",
     "footer.platform": "Plataforma",
     "footer.legal_section": "Legal",
     "footer.follow_us": "Síguenos",
@@ -257,10 +257,10 @@ const dict = {
     "nav.dashboard": "Dashboard",
     "nav.logout": "Log out",
     "nav.plans": "Plans",
-    "hero.eyebrow": "Latino Community · USA",
-    "hero.typewriter": "Latino, at your hand.",
-    "hero.subtitle": "We connect the Latino community in the USA with the best providers — Latino and American — verified and trustworthy.",
-    "hero.title": "Latino products and services, at your hand.",
+    "hero.eyebrow": "Latino-built · America-wide",
+    "hero.typewriter": "Trusted service professionals, near you.",
+    "hero.subtitle": "Plumbers, electricians, cleaning, landscaping & more — verified providers with real reviews. Many speak English & Spanish.",
+    "hero.title": "Find trusted service professionals near you",
     "hero.search.placeholder": "What service are you looking for? e.g. cleaning, catering...",
     "hero.search.location": "City, state or ZIP",
     "hero.search.cta": "Search",
@@ -296,7 +296,7 @@ const dict = {
     "faq.q4": "Do you have a mobile app?",
     "faq.a4": "Coming soon to iOS and Android. The web works great on any phone for now.",
     "footer.legal": "© 2026 getamano. All rights reserved.",
-    "footer.tagline": "The marketplace for Latino products and services. Fresh, real, verified — across the United States.",
+    "footer.tagline": "Latino-built · America-wide. The trusted marketplace for verified home & business services across the US — for every family and every provider.",
     "footer.platform": "Platform",
     "footer.legal_section": "Legal",
     "footer.follow_us": "Follow us",
@@ -547,3 +547,4 @@ export function I18nProvider({ children }) {
 }
 
 export const useI18n = () => useContext(I18nContext);
+(I18nContext);

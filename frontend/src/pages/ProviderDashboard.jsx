@@ -535,13 +535,22 @@ export default function ProviderDashboard() {
                     </div>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Idiomas de atención</label>
-                    <div className="flex gap-2">
-                      {[["es", "Español"], ["en", "English"]].map(([code, label]) => {
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Idiomas que hablas</label>
+                    <p className="text-xs text-slate-500 mb-2">Los clientes verán esto en tu perfil y podrán filtrar por idioma.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[["es", "🇲🇽", "Español"], ["en", "🇺🇸", "English"], ["pt", "🇧🇷", "Português"]].map(([code, flag, label]) => {
                         const active = form.languages.includes(code);
                         return (
-                          <button key={code} type="button" onClick={() => update("languages", active ? form.languages.filter(l => l !== code) : [...form.languages, code])} className={`px-4 py-2 rounded-full border ${active ? "bg-blue-600 text-white border-blue-600" : "bg-white border-slate-200 text-slate-700"}`} data-testid={`form-lang-${code}`}>
-                            {label}
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => update("languages", active ? form.languages.filter(l => l !== code) : [...form.languages, code])}
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border-2 text-sm font-semibold transition ${active ? "border-teal-700 bg-teal-50 text-teal-800" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
+                            data-testid={`form-lang-${code}`}
+                          >
+                            <span aria-hidden="true">{flag}</span>
+                            <span>{label}</span>
+                            {active && <span className="text-teal-700 text-xs">✓</span>}
                           </button>
                         );
                       })}

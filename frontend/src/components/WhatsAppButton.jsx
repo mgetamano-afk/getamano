@@ -1,20 +1,36 @@
-import { Phone } from "lucide-react";
+import { useI18n } from "../contexts/I18nContext";
 
 /**
  * WhatsApp button. Strips non-numeric from phone and opens wa.me.
+ *
+ * Section 67 — Dual-audience pivot: the prefilled message is now generated
+ * in the visitor's UI language (EN or ES). An American visitor on an
+ * EN-rendered eCard will send an English message; a Spanish visitor will
+ * send Spanish. The visitor's language signal is the source of truth for
+ * the message language — not the provider's profile language.
  */
-export default function WhatsAppButton({ phone, businessName, testid = "whatsapp-button", variant = "compact" }) {
+export default function WhatsAppButton({ phone, businessName, category, testid = "whatsapp-button", variant = "compact" }) {
+  const { lang } = useI18n();
   if (!phone) return null;
   const clean = String(phone).replace(/\D/g, "");
   if (!clean) return null;
-  const msg = businessName ? encodeURIComponent(`Hola, vengo de getamano y me interesa el servicio de ${businessName}.`) : "";
+  const text = lang === "en"
+    ? (businessName
+        ? `Hi ${businessName}, I found your profile on getamano and I'd like to get a quote${category ? ` for ${category} services` : ""}.`
+        : "")
+    : (businessName
+        ? `Hola ${businessName}, vi tu perfil en getamano y me gustaría cotizar${category ? ` un servicio de ${category}` : ""}.`
+        : "");
+  const msg = text ? encodeURIComponent(text) : "";
   const href = `https://wa.me/${clean}${msg ? `?text=${msg}` : ""}`;
   const isPrimary = variant === "primary";
   const className = isPrimary
     ? "w-full flex items-center justify-center gap-2.5 text-base rounded-2xl px-6 py-3.5 font-semibold text-white transition active:scale-[0.98] shadow-md hover:shadow-lg"
     : "justify-center flex items-center gap-1 text-sm rounded-full px-4 py-3 font-medium text-white transition";
   const label = isPrimary
-    ? (businessName ? `Enviar mensaje por WhatsApp` : `WhatsApp`)
+    ? (businessName
+        ? (lang === "en" ? "Message via WhatsApp" : "Enviar mensaje por WhatsApp")
+        : "WhatsApp")
     : "WhatsApp";
   const iconSize = isPrimary ? "w-5 h-5" : "w-4 h-4";
   return (

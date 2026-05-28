@@ -28,6 +28,7 @@ import GalleryGrid from "../components/GalleryGrid";
 import CategoryIcon from "../components/CategoryIcon";
 import BookingModal from "../components/BookingModal";
 import RecommendModal from "../components/RecommendModal";
+import LanguageBadges from "../components/LanguageBadges";
 import RecommendationsSection from "../components/RecommendationsSection";
 import { LicenseBadge } from "../components/LicenseSection";
 import { formatRate } from "../components/ProviderRates";
@@ -252,6 +253,14 @@ export default function ProviderECard() {
                   {p.city && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {p.city}, {p.state}</span>}
                   {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800 font-medium"><Star className="w-3.5 h-3.5 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)} ({p.rating_count})</span>}
                 </div>
+                {/* Section 67 — Dual-audience: surface spoken languages
+                    prominently so American visitors instantly know the
+                    pro speaks their language. */}
+                {(p.languages?.length || 0) > 0 && (
+                  <div className="mt-2.5" data-testid="ecard-languages-row">
+                    <LanguageBadges languages={p.languages} variant="dark" size="md" />
+                  </div>
+                )}
                 {p.description && (
                   <TranslatableDescription
                     text={p.description}
@@ -280,7 +289,7 @@ export default function ProviderECard() {
             <div className="mt-6 space-y-2.5">
               {p.phone ? (
                 <AuthGate action="phone">
-                  <WhatsAppButton phone={p.phone} businessName={p.business_name} testid="ecard-whatsapp-button" variant="primary" />
+                  <WhatsAppButton phone={p.phone} businessName={p.business_name} category={lang === "es" ? p.category?.name_es : p.category?.name_en} testid="ecard-whatsapp-button" variant="primary" />
                 </AuthGate>
               ) : (
                 <AuthGate action="message">
@@ -536,8 +545,11 @@ export default function ProviderECard() {
                 </div>
               )}
               {p.languages?.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-2 border-t border-slate-100">
-                  {p.languages.map(l => <span key={l} className="text-xs px-2 py-0.5 rounded-full bg-slate-100">{l.toUpperCase()}</span>)}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-2">
+                    {lang === "en" ? "Languages spoken" : "Idiomas que habla"}
+                  </div>
+                  <LanguageBadges languages={p.languages} variant="light" size="sm" showEnglishFriendly={false} />
                 </div>
               )}
             </div>

@@ -22,6 +22,7 @@ import MilestoneOfTheWeekWidget from "../components/MilestoneOfTheWeekWidget";
 import OnboardingTour from "../components/OnboardingTour";
 import InviterWelcomeBanner from "../components/InviterWelcomeBanner";
 import ThankInviterModal from "../components/ThankInviterModal";
+import AudienceCards from "../components/AudienceCards";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -151,14 +152,28 @@ export default function AppHome() {
               : (lang === "en" ? "Welcome to" : "Bienvenido a")}
           </p>
           <h1
-            className={`text-white font-display font-extrabold tracking-tight mb-5 ${user ? "text-xl md:text-2xl" : "text-[26px] md:text-4xl"}`}
+            className={`text-white font-display font-extrabold tracking-tight mb-3 ${user ? "text-xl md:text-2xl" : "text-[26px] md:text-4xl"}`}
             style={{ letterSpacing: "-0.5px", lineHeight: 1.1 }}
             data-testid="apphome-greeting"
           >
             {user
               ? (lang === "en" ? "What do you need today?" : "¿Qué necesitas hoy?")
-              : (lang === "en" ? "getamano — Latino services" : "getamano — servicios latinos")}
+              : (lang === "en"
+                  ? "Find trusted service professionals near you"
+                  : "Encuentra profesionales de confianza cerca de ti")}
           </h1>
+
+          {/* Section 67 — dual-audience subhead + "Latino-built" pride badge */}
+          {!user && (
+            <p className="text-white/85 text-[13px] md:text-[15px] mb-4 max-w-2xl leading-snug" data-testid="apphome-subhead">
+              {lang === "en"
+                ? "Plumbers, electricians, cleaning, landscaping & more — verified pros with real reviews."
+                : "Plomeros, electricistas, limpieza, jardinería y más — proveedores verificados con reseñas reales."}
+            </p>
+          )}
+          <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-[11px] font-semibold text-white/90" data-testid="apphome-latino-built-badge">
+            🫂 <span>Latino-built · America-wide</span>
+          </div>
 
           {/* Search trigger */}
           <button
@@ -340,6 +355,9 @@ export default function AppHome() {
         </section>
       )}
 
+      {/* ── Section 67 — Dual-audience cards ─────────────────────────── */}
+      <AudienceCards />
+
       {/* ── Become a provider banner (guests + clients) ───────────────── */}
       {!isProvider && (
         <section className="max-w-7xl mx-auto px-5 pt-6 md:pt-8" data-testid="apphome-provider-banner">
@@ -349,10 +367,12 @@ export default function AppHome() {
           >
             <div className="min-w-0">
               <p className="text-white/80 text-[12px] mb-1">
-                {lang === "en" ? "Do you offer services?" : "¿Ofreces servicios?"}
+                {lang === "en" ? "Are you a service pro?" : "¿Ofreces servicios profesionales?"}
               </p>
               <p className="text-white text-base md:text-lg font-bold mb-3 leading-tight">
-                {lang === "en" ? "Create your free profile" : "Crea tu perfil gratis"}
+                {lang === "en"
+                  ? "Create your free profile — open to all"
+                  : "Crea tu perfil gratis — para todos"}
               </p>
               <button
                 type="button"
@@ -374,8 +394,8 @@ export default function AppHome() {
         <Sparkles className="w-4 h-4 mx-auto mb-1.5" style={{ color: "#F59E0B" }} />
         <p className="text-xs text-slate-500">
           {lang === "en"
-            ? "Real Latino services, verified across the US."
-            : "Servicios latinos reales, verificados en todo EE.UU."}
+            ? "Latino-built · America-wide. Verified service pros across the US."
+            : "Latino-built · America-wide. Profesionales verificados en todo EE.UU."}
         </p>
       </div>
 

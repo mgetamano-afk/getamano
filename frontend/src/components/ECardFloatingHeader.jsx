@@ -56,8 +56,8 @@ export default function ECardFloatingHeader({ provider, lang = "es" }) {
     const url = `${window.location.origin}/p/${provider?.slug}`;
     const title = lang === "en" ? `${provider?.business_name} on getamano` : `${provider?.business_name} en getamano`;
     const text = lang === "en"
-      ? `Check out ${provider?.business_name} on getamano — the Latino services marketplace`
-      : `Mira el perfil de ${provider?.business_name} en getamano — el marketplace de servicios latinos`;
+      ? `Check out ${provider?.business_name} on getamano — trusted service pros across the US`
+      : `Mira el perfil de ${provider?.business_name} en getamano — profesionales de confianza en USA`;
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url });

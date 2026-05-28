@@ -480,9 +480,10 @@ export default function Search() {
               <div>
                 <label className="block text-xs uppercase tracking-widest text-slate-500 mb-2">{t("filter.language")}</label>
                 <select value={language} onChange={e => { setLanguage(e.target.value); setTimeout(() => doSearch(), 0); }} className="w-full h-10 px-3 rounded-xl border border-slate-200" data-testid="filter-language-select">
-                  <option value="">Cualquiera</option>
-                  <option value="es">Español</option>
-                  <option value="en">English</option>
+                  <option value="">{lang === "en" ? "Any" : "Cualquiera"}</option>
+                  <option value="es">🇲🇽 {lang === "en" ? "Spanish" : "Español"}</option>
+                  <option value="en">🇺🇸 English</option>
+                  <option value="pt">🇧🇷 {lang === "en" ? "Portuguese" : "Portugués"}</option>
                 </select>
               </div>
               <label className="flex items-center gap-2 cursor-pointer" data-testid="filter-verified-label">

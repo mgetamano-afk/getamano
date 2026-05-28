@@ -2408,3 +2408,52 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - Cold-streak nudge (>7d no shares) in SmartActionHub
 - Smart invite targets (suggest 5⭐ clients to convert to providers)
 
+
+
+---
+
+## Section 67 — Audiencia Dual: Latino-built · America-wide (2026-05-27)
+
+**Strategic pivot**: Shift positioning from "Latino-only marketplace" to "Latino-built · America-wide" — quality and trust differentiator, Latino heritage as pride not exclusion. Targets 3 audiences simultaneously: American families, Latino families, and service pros of all backgrounds.
+
+### Frontend changes
+- **`AppHome.jsx` hero (logged-out)** rewritten to "Find trusted service professionals near you" / "Encuentra profesionales de confianza cerca de ti" + dual-audience subheadline + pulsing pill "🫂 Latino-built · America-wide" badge under the title (`data-testid="apphome-latino-built-badge"`).
+- **`AppHome.jsx` tagline tail** updated to "Latino-built · America-wide. Verified service pros across the US."
+- **`AppHome.jsx` "Become a provider" CTA** copy now reads "Are you a service pro? — Create your free profile — open to all".
+- **NEW `components/AudienceCards.jsx`** — 3-card section mounted between Featured providers and the provider CTA, addressing American families (blue), Latino families (teal, ES copy intentional), and service professionals (amber). Hover lift, responsive 3→1 col, data-testids per card.
+- **NEW `components/LanguageBadges.jsx`** — reusable flag-pill row. 3 variants (light/glass/dark) + optional prominent "🗣️ English-friendly" standout badge when `en` is present in the languages array. Used on eCard (prominent + sidebar).
+- **`components/WhatsAppButton.jsx`** rewritten to use `useI18n`. WA prefilled message switches EN/ES based on visitor's UI language; now also accepts `category` to enrich the message ("...quote for Cleaning services").
+- **`ProviderECard.jsx`** — new prominent `<LanguageBadges variant="dark">` row right under category/identity row + sidebar bilingual "Languages spoken / Idiomas que habla" section. `category` prop now flows into the WA button.
+- **`Search.jsx`** language filter enhanced with flags + Portuguese option (`🇲🇽 Spanish / 🇺🇸 English / 🇧🇷 Portuguese`) + bilingual "Any/Cualquiera" label.
+- **`ProviderDashboard.jsx` + `ProviderOnboarding.jsx`** profile forms: language multiselect upgraded to flag-pill style + hint text explaining clients can filter by language. Added `pt` option.
+- **`Footer.jsx`** — adds the `🫂 Latino-built · America-wide` pride pill under the tagline.
+- **`I18nContext.jsx`** — updated keys: `hero.title`, `hero.subtitle`, `hero.typewriter`, `hero.eyebrow`, `footer.tagline` for both ES and EN (no longer say "Latino-only marketplace").
+- **Misc residual tagline cleanup**: `LegalLayout.jsx`, `SeoHead.jsx` default title, `ECardFloatingHeader.jsx` share text.
+
+### Backend
+- Already had `ProviderProfileIn.languages: List[str] = ["es", "en"]` (server.py:253) and search filters by language (server.py:1052, 1282). No schema changes needed — the field name `languages` is kept (not renamed to `languages_spoken`); the demo provider was already seeded with `['es', 'en']`.
+
+### Test data (already in place)
+- demo.provider@getamano.com → languages=['es','en'], so the eCard renders `🇲🇽 Spanish + 🇺🇸 English + 🗣️ English-friendly` for any visitor.
+
+### E2E verified
+- Guest landing (`/`) — hero, subhead, Latino-built badge, audience cards section all render.
+- Public eCard (`/p/maria-cleaning-services-sallisaw-ok`) — language badges + English-friendly badge + bilingual "Message via WhatsApp" CTA all confirmed in the screenshot.
+
+### Lint
+All JavaScript + Python lint passed.
+
+### Files NEW
+- `components/AudienceCards.jsx`
+- `components/LanguageBadges.jsx`
+
+### Files MODIFIED
+- `pages/AppHome.jsx`, `pages/ProviderECard.jsx`, `pages/Search.jsx`, `pages/ProviderDashboard.jsx`, `pages/ProviderOnboarding.jsx`, `pages/legal/LegalLayout.jsx`
+- `components/Footer.jsx`, `components/WhatsAppButton.jsx`, `components/seo/SeoHead.jsx`, `components/ECardFloatingHeader.jsx`
+- `contexts/I18nContext.jsx`
+
+### Backlog (skipped — not blocking)
+- Backend categories migration from Spanish strings to English IDs (current categories already work bilingually via name_es/name_en fields — no DB change needed).
+- Sitemap.xml regeneration with English category-city URLs (current SEO routes /services/*, /cities/* already EN-canonical).
+- Bilingual hreflang on every page (already partially handled via `EN_PATH_PREFIXES` in I18nContext).
+

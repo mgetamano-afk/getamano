@@ -22,6 +22,10 @@ export default function Footer() {
             <span className="font-display font-bold text-2xl text-white">get<span style={{ color: "#2F9D94" }}>amano</span></span>
           </div>
           <p className="text-slate-400 text-sm max-w-md leading-relaxed">{t("footer.tagline")}</p>
+          {/* Section 67 — dual-audience pride badge */}
+          <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-slate-700 text-[11px] font-semibold text-slate-300" data-testid="footer-latino-built-badge">
+            🫂 <span>Latino-built · America-wide</span>
+          </div>
           <div className="mt-4 flex items-center gap-4 text-sm text-slate-400">
             <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> USA</span>
             <span className="flex items-center gap-1"><Mail className="w-4 h-4" /> hola@getamano.us</span>

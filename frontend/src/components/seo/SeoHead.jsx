@@ -14,7 +14,7 @@ import { ChevronRight } from "lucide-react";
  * the right locale.
  */
 export function SeoHead({ title, description, canonical, image, jsonLd, alternates, lang = "es" }) {
-  const fullTitle = title ? `${title} — getamano` : "getamano · Marketplace latino en USA";
+  const fullTitle = title ? `${title} — getamano` : "getamano · Trusted service pros across the US";
   const ogImage = image || "/getamano-logo-full.png";
   const ogLocale = lang === "en" ? "en_US" : "es_US";
   const defaultUrl = (alternates || []).find((a) => a.lang === "es")?.url
