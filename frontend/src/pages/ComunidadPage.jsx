@@ -16,6 +16,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
 import FollowingFeed from "../components/FollowingFeed";
+import { SeoHead } from "../components/seo/SeoHead";
 
 const MAX_LEN = 500;
 
@@ -900,6 +901,13 @@ function RightSidebar() {
 // ─── Main page ──────────────────────────────────────────────────────────
 export default function ComunidadPage({ embedded = false }) {
   const [feedTab, setFeedTab] = useState("all"); // "all" | "following"
+  const seoNode = !embedded ? (
+    <SeoHead
+      title="Comunidad"
+      description="Lo que está pasando en la comunidad latina en USA — ahora mismo."
+      lang="es"
+    />
+  ) : null;
   const body = (
     <main className={`flex-1 ${embedded ? "" : "max-w-7xl mx-auto"} px-4 sm:px-6 lg:px-8 py-6 w-full`}>
       <div className="flex gap-0">
@@ -947,6 +955,7 @@ export default function ComunidadPage({ embedded = false }) {
   }
   return (
     <div className="min-h-screen flex flex-col bg-slate-50" data-testid="comunidad-page">
+      {seoNode}
       <Header />
       {body}
       <Footer />

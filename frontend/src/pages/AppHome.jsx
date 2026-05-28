@@ -23,6 +23,7 @@ import OnboardingTour from "../components/OnboardingTour";
 import InviterWelcomeBanner from "../components/InviterWelcomeBanner";
 import ThankInviterModal from "../components/ThankInviterModal";
 import UniversalServicesCard from "../components/UniversalServicesCard";
+import { SeoHead } from "../components/seo/SeoHead";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -84,6 +85,15 @@ export default function AppHome() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SeoHead
+        title={lang === "en"
+          ? "Trusted service pros near you"
+          : "Profesionales de confianza cerca de ti"}
+        description={lang === "en"
+          ? "Plumbers, electricians, cleaning, landscaping & more — verified pros with real reviews across the US."
+          : "Plomeros, electricistas, limpieza, jardinería y más — profesionales verificados con reseñas reales en todo USA."}
+        lang={lang}
+      />
       {/* ── Sticky compact header ─────────────────────────────────────── */}
       <header
         className="sticky top-0 z-50 bg-white border-b border-slate-100"

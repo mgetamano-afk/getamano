@@ -1,7 +1,16 @@
 /**
  * Inclusive owner identity badge for getamano providers.
- * Replaces all country flag badges. Values: 'latino' | 'american' | null
- * Null/undefined → renders nothing (clean profile).
+ *
+ * Section 68 / C3 — STRATEGIC UPDATE: this badge is no longer rendered on
+ * client-facing surfaces (Search, public eCard, Landing, SEO, CategoryHub,
+ * ProvidersMap). The getamano brand is "Latino-built · America-wide" and
+ * client-facing pages should be ethnically neutral.
+ *
+ * The badge now ONLY renders when the caller explicitly opts-in via
+ * `forceShow={true}`. Internal surfaces that still want to surface the
+ * identity (provider dashboard, admin panels) must pass that prop.
+ *
+ * Values: 'latino' | 'american' | null
  */
 const STYLES = {
   latino: {
@@ -18,7 +27,9 @@ const STYLES = {
   },
 };
 
-export default function OwnerIdentityBadge({ identity, size = "md", className = "" }) {
+export default function OwnerIdentityBadge({ identity, size = "md", className = "", forceShow = false }) {
+  // Client-facing default: render nothing. Section 68 / C3.
+  if (!forceShow) return null;
   if (!identity || !STYLES[identity]) return null;
   const s = STYLES[identity];
   const sizeClass =

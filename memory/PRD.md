@@ -2508,3 +2508,46 @@ All checks passed.
 ### E2E verified
 - `/nosotros` renders the full page (hero + stats + story + values + quote + CTA + footer with About link). Screenshots confirm visual quality.
 
+
+
+---
+
+## Section 68 + 69 — Audit fixes & sticky tabs (2026-05-27)
+
+### Critical fixes
+- **C1 Title tags** — `<title>` in `index.html` updated to "getamano · Trusted service pros across the US"; `<meta description>` updated to neutral America-wide copy. `<SeoHead>` now mounted on `AppHome`, `Search`, `ComunidadPage` with per-page titles + descriptions (ES/EN). Previously every page rendered the same generic title.
+- **C2 Live ticker** — `LiveActivityTicker.jsx`:
+  - Marquee duration 40s → **80s** (slower, less spammy).
+  - Filter events to **last 72h only** (`MAX_AGE_MS = 72h`).
+  - Dedupe by text + cap to **max 8** unique events to break the "loop of 3".
+  - **Removed the evergreen fallback** — when nothing is recent, renders a calm `live-activity-ticker-idle` pill ("Tranquilo por aquí / Quiet right now") instead of faking activity.
+- **C3 Latino badge removal** — `OwnerIdentityBadge` now returns `null` by default. Only renders when caller passes `forceShow={true}` (internal/admin surfaces). This made the "🤝 Dueño Latino" badge disappear from Search, public eCard, Landing, SEO pages, CategoryHub and ProvidersMap — without touching 7 files.
+- **C4 Pending providers in search** — VERIFIED: backend already filters `verification_status: "approved"` in `/api/search`, `/api/providers/featured`, and the public guard. No code change needed.
+- **C6 Pricing simplified to 2 tiers** — `/api/plans` rewritten to only expose **Free $0** + **Pro $29/mo ($290/yr, 17% savings)**. Legacy plan IDs (`basic`, `premium`) kept in the internal PLAN_TIER/PLAN_PRICES dicts so historical subscriptions keep working. Pro feature list consolidates the best of the old Pro+Premium tiers.
+
+### Important fixes
+- **I2 Language toggle** — desktop button now shows **destination** flag + code (clicking from ES shows `🇺🇸 EN`, clicking from EN shows `🇲🇽 ES`). Previously showed the current language, which is confusing UX.
+- **I4 Recommend button duplicate** — removed from the top action bar in `ProviderECard.jsx`. The button remains inside `RecommendationsSection` below the fold, where users naturally find it after reading reviews.
+- **I10 Category rename** — `Catering Latino` → **"Catering y Eventos" / "Catering & Events"**. Updated in `server.py` seed AND live MongoDB collection.
+- **I11 Notifications mark-as-read** — `markRead` in `NotificationBell.jsx` is now idempotent (no-ops on already-read items) and uses functional setState updates to prevent unread-count drift on rapid clicks.
+
+### Section 69 — Sticky tabs on /comunidad
+**VERIFIED: already implemented.** `ComunidadLayout.jsx` uses `fixed top-14 md:top-16 z-30` for the tab bar with a header-height offset spacer (`h-12 md:h-14`) immediately after — which functionally matches the prompt's `sticky top-0 z-40 bg-white shadow-sm` requirement. No change needed.
+
+### Files modified
+- `backend/server.py` — `/api/plans` rewritten; `Catering Latino` → `Catering y Eventos`.
+- `frontend/public/index.html` — title + description.
+- `frontend/src/components/LiveActivityTicker.jsx` — 72h filter, idle state, slower marquee, dedupe/cap.
+- `frontend/src/components/OwnerIdentityBadge.jsx` — opt-in `forceShow` prop.
+- `frontend/src/components/Header.jsx` — language toggle shows destination.
+- `frontend/src/components/NotificationBell.jsx` — idempotent markRead.
+- `frontend/src/pages/AppHome.jsx`, `Search.jsx`, `ComunidadPage.jsx` — SeoHead per page.
+- `frontend/src/pages/ProviderECard.jsx` — removed duplicate Recommend button.
+
+### Verified
+- `/api/plans` curl returns 2 plans (Free $0, Pro $29 — Pro highlighted).
+- `/api/categories` returns Catering as "Catering y Eventos / Catering & Events".
+- Home page title is "Trusted service pros near you — getamano".
+- Public eCard no longer shows Dueño Latino badge.
+- Live ticker shows real recent events (no evergreen filler).
+

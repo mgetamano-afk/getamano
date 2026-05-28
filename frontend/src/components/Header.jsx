@@ -83,8 +83,11 @@ export default function Header() {
               data-testid="lang-toggle"
               title={lang === "es" ? "Switch to English" : "Cambiar a Español"}
             >
-              <span className="text-base leading-none">{lang === "es" ? "🇲🇽" : "🇺🇸"}</span>
-              <span className="text-xs uppercase tracking-wide">{lang}</span>
+              {/* Section 68 / I2 — show DESTINATION language, not current.
+                  A user reading Spanish should see the EN target so they
+                  understand what clicking will switch them to. */}
+              <span className="text-base leading-none">{lang === "es" ? "🇺🇸" : "🇲🇽"}</span>
+              <span className="text-xs uppercase tracking-wide">{lang === "es" ? "EN" : "ES"}</span>
             </button>
 
             {user ? (

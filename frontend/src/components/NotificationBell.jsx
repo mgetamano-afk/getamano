@@ -44,9 +44,14 @@ export default function NotificationBell({ compact = false }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // Section 68 / I11 — idempotent. If the user clicks an already-read
+  // item the unread counter must NOT decrement again. Source of truth is
+  // the item.is_read flag inside `items`.
   const markRead = async (id) => {
-    setItems(items.map(i => i.notification_id === id ? { ...i, is_read: true } : i));
-    setUnread(Math.max(0, unread - 1));
+    const target = items.find(i => i.notification_id === id);
+    if (!target || target.is_read) return; // no-op, already read
+    setItems(prev => prev.map(i => i.notification_id === id ? { ...i, is_read: true } : i));
+    setUnread(u => Math.max(0, u - 1));
     try { await api.post(`/notifications/${id}/read`); } catch (e) { console.error("mark read failed", e); }
   };
   const dismiss = async (id, e) => {

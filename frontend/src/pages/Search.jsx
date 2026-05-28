@@ -13,6 +13,7 @@ import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import useGeolocation from "../hooks/useGeolocation";
 import { trackSearch } from "../lib/analytics";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
+import { SeoHead } from "../components/seo/SeoHead";
 
 const IDENTITY_CHIPS = [
   { id: "", label: "Todos" },
@@ -191,6 +192,13 @@ export default function Search() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+      <SeoHead
+        title={lang === "en" ? "Search service pros" : "Buscar profesionales"}
+        description={lang === "en"
+          ? "Find verified service professionals near you — plumbers, electricians, cleaning, landscaping & more."
+          : "Encuentra profesionales verificados cerca de ti — plomeros, electricistas, limpieza, jardinería y más."}
+        lang={lang}
+      />
       <Header />
       {/* Sentinel to detect when the sticky filter bar becomes stuck */}
       <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />

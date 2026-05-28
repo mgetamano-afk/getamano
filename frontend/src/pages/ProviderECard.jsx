@@ -339,19 +339,11 @@ export default function ProviderECard() {
                 )}
               </div>
 
-              {/* Tertiary actions — recommend + map + view eCard. "Recommend" requires auth (Section 66). */}
+              {/* Tertiary actions — map + view eCard. Section 68 / I4:
+                  the duplicate "I recommend" button is removed from this
+                  top action bar — users find it inside the
+                  RecommendationsSection below. */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <AuthGate action="default">
-                  <button
-                    onClick={() => setShowRecommend(true)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 hover:bg-red-50 transition"
-                    style={{ background: "linear-gradient(135deg, #FEE2E2 0%, #FEF3C7 100%)", color: "#B91C1C" }}
-                    data-testid="ecard-recommend-button"
-                  >
-                    <Heart className="w-3.5 h-3.5 fill-red-500" />
-                    {lang === "en" ? "I recommend" : "Lo/la recomiendo"}
-                  </button>
-                </AuthGate>
                 {!p.is_home_based && p.city && (
                   <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700 transition" data-testid="ecard-map-button">
                     <MapPin className="w-3.5 h-3.5" /> {t("provider.map")}

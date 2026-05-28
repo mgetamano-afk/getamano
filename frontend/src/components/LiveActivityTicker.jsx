@@ -11,7 +11,12 @@ import { useI18n } from "../contexts/I18nContext";
  * never looks dead. Refetches every 60s.
  */
 const POLL_MS = 60_000;
-const MARQUEE_DURATION_S = 40;
+// Section 68 / C2 fix — slower marquee for less visual noise.
+const MARQUEE_DURATION_S = 80;
+// Show events from the last 72h only (keeps the strip relevant, not spammy).
+const MAX_AGE_MS = 72 * 60 * 60 * 1000;
+// Cap unique events shown so we don't fall back into a "loop of the same 3".
+const MAX_ITEMS = 8;
 
 function _formatRelative(iso, lang) {
   if (!iso) return "";
@@ -52,19 +57,63 @@ export default function LiveActivityTicker() {
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
-  // Convert API rows to render rows, mix with evergreen so the strip never empties.
+  // Convert API rows to render rows.
   const liveRows = items.map((it) => ({
     icon: it.icon || "•",
     text: lang === "es" ? it.text_es : it.text_en,
     link: it.link || "/buscar",
     rel: _formatRelative(it.at, lang),
+    at: it.at,
   }));
-  const rows = liveRows.length >= 4
-    ? liveRows
-    : [...liveRows, ..._evergreen(lang).map((e) => ({ ...e, rel: "" }))];
+
+  // Section 68 / C2 — filter to last 72h, dedupe by text, cap at MAX_ITEMS.
+  // No evergreen fill — when there's nothing recent, render the idle state
+  // so users aren't tricked by a fake "always live" loop.
+  const cutoff = Date.now() - MAX_AGE_MS;
+  const seen = new Set();
+  const filtered = liveRows
+    .filter((r) => !r.at || new Date(r.at).getTime() >= cutoff)
+    .filter((r) => {
+      const k = r.text || "";
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, MAX_ITEMS);
+
+  // Idle state: nothing recent → render a calm "Tranquilo por aquí" pill,
+  // no marquee, no faux activity.
+  if (filtered.length === 0) {
+    return (
+      <div
+        className="relative overflow-hidden rounded-2xl border border-emerald-400/15 shadow-xl"
+        style={{
+          background:
+            "radial-gradient(ellipse at top left, rgba(16,185,129,0.10) 0%, transparent 55%), " +
+            "linear-gradient(135deg, #050a14 0%, #0b1220 60%, #050a14 100%)",
+          boxShadow: "0 8px 24px -10px rgba(0,0,0,0.55)",
+        }}
+        data-testid="live-activity-ticker-idle"
+      >
+        <div className="py-3 px-4 flex items-center gap-2 text-[12px] text-white/70">
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400/60" />
+          </span>
+          <span className="font-bold text-emerald-300/90 tracking-[0.18em] text-[10px]">
+            {lang === "es" ? "TRANQUILO POR AQUÍ" : "QUIET RIGHT NOW"}
+          </span>
+          <span className="text-white/50">
+            · {lang === "es"
+              ? "vuelve pronto para ver actividad reciente"
+              : "check back soon for fresh activity"}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   // Duplicate the array so the CSS marquee scrolls seamlessly.
-  const doubled = [...rows, ...rows];
+  const doubled = [...filtered, ...filtered];
 
   return (
     <div

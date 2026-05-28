@@ -526,7 +526,7 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
 # ============ STARTUP: SEED DATA ============
 DEFAULT_CATEGORIES = [
     {"slug": "cleaning", "name_es": "Limpieza", "name_en": "Cleaning", "icon": "Sparkles", "color": "#3B82F6"},
-    {"slug": "catering", "name_es": "Catering Latino", "name_en": "Latin Catering", "icon": "UtensilsCrossed", "color": "#F97316"},
+    {"slug": "catering", "name_es": "Catering y Eventos", "name_en": "Catering & Events", "icon": "UtensilsCrossed", "color": "#F97316"},
     {"slug": "construction", "name_es": "Construcción", "name_en": "Construction", "icon": "HardHat", "color": "#EAB308"},
     {"slug": "handyman", "name_es": "Mantenimiento", "name_en": "Handyman", "icon": "Wrench", "color": "#10B981"},
     {"slug": "auto", "name_es": "Automotriz", "name_en": "Automotive", "icon": "Car", "color": "#EF4444"},
@@ -1712,25 +1712,55 @@ async def admin_stats(_: User = Depends(require_admin)):
 # ============ PLANS (UI only) ============
 @api_router.get("/plans")
 async def list_plans():
-    # SECTION 26 — Annual pricing: pay for 10 months, get 12 months access (2 free).
-    # Frontend toggles between monthly/annual using price_monthly and price_annual.
+    # Section 68 / C6 — Simplified to 2 tiers (Free + Pro). CEO direction:
+    # remove the 4-plan ladder that created decision fatigue. One paid SKU
+    # at $29/mo (or $290/yr → 2 months free).
+    # Note: backend keeps the legacy plan ids ('basic', 'pro', 'premium')
+    # in PLAN_TIER / PLAN_PRICES dicts so historical subscriptions keep
+    # working. We only expose Free + Pro on the public /plans listing.
     return [
         {"id": "free", "name": "Gratis", "name_en": "Free", "price_monthly": 0, "price_annual": 0, "annual_savings": 0,
          "badge": None, "highlight": False,
-         "features_es": ["eCard básica con enlace único", "1 categoría de servicio", "Hasta 20 fotos en tu galería", "Analytics básicos", "Formulario de contacto"],
-         "features_en": ["Basic eCard with unique link", "1 service category", "Up to 20 photos in your gallery", "Basic analytics", "Contact form"]},
-        {"id": "basic", "name": "Básico", "name_en": "Basic", "price_monthly": 10, "price_annual": 100, "annual_savings": 20,
-         "badge": "Básico", "badge_color": "#94a3b8", "highlight": False,
-         "features_es": ["Todo lo de Gratis +", "Hasta 3 categorías", "Fotos ilimitadas en tu galería", "Analytics mejorados", "Responder reseñas", "1 boost mensual de visibilidad"],
-         "features_en": ["Everything in Free +", "Up to 3 categories", "Unlimited gallery photos", "Enhanced analytics", "Respond to reviews", "1 visibility boost/month"]},
-        {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 15, "price_annual": 150, "annual_savings": 30,
+         "features_es": [
+             "eCard básica con enlace único",
+             "1 categoría de servicio",
+             "Hasta 20 fotos en tu galería",
+             "Analytics básicos",
+             "Formulario de contacto",
+         ],
+         "features_en": [
+             "Basic eCard with unique link",
+             "1 service category",
+             "Up to 20 photos in your gallery",
+             "Basic analytics",
+             "Contact form",
+         ]},
+        {"id": "pro", "name": "Pro", "name_en": "Pro", "price_monthly": 29, "price_annual": 290, "annual_savings": 58,
          "badge": "Pro", "badge_color": "#F97316", "highlight": True, "label": "Más popular",
-         "features_es": ["Todo lo de Básico +", "Hasta 5 categorías", "Fotos ilimitadas + 1 video de presentación", "Mejor posición en búsquedas", "Notificaciones en tiempo real", "Botón WhatsApp directo", "3 boosts mensuales", "Soporte prioritario"],
-         "features_en": ["Everything in Basic +", "Up to 5 categories", "Unlimited photos + 1 presentation video", "Better search ranking", "Real-time notifications", "Direct WhatsApp button", "3 visibility boosts/month", "Priority support"]},
-        {"id": "premium", "name": "Premium", "name_en": "Premium", "price_monthly": 25, "price_annual": 250, "annual_savings": 50,
-         "badge": "Premium", "badge_color": "#D97706", "highlight": False, "label": "Mejor valor",
-         "features_es": ["Todo lo de Pro +", "Categorías ilimitadas", "Fotos ilimitadas + 1 video de presentación", "Posición TOP en búsquedas", "Aparece en homepage", "Campañas mensuales", "QR personalizado descargable", "eCard premium con branding", "Reportes avanzados", "5 boosts mensuales"],
-         "features_en": ["Everything in Pro +", "Unlimited categories", "Unlimited photos + 1 presentation video", "TOP search position", "Featured on homepage", "Monthly campaigns", "Downloadable custom QR", "Premium eCard", "Advanced reports", "5 visibility boosts/month"]},
+         "features_es": [
+             "Todo lo de Gratis +",
+             "Categorías ilimitadas",
+             "Fotos ilimitadas + 1 video de presentación",
+             "Mejor posición en búsquedas",
+             "Notificaciones en tiempo real",
+             "Botón WhatsApp directo",
+             "Responder reseñas",
+             "Boosts mensuales de visibilidad",
+             "Reportes avanzados",
+             "Soporte prioritario",
+         ],
+         "features_en": [
+             "Everything in Free +",
+             "Unlimited categories",
+             "Unlimited photos + 1 presentation video",
+             "Better search ranking",
+             "Real-time notifications",
+             "Direct WhatsApp button",
+             "Respond to reviews",
+             "Monthly visibility boosts",
+             "Advanced reports",
+             "Priority support",
+         ]},
     ]
 
 
