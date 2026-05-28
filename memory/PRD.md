@@ -2490,7 +2490,7 @@ The Sprint A "🔥 ¡Te falta 1!" pulsing badge used `transform: scale(1.06)` in
   3. "Why getamano exists" 4-paragraph origin story narrative.
   4. "What we stand for" — 4 value cards (Verified always · Real reviews · Bilingual by design · Pros first, then platform).
   5. Pull quote testimonial — "A platform that finally treats service pros and families like people, not transactions."
-  6. **Founder section** (`about-founder`) — AI-generated portrait of E. Hernandez (founder, Mexican-American tech entrepreneur), Mexican flag badge, role, 3-paragraph bio in his voice, and 2 project pills (`getamano · services` + `Tiangix · Latino products`). Portrait generated via OpenAI gpt-image-1 (script: `backend/scripts/generate_founder_avatar.py`), saved 512×512 to `/avatars/founder-e-hernandez.png` (234KB).
+  6. **Founder section** (`about-founder`) — AI-generated portrait of **Eloy Hernández** (CEO & Founder of Getamano & Tiangix, Latino entrepreneur), young (mid-20s, clean-shaven), Mexican flag badge. Layout: name + role + tagline → lead question → pull-quote with orange left border → 4 bio paragraphs (getamano mission, "not only for Latinos", Tiangix product marketplace, closing) → "Welcome." in teal → external links to getamano.com + tiangix.com → trust pill "🫂 Latino-founded · Serving all of America". Portrait via OpenAI gpt-image-1 (`backend/scripts/generate_founder_avatar.py`), 512×512.
   7. CTA block (teal gradient) — orange "Find a pro near me" + outline "Join as a provider".
 - Uses named `{ SeoHead }` import (component re-exported by name, not default).
 - All sections + values have stable `data-testid` for testing.

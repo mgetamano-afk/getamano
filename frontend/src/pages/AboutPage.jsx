@@ -83,14 +83,25 @@ export default function AboutPage() {
         quote: "“A platform that finally treats service pros and families like people, not transactions.”",
         quoteAttr: "— Founding provider, Sallisaw OK",
         founderEyebrow: "Meet the founder",
-        founderName: "E. Hernandez",
-        founderRole: "Founder · Mexican-American tech entrepreneur",
+        founderName: "Eloy Hernández",
+        founderRole: "CEO & Founder · Getamano & Tiangix",
+        founderTagline: "Latino entrepreneur",
+        founderLead:
+          "One question has followed us since the very beginning: why is it so hard to find a trusted service, at a fair price, from someone who actually does great work?",
+        founderQuote:
+          "Millions of families across the US look for that every single day. And millions of workers — many of them Latino — offer it. The problem is they've never had the right place to find each other.",
         founderBioParas: [
-          "I'm passionate about technology and obsessed with one question: how do we give people — every person in the US, not just our Latino community — honest, affordable and functional services?",
-          "getamano is one answer. Tiangix, my sister project, is the other: a marketplace for Latino products and small Latino businesses that sell to every household in America, the same way getamano does for services.",
-          "If you believe quality work and honest trade deserve a real platform, you're in the right place. Welcome.",
+          "Getamano is our answer. A platform where the best service pros — plumbers, electricians, cleaners, landscapers — get the digital presence they deserve, and where any family in the US can find them, read real reviews, and hire with confidence.",
+          "We didn't build this only for the Latino community. We built it because honest work deserves a real platform — and because that work, in great part, is done by Latino hands that still don't have the visibility they deserve.",
+          "At tiangix.com we do the same with products: connecting small Latino businesses with every household in the US. Same mission, different path.",
+          "If you believe in honest commerce, in work done right, and in technology that brings people closer — you're in the right place.",
         ],
-        founderProjects: ["getamano · services", "Tiangix · Latino products"],
+        founderClose: "Welcome.",
+        founderLinks: [
+          { label: "getamano.com", url: "https://getamano.com", emoji: "🤝" },
+          { label: "tiangix.com", url: "https://tiangix.com", emoji: "📦" },
+        ],
+        founderTrust: "🫂 Latino-founded · Serving all of America",
         ctaTitle: "Ready to experience it?",
         ctaSub: "Whether you need a pro or are one, getamano is open to you.",
         ctaFind: "Find a pro near me",
@@ -144,14 +155,25 @@ export default function AboutPage() {
         quote: "“Una plataforma que por fin trata a los pros y a las familias como personas, no como transacciones.”",
         quoteAttr: "— Proveedor fundador, Sallisaw OK",
         founderEyebrow: "Conoce al fundador",
-        founderName: "E. Hernández",
-        founderRole: "Fundador · Emprendedor tecnológico mexicano-americano",
+        founderName: "Eloy Hernández",
+        founderRole: "CEO & Founder · Getamano & Tiangix",
+        founderTagline: "Emprendedor latino",
+        founderLead:
+          "Hay una pregunta que nos ha perseguido desde el principio: ¿por qué es tan difícil encontrar un servicio de confianza, a un precio justo, de alguien que de verdad hace bien su trabajo?",
+        founderQuote:
+          "Millones de familias en USA buscan eso mismo todos los días. Y millones de trabajadores — muchos de ellos latinos — lo ofrecen. El problema es que nunca han tenido el lugar correcto para encontrarse.",
         founderBioParas: [
-          "Soy apasionado por la tecnología y obsesionado con una pregunta: ¿cómo le damos a la gente — a toda persona en USA, no solo a nuestra comunidad latina — servicios honestos, económicos y funcionales?",
-          "getamano es una respuesta. Tiangix, mi proyecto hermano, es la otra: un marketplace de productos latinos y pequeños negocios latinos que venden a cada hogar en USA, igual que getamano lo hace con servicios.",
-          "Si crees que el trabajo de calidad y el comercio honesto merecen una plataforma real, estás en el lugar correcto. Bienvenido.",
+          "Getamano es nuestra respuesta. Una plataforma donde los mejores proveedores de servicios — plomeros, electricistas, limpiadores, jardineros — tienen la presencia digital que merecen, y donde cualquier familia en USA puede encontrarlos, leer sus reseñas, y contratarlos con confianza.",
+          "No construimos esto solo para la comunidad latina. Lo construimos porque el trabajo honesto merece una plataforma real — y porque ese trabajo, en gran parte, lo hacen manos latinas que todavía no tienen la visibilidad que merecen.",
+          "En tiangix.com hacemos lo mismo con productos: conectamos pequeños negocios latinos con cada hogar en USA. Misma misión, distinto camino.",
+          "Si crees en el comercio honesto, en el trabajo bien hecho, y en que la tecnología puede acercar a las personas — estás en el lugar correcto.",
         ],
-        founderProjects: ["getamano · servicios", "Tiangix · productos latinos"],
+        founderClose: "Bienvenido.",
+        founderLinks: [
+          { label: "getamano.com", url: "https://getamano.com", emoji: "🤝" },
+          { label: "tiangix.com", url: "https://tiangix.com", emoji: "📦" },
+        ],
+        founderTrust: "🫂 Latino-founded · Serving all of America",
         ctaTitle: "¿Listo para experimentarlo?",
         ctaSub: "Necesites un pro o lo seas tú, getamano está abierto para ti.",
         ctaFind: "Buscar un profesional",
@@ -308,14 +330,30 @@ export default function AboutPage() {
                 <p className="mt-1 text-sm font-semibold" style={{ color: "#025F67" }} data-testid="about-founder-role">
                   {c.founderRole}
                 </p>
+                <p className="mt-0.5 text-[11px] font-bold uppercase tracking-[1.2px] text-slate-400" data-testid="about-founder-tagline">
+                  {c.founderTagline}
+                </p>
 
-                <div className="mt-4 space-y-3">
+                {/* Lead question */}
+                <p className="mt-5 text-base md:text-[17px] text-slate-700 leading-relaxed" data-testid="about-founder-lead">
+                  {c.founderLead}
+                </p>
+
+                {/* Pull quote */}
+                <blockquote
+                  className="mt-5 pl-4 italic text-slate-800 text-[15px] md:text-base leading-relaxed"
+                  style={{ borderLeft: "3px solid #F97316" }}
+                  data-testid="about-founder-quote"
+                >
+                  "{c.founderQuote}"
+                </blockquote>
+
+                {/* Bio paragraphs */}
+                <div className="mt-5 space-y-3">
                   {c.founderBioParas.map((p, i) => (
                     <p
                       key={i}
-                      className={i === c.founderBioParas.length - 1
-                        ? "text-base font-semibold text-slate-900 leading-relaxed"
-                        : "text-base text-slate-700 leading-relaxed"}
+                      className="text-base text-slate-700 leading-relaxed"
                       data-testid={`about-founder-bio-${i}`}
                     >
                       {p}
@@ -323,19 +361,37 @@ export default function AboutPage() {
                   ))}
                 </div>
 
-                {/* Project badges */}
-                <div className="mt-5 flex flex-wrap gap-2" data-testid="about-founder-projects">
-                  {c.founderProjects.map((proj, i) => (
-                    <span
-                      key={proj}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold"
+                {/* Welcome close */}
+                <p className="mt-4 text-xl font-extrabold" style={{ color: "#025F67" }} data-testid="about-founder-close">
+                  {c.founderClose}
+                </p>
+
+                {/* Cross-project links */}
+                <div className="mt-5 flex flex-wrap gap-2" data-testid="about-founder-links">
+                  {c.founderLinks.map((link, i) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-bold transition hover:-translate-y-0.5 hover:shadow-md"
                       style={i === 0
                         ? { background: "#025F67", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(2,95,103,0.25)" }
                         : { background: "#FEF3C7", color: "#92400E", border: "1.5px solid #F59E0B" }}
+                      data-testid={`about-founder-link-${i}`}
                     >
-                      {i === 0 ? "🤝" : "🛍️"} {proj}
-                    </span>
+                      <span aria-hidden="true">{link.emoji}</span> {link.label}
+                    </a>
                   ))}
+                </div>
+
+                {/* Trust pill */}
+                <div
+                  className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold"
+                  style={{ background: "#EFF9F7", color: "#025F67", border: "1px solid #5DCAA5" }}
+                  data-testid="about-founder-trust"
+                >
+                  {c.founderTrust}
                 </div>
               </div>
             </div>

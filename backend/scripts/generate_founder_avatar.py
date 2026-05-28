@@ -23,16 +23,17 @@ load_dotenv(BACKEND_DIR / ".env")
 
 OUT_DIR = Path("/app/frontend/public/avatars")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-OUT_FILE = OUT_DIR / "founder-e-hernandez.png"
+OUT_FILE = Path("/app/frontend/public/avatars/founder-e-hernandez.png")
 
 PROMPT = (
-    "A flat 2D vector portrait illustration of a Mexican-American tech "
-    "entrepreneur in his mid-30s, light brown skin (moreno claro), Mexican "
-    "facial features with strong jawline and friendly warm eyes, short "
-    "well-groomed dark hair, neatly trimmed dark beard, wearing a smart "
-    "casual navy button-up shirt. Shown from the chest up, looking at the "
-    "viewer with a confident yet approachable smile that conveys passion "
-    "for technology and community service. "
+    "A flat 2D vector portrait illustration of a young Mexican-American tech "
+    "entrepreneur in his mid-20s (around 25 years old), light brown skin "
+    "(moreno claro), Mexican facial features with warm friendly eyes, short "
+    "neat dark hair with a modern fade, clean-shaven smooth face (NO beard, "
+    "NO mustache, NO facial hair at all), wearing a smart casual navy "
+    "button-up shirt. Shown from the chest up, looking at the viewer with a "
+    "confident yet approachable smile that conveys youthful passion for "
+    "technology and entrepreneurship. "
     "Solid background color: soft teal #B7D6D8. "
     "Style: minimalist modern flat illustration, soft rounded shapes, "
     "gentle clean line work, thick rounded strokes, no shading gradients "
