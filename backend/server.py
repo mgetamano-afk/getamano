@@ -1558,98 +1558,10 @@ async def track_contact_click(provider_id: str):
     return {"ok": True}
 
 # ============ REVIEWS ============
-@api_router.post("/reviews")
-async def create_review(payload: ReviewIn, user: User = Depends(get_current_user)):
-    existing = await db.reviews.find_one({"provider_id": payload.provider_id, "user_id": user.user_id})
-    if existing:
-        raise HTTPException(status_code=400, detail="You already reviewed this provider")
-
-    # Section 50 — Verified Reviews:
-    # A review is "verified" when there's documented prior interaction between
-    # the reviewer and the provider — i.e. an existing conversation, a service
-    # request submitted, or a booked appointment.
-    is_verified = False
-    verification_source = None
-    try:
-        prof = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0, "user_id": 1})
-        provider_user_id = prof.get("user_id") if prof else None
-
-        # 1. Conversation (in-app message exchange)
-        conv = await db.conversations.find_one({
-            "provider_id": payload.provider_id,
-            "client_id": user.user_id,
-        }, {"_id": 0, "conversation_id": 1})
-        if conv:
-            is_verified = True
-            verification_source = "messaging"
-
-        # 2. Service request (quote requested)
-        if not is_verified:
-            req = await db.service_requests.find_one({
-                "provider_id": payload.provider_id,
-                "client_id": user.user_id,
-            }, {"_id": 0, "request_id": 1})
-            if req:
-                is_verified = True
-                verification_source = "service_request"
-
-        # 3. Appointment (booking)
-        if not is_verified and provider_user_id:
-            appt = await db.appointments.find_one({
-                "$or": [
-                    {"provider_id": payload.provider_id, "client_user_id": user.user_id},
-                    {"provider_user_id": provider_user_id, "client_user_id": user.user_id},
-                ]
-            }, {"_id": 0, "appointment_id": 1})
-            if appt:
-                is_verified = True
-                verification_source = "appointment"
-    except Exception as e:
-        logger.warning(f"verified-review-check failed: {e}")
-
-    review = {
-        "review_id": f"rev_{uuid.uuid4().hex[:10]}",
-        "provider_id": payload.provider_id,
-        "user_id": user.user_id, "user_name": user.name,
-        "rating": payload.rating, "comment": payload.comment or "",
-        "paid_amount_range": payload.paid_amount_range,
-        "verified": is_verified,
-        "verification_source": verification_source,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.reviews.insert_one(review)
-    # recompute aggregate
-    all_revs = await db.reviews.find({"provider_id": payload.provider_id}, {"_id": 0, "rating": 1}).to_list(10000)
-    if all_revs:
-        avg = sum(r["rating"] for r in all_revs) / len(all_revs)
-        await db.provider_profiles.update_one(
-            {"provider_id": payload.provider_id},
-            {"$set": {"rating_avg": round(avg, 2), "rating_count": len(all_revs)}}
-        )
-    review.pop("_id", None)
-    return review
-
-# ============ FAVORITES ============
-@api_router.get("/favorites")
-async def list_favorites(user: User = Depends(get_current_user)):
-    favs = await db.favorites.find({"user_id": user.user_id}, {"_id": 0}).to_list(200)
-    provider_ids = [f["provider_id"] for f in favs]
-    providers = await db.provider_profiles.find({"provider_id": {"$in": provider_ids}}, {"_id": 0}).to_list(200)
-    return providers
-
-@api_router.post("/favorites")
-async def add_favorite(payload: FavoriteIn, user: User = Depends(get_current_user)):
-    await db.favorites.update_one(
-        {"user_id": user.user_id, "provider_id": payload.provider_id},
-        {"$set": {"user_id": user.user_id, "provider_id": payload.provider_id, "created_at": datetime.now(timezone.utc).isoformat()}},
-        upsert=True
-    )
-    return {"ok": True}
-
-@api_router.delete("/favorites/{provider_id}")
-async def remove_favorite(provider_id: str, user: User = Depends(get_current_user)):
-    await db.favorites.delete_one({"user_id": user.user_id, "provider_id": provider_id})
-    return {"ok": True}
+# ============ SECTION 71 — Reviews & Favorites (extracted) ============
+# `POST /reviews`, `GET/POST/DELETE /favorites*`, and the three `/admin/reviews/*`
+# endpoints have been moved to `routes/reviews.py` and are wired via
+# `api_router.include_router(...)` near the bottom of this file.
 
 
 # ============ SECTION 55 — Saved eCards (extracted) ============
@@ -2039,46 +1951,8 @@ async def update_request_status(request_id: str, payload: ServiceRequestStatusIn
     return {"ok": True}
 
 # ============ ADMIN: REVIEWS MODERATION ============
-@api_router.get("/admin/reviews")
-async def admin_list_reviews(flagged: Optional[bool] = None, _: User = Depends(require_admin)):
-    q = {}
-    if flagged is not None:
-        q["is_flagged"] = flagged
-    items = await db.reviews.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
-    # enrich with provider business name
-    pids = list({r["provider_id"] for r in items})
-    provs = {p["provider_id"]: p for p in await db.provider_profiles.find({"provider_id": {"$in": pids}}, {"_id": 0, "provider_id": 1, "business_name": 1, "slug": 1}).to_list(500)}
-    for r in items:
-        r["provider"] = provs.get(r["provider_id"])
-    return items
-
-@api_router.post("/admin/reviews/{review_id}/flag")
-async def admin_flag_review(review_id: str, admin: User = Depends(require_admin)):
-    await db.reviews.update_one({"review_id": review_id}, {"$set": {"is_flagged": True}})
-    await db.audit_logs.insert_one({
-        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
-        "action": "review:flag", "target": review_id, "note": "",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {"ok": True}
-
-@api_router.delete("/admin/reviews/{review_id}")
-async def admin_delete_review(review_id: str, admin: User = Depends(require_admin)):
-    review = await db.reviews.find_one({"review_id": review_id}, {"_id": 0})
-    if not review:
-        raise HTTPException(status_code=404, detail="Not found")
-    await db.reviews.delete_one({"review_id": review_id})
-    # recompute aggregate
-    pid = review["provider_id"]
-    all_revs = await db.reviews.find({"provider_id": pid}, {"_id": 0, "rating": 1}).to_list(10000)
-    avg = (sum(r["rating"] for r in all_revs) / len(all_revs)) if all_revs else 0.0
-    await db.provider_profiles.update_one({"provider_id": pid}, {"$set": {"rating_avg": round(avg, 2), "rating_count": len(all_revs)}})
-    await db.audit_logs.insert_one({
-        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
-        "action": "review:delete", "target": review_id, "note": "",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {"ok": True}
+# Admin reviews endpoints (`GET /admin/reviews`, `POST /admin/reviews/{id}/flag`,
+# `DELETE /admin/reviews/{id}`) live in `routes/reviews.py`.
 
 # ============ ADMIN: CATEGORIES CRUD ============
 @api_router.post("/admin/categories")
@@ -9561,6 +9435,7 @@ from routes.profile_versions import (  # noqa: E402
     build_profile_versions_router as _make_profile_versions_router,
     auto_snapshot as _profile_auto_snapshot,
 )
+from routes.reviews import build_reviews_router as _make_reviews_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9700,6 +9575,16 @@ api_router.include_router(
         db=db,
         User=User,
         get_current_user=get_current_user,
+    )
+)
+
+# Section 71 — Reviews & Favorites (extracted from server.py)
+api_router.include_router(
+    _make_reviews_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
+        require_admin=require_admin,
     )
 )
 
