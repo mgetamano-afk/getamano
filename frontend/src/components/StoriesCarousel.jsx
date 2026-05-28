@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
 import LikeButton from "./LikeButton";
+import useRefreshable from "../hooks/useRefreshable";
 
 /**
  * StoriesCarousel — Section 60 (CEO recommendation).
@@ -34,15 +35,17 @@ export default function StoriesCarousel() {
   const [viewerIdx, setViewerIdx] = useState(-1); // index in groups, -1 = closed
 
   // Refresh active stories
-  const fetchActive = async () => {
+  const fetchActive = useCallback(async () => {
     try {
       const { data } = await api.get("/stories/active?limit=30");
       setGroups(data || []);
     } catch { /* silent */ }
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { fetchActive(); }, []);
+  useEffect(() => { fetchActive(); }, [fetchActive]);
+  // Section 75 — pull-to-refresh: refresh the stories tile row too
+  useRefreshable(fetchActive);
 
   const openViewer = (idx) => setViewerIdx(idx);
   const closeViewer = () => setViewerIdx(-1);

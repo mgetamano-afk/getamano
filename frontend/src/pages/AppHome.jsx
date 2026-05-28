@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -24,6 +24,7 @@ import InviterWelcomeBanner from "../components/InviterWelcomeBanner";
 import ThankInviterModal from "../components/ThankInviterModal";
 import UniversalServicesCard from "../components/UniversalServicesCard";
 import { SeoHead } from "../components/seo/SeoHead";
+import useRefreshable from "../hooks/useRefreshable";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -57,31 +58,56 @@ export default function AppHome() {
   const isProvider = user?.role === "provider";
   const firstName = (user?.name || "").trim().split(/\s+/)[0] || (user?.email || "").split("@")[0];
 
-  // Featured + jobs — runs once, guest-safe.
-  useEffect(() => {
-    api.get("/providers/featured").then(r => setFeatured(Array.isArray(r.data) ? r.data.slice(0, 6) : [])).catch(() => {});
-    api.get("/jobs", { params: { limit: 3, sort: "recent" } })
-      .then(r => setRecentJobs(Array.isArray(r.data) ? r.data : (r.data?.items || [])))
-      .catch(() => setRecentJobs([]));
+  // Featured + jobs — fetched on mount AND on pull-to-refresh.
+  const fetchFeaturedAndJobs = useCallback(async () => {
+    try {
+      const [f, j] = await Promise.allSettled([
+        api.get("/providers/featured"),
+        api.get("/gigs", { params: { limit: 3, sort: "recent" } }),
+      ]);
+      if (f.status === "fulfilled") {
+        setFeatured(Array.isArray(f.value.data) ? f.value.data.slice(0, 6) : []);
+      }
+      if (j.status === "fulfilled") {
+        const d = j.value.data;
+        setRecentJobs(Array.isArray(d) ? d : (d?.items || []));
+      }
+    } catch { /* ignore */ }
   }, []);
+
+  useEffect(() => { fetchFeaturedAndJobs(); }, [fetchFeaturedAndJobs]);
 
   // Auth-dependent fetches: conversations, and provider slug. (Notifications
   // are now owned by the <NotificationBell /> component which has its own
   // dropdown — no more navigate to a non-existent /notifications route.)
-  useEffect(() => {
-    if (!user) { setUnreadMessages(0); setProviderSlug(""); return; }
-    api.get("/conversations").then(r => {
-      const list = Array.isArray(r.data) ? r.data : [];
+  const fetchAuthData = useCallback(async () => {
+    if (!user) {
+      setUnreadMessages(0);
+      setProviderSlug("");
+      return;
+    }
+    try {
+      const conv = await api.get("/conversations");
+      const list = Array.isArray(conv.data) ? conv.data : [];
       setUnreadMessages(list.filter(c => c.unread).length);
-    }).catch(() => {});
-    // Fetch provider slug so QA4 'My eCard' can route to /p/{slug}.
+    } catch { /* ignore */ }
     if (user.role === "provider") {
-      api.get("/providers/me").then(r => setProviderSlug(r.data?.slug || "")).catch(() => {});
-      // Section 77 — fetch referral summary so we can detect new milestones
-      // and fire MilestoneCelebrationModal exactly once per unlock.
-      api.get("/user-referrals/me").then(r => setReferralSummary(r.data)).catch(() => {});
+      try {
+        const r = await api.get("/providers/me");
+        setProviderSlug(r.data?.slug || "");
+      } catch { /* ignore */ }
+      try {
+        const r = await api.get("/user-referrals/me");
+        setReferralSummary(r.data);
+      } catch { /* ignore */ }
     }
   }, [user]);
+
+  useEffect(() => { fetchAuthData(); }, [fetchAuthData]);
+
+  // Register both for pull-to-refresh
+  useRefreshable(fetchFeaturedAndJobs);
+  useRefreshable(fetchAuthData);
 
   return (
     <div className="min-h-screen bg-slate-50">

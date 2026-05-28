@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   TrendingUp, TrendingDown, Info, ArrowUpRight, Wallet,
@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
+import useRefreshable from "../hooks/useRefreshable";
 
 /**
  * EarningsWidget — Section 71 / redesigned Section 76b.
@@ -32,6 +33,15 @@ export default function EarningsWidget() {
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, []);
+
+  // Section 75 — pull-to-refresh hook
+  const refresh = useCallback(async () => {
+    try {
+      const r = await api.get("/credits/me/summary");
+      setSummary(r.data);
+    } catch { /* ignore */ }
+  }, []);
+  useRefreshable(refresh);
 
   // Count-up animation when summary arrives
   useEffect(() => {

@@ -2768,3 +2768,42 @@ User: *"Sii hazlo ya, pero haz que esas historias se vean bonitas y los likes �
 ### Files
 - **NEW**: `frontend/src/components/ScrollToTop.jsx`, `frontend/src/components/PullToRefresh.jsx`
 - **MODIFIED**: `frontend/src/App.js`, `frontend/src/index.css`, `frontend/src/components/EarningsWidget.jsx`, `frontend/src/components/ReferralProgressCard.jsx`, `frontend/src/components/ComunidadLayout.jsx`, `frontend/src/components/StoriesCarousel.jsx`
+
+---
+
+## Section 75 — Smart re-fetch on pull-to-refresh (2026-02-28)
+
+### Why
+Sec.74 PullToRefresh defaulted to `window.location.reload()` — slow on 3G/4G (multi-second white screen). The user accepted the suggestion to wire it to a smart bus that only re-fetches the data each page needs.
+
+### What changed
+
+#### New infrastructure
+- **NEW** `frontend/src/lib/refreshBus.js`: tiny pub/sub. `onRefresh(handler)` to subscribe, `triggerRefresh()` to fire all handlers with a 2.5s timeout.
+- **NEW** `frontend/src/hooks/useRefreshable.js`: thin React hook that registers a memoized fetch fn for the lifetime of the component.
+
+#### PullToRefresh upgraded
+- **MODIFIED** `frontend/src/components/PullToRefresh.jsx`: on commit, calls `triggerRefresh()` instead of `window.location.reload()`. If the bus has no subscribers, falls back to a hard reload so the gesture is never dead. Spinner closes on Promise resolution → instant tactile feedback.
+
+#### Components subscribed
+- `pages/AppHome.jsx` — featured providers, gigs, conversations unread count, provider profile/referrals (auth-aware).
+- `pages/Search.jsx` — re-runs the current search with active filters (q, city, category, location, verifiedOnly, etc.).
+- `pages/ComunidadPage.jsx` — community feed via existing `silentRefresh` (zero added cost).
+- `components/EarningsWidget.jsx` — `/credits/me/summary`.
+- `components/ReferralProgressCard.jsx` — `/user-referrals/me`.
+- `components/StoriesCarousel.jsx` — `/stories/active`.
+
+#### Bug surfaced + fixed
+- AppHome was calling `/jobs` which didn't exist (404). The SLA test caught it; corrected to `/gigs` (matches `backend/routes/jobs.py` mounting). Recent jobs now display real data on home.
+
+### Tests
+- **NEW** `backend/tests/test_iter75_refresh_endpoints_sla.py` — 9 tests parametrized across every endpoint subscribed by the refresh bus. Each asserts status 200 + JSON shape + <1500ms response. Locks the contract so future refactors can't quietly break a refresh path.
+
+### Verification
+- 52 backend tests passing (iter69 + iter71 + iter72 + iter73 + iter75). Zero regressions.
+- Frontend lint: all 9 modified/new files clean.
+- Mobile screenshot @ 393×852 (iPhone 15 Pro): home renders cleanly, recent jobs section now shows real `/gigs` data.
+
+### Files
+- **NEW**: `frontend/src/lib/refreshBus.js`, `frontend/src/hooks/useRefreshable.js`, `backend/tests/test_iter75_refresh_endpoints_sla.py`
+- **MODIFIED**: `frontend/src/components/PullToRefresh.jsx`, `frontend/src/pages/AppHome.jsx`, `frontend/src/pages/Search.jsx`, `frontend/src/pages/ComunidadPage.jsx`, `frontend/src/components/EarningsWidget.jsx`, `frontend/src/components/ReferralProgressCard.jsx`, `frontend/src/components/StoriesCarousel.jsx`

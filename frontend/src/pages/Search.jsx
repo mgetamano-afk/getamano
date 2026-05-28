@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, createElement } from "react";
+import { useEffect, useState, useRef, useCallback, createElement } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
@@ -11,6 +11,7 @@ import ProvidersMap from "../components/ProvidersMap";
 import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import useGeolocation from "../hooks/useGeolocation";
+import useRefreshable from "../hooks/useRefreshable";
 import { trackSearch } from "../lib/analytics";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { SeoHead } from "../components/seo/SeoHead";
@@ -177,6 +178,14 @@ export default function Search() {
   };
 
   useEffect(() => { doSearch(); /* eslint-disable-next-line */ }, []);
+
+  // Section 75 — pull-to-refresh: re-run the current search with no overrides.
+  // doSearch() reads from state, so the latest filter set is used.
+  const refresh = useCallback(() => {
+    return doSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, city, category, verifiedOnly, language, ownerIdentity, hasVideo, position?.lat, position?.lng, radiusMiles, view]);
+  useRefreshable(refresh);
 
   // Section 18F — auto-research when user enables "Near me"
   useEffect(() => {

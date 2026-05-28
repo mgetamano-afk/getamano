@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
+import useRefreshable from "../hooks/useRefreshable";
 
 /**
  * ReferralProgressCard — Section 72 / redesigned Section 76b.
@@ -35,6 +36,15 @@ export default function ReferralProgressCard() {
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, []);
+
+  // Section 75 — pull-to-refresh hook
+  const refresh = useCallback(async () => {
+    try {
+      const r = await api.get("/user-referrals/me");
+      setSummary(r.data);
+    } catch { /* ignore */ }
+  }, []);
+  useRefreshable(refresh);
 
   if (loading || !summary) return null;
 

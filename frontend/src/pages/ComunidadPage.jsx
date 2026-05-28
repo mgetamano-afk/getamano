@@ -17,6 +17,7 @@ import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
 import FollowingFeed from "../components/FollowingFeed";
 import { SeoHead } from "../components/seo/SeoHead";
+import useRefreshable from "../hooks/useRefreshable";
 
 const MAX_LEN = 500;
 
@@ -542,6 +543,9 @@ function PostFeed() {
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint]);
+
+  // Section 75 — pull-to-refresh: reuse the silentRefresh path
+  useRefreshable(silentRefresh);
 
   // Polling: count posts strictly newer than what we have on screen
   const checkForNewPosts = useCallback(async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { triggerRefresh } from "../lib/refreshBus";
 
 /**
  * PullToRefresh — Section 74 (mobile-first UX fix).
@@ -82,8 +83,16 @@ export default function PullToRefresh({ onRefresh } = {}) {
             await onRefresh();
             setRefreshing(false);
             setPull(0);
+            return;
+          }
+          // Section 75 — Smart re-fetch: dispatch the bus and let pages
+          // re-fetch only their own data. If no page subscribes, fall
+          // back to a hard reload so the gesture never feels broken.
+          const handled = await triggerRefresh();
+          if (handled) {
+            setRefreshing(false);
+            setPull(0);
           } else {
-            // Default: hard reload — guarantees fresh data
             window.location.reload();
           }
         } catch {
