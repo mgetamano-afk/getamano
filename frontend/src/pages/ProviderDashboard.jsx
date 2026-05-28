@@ -6,7 +6,7 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar, Sparkles } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar, Sparkles, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import ProviderSideNav from "../components/ProviderSideNav";
@@ -36,6 +36,7 @@ import ProviderLeftNav from "../components/ProviderLeftNav";  // eslint-disable-
 import ECardPreviewModal from "../components/ECardPreviewModal";
 import BannerGenerator from "../components/BannerGenerator";
 import SmartSubcategoryPicker from "../components/SmartSubcategoryPicker";
+import CategoryTreePicker from "../components/CategoryTreePicker";
 import EcardHealth from "../components/EcardHealth";
 import WeeklyHealthEmailPreview from "../components/WeeklyHealthEmailPreview";
 import WaitingClientsBadge from "../components/WaitingClientsBadge";
@@ -80,6 +81,7 @@ export default function ProviderDashboard() {
   const [ecardPreviewOpen, setEcardPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false); // Section 80
 
   useEffect(() => {
     if (authLoading) return;
@@ -197,6 +199,18 @@ export default function ProviderDashboard() {
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8" data-testid="provider-dashboard">
         <MilestoneCelebration />
+        {/* Section 80 — Hierarchical service picker (used by main category edit) */}
+        <CategoryTreePicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          value={(categories.find(c => c.category_id === form?.category_id) || {}).slug}
+          onSelect={(sub) => {
+            const cat = categories.find(c => c.slug === sub.slug);
+            if (cat) {
+              setForm(f => ({ ...f, category_id: cat.category_id, additional_categories: [] }));
+            }
+          }}
+        />
 
         <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
           {/* Section 64 — Vertical sidebar (desktop only) */}
@@ -380,7 +394,37 @@ export default function ProviderDashboard() {
                   </div>
                   <Field label="Nombre del negocio *" value={form.business_name} onChange={v => update("business_name", v)} required testid="form-business-name" />
                   <Field label="Nombre legal" value={form.legal_name} onChange={v => update("legal_name", v)} testid="form-legal-name" />
-                  <SelectField label="Categoría principal *" value={form.category_id} onChange={v => update("category_id", v)} options={categories.filter(c => MAIN_CATEGORIES.includes(c.name_es)).sort((a, b) => MAIN_CATEGORIES.indexOf(a.name_es) - MAIN_CATEGORIES.indexOf(b.name_es)).map(c => ({ value: c.category_id, label: lang === "es" ? c.name_es : c.name_en }))} testid="form-category-select" />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Categoría principal *</label>
+                    {(() => {
+                      const picked = categories.find(c => c.category_id === form.category_id);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setPickerOpen(true)}
+                          className={`w-full h-12 px-4 rounded-xl border flex items-center gap-3 text-left transition ${picked ? "border-teal-400 bg-teal-50/40" : "border-slate-200 hover:border-teal-400 bg-white"}`}
+                          data-testid="form-category-picker-btn"
+                        >
+                          {picked ? (
+                            <>
+                              <span className="text-xl leading-none">{picked.emoji || "🛠️"}</span>
+                              <span className="flex-1 min-w-0">
+                                <span className="block text-sm font-semibold text-slate-900 truncate">{lang === "es" ? picked.name_es : picked.name_en}</span>
+                                <span className="block text-[11px] text-slate-500 truncate">{picked.sector_label || ""}</span>
+                              </span>
+                              <ChevronRight className="w-4 h-4 text-slate-400" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xl leading-none">🧭</span>
+                              <span className="flex-1 text-sm text-slate-500">{lang === "es" ? "Elige tu servicio…" : "Pick your service…"}</span>
+                              <ChevronRight className="w-4 h-4 text-slate-400" />
+                            </>
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Categorías adicionales <span className="text-slate-400 font-normal">(opcional)</span></label>
                     <p className="text-xs text-slate-500 mb-3">Agrega las especializaciones específicas que ofreces dentro de tu categoría.</p>

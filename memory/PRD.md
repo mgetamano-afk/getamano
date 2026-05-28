@@ -3000,3 +3000,48 @@ Stories were pure visuals — no monetizable CTA. User asked to turn them into m
 ### Files
 - **NEW**: `frontend/src/components/CategoryTreePicker.jsx`, `backend/tests/test_iter79_category_tree.py`
 - **MODIFIED**: `backend/catalog.py`, `backend/server.py`, `frontend/src/pages/Search.jsx`
+
+---
+
+## Section 80 — Hierarchical picker wired into provider register & profile edit (2026-02-28)
+
+### Why
+Sec.79 built the elegant `CategoryTreePicker` for the Search page. The provider onboarding and "Edit Profile" forms still used a flat `<select>`/`SelectField` showing only the 16 sector names — providers could only categorize themselves at the SECTOR level (e.g., "Belleza"), not at the actual service level (e.g., "Maquillaje para eventos"). Bad for client → provider matching.
+
+### What changed
+
+#### `frontend/src/pages/ProviderOnboarding.jsx`
+- Imported `CategoryTreePicker` + `Compass` icon.
+- Added `pickerOpen` state.
+- **Replaced** the `<select>` dropdown with a tappable button:
+  - When EMPTY: `🧭 Elige tu servicio…`
+  - When SELECTED: shows the chosen subcategory's emoji + name_es + sector_label.
+- Mounted `<CategoryTreePicker />` at the bottom of the component. `onSelect` resolves `sub.slug → category_id` from the loaded `categories` list, sets `form.category_id`, and clears `additional_categories` (same contract the old `onChange` enforced per Sec.55).
+
+#### `frontend/src/pages/ProviderDashboard.jsx`
+- Imported `CategoryTreePicker` + `ChevronRight`.
+- Added `pickerOpen` state.
+- **Replaced** the `SelectField` for "Categoría principal" with the same picker button pattern (Spanish + English aware via `lang === "es"`).
+- Mounted the picker once at the top of `<main>` so it works regardless of which tab the user is on when they trigger the open.
+
+### Why both screens use the same component (DRY)
+`CategoryTreePicker` is a single 180-line component that gets:
+- ✅ Bottom-sheet on mobile / centered modal on desktop
+- ✅ Full-text search across 188 services
+- ✅ Sector → subcategory drill-down with emojis
+- ✅ License color dots
+- ✅ Safe-area-bottom padding
+- ✅ Portal-rendered so z-index never fights other modals
+
+Both screens benefit from any future improvement (e.g., a 3rd level) for free.
+
+### Verification
+- 47 backend tests still passing (no backend changes were needed — only consumer wiring).
+- Mobile screenshots @ 393×852:
+  1. Dashboard → Profile tab → button shows `🏠 Cleaning - Hogar y mantenimiento`.
+  2. Tap → modal with 14 sectors, all emojis present, counts correct.
+  3. Tap "💅 Belleza y estética" → 13 alphabetical subs with their own emojis.
+- Lint 100% clean.
+
+### Files
+- **MODIFIED**: `frontend/src/pages/ProviderOnboarding.jsx`, `frontend/src/pages/ProviderDashboard.jsx`

@@ -7,10 +7,11 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload from "../components/ImageUpload";
 import ChipInput from "../components/ChipInput";
 import ServiceAreasInput from "../components/ServiceAreasInput";
-import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2, ScanLine } from "lucide-react";
+import { Check, ChevronRight, ChevronLeft, Sparkles, Home, Building2, ScanLine, Compass } from "lucide-react";
 import { toast } from "sonner";
 import BusinessCardScanner from "../components/BusinessCardScanner";
 import AIDescriptionAssistant from "../components/AIDescriptionAssistant";
+import CategoryTreePicker from "../components/CategoryTreePicker";
 import { getRelatedCategories, normalizeCategoryKey } from "../data/categoryGroups";
 
 const STEPS = [
@@ -30,6 +31,7 @@ export default function ProviderOnboarding() {
   const [plans, setPlans] = useState([]);
   const [categories, setCategories] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false); // Section 80
   const [form, setForm] = useState({
     selected_plan: "free",
     business_name: "", legal_name: "", category_id: "", additional_categories: [],
@@ -156,10 +158,37 @@ export default function ProviderOnboarding() {
               <Field label="Nombre legal (LLC, Inc., etc.)" value={form.legal_name} onChange={v => update("legal_name", v)} testid="onboarding-legal-name" />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Categoría principal *</label>
-                <select value={form.category_id} onChange={e => update("category_id", e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200" data-testid="onboarding-category">
-                  <option value="">Selecciona...</option>
-                  {categories.map(c => <option key={c.category_id} value={c.category_id}>{c.name_es}</option>)}
-                </select>
+                {/* Section 80 — Use the hierarchical CategoryTreePicker instead
+                    of a flat dropdown. Forces the provider to pick a real
+                    subcategory (not a sector), guaranteeing data quality. */}
+                {(() => {
+                  const picked = categories.find(c => c.category_id === form.category_id);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen(true)}
+                      className={`w-full h-12 px-4 rounded-xl border flex items-center gap-3 text-left transition ${picked ? "border-teal-400 bg-teal-50/40" : "border-slate-200 hover:border-teal-400 bg-white"}`}
+                      data-testid="onboarding-category-picker-btn"
+                    >
+                      {picked ? (
+                        <>
+                          <span className="text-xl leading-none">{picked.emoji || "🛠️"}</span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-semibold text-slate-900 truncate">{picked.name_es}</span>
+                            <span className="block text-[11px] text-slate-500 truncate">{picked.sector_label || ""}</span>
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl leading-none">🧭</span>
+                          <span className="flex-1 text-sm text-slate-500">Elige tu servicio…</span>
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Categorías adicionales (opcional)</label>
@@ -402,6 +431,21 @@ export default function ProviderOnboarding() {
             zip_code: f.zip_code || ext.zip_code || "",
           }));
           toast.success("Datos importados de la tarjeta — revisa antes de continuar.");
+        }}
+      />
+
+      {/* Section 80 — Hierarchical service picker for the onboarding flow */}
+      <CategoryTreePicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        value={(categories.find(c => c.category_id === form.category_id) || {}).slug}
+        onSelect={(sub) => {
+          const cat = categories.find(c => c.slug === sub.slug);
+          if (cat) {
+            // Picking a new main category clears the additional ones, same
+            // contract the old onChange enforced (see Sec.55 comment above).
+            setForm(f => ({ ...f, category_id: cat.category_id, additional_categories: [] }));
+          }
         }}
       />
     </div>
