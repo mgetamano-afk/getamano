@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2 } from "lucide-react";
+import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2, Heart, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
@@ -107,8 +107,14 @@ export default function StoriesCarousel() {
                   )}
                 </div>
                 {g.stories_count > 1 && (
-                  <span className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-pink-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                  <span className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-pink-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white" data-testid={`story-tile-count-${g.provider_user_id}`}>
                     {g.stories_count}
+                  </span>
+                )}
+                {g.likes_count > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center gap-0.5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold ring-2 ring-white shadow-sm" data-testid={`story-tile-likes-${g.provider_user_id}`}>
+                    <Heart className="w-2.5 h-2.5" fill="currentColor" strokeWidth={0} />
+                    {g.likes_count}
                   </span>
                 )}
               </div>
@@ -367,6 +373,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 gtm-heart"><path d="M12 21s-7-4.5-9.5-9C.5 8.5 2 5 5 5c1.7 0 3.3.9 4 2.4C9.7 5.9 11.3 5 13 5c3 0 4.5 3.5 2.5 7C19 16.5 12 21 12 21z"/></svg>
                   {active.likes_count || 0}
                 </span>
+                <ExpiryBadge expiresAt={active.expires_at} lang={lang} />
               </div>
               <button
                 type="button"
@@ -386,7 +393,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
                 count={active.likes_count || 0}
                 onClick={toggleStoryLike}
                 disabled={!!likePending[active.story_id]}
-                size="md"
+                size="lg"
                 variant="floating"
                 testid="story-viewer-like"
                 ariaLabel={lang === "en" ? "Like this story" : "Dar like a esta historia"}
@@ -411,6 +418,47 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
       )}
     </div>
   ), document.body);
+}
+
+/**
+ * ExpiryBadge — pill showing "Expira en Xh" (or "Xm" / "Xs") so the
+ * story owner knows how much time is left before MongoDB TTL deletes
+ * it (24h after creation). Updates every 30s while open.
+ */
+function ExpiryBadge({ expiresAt, lang }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!expiresAt) return null;
+  const exp = new Date(expiresAt).getTime();
+  const diffMs = exp - now;
+  if (Number.isNaN(diffMs)) return null;
+  let label;
+  if (diffMs <= 0) {
+    label = lang === "en" ? "Expired" : "Expiró";
+  } else {
+    const totalMin = Math.floor(diffMs / 60_000);
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    if (hours >= 1) {
+      label = lang === "en" ? `Expires in ${hours}h ${mins}m` : `Expira en ${hours}h ${mins}m`;
+    } else if (totalMin >= 1) {
+      label = lang === "en" ? `Expires in ${totalMin}m` : `Expira en ${totalMin}m`;
+    } else {
+      label = lang === "en" ? "Expires in <1m" : "Expira en <1m";
+    }
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 backdrop-blur text-amber-200 text-xs font-semibold shadow-md"
+      data-testid="story-expiry-countdown"
+    >
+      <Clock className="w-3.5 h-3.5" />
+      {label}
+    </span>
+  );
 }
 
 /**

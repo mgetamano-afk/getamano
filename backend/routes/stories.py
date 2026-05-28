@@ -109,6 +109,8 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
                 "image_url": "$latest.image_url",
                 "caption": "$latest.caption",
                 "created_at": "$latest.created_at",
+                "likes_count": {"$ifNull": ["$latest.likes_count", 0]},
+                "views_count": {"$ifNull": ["$latest.views_count", 0]},
             }},
         ]
         rows = await db.stories.aggregate(pipeline).to_list(limit)
