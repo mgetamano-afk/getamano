@@ -98,7 +98,7 @@ export default function AboutPage() {
         ],
         founderClose: "Welcome.",
         founderLinks: [
-          { label: "getamano.com", url: "https://getamano.com", emoji: "🤝" },
+          { label: "getamano.us", url: "https://getamano.us", emoji: "🤝" },
           { label: "tiangix.com", url: "https://tiangix.com", emoji: "📦" },
         ],
         founderTrust: "🫂 Latino-founded · Serving all of America",
@@ -170,7 +170,7 @@ export default function AboutPage() {
         ],
         founderClose: "Bienvenido.",
         founderLinks: [
-          { label: "getamano.com", url: "https://getamano.com", emoji: "🤝" },
+          { label: "getamano.us", url: "https://getamano.us", emoji: "🤝" },
           { label: "tiangix.com", url: "https://tiangix.com", emoji: "📦" },
         ],
         founderTrust: "🫂 Latino-founded · Serving all of America",
@@ -307,18 +307,29 @@ export default function AboutPage() {
                 />
                 <img
                   src="/avatars/founder-e-hernandez.png"
-                  alt="E. Hernandez, founder of getamano"
+                  alt="Eloy Hernández, founder of getamano"
                   loading="lazy"
                   className="relative w-40 h-40 md:w-48 md:h-48 rounded-full object-cover shadow-xl"
                   style={{ border: "4px solid #FFFFFF", boxShadow: "0 12px 40px -10px rgba(2,95,103,0.35)" }}
                   data-testid="about-founder-image"
                 />
+                {/* Mexico flag — heritage badge (bottom-right) */}
                 <span
                   className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full text-white text-base font-bold flex items-center justify-center shadow-lg border-2 border-white"
                   style={{ background: "#5DCAA5" }}
-                  aria-hidden="true"
+                  aria-label="Mexican-American heritage"
+                  data-testid="about-founder-flag-mx"
                 >
                   🇲🇽
+                </span>
+                {/* USA flag — serving-all-of-America badge (bottom-left) */}
+                <span
+                  className="absolute -bottom-1 -left-1 w-9 h-9 rounded-full text-white text-base font-bold flex items-center justify-center shadow-lg border-2 border-white"
+                  style={{ background: "#1D4ED8" }}
+                  aria-label="Serving all of America"
+                  data-testid="about-founder-flag-us"
+                >
+                  🇺🇸
                 </span>
               </div>
 
