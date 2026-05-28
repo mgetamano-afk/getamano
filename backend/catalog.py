@@ -240,6 +240,133 @@ SECTOR_COLORS = {
     "religioso": "#0891B2",
 }
 
+# ─── Section 79 — Hierarchical category picker emojis ───────────────
+# One emoji per sector (top-level "category") + per slug overrides for
+# common subcategories. Anything not in SUBCATEGORY_EMOJIS falls back to
+# its sector emoji. Emojis are stored on each category doc at startup so
+# the UI can read them directly from `/api/categories` without a lookup.
+SECTOR_EMOJIS = {
+    "hogar":         "🏠",
+    "jardineria":    "🌿",
+    "autos":         "🚗",
+    "profesionales": "💼",
+    "salud":         "🩺",
+    "belleza":       "💅",
+    "educacion":     "🎓",
+    "comida":        "🍽️",
+    "eventos":       "🎉",
+    "mascotas":      "🐾",
+    "tecnologia":    "💻",
+    "transporte":    "🚚",
+    "textiles":      "👗",
+    "religioso":     "🕊️",
+}
+
+# Per-subcategory overrides — kept compact, anything unlisted inherits
+# the sector emoji. Picked the most recognizable ones for each domain.
+SUBCATEGORY_EMOJIS = {
+    # hogar
+    "limpieza-hogar": "🧹", "limpieza-alfombras": "🧼", "limpieza-ventanas": "🪟",
+    "limpieza-post-construccion": "🚧", "limpieza-comercial": "🏢",
+    "organizacion-hogar": "🗂️", "lavanderia": "🧺",
+    "plomeria": "🔧", "electricidad": "⚡", "hvac": "❄️",
+    "techos": "🏚️", "pintura-interior": "🎨", "pintura-exterior": "🖌️",
+    "construccion": "🏗️", "drywall": "🧱", "carpinteria": "🪚",
+    "pisos": "🪵", "azulejos": "◽", "instalacion-gabinetes": "🪑",
+    "ventanas-puertas": "🚪", "herreria": "🔩", "cercas": "🚧",
+    "concreto": "🧱", "impermeabilizacion": "💧", "puertas-garage": "🏠",
+    "demolicion": "💥", "excavacion": "🚜", "deck-pergolas": "🌳",
+    "reparacion-electrodomesticos": "🔌", "mantenimiento-propiedades": "🏘️",
+    "alarmas-camaras": "🚨", "instalacion-iluminacion": "💡",
+    "fumigacion": "🐜", "exterminio-chinches": "🛏️",
+    "smart-home": "🎛️", "instalacion-tv-sonido": "📺",
+    # jardineria
+    "jardineria-yardwork": "🌱", "poda-arboles": "🌳",
+    "diseno-jardines": "🌷", "instalacion-pasto": "🌾",
+    "sistema-riego": "💦", "mantenimiento-piscina": "🏊",
+    "construccion-piscina": "🏖️", "limpieza-presion": "🚿",
+    # autos
+    "mecanica-general": "🔧", "mecanica-domicilio": "🏠",
+    "frenos": "🛞", "transmision": "⚙️", "llantas-rines": "🛞",
+    "pintura-autos": "🎨", "hojalateria": "🔨", "detailing-autos": "✨",
+    "ac-autos": "❄️", "car-audio": "🔊", "tintado-ventanas": "🪟",
+    "cristales-auto": "🪟", "grua-remolque": "🚚",
+    "inspeccion-autos-usados": "🔍", "seguros-auto": "🛡️",
+    "lavado-autos-domicilio": "🚿",
+    # profesionales
+    "impuestos": "📋", "contabilidad": "📊", "notario-publico": "📜",
+    "traduccion": "🌐", "agente-seguros": "🛡️", "bienes-raices": "🏘️",
+    "credito-hipotecas": "🏦", "reparacion-credito": "📈",
+    "consultoria-negocios": "💡", "registro-llc": "📑",
+    "asistente-virtual": "💻", "tramites-gestiones": "📨",
+    # salud
+    "entrenamiento-personal": "🏋️", "yoga-meditacion": "🧘",
+    "masajes": "💆", "nutricionista": "🥗", "terapia-fisica": "🦴",
+    "enfermeria-domicilio": "👩‍⚕️", "cuidado-heridas": "🩹",
+    "quiropractico": "🦴", "acupuntura": "🪡",
+    "psicologia-terapia": "🧠", "medicina-alternativa": "🌿",
+    "cuidado-personas-mayores": "👵", "companía-adultos-mayores": "🤝",
+    "asistencia-hogar-mayores": "🏠", "transporte-medico": "🚑",
+    # belleza
+    "peluqueria": "💇", "barberia": "💈", "unas": "💅",
+    "maquillaje": "💄", "cejas-pestanas": "👁️", "depilacion": "🪒",
+    "spa-faciales": "🧖", "estilismo-domicilio": "💇‍♀️",
+    "maquillaje-eventos": "✨", "extensiones-cabello": "💁",
+    "bronceado": "🌞", "tatuajes": "🖋️", "piercings": "💎",
+    # educacion
+    "tutoria-escolar": "📚", "clases-ingles": "🇺🇸",
+    "clases-espanol": "🇲🇽", "clases-musica": "🎵",
+    "clases-guitarra": "🎸", "clases-piano": "🎹",
+    "clases-baile": "💃", "clases-arte": "🎨",
+    "clases-computacion": "💻", "cuidado-ninos": "👶",
+    "ninera": "👶", "guarderia-casa": "🏡", "transporte-escolar": "🚌",
+    # comida
+    "chef-domicilio": "👨‍🍳", "pasteles-reposteria": "🎂",
+    "tamales-comida-tradicional": "🌮", "meal-prep": "🍱",
+    "bartending": "🍸", "meseros-eventos": "🍽️",
+    "food-truck": "🚚", "clases-cocina": "🍳",
+    "pinatas-artesanales": "🪅",
+    # eventos
+    "fotografia-eventos": "📸", "videografia": "🎥",
+    "fotografia-quinceaneras": "👑", "fotografia-bodas": "💒",
+    "fotografia-productos": "📦", "dj": "🎧",
+    "mariachi-musica-vivo": "🎺", "animacion-fiestas-infantiles": "🎈",
+    "payasos-magos": "🤡", "renta-brincolines": "🎪",
+    "decoracion-eventos": "🎀", "organizacion-quinceaneras": "👑",
+    "organizacion-bodas": "💒", "organizacion-eventos": "📋",
+    "flores-arreglos-florales": "💐", "renta-sillas-mesas": "🪑",
+    "carpas-lonas": "⛺", "fotomaton": "📸",
+    # mascotas
+    "peluqueria-mascotas": "🐩", "cuidado-mascotas": "🐕",
+    "paseo-perros": "🦮", "entrenamiento-perros": "🐕‍🦺",
+    "veterinario-domicilio": "🩺", "hotel-mascotas": "🏨",
+    "fotografia-mascotas": "📸",
+    # tecnologia
+    "reparacion-computadoras": "💻", "reparacion-celulares": "📱",
+    "instalacion-redes-wifi": "📶", "soporte-tecnico-domicilio": "🛠️",
+    "diseno-web": "🌐", "diseno-grafico": "🎨",
+    "redes-sociales": "📲", "edicion-digital": "✂️",
+    "impresion-diseno": "🖨️",
+    # transporte
+    "mudanzas-locales": "📦", "mudanzas-largo-alcance": "🚛",
+    "flete-acarreos": "🚚", "transporte-carga": "📦",
+    "mensajeria-delivery-local": "🛵", "transporte-aeropuerto": "✈️",
+    # textiles
+    "costura-alteraciones": "🧵", "diseno-ropa": "👗",
+    "bordados-personalizados": "🪡", "serigrafia-estampados": "👕",
+    "limpieza-seco": "🧥", "reparacion-calzado": "👞",
+    # religioso
+    "musica-religiosa": "⛪", "fotografia-bautizos-comuniones": "💒",
+    "decoracion-altares": "🕯️", "limpia-espiritual": "🌿",
+}
+
+
+def emoji_for(slug: str, sector: str) -> str:
+    """Resolve the best emoji for a subcategory slug — overrides win,
+    otherwise fall back to the sector's emoji, otherwise a neutral tool."""
+    return SUBCATEGORY_EMOJIS.get(slug) or SECTOR_EMOJIS.get(sector, "🛠️")
+
+
 # 23 prioritized US cities by latino population
 CITIES = [
     {"slug": "dallas", "name": "Dallas", "state": "TX"},

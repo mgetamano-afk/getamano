@@ -10,6 +10,7 @@ import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
 import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
+import CategoryTreePicker from "../components/CategoryTreePicker";
 import useGeolocation from "../hooks/useGeolocation";
 import useRefreshable from "../hooks/useRefreshable";
 import { trackSearch } from "../lib/analytics";
@@ -34,6 +35,7 @@ export default function Search() {
     return Number.isFinite(r) && r > 0 ? r : 75;
   });
   const [stuck, setStuck] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false); // Section 79
   const [view, setView] = useState(() => {
     const v = params.get("view");
     return v === "map" || v === "split" ? v : "list";
@@ -231,6 +233,48 @@ export default function Search() {
             </div>
             <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
           </form>
+
+          {/* Section 79 — Hierarchical service picker (mobile-first).
+              Tap → opens a bottom-sheet with sector → subcategory navigation
+              and full-text search across all 188 services. Replaces the old
+              16-option dropdown that was desktop-only. */}
+          <div className="-mt-2 mb-4 flex items-center gap-2 flex-wrap" data-testid="category-picker-row">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white border border-slate-200 shadow-sm hover:border-teal-400 hover:shadow transition text-sm font-medium text-slate-700"
+              data-testid="open-category-picker"
+            >
+              {(() => {
+                const cat = categories.find(c => c.slug === category);
+                if (cat) {
+                  return (
+                    <>
+                      <span className="text-base leading-none">{cat.emoji || "🛠️"}</span>
+                      <span className="truncate max-w-[200px]">{lang === "en" ? cat.name_en : cat.name_es}</span>
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <span className="text-base leading-none">🧭</span>
+                    <span>{lang === "en" ? "What service?" : "¿Qué servicio?"}</span>
+                  </>
+                );
+              })()}
+            </button>
+            {category && (
+              <button
+                type="button"
+                onClick={() => { setCategory(""); setTimeout(() => doSearch(), 0); }}
+                className="inline-flex items-center gap-1 h-10 px-3 rounded-full bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 transition"
+                data-testid="clear-category"
+                aria-label={lang === "en" ? "Clear category" : "Quitar categoría"}
+              >
+                <X className="w-3.5 h-3.5" /> {lang === "en" ? "Clear" : "Quitar"}
+              </button>
+            )}
+          </div>
 
           {/* Section 18F — Radius selector (only when "Near me" is active) */}
           {position && (
@@ -546,6 +590,16 @@ export default function Search() {
         )}
       </main>
       <Footer />
+
+      <CategoryTreePicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        value={category}
+        onSelect={(sub) => {
+          setCategory(sub.slug);
+          setTimeout(() => doSearch(null, {}), 0);
+        }}
+      />
     </div>
   );
 }

@@ -12,7 +12,15 @@ import string
 import uuid
 import bcrypt
 import jwt
-from catalog import CATALOG as FULL_CATALOG, SECTOR_LABELS, SECTOR_COLORS, CITIES as SEO_CITIES
+from catalog import (
+    CATALOG as FULL_CATALOG,
+    SECTOR_LABELS,
+    SECTOR_COLORS,
+    SECTOR_EMOJIS,
+    SUBCATEGORY_EMOJIS,
+    emoji_for,
+    CITIES as SEO_CITIES,
+)
 import httpx
 import requests
 from pathlib import Path
@@ -799,6 +807,7 @@ async def seed():
                 "license_flag": item["license"],
                 "color": SECTOR_COLORS.get(item["sector"], "#2F9D94"),
                 "icon": "🛠️",
+                "emoji": emoji_for(item["slug"], item["sector"]),
             })
     if new_docs:
         await db.categories.insert_many(new_docs)
@@ -806,6 +815,23 @@ async def seed():
     # Ensure license_flag/sector exist on legacy categories
     await db.categories.update_many({"license_flag": {"$exists": False}}, {"$set": {"license_flag": "green"}})
     await db.categories.update_many({"sector": {"$exists": False}}, {"$set": {"sector": "hogar", "sector_label": "Hogar y mantenimiento"}})
+
+    # Section 79 — Backfill `emoji` per category (sector override + subcategory override).
+    # Updates only docs that don't already carry one, so admin overrides are never clobbered.
+    try:
+        no_emoji = await db.categories.find(
+            {"$or": [{"emoji": {"$exists": False}}, {"emoji": None}, {"emoji": ""}]},
+            {"_id": 0, "slug": 1, "sector": 1}
+        ).to_list(1000)
+        for c in no_emoji:
+            await db.categories.update_one(
+                {"slug": c["slug"]},
+                {"$set": {"emoji": emoji_for(c["slug"], c.get("sector", "hogar"))}},
+            )
+        if no_emoji:
+            logger.info(f"Backfilled emoji on {len(no_emoji)} categories")
+    except Exception as e:
+        logger.warning(f"emoji backfill warn: {e}")
 
     # Seed an admin
     if not await db.users.find_one({"email": "admin@getamano.com"}):
@@ -1007,6 +1033,81 @@ async def seed():
 async def list_categories():
     cats = await db.categories.find({}, {"_id": 0}).to_list(500)
     return cats
+
+@api_router.get("/categories/tree")
+async def categories_tree():
+    """Section 79 — Hierarchical category tree.
+
+    Returns one node per sector (= top-level "service category" the user
+    sees in the picker) with its emoji, color, label, and the full list
+    of subcategories under it. Powers the two-step category selector on
+    the Search page (sector → subcategory → results).
+
+    Shape:
+        [
+          {
+            "sector": "hogar",
+            "label_es": "Hogar y mantenimiento",
+            "emoji": "🏠",
+            "color": "#2F9D94",
+            "count": 33,
+            "children": [
+              {"slug": "limpieza-hogar", "name_es": "Limpieza del hogar",
+               "name_en": "House Cleaning", "emoji": "🧹",
+               "license_flag": "green"},
+              ...
+            ]
+          },
+          ...
+        ]
+    """
+    cats = await db.categories.find({}, {"_id": 0}).to_list(500)
+    # Group by sector
+    grouped: dict[str, list[dict]] = {}
+    for c in cats:
+        sector = c.get("sector", "hogar")
+        grouped.setdefault(sector, []).append({
+            "slug": c.get("slug"),
+            "category_id": c.get("category_id"),
+            "name_es": c.get("name_es"),
+            "name_en": c.get("name_en"),
+            "emoji": c.get("emoji") or emoji_for(c.get("slug", ""), sector),
+            "license_flag": c.get("license_flag", "green"),
+        })
+
+    # Stable order: follow the order keys appear in SECTOR_LABELS
+    tree = []
+    seen = set()
+    for sector_key, label in SECTOR_LABELS.items():
+        children = grouped.get(sector_key, [])
+        if not children:
+            continue
+        children.sort(key=lambda x: (x.get("name_es") or "").lower())
+        tree.append({
+            "sector": sector_key,
+            "label_es": label,
+            "label_en": label,  # English labels can be added later
+            "emoji": SECTOR_EMOJIS.get(sector_key, "🛠️"),
+            "color": SECTOR_COLORS.get(sector_key, "#2F9D94"),
+            "count": len(children),
+            "children": children,
+        })
+        seen.add(sector_key)
+    # Append any unknown sectors at the end (defensive)
+    for sector_key, children in grouped.items():
+        if sector_key in seen:
+            continue
+        children.sort(key=lambda x: (x.get("name_es") or "").lower())
+        tree.append({
+            "sector": sector_key,
+            "label_es": sector_key.title(),
+            "label_en": sector_key.title(),
+            "emoji": SECTOR_EMOJIS.get(sector_key, "🛠️"),
+            "color": SECTOR_COLORS.get(sector_key, "#2F9D94"),
+            "count": len(children),
+            "children": children,
+        })
+    return tree
 
 # ============ PROVIDERS + SEARCH ============
 # Extracted to routes/search.py — wired at the bottom of this file alongside

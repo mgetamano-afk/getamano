@@ -2950,3 +2950,53 @@ Stories were pure visuals — no monetizable CTA. User asked to turn them into m
 ### Files
 - **NEW**: `backend/tests/test_iter78_story_stickers.py`
 - **MODIFIED**: `backend/routes/stories.py`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`
+
+---
+
+## Section 79 — Hierarchical service category picker with emojis (2026-02-28)
+
+### User ask
+*"En la sección de buscar servicio, hay que crear en la base de datos todos los servicios "categories" que tenemos los mismos que están en el footer, si hay subcategorías el cliente puede escojer categoria, subcategoria hasta darle el servicio real que necesita, cuando carges las categories y subcategorias asegurate de cargar los emojis representativos."*
+
+### Discovery
+- 188 categories already seeded in MongoDB (14 sectors via `catalog.py` × ~13 subs each).
+- Old Search dropdown only showed 16 flat names; no emojis; not mobile-friendly.
+
+### Backend
+- **MODIFIED** `backend/catalog.py`:
+  - Added `SECTOR_EMOJIS` (14 entries) — one emoji per top-level category (🏠 hogar, 🌿 jardinería, 🚗 autos, 💼 profesionales, 🩺 salud, 💅 belleza, 🎓 educación, 🍽️ comida, 🎉 eventos, 🐾 mascotas, 💻 tecnología, 🚚 transporte, 👗 textiles, 🕊️ religioso).
+  - Added `SUBCATEGORY_EMOJIS` — ~140 per-slug overrides for the most recognizable services (🧹 Limpieza hogar, 🔧 Plomería, ⚡ Electricidad, 💇 Peluquería, etc.).
+  - New `emoji_for(slug, sector)` helper with fallback chain: slug-override → sector-emoji → 🛠️.
+- **MODIFIED** `backend/server.py`:
+  - Startup migration: backfills the `emoji` field on every category doc that didn't have one (idempotent — admin overrides are never clobbered).
+  - New seed inserts now carry `emoji` from the start.
+  - New endpoint `GET /api/categories/tree` — returns 14 sector nodes with `{sector, label_es, emoji, color, count, children[]}`. Children are alphabetically sorted by `name_es` for deterministic UI.
+
+### Frontend
+- **NEW** `frontend/src/components/CategoryTreePicker.jsx`:
+  - Bottom-sheet modal (mobile-first; centered on sm+).
+  - Two-step navigation: SECTOR list → drill into chosen sector → SUBCATEGORY list with checkmark on current selection.
+  - Persistent search bar at top that does **cross-sector full-text** filter (≥2 chars) — bypasses the sector navigation entirely.
+  - License color dots (green / yellow / red) on each row.
+  - Back button + close button + safe-area-bottom padding for iPhone.
+  - Renders into `document.body` via portal so the z-index never fights with the header.
+- **MODIFIED** `frontend/src/pages/Search.jsx`:
+  - Added a prominent "🧭 ¿Qué servicio?" button under the search form (visible on mobile + desktop) that opens the picker. When a category is selected, the button morphs into "🧹 House Cleaning" with a "✕ Clear" chip next to it.
+  - Picker `onSelect` writes the slug to `category` state and re-runs `doSearch`.
+  - Old desktop `<select>` sidebar dropdown still present (untouched) for power users.
+
+### Tests
+- **NEW** `backend/tests/test_iter79_category_tree.py` — 5 tests:
+  1. Every category has a non-empty `emoji` after backfill.
+  2. `/categories/tree` returns ≥10 sectors, each with the full shape (sector/label/emoji/color/count/children), all children have license_flag ∈ {green, yellow, red}.
+  3. Tree endpoint responds in <300ms.
+  4. Children inside a sector are alphabetically sorted by `name_es`.
+  5. Selecting a subcategory slug correctly filters `/providers?category=...`.
+
+### Verification
+- 47 backend tests passing (iter71 → iter79). No regressions.
+- Mobile screenshots @ 393×852: picker opens → 14 sectors with emojis → drill into "🏠 Hogar y mantenimiento" → 50 subs alphabetically with their own emojis → pick "Limpieza del hogar" → search filters to 3 results with button showing "🧹 House Cleaning". Full flow validated.
+
+### Files
+- **NEW**: `frontend/src/components/CategoryTreePicker.jsx`, `backend/tests/test_iter79_category_tree.py`
+- **MODIFIED**: `backend/catalog.py`, `backend/server.py`, `frontend/src/pages/Search.jsx`
