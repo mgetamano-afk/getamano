@@ -2807,3 +2807,91 @@ Sec.74 PullToRefresh defaulted to `window.location.reload()` — slow on 3G/4G (
 ### Files
 - **NEW**: `frontend/src/lib/refreshBus.js`, `frontend/src/hooks/useRefreshable.js`, `backend/tests/test_iter75_refresh_endpoints_sla.py`
 - **MODIFIED**: `frontend/src/components/PullToRefresh.jsx`, `frontend/src/pages/AppHome.jsx`, `frontend/src/pages/Search.jsx`, `frontend/src/pages/ComunidadPage.jsx`, `frontend/src/components/EarningsWidget.jsx`, `frontend/src/components/ReferralProgressCard.jsx`, `frontend/src/components/StoriesCarousel.jsx`
+
+---
+
+## Section 76 — Mobile UX overhaul: stories merged, identity filters removed (2026-02-28)
+
+### User report
+Three issues + design ask, all in one message:
+1. Search page: `Dueños Latinos` + `Dueños Americanos` chips still visible — must be removed (we already generalized in Sec.67 dual-audience).
+2. Search page: scroll trapped mid-page; map allegedly broken (was actually rendering, but sticky filter bar was eating screen).
+3. Comunidad: two avatar rows stacked (provider directory + active stories) felt cluttered. Wanted ONE Instagram/Facebook-style row, with the user's own avatar as the "+ Add story" entry point.
+4. Design ask: more native/elegant, social-network feel; pulse animation hinting at new stories.
+
+### Fixes
+
+#### Search.jsx (3 changes)
+- **Removed** `IDENTITY_CHIPS` constant + `ownerIdentity` state + `identityCounts` state/fetch + `selectIdentity` handler + entire chips render block.
+- **Removed** `owner_identity` query param from `doSearch` + `fetchMap`.
+- **Mobile sticky disabled**: `sticky top-16` → `md:sticky md:top-20`. On phones, the bar scrolls naturally (no more lockup mid-page). Sticky preserved on tablet/desktop where there's room.
+
+#### ComunidadPage.jsx (3 changes)
+- **Deleted** `StoriesRow` component (~37 lines) — its function is now absorbed by the existing `StoriesCarousel` inside `PostFeed`. No more double avatar row.
+- **Removed** "Todos / Siguiendo" feed tabs and `feedTab` state. Single `<PostFeed />` render. Cleaner mental model, more emphasis on stories.
+- Header copy unchanged (still "Comunidad" + the existing tagline).
+
+#### StoriesCarousel.jsx — Instagram pattern
+- Logged-in provider's OWN tile rendered FIRST.
+  - WITH active stories: avatar with gradient ring + tappable "+" badge floating bottom-right (Instagram pattern) to add another. Tap the avatar → opens viewer.
+  - WITHOUT stories: dashed-border "+ Tu historia" tile (was always there, now sized to 72px to match).
+- Tile size: 64px → 72px for more presence.
+- Other providers' tiles get a `gtm-story-pulse` class when their latest story was created in the last 60 min — subtle ring breathing animation (box-shadow halo, 2.2s ease-in-out infinite). Catches the eye like Facebook's "new stories" cue.
+- ShieldCheck verified badge now `inline-flex` with the name so it never wraps awkwardly.
+
+#### App.css
+- New `@keyframes gtm-story-pulse` + `.gtm-story-pulse` class with `box-shadow + transform` pulse. GPU-accelerated, hint-free on idle.
+
+### Verification
+- 31 backend tests still passing (iter71/72/73/75 — refactor + stories + critical-path + SLA).
+- Mobile screenshot @ 393×852:
+  - **Comunidad**: ONE row showing María's avatar with green "+" badge, label "Tu historia". No `Todos/Siguiendo` tabs. No duplicate stories row. Feed posts render directly below.
+  - **Search**: NO identity chips. Just "Con video" + view toggle. Scroll works without sticking. Map view still renders correctly (verified separately — 16 leaflet tiles loaded, 3 markers placed).
+
+### Files
+- **MODIFIED**: `frontend/src/pages/Search.jsx`, `frontend/src/pages/ComunidadPage.jsx`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`, `backend/tests/test_iter72_stories_likes_ttl.py` (test reliability fix)
+
+---
+
+## Section 77 — Auto-refresh on tab return + desktop hover preview + viewer swipe (2026-02-28)
+
+User asked for both enhancements at once: smart background refresh AND polish the stories experience to match Instagram-grade (hover preview on desktop, horizontal swipe between providers in the viewer).
+
+### Auto-refresh on tab return
+- **NEW** `frontend/src/components/AutoRefreshOnReturn.jsx`: tiny component mounted at `BrowserRouter` level.
+  - Tracks `document.visibilitychange`, `window.focus`, and `pageshow` (iOS bfcache).
+  - If page was hidden ≥ 120 s, calls `triggerRefresh()` silently — no spinner, no UI noise. Each registered widget re-fetches its own slice via the refresh-bus from Sec.75.
+  - 5 s debounce so visibilitychange + focus firing in quick succession only refreshes once.
+  - No-op when no widget is subscribed (avoids waking dead routes).
+- **MODIFIED** `frontend/src/App.js`: added `<AutoRefreshOnReturn />` next to `<PullToRefresh />`.
+
+### Desktop hover preview on story tiles
+- **MODIFIED** `frontend/src/components/StoriesCarousel.jsx`: extracted the per-tile render into a new `StoryTile` subcomponent.
+  - On `pointerenter` with `pointerType === "mouse"` ONLY (touch devices opt out automatically), shows a floating popover beneath the tile with:
+    - Latest story image (`g.image_url`) at 3:5 aspect ratio
+    - Business name + caption with dark gradient overlay for readability
+  - Hidden on mobile via `hidden md:block`.
+  - 160 ms `gtm-story-hover-pop` animation: slide down + scale 0.95→1, cubic-bezier ease-out.
+
+### Horizontal swipe between providers (Instagram pattern)
+- **MODIFIED** `StoryViewer` in same file:
+  - Added `swipeRef` + `handleSwipeStart`/`handleSwipeEnd` on the outer container.
+  - Tracks `touchstart` x/y, on `touchend` measures `dx`/`dy`.
+  - Threshold: `|dx| ≥ 60px` AND `|dx| > |dy|` (horizontal-dominant) — avoids hijacking vertical scroll/dismiss gestures.
+  - Swipe LEFT → `onNext()` if `hasNext`. Swipe RIGHT → `onPrev()` if `hasPrev`.
+- **MODIFIED** `App.css`: added `@keyframes gtm-story-hover-pop` + `.gtm-story-hover-pop` class.
+
+### Tests
+- **NEW** `backend/tests/test_iter77_autorefresh_swipe.py` — 3 tests:
+  1. `/stories/by-provider/{uid}` returns story list in <800 ms (powers the viewer; cold call must stay snappy).
+  2. `/stories/active` payload includes `image_url` + `caption` keys (powers hover preview).
+  3. `/stories/active` includes parseable `created_at` (powers pulse animation).
+
+### Verification
+- 34 backend tests passing (iter71/72/73/75/77). No regressions.
+- Desktop screenshot @ 1280×800: hovering María's tile shows a 176×293px popover with the story image, business name, and stories_count badge — animation slides in from above.
+- Lint 100% clean.
+
+### Files
+- **NEW**: `frontend/src/components/AutoRefreshOnReturn.jsx`, `backend/tests/test_iter77_autorefresh_swipe.py`
+- **MODIFIED**: `frontend/src/App.js`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`

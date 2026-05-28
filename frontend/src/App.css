@@ -220,6 +220,33 @@
 }
 
 
+/* ─── Section 76 — Story tile "fresh" pulse (Instagram/Facebook-style)
+   Subtle ring breathing animation on stories created in the last hour.
+   Pure CSS, GPU-accelerated via box-shadow + transform. */
+@keyframes gtm-story-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(244, 63, 94, 0);
+    transform: scale(1.02);
+  }
+}
+.gtm-story-pulse {
+  animation: gtm-story-pulse 2.2s ease-in-out infinite;
+}
+
+/* ─── Section 77 — Desktop hover preview popover on story tiles ─── */
+@keyframes gtm-story-hover-pop {
+  from { opacity: 0; transform: translate(-50%, -6px) scale(0.95); }
+  to   { opacity: 1; transform: translate(-50%, 0)    scale(1);    }
+}
+.gtm-story-hover-pop {
+  animation: gtm-story-hover-pop 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
+}
+
 /* ─── Section 72.5 — Story Center Heart Burst (Instagram-style) ─── */
 @keyframes gtm-center-heart {
   0%   { transform: scale(0.2) rotate(-12deg); opacity: 0; }

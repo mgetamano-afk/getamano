@@ -8,6 +8,7 @@ import { useEffect, lazy, Suspense } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
 import ScrollToTop from "./components/ScrollToTop";
 import PullToRefresh from "./components/PullToRefresh";
+import AutoRefreshOnReturn from "./components/AutoRefreshOnReturn";
 import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
 import BottomNav from "./components/BottomNav";
@@ -261,6 +262,7 @@ function App() {
               <AnalyticsTracker />
               <ScrollToTop />
               <PullToRefresh />
+              <AutoRefreshOnReturn />
               <InstallPrompt />
               <InstallAppModal />
               <RouteErrorBoundary>

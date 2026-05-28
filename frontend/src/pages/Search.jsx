@@ -16,12 +16,6 @@ import { trackSearch } from "../lib/analytics";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { SeoHead } from "../components/seo/SeoHead";
 
-const IDENTITY_CHIPS = [
-  { id: "", label: "Todos" },
-  { id: "latino", label: "Dueños Latinos", emoji: "🤝" },
-  { id: "american", label: "Dueños Americanos", emoji: "🤝" },
-];
-
 export default function Search() {
   const [params, setParams] = useSearchParams();
   const { t, lang } = useI18n();
@@ -30,7 +24,6 @@ export default function Search() {
   const [category, setCategory] = useState(params.get("category") || "");
   const [verifiedOnly, setVerifiedOnly] = useState(params.get("verified") === "true");
   const [language, setLanguage] = useState(params.get("language") || "");
-  const [ownerIdentity, setOwnerIdentity] = useState(params.get("owner_identity") || "");
   const [hasVideo, setHasVideo] = useState(params.get("has_video") === "true");
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -40,7 +33,6 @@ export default function Search() {
     const r = parseInt(params.get("radius_miles") || "", 10);
     return Number.isFinite(r) && r > 0 ? r : 75;
   });
-  const [identityCounts, setIdentityCounts] = useState({ all: 0, latino: 0, american: 0 });
   const [stuck, setStuck] = useState(false);
   const [view, setView] = useState(() => {
     const v = params.get("view");
@@ -87,13 +79,12 @@ export default function Search() {
     if (e) e.preventDefault();
     setLoading(true);
     const qs = {};
-    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, hasVideo, ...overrides };
+    const cur = { q, city, category, verifiedOnly, language, hasVideo, ...overrides };
     if (cur.q) qs.q = cur.q;
     if (cur.city) qs.city = cur.city;
     if (cur.category) qs.category = cur.category;
     if (cur.verifiedOnly) qs.verified = "true";
     if (cur.language) qs.language = cur.language;
-    if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     if (cur.hasVideo) qs.has_video = "true";
     // Section 18F — proximity ("Near me") — US default radius: 75 miles (~1.5h drive)
     if (position && !cur.city) {
@@ -104,16 +95,9 @@ export default function Search() {
     const urlQs = { ...qs };
     if (view !== "list") urlQs.view = view;
     setParams(urlQs);
-    // counts query: same filters minus owner_identity
-    const countsQs = { ...qs };
-    delete countsQs.owner_identity;
     try {
-      const [{ data }, countsRes] = await Promise.all([
-        api.get("/providers", { params: qs }),
-        api.get("/providers/identity-counts", { params: countsQs }).catch(() => ({ data: null })),
-      ]);
+      const { data } = await api.get("/providers", { params: qs });
       setProviders(data);
-      if (countsRes?.data) setIdentityCounts(countsRes.data);
       trackSearch(cur.q, cur.city, cur.category, (data || []).length);
     } finally {
       setLoading(false);
@@ -123,13 +107,12 @@ export default function Search() {
   // Fetch map data progressively (geocodes up to 5 per call server-side; we call up to 6 times)
   const fetchMap = async (overrides = {}, bbox = null) => {
     const qs = {};
-    const cur = { q, city, category, verifiedOnly, language, ownerIdentity, hasVideo, ...overrides };
+    const cur = { q, city, category, verifiedOnly, language, hasVideo, ...overrides };
     if (cur.q) qs.q = cur.q;
     if (cur.city) qs.city = cur.city;
     if (cur.category) qs.category = cur.category;
     if (cur.verifiedOnly) qs.verified = "true";
     if (cur.language) qs.language = cur.language;
-    if (cur.ownerIdentity) qs.owner_identity = cur.ownerIdentity;
     if (cur.hasVideo) qs.has_video = "true";
     if (bbox) {
       qs.min_lat = bbox.min_lat;
@@ -184,7 +167,7 @@ export default function Search() {
   const refresh = useCallback(() => {
     return doSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, city, category, verifiedOnly, language, ownerIdentity, hasVideo, position?.lat, position?.lng, radiusMiles, view]);
+  }, [q, city, category, verifiedOnly, language, hasVideo, position?.lat, position?.lng, radiusMiles, view]);
   useRefreshable(refresh);
 
   // Section 18F — auto-research when user enables "Near me"
@@ -192,12 +175,6 @@ export default function Search() {
     if (position) doSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position?.lat, position?.lng]);
-
-  const selectIdentity = (id) => {
-    setOwnerIdentity(id);
-    doSearch(null, { ownerIdentity: id });
-    if (view === "map" || view === "split") fetchMap({ ownerIdentity: id });
-  };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
@@ -212,9 +189,13 @@ export default function Search() {
       {/* Sentinel to detect when the sticky filter bar becomes stuck */}
       <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
 
-      {/* Sticky filter bar: search form + identity chips */}
+      {/* Search filter bar. On mobile (sm and below) this scrolls
+          naturally with the page — sticky was trapping touch and
+          forcing the section to lock at mid-screen on iOS. On md+
+          screens it sticks below the header for quick filter access
+          while browsing long result lists. */}
       <div
-        className="sticky top-16 md:top-20 z-30 transition-all duration-200"
+        className="md:sticky md:top-20 z-30 transition-all duration-200"
         style={{
           backgroundColor: stuck ? "rgba(247, 246, 242, 0.92)" : "transparent",
           backdropFilter: stuck ? "blur(14px)" : "none",
@@ -289,42 +270,10 @@ export default function Search() {
             </div>
           )}
 
-          {/* Identity chips (inclusive filter, no flags) */}
-          <div className="flex flex-wrap items-center gap-2" data-testid="identity-filter-chips">
-          {IDENTITY_CHIPS.map(chip => {
-            const active = ownerIdentity === chip.id;
-            const countKey = chip.id || "all";
-            const count = identityCounts[countKey] ?? 0;
-            return (
-              <button
-                key={chip.id || "all"}
-                type="button"
-                onClick={() => selectIdentity(chip.id)}
-                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all border ${active ? "shadow-sm" : "hover:border-slate-300"}`}
-                style={{
-                  backgroundColor: active ? "#025F67" : "#FFFFFF",
-                  color: active ? "#FFFFFF" : "#025F67",
-                  borderColor: active ? "#025F67" : "#BCC5CC",
-                }}
-                data-testid={`identity-chip-${chip.id || "all"}`}
-                aria-pressed={active}
-              >
-                {chip.emoji && <span aria-hidden="true">{chip.emoji}</span>}
-                {chip.label}
-                <span
-                  className="ml-1 inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full text-[11px] font-semibold tabular-nums"
-                  style={{
-                    backgroundColor: active ? "rgba(255,255,255,0.22)" : "#EBF8F7",
-                    color: active ? "#FFFFFF" : "#025F67",
-                  }}
-                  data-testid={`identity-chip-count-${chip.id || "all"}`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-
+          {/* Inclusive filters: Video only. Identity filters removed in
+              Section 76 — getamano now serves all of America without
+              segmenting by owner ethnicity (per Section 67 dual-audience). */}
+          <div className="flex flex-wrap items-center gap-2" data-testid="filter-chips">
           {/* Video filter chip */}
           <button
             type="button"

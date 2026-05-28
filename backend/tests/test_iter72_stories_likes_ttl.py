@@ -57,15 +57,17 @@ def test_like_increments_count_visible_in_carousel(client_session, anon_session)
     r = anon_session.get(f"{API}/stories/active?limit=5", timeout=15)
     if r.status_code != 200 or not r.json():
         pytest.skip("no active stories to like")
-    row = r.json()[0]
-    story_id = row.get("latest_story_id")
-    before = row.get("likes_count", 0)
-    assert story_id, f"no latest_story_id in {row}"
+    story_id = r.json()[0].get("latest_story_id")
+    assert story_id, "no latest_story_id"
 
-    # Reset to a known state — un-like if currently liked
+    # Reset to a known UNLIKED state — un-like if currently liked
     state = client_session.get(f"{API}/stories/{story_id}/like-state", timeout=15).json()
     if state.get("liked"):
         client_session.post(f"{API}/stories/{story_id}/like", timeout=15)
+
+    # Capture baseline AFTER reset (so we know the floor)
+    r = anon_session.get(f"{API}/stories/active?limit=5", timeout=15)
+    before = next((row.get("likes_count", 0) for row in r.json() if row["latest_story_id"] == story_id), 0)
 
     # Like once
     r = client_session.post(f"{API}/stories/{story_id}/like", timeout=15)

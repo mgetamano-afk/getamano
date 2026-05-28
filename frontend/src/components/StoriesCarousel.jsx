@@ -65,68 +65,102 @@ export default function StoriesCarousel() {
   // Show nothing if no stories AND user is not a provider
   if (!groups.length && user?.role !== "provider") return null;
 
+  // Section 76 — Identify the logged-in provider's OWN tile in the
+  // active list so we can render it first with a "+" overlay (Instagram
+  // pattern), instead of a separate floating "+ Tu historia" tile.
+  const myIdx = user?.role === "provider" ? groups.findIndex(g => g.provider_user_id === user.user_id) : -1;
+  const myGroup = myIdx >= 0 ? groups[myIdx] : null;
+  const otherGroups = myIdx >= 0 ? groups.filter((_, i) => i !== myIdx) : groups;
+
+  // Stories created in the last 60 minutes get a subtle pulse animation —
+  // "there's something new" social-network cue.
+  const isFresh = (g) => {
+    if (!g?.created_at) return false;
+    const t = new Date(g.created_at).getTime();
+    if (Number.isNaN(t)) return false;
+    return (Date.now() - t) < 60 * 60 * 1000;
+  };
+
   return (
     <>
       <div className="mb-4" data-testid="stories-carousel">
         <div className="flex gap-3 overflow-x-auto pb-3 px-1 -mx-1 scrollbar-none">
-          {/* "+" tile for logged-in providers */}
+          {/* Logged-in provider's tile — shown first.
+              - WITH active stories: tap opens viewer, "+" badge overlays
+                the avatar so they can add another segment.
+              - WITHOUT stories: tap opens creator. */}
           {user?.role === "provider" && (
-            <button
-              type="button"
-              onClick={() => setShowCreator(true)}
-              className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
-              data-testid="story-create-tile"
-            >
-              <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center ring-2 ring-white shadow-md group-hover:scale-105 transition">
-                <Plus className="w-7 h-7 text-white" strokeWidth={2.5} />
+            myGroup ? (
+              <div
+                className="flex-shrink-0 flex flex-col items-center gap-1.5 group relative"
+                data-testid="story-tile-self"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = groups.findIndex(g => g.provider_user_id === user.user_id);
+                    if (idx >= 0) openViewer(idx);
+                  }}
+                  className="relative w-[72px] h-[72px] rounded-full p-[2.5px] group-hover:scale-105 transition will-change-transform"
+                  style={{ background: "linear-gradient(135deg, #ec4899 0%, #f97316 50%, #f43f5e 100%)" }}
+                  aria-label={lang === "en" ? "View your story" : "Ver tu historia"}
+                >
+                  <div className="w-full h-full rounded-full p-[2px] bg-white">
+                    {myGroup.logo_url ? (
+                      <img {...lazyImg(buildFileUrl(myGroup.logo_url))} alt="" className="w-full h-full rounded-full object-cover bg-slate-100" />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
+                        {(myGroup.business_name || user?.name || "?")[0]?.toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                </button>
+                {/* "+" badge overlay — tap to add another story */}
+                <button
+                  type="button"
+                  onClick={() => setShowCreator(true)}
+                  className="absolute top-[42px] left-[42px] w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center ring-2 ring-white shadow-md hover:scale-110 transition will-change-transform"
+                  data-testid="story-add-badge"
+                  aria-label={lang === "en" ? "Add story" : "Agregar historia"}
+                >
+                  <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                </button>
+                <span className="text-[11px] font-medium text-slate-700 max-w-[72px] truncate">
+                  {lang === "en" ? "Your story" : "Tu historia"}
+                </span>
               </div>
-              <span className="text-[11px] font-medium text-slate-600 max-w-[64px] truncate">
-                {lang === "en" ? "Your story" : "Tu historia"}
-              </span>
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowCreator(true)}
+                className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
+                data-testid="story-create-tile"
+              >
+                <div className="relative w-[72px] h-[72px] rounded-full p-[2.5px] group-hover:scale-105 transition will-change-transform" style={{ background: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)" }}>
+                  <div className="w-full h-full rounded-full bg-slate-50 border-2 border-dashed border-teal-400 flex items-center justify-center">
+                    <Plus className="w-7 h-7 text-teal-600" strokeWidth={2.5} />
+                  </div>
+                </div>
+                <span className="text-[11px] font-medium text-slate-600 max-w-[72px] truncate">
+                  {lang === "en" ? "Add story" : "Tu historia"}
+                </span>
+              </button>
+            )
           )}
 
-          {/* Provider story tiles */}
-          {groups.map((g, idx) => (
-            <button
-              key={g.provider_user_id}
-              type="button"
-              onClick={() => openViewer(idx)}
-              className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
-              data-testid={`story-tile-${g.provider_user_id}`}
-            >
-              <div className="relative w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-pink-500 via-orange-400 to-rose-500 group-hover:scale-105 transition">
-                <div className="w-full h-full rounded-full p-[2px] bg-white">
-                  {g.logo_url ? (
-                    <img
-                      {...lazyImg(buildFileUrl(g.logo_url))}
-                      alt=""
-                      className="w-full h-full rounded-full object-cover bg-slate-100"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
-                      {(g.business_name || "?")[0]?.toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                {g.stories_count > 1 && (
-                  <span className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-pink-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white" data-testid={`story-tile-count-${g.provider_user_id}`}>
-                    {g.stories_count}
-                  </span>
-                )}
-                {g.likes_count > 0 && (
-                  <span className="absolute -top-1 -right-1 inline-flex items-center gap-0.5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold ring-2 ring-white shadow-sm" data-testid={`story-tile-likes-${g.provider_user_id}`}>
-                    <Heart className="w-2.5 h-2.5" fill="currentColor" strokeWidth={0} />
-                    {g.likes_count}
-                  </span>
-                )}
-              </div>
-              <span className="text-[11px] font-medium text-slate-700 max-w-[64px] truncate">
-                {g.business_name}
-                {g.verified && <ShieldCheck className="w-2.5 h-2.5 inline-block ml-0.5 text-emerald-500" />}
-              </span>
-            </button>
-          ))}
+          {/* Other providers' story tiles */}
+          {otherGroups.map((g) => {
+            const realIdx = groups.findIndex(x => x.provider_user_id === g.provider_user_id);
+            const fresh = isFresh(g);
+            return (
+              <StoryTile
+                key={g.provider_user_id}
+                group={g}
+                fresh={fresh}
+                onOpen={() => openViewer(realIdx)}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -154,6 +188,100 @@ export default function StoriesCarousel() {
 }
 
 /**
+ * StoryTile — single avatar circle in the carousel with optional desktop
+ * hover preview. On `pointerenter` (mouse/trackpad only, NOT touch), we
+ * show a small floating popover with the latest story thumbnail + caption,
+ * giving desktop users a quick peek before committing to open the viewer.
+ *
+ * The hover only triggers for pointers that have `pointerType === "mouse"`
+ * — coarse-pointer (touch) devices never see the popover, preserving the
+ * mobile interaction (tap → open viewer directly).
+ */
+function StoryTile({ group, fresh, onOpen }) {
+  const g = group;
+  const [hover, setHover] = useState(false);
+  const tileRef = useRef(null);
+
+  const onPointerEnter = (e) => {
+    if (e.pointerType !== "mouse") return;
+    setHover(true);
+  };
+  const onPointerLeave = () => setHover(false);
+
+  return (
+    <div
+      ref={tileRef}
+      className="relative flex-shrink-0"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex flex-col items-center gap-1.5 group"
+        data-testid={`story-tile-${g.provider_user_id}`}
+      >
+        <div
+          className={`relative w-[72px] h-[72px] rounded-full p-[2.5px] group-hover:scale-105 transition will-change-transform ${fresh ? "gtm-story-pulse" : ""}`}
+          style={{ background: "linear-gradient(135deg, #ec4899 0%, #f97316 50%, #f43f5e 100%)" }}
+        >
+          <div className="w-full h-full rounded-full p-[2px] bg-white">
+            {g.logo_url ? (
+              <img
+                {...lazyImg(buildFileUrl(g.logo_url))}
+                alt=""
+                className="w-full h-full rounded-full object-cover bg-slate-100"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
+                {(g.business_name || "?")[0]?.toUpperCase()}
+              </div>
+            )}
+          </div>
+          {g.stories_count > 1 && (
+            <span className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-pink-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white" data-testid={`story-tile-count-${g.provider_user_id}`}>
+              {g.stories_count}
+            </span>
+          )}
+          {g.likes_count > 0 && (
+            <span className="absolute -top-1 -right-1 inline-flex items-center gap-0.5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold ring-2 ring-white shadow-sm" data-testid={`story-tile-likes-${g.provider_user_id}`}>
+              <Heart className="w-2.5 h-2.5" fill="currentColor" strokeWidth={0} />
+              {g.likes_count}
+            </span>
+          )}
+        </div>
+        <span className="text-[11px] font-medium text-slate-700 max-w-[72px] truncate inline-flex items-center gap-0.5">
+          <span className="truncate">{g.business_name}</span>
+          {g.verified && <ShieldCheck className="w-2.5 h-2.5 flex-shrink-0 text-emerald-500" />}
+        </span>
+      </button>
+
+      {hover && g.image_url && (
+        <div
+          className="hidden md:block absolute left-1/2 -translate-x-1/2 top-[88px] z-30 w-44 rounded-xl overflow-hidden shadow-2xl ring-1 ring-black/10 pointer-events-none gtm-story-hover-pop"
+          data-testid={`story-tile-hover-${g.provider_user_id}`}
+        >
+          <div className="aspect-[3/5] bg-slate-900 relative">
+            <img
+              src={buildFileUrl(g.image_url)}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+            />
+            <div className="absolute inset-x-0 bottom-0 px-2.5 py-2 bg-gradient-to-t from-black/80 to-transparent">
+              <p className="text-white text-[11px] font-semibold truncate">{g.business_name}</p>
+              {g.caption ? (
+                <p className="text-white/80 text-[10px] line-clamp-2 mt-0.5">{g.caption}</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * StoryViewer — fullscreen modal that plays a single provider's stories in
  * sequence with auto-advancing 5s progress bars (Instagram-style).
  */
@@ -173,6 +301,29 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
   // Section 72.5 — Double-tap to like + giant center heart animation
   const [centerHeart, setCenterHeart] = useState(0); // increment to retrigger anim
   const lastTapRef = useRef(0);
+
+  // Section 77 — Horizontal swipe between providers (Instagram pattern).
+  // Touch a story image, drag left/right > 60px, release → go to prev/next group.
+  const swipeRef = useRef({ x: 0, y: 0, active: false });
+  const SWIPE_THRESHOLD = 60;
+  const handleSwipeStart = (e) => {
+    const t = e.touches?.[0];
+    if (!t) return;
+    swipeRef.current = { x: t.clientX, y: t.clientY, active: true };
+  };
+  const handleSwipeEnd = (e) => {
+    const s = swipeRef.current;
+    if (!s.active) return;
+    swipeRef.current = { x: 0, y: 0, active: false };
+    const t = e.changedTouches?.[0];
+    if (!t) return;
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    // Ignore vertical-dominant swipes (those are scroll/dismiss gestures)
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dy) > Math.abs(dx)) return;
+    if (dx < 0 && hasNext) onNext();
+    else if (dx > 0 && hasPrev) onPrev();
+  };
 
   const isOwner = user && group && user.user_id === group.provider_user_id;
 
@@ -318,8 +469,9 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
       data-no-ptr="true"
       onMouseDown={() => setPaused(true)}
       onMouseUp={() => setPaused(false)}
-      onTouchStart={() => setPaused(true)}
-      onTouchEnd={() => setPaused(false)}
+      onTouchStart={(e) => { setPaused(true); handleSwipeStart(e); }}
+      onTouchEnd={(e) => { setPaused(false); handleSwipeEnd(e); }}
+      onTouchCancel={() => { setPaused(false); swipeRef.current = { x: 0, y: 0, active: false }; }}
     >
       {loading ? (
         <Loader2 className="w-8 h-8 text-white animate-spin" />

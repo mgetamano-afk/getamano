@@ -35,43 +35,11 @@ function relTime(iso) {
 }
 
 // ─── Stories Row ────────────────────────────────────────────────────────
-function StoriesRow() {
-  const [stories, setStories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    api.get("/community/stories")
-      .then(r => { if (alive) setStories(r.data || []); })
-      .catch(() => {})
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
-
-  if (loading) return <div className="h-20 rounded-2xl bg-slate-50 animate-pulse mb-4" />;
-  if (stories.length === 0) return null;
-  return (
-    <div className="mb-4 -mx-4 sm:mx-0" data-testid="comunidad-stories">
-      <div className="flex gap-3 overflow-x-auto px-4 sm:px-0 pb-1" style={{ scrollbarWidth: "none" }}>
-        <style>{`[data-testid="comunidad-stories"] ::-webkit-scrollbar{display:none}`}</style>
-        {stories.map(s => (
-          <Link
-            key={s.user_id}
-            to={`/provider/${s.slug}`}
-            className="flex flex-col items-center flex-shrink-0 w-16 group"
-            data-testid={`comunidad-story-${s.user_id}`}
-          >
-            <div className="relative p-[2px] rounded-full" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 40%, #F59E0B 100%)" }}>
-              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white bg-slate-100">
-                <img src={resolveAvatar({picture: s.picture, user_id: s.user_id || s.provider_user_id, name: s.business_name, gender: s.gender})} alt={s.business_name} className="w-full h-full object-cover" loading="lazy" />
-              </div>
-            </div>
-            <p className="text-[10px] font-semibold text-slate-700 mt-1 truncate w-full text-center">{(s.business_name || "").split(" ")[0]}</p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
+// Section 76 — `StoriesRow` (provider directory mini-carousel) merged
+// into the main `StoriesCarousel` so users see ONE Instagram-style row
+// per provider, not two stacked rows. The new component handles both
+// "providers with active stories" and "add your own story" via the
+// + tile.
 
 // ─── New Post Box ───────────────────────────────────────────────────────
 function NewPostBox({ onPosted }) {
@@ -904,7 +872,6 @@ function RightSidebar() {
 
 // ─── Main page ──────────────────────────────────────────────────────────
 export default function ComunidadPage({ embedded = false }) {
-  const [feedTab, setFeedTab] = useState("all"); // "all" | "following"
   const seoNode = !embedded ? (
     <SeoHead
       title="Comunidad"
@@ -923,32 +890,8 @@ export default function ComunidadPage({ embedded = false }) {
               <p className="text-sm text-slate-500 mt-1">Lo que está pasando en la comunidad latina en USA — ahora mismo.</p>
             </header>
           )}
-          <StoriesRow />
-          {/* Section 67 — Feed source toggle: all vs following */}
-          <div className="flex gap-1.5 mb-3 mt-1" data-testid="comunidad-feed-tabs">
-            <button
-              type="button"
-              onClick={() => setFeedTab("all")}
-              className={`px-3.5 h-9 rounded-full text-[13px] font-semibold transition ${
-                feedTab === "all" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-              data-testid="comunidad-feed-tab-all"
-            >
-              Todos
-            </button>
-            <button
-              type="button"
-              onClick={() => setFeedTab("following")}
-              className={`px-3.5 h-9 rounded-full text-[13px] font-semibold inline-flex items-center gap-1.5 transition ${
-                feedTab === "following" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-              data-testid="comunidad-feed-tab-following"
-            >
-              <Users className="w-3.5 h-3.5" />
-              Siguiendo
-            </button>
-          </div>
-          {feedTab === "all" ? <PostFeed /> : <FollowingFeed />}
+          {/* Section 76 — single unified stories carousel (was two rows). */}
+          <PostFeed />
         </div>
         {!embedded && <RightSidebar />}
       </div>
