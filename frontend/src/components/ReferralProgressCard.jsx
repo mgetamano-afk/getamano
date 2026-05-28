@@ -122,7 +122,7 @@ export default function ReferralProgressCard() {
       style={{
         background: "linear-gradient(135deg, #FB923C 0%, #F97316 55%, #EA580C 100%)",
         boxShadow: "0 8px 24px -10px rgba(234, 88, 12, 0.45)",
-        contain: "layout paint",
+        touchAction: "pan-y",
       }}
       data-testid="referral-progress-card"
     >

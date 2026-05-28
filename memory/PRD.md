@@ -2726,3 +2726,45 @@ User: *"Sii hazlo ya, pero haz que esas historias se vean bonitas y los likes �
 ### Files
 - **NEW**: `backend/tests/test_iter73_story_milestones.py`
 - **MODIFIED**: `backend/routes/stories.py`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`
+
+---
+
+## Section 74 — Mobile-first UX fixes (2026-02-28)
+
+### User report (six issues)
+1. Home: las dos tarjetas "Tus ganancias" + "Tu red" no permitían hacer scroll hacia abajo.
+2. Buscar servicio: se quedaba a mitad de pantalla al hacer scroll.
+3. Comunidad: la barra de tabs quedaba "separada" del header al scrollear (gap visible cuando el header se ocultaba).
+4. Stories: el botón ❤️ quedaba oculto debajo del home indicator en iPhone 17.
+5. Faltaba pull-to-refresh universal.
+6. Footer nav: al tocar un tab, te llevaba a la mitad de la nueva página (sin resetear scroll).
+
+### Fixes implementadas
+
+#### Bug 6 — `ScrollToTop` global
+- **NEW** `frontend/src/components/ScrollToTop.jsx`: monta en `BrowserRouter`, observa `useLocation()`, hace `window.scrollTo(0,0)` con `behavior: instant` en cada cambio de `pathname`. Respeta hash links (anchors) y deja a `ComunidadLayout` manejar su propia restauración por tab.
+- **MODIFIED** `frontend/src/App.js`: monta `<ScrollToTop />` justo después de `<AnalyticsTracker />`.
+
+#### Bug 5 — `PullToRefresh` cross-platform
+- **NEW** `frontend/src/components/PullToRefresh.jsx`: pull-to-refresh manual con `touchstart/move/end` a nivel de `window`. Funciona en PWA iOS standalone (donde no hay URL bar nativa). Threshold 70px feedback, 110px commit. Resistencia dampeada (0.55x) tipo iOS bounce. Spinner teal que rota 0→180° durante el pull, animate-spin al refrescar.
+- Opt-out via `data-no-ptr="true"` (aplicado al story viewer) y auto-bypass cuando `body.style.overflow === "hidden"` (modal abierto).
+- **MODIFIED** `frontend/src/index.css`: `overscroll-behavior-y: auto` (era `none`) para permitir el gesto nativo en Chrome Android.
+
+#### Bugs 1 + 2 — Scroll trapping
+- **MODIFIED** `frontend/src/index.css`: regla global `body, a, button, [role="button"] { touch-action: pan-y }` — explícitamente le dice al navegador "el scroll vertical siempre está permitido aquí", evita que tarjetas-Link grandes capten el touch como tap y bloqueen el scroll.
+- **MODIFIED** `EarningsWidget.jsx` + `ReferralProgressCard.jsx`: removido `contain: "layout paint"` (que en algunos navegadores móviles confundía al motor de scroll), añadido `touchAction: "pan-y"` inline.
+
+#### Bug 3 — Comunidad sticky tab bar gap
+- **MODIFIED** `frontend/src/components/ComunidadLayout.jsx`: ahora usa `useSmartNav` para detectar cuando el Header se oculta. Cuando `headerVisible === false`, el tab bar pasa de `top-14` a `top-0` con transición de 300ms y añade `var(--safe-top)` padding. Resultado: cero gap visible, el tab bar se "pega" perfectamente al borde superior cuando el header se va.
+
+#### Bug 4 — Story like button hidden by home indicator
+- **MODIFIED** `frontend/src/components/StoriesCarousel.jsx`: el bloque de acciones (LikeButton del visor y la fila views/likes/expiry del dueño) ahora usa `bottom: calc(1rem + env(safe-area-inset-bottom, 0px))` en lugar de `bottom-4`. Garantiza que el botón ❤️ y el botón "Eliminar" siempre estén por encima del home indicator en iPhone 14/15/16/17.
+
+### Verification
+- 22 tests verdes en backend (iter71+72+73 — refactor + stories likes + milestones).
+- Lint JS/PY: 100% clean.
+- Mobile screenshot @ 393×852 (iPhone 15 Pro): scroll funciona, tarjetas visibles, story viewer con botón ❤️ pegado al borde inferior con padding seguro.
+
+### Files
+- **NEW**: `frontend/src/components/ScrollToTop.jsx`, `frontend/src/components/PullToRefresh.jsx`
+- **MODIFIED**: `frontend/src/App.js`, `frontend/src/index.css`, `frontend/src/components/EarningsWidget.jsx`, `frontend/src/components/ReferralProgressCard.jsx`, `frontend/src/components/ComunidadLayout.jsx`, `frontend/src/components/StoriesCarousel.jsx`

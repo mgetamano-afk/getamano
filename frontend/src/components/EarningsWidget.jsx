@@ -87,7 +87,7 @@ export default function EarningsWidget() {
       style={{
         background: "linear-gradient(135deg, #063154 0%, #0A4D5E 55%, #025F67 100%)",
         boxShadow: "0 8px 24px -10px rgba(2, 95, 103, 0.4)",
-        contain: "layout paint",
+        touchAction: "pan-y",
       }}
       data-testid="earnings-widget"
     >

@@ -312,6 +312,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
       className="fixed inset-0 z-[120] bg-black flex items-center justify-center"
       style={{ height: "100vh", maxHeight: "100vh" }}
       data-testid="story-viewer"
+      data-no-ptr="true"
       onMouseDown={() => setPaused(true)}
       onMouseUp={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
@@ -399,7 +400,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
 
           {/* Section 61 — Story actions: like (for viewers) OR views/likes counter (for owner) */}
           {isOwner ? (
-            <div className="absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between gap-3 pointer-events-auto">
+            <div className="absolute left-4 right-4 z-10 flex items-center justify-between gap-3 pointer-events-auto" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 backdrop-blur text-white text-sm font-semibold shadow-md" data-testid="story-views-count">
                   <Eye className="w-4 h-4" /> {active.views_count || 0}
@@ -422,7 +423,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
               </button>
             </div>
           ) : (
-            <div className="absolute bottom-4 left-4 z-10 pointer-events-auto" data-testid="story-viewer-actions">
+            <div className="absolute left-4 z-10 pointer-events-auto" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }} data-testid="story-viewer-actions">
               <LikeButton
                 liked={!!likeStates[active.story_id]}
                 count={active.likes_count || 0}

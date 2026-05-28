@@ -6,6 +6,8 @@ import { PwaInstallProvider } from "./contexts/PwaInstallContext";
 import { Toaster } from "sonner";
 import { useEffect, lazy, Suspense } from "react";
 import AnalyticsTracker from "./components/AnalyticsTracker";
+import ScrollToTop from "./components/ScrollToTop";
+import PullToRefresh from "./components/PullToRefresh";
 import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
 import BottomNav from "./components/BottomNav";
@@ -257,6 +259,8 @@ function App() {
               <SplashScreen />
               <Toaster position="top-right" richColors />
               <AnalyticsTracker />
+              <ScrollToTop />
+              <PullToRefresh />
               <InstallPrompt />
               <InstallAppModal />
               <RouteErrorBoundary>

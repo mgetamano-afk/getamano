@@ -139,15 +139,33 @@ html, body, #root {
 .h-screen-d { height: 100dvh; }
 .min-h-screen-d { min-height: 100dvh; }
 
-/* Prevent overscroll "pull to refresh" from accidentally firing while
-   scrolling vertically inside the app. Modal overlays opt back in. */
+/* Pull-to-refresh: native browser refresh when user pulls down at the
+   top of the page (mobile-first request). Previously this was
+   `overscroll-behavior-y: none` to suppress iOS bounce, but it also
+   killed the gesture. We now use `contain` which still prevents
+   *horizontal* pull navigation while leaving vertical pull-to-refresh
+   intact. Modal overlays opt out via their own overscroll-behavior. */
 html {
-  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
 }
 
 /* Smooth momentum scrolling on iOS for any inner-scroll containers */
 .scroll-touch {
   -webkit-overflow-scrolling: touch;
+}
+
+/* Section 74 — Universal vertical-scroll guarantee.
+   Some clickable cards/links on mobile inadvertently swallow vertical
+   scroll because the browser treats the touch as a tap. `pan-y` keeps
+   the tap working (no preventDefault) but explicitly tells the browser
+   "vertical scroll is always allowed here". Apply broadly to common
+   surfaces; horizontal carousels override via .scrollbar-none. */
+body, a, button, [role="button"] {
+  touch-action: pan-y;
+}
+.scrollbar-none {
+  touch-action: pan-x pan-y;
 }
 
 /* All media: never break the layout */

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import { Newspaper, Compass, Trophy, Award, IdCard } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
+import useSmartNav from "../hooks/useSmartNav";
 import Header from "./Header";
 
 /**
@@ -29,6 +30,7 @@ export default function ComunidadLayout() {
   const scrollPositions = useRef({});
   const prevPath = useRef(location.pathname);
   const COMUNIDAD_TABS = buildTabs(lang);
+  const headerVisible = useSmartNav();
 
   // Restore / save window scroll per pathname (unchanged from before).
   useEffect(() => {
@@ -63,14 +65,16 @@ export default function ComunidadLayout() {
     <div className="min-h-screen bg-slate-50" data-testid="comunidad-layout">
       <Header />
 
-      {/* Section 69 — Sticky tab bar.
-          Uses `sticky` (not `fixed`) so the bar stays in the document flow
-          and scrolls naturally with the page until it hits the top, then
-          locks in place. `top-14 md:top-16` aligns it right under the
-          global Header (which is `sticky top-0 z-50`). z-40 keeps it
-          below the Header (z-50) but above all page content. */}
+      {/* Section 69 + 74 — Sticky tab bar that follows the header's auto-hide.
+          When the smart-nav Header slides up off-screen, this tab bar slides
+          up to take its place at `top-0` so there's no orphaned empty band
+          on mobile. When the Header comes back, the tab bar drops to sit
+          right under it again. */}
       <div
-        className="sticky top-14 md:top-16 z-40 bg-white border-b border-slate-200 shadow-sm lg:hidden"
+        className={`sticky z-40 bg-white border-b border-slate-200 shadow-sm lg:hidden transition-[top] duration-300 ease-in-out ${
+          headerVisible ? "top-14 md:top-16" : "top-0"
+        }`}
+        style={{ paddingTop: headerVisible ? 0 : "var(--safe-top, 0px)" }}
         data-testid="comunidad-tabbar"
       >
         <nav
