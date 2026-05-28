@@ -3045,3 +3045,27 @@ Both screens benefit from any future improvement (e.g., a 3rd level) for free.
 
 ### Files
 - **MODIFIED**: `frontend/src/pages/ProviderOnboarding.jsx`, `frontend/src/pages/ProviderDashboard.jsx`
+
+---
+
+## Section 80b — Service picker consolidated INSIDE the filter card (2026-02-28)
+
+### User feedback
+*"Las categorías que trabajaste en el área de buscar servicio deben estar dentro de los campos que ya están en la sección de filtro, no afuera. Si no, no tiene caso tener la sección filter."*
+
+Fair point — having both a standalone picker row AND a filter card with its own Category select created visual duplication and weakened the filter card as the single source of truth.
+
+### Fix
+- **REMOVED** the standalone picker row that sat between the search form and the results.
+- **REPLACED** the `<select>` "Category" dropdown inside `<aside data-testid="search-filters">` with the same hierarchical `CategoryTreePicker` button.
+- The picker button now lives next to the existing Language + Verified-only filters. Click → opens the same bottom-sheet with 14 sectors → drill into one → pick a real subcategory. The chosen service shows up inline with emoji.
+- Added a small "Clear" link below when a category is active.
+- Cleaned up unused imports: removed `MAIN_CATEGORIES` and `createElement` from Search.jsx (no longer needed since the flat dropdown is gone).
+
+### Verification
+- Lint clean.
+- Mobile screenshot @ 393×852 confirms: ONE picker button (not two), inside the filter card aligned with Language + Verified-only.
+- 14 backend tests still passing (iter75 + iter79).
+
+### Files
+- **MODIFIED**: `frontend/src/pages/Search.jsx`

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, createElement } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
@@ -14,7 +14,6 @@ import CategoryTreePicker from "../components/CategoryTreePicker";
 import useGeolocation from "../hooks/useGeolocation";
 import useRefreshable from "../hooks/useRefreshable";
 import { trackSearch } from "../lib/analytics";
-import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { SeoHead } from "../components/seo/SeoHead";
 
 export default function Search() {
@@ -234,47 +233,9 @@ export default function Search() {
             <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
           </form>
 
-          {/* Section 79 — Hierarchical service picker (mobile-first).
-              Tap → opens a bottom-sheet with sector → subcategory navigation
-              and full-text search across all 188 services. Replaces the old
-              16-option dropdown that was desktop-only. */}
-          <div className="-mt-2 mb-4 flex items-center gap-2 flex-wrap" data-testid="category-picker-row">
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white border border-slate-200 shadow-sm hover:border-teal-400 hover:shadow transition text-sm font-medium text-slate-700"
-              data-testid="open-category-picker"
-            >
-              {(() => {
-                const cat = categories.find(c => c.slug === category);
-                if (cat) {
-                  return (
-                    <>
-                      <span className="text-base leading-none">{cat.emoji || "🛠️"}</span>
-                      <span className="truncate max-w-[200px]">{lang === "en" ? cat.name_en : cat.name_es}</span>
-                    </>
-                  );
-                }
-                return (
-                  <>
-                    <span className="text-base leading-none">🧭</span>
-                    <span>{lang === "en" ? "What service?" : "¿Qué servicio?"}</span>
-                  </>
-                );
-              })()}
-            </button>
-            {category && (
-              <button
-                type="button"
-                onClick={() => { setCategory(""); setTimeout(() => doSearch(), 0); }}
-                className="inline-flex items-center gap-1 h-10 px-3 rounded-full bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 transition"
-                data-testid="clear-category"
-                aria-label={lang === "en" ? "Clear category" : "Quitar categoría"}
-              >
-                <X className="w-3.5 h-3.5" /> {lang === "en" ? "Clear" : "Quitar"}
-              </button>
-            )}
-          </div>
+          {/* Section 80b — Service picker now lives INSIDE the filter
+              card (see <aside> below), not outside. Removed the standalone
+              row to keep the filter as the single source of truth. */}
 
           {/* Section 18F — Radius selector (only when "Near me" is active) */}
           {position && (
@@ -479,13 +440,42 @@ export default function Search() {
             <div className="space-y-5">
               <div>
                 <label className="block text-xs uppercase tracking-widest text-slate-500 mb-2">{t("filter.category")}</label>
-                <select value={category} onChange={e => { setCategory(e.target.value); setTimeout(() => doSearch(), 0); }} className="w-full h-10 px-3 rounded-xl border border-slate-200" data-testid="filter-category-select">
-                  <option value="">Todas</option>
-                  {categories
-                    .filter(c => MAIN_CATEGORIES.includes(c.name_es))
-                    .sort((a, b) => MAIN_CATEGORIES.indexOf(a.name_es) - MAIN_CATEGORIES.indexOf(b.name_es))
-                    .map(c => createElement("option", { key: c.category_id, value: c.slug }, lang === "es" ? c.name_es : c.name_en))}
-                </select>
+                {/* Section 80b — Hierarchical picker lives inside the filter
+                    panel (mobile + desktop). Tap → bottom-sheet with the 14
+                    sectors → drill into one → pick a real subcategory. */}
+                {(() => {
+                  const picked = categories.find(c => c.slug === category);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen(true)}
+                      className={`w-full h-10 px-3 rounded-xl border flex items-center gap-2 text-left transition ${picked ? "border-teal-400 bg-teal-50/40" : "border-slate-200 hover:border-teal-400 bg-white"}`}
+                      data-testid="open-category-picker"
+                    >
+                      {picked ? (
+                        <>
+                          <span className="text-base leading-none">{picked.emoji || "🛠️"}</span>
+                          <span className="flex-1 truncate text-sm text-slate-900">{lang === "en" ? picked.name_en : picked.name_es}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-base leading-none">🧭</span>
+                          <span className="flex-1 text-sm text-slate-500">{lang === "en" ? "All services" : "Todas"}</span>
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
+                {category && (
+                  <button
+                    type="button"
+                    onClick={() => { setCategory(""); setTimeout(() => doSearch(), 0); }}
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-700 transition"
+                    data-testid="clear-category"
+                  >
+                    <X className="w-3 h-3" /> {lang === "en" ? "Clear" : "Quitar"}
+                  </button>
+                )}
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-widest text-slate-500 mb-2">{t("filter.language")}</label>
