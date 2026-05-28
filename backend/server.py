@@ -605,6 +605,8 @@ async def seed():
         await db.stories.create_index("story_id", unique=True)
         await db.stories.create_index([("expires_at", 1)], expireAfterSeconds=0)  # TTL → auto-delete
         await db.stories.create_index([("provider_user_id", 1), ("created_at", -1)])
+        # Section 81 — Concierge cache TTL (7-day expiry handled at write time)
+        await db.concierge_cache.create_index([("expires_at", 1)], expireAfterSeconds=0)
         await db.stories.create_index([("is_public", 1), ("created_at", -1)])
         await db.story_views.create_index([("story_id", 1), ("viewer_user_id", 1)], unique=True)
         await db.story_likes.create_index([("story_id", 1), ("user_id", 1)], unique=True)
@@ -9537,6 +9539,7 @@ from routes.profile_versions import (  # noqa: E402
     auto_snapshot as _profile_auto_snapshot,
 )
 from routes.reviews import build_reviews_router as _make_reviews_router  # noqa: E402
+from routes.search_concierge import build_concierge_router as _make_concierge_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9688,6 +9691,9 @@ api_router.include_router(
         require_admin=require_admin,
     )
 )
+
+# Section 81 — AI Search Concierge
+api_router.include_router(_make_concierge_router(db=db))
 
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.

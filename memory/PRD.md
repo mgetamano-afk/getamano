@@ -3069,3 +3069,47 @@ Fair point — having both a standalone picker row AND a filter card with its ow
 
 ### Files
 - **MODIFIED**: `frontend/src/pages/Search.jsx`
+
+---
+
+## Section 81 — AI Search Concierge (2026-02-28)
+
+### Why
+User accepted the proposed enhancement: turn the search box into an intelligent assistant that maps natural-language queries to the right service slug.
+
+### Backend
+- **NEW** `backend/routes/search_concierge.py`:
+  - Endpoint `POST /api/search/concierge` accepts `{query, lang}` and returns `{slug, category_id, name_es, name_en, emoji, confidence, reasoning_es, from_cache}`.
+  - Uses **Gemini 3 Flash preview** via Emergent LLM key (cheapest/fastest model for this classification task) with a **system prompt that inlines all 188 catalog slugs** so the model can ONLY choose from the catalog (sanity-checked server-side against the live `db.categories` slug set).
+  - **MongoDB cache** with `concierge_cache` collection keyed by normalized query (lowercased + collapsed whitespace + stripped punctuation). 7-day TTL via `expireAfterSeconds=0` on `expires_at`.
+  - Returns `from_cache: true` on hits. Cache hit latency: 161 ms; fresh LLM call: ~1.5 s.
+  - 422 if query <3 chars; 502 if LLM unreachable; never invents slugs (empty `slug` when no match).
+- **MODIFIED** `backend/server.py`:
+  - Added the new router via `_make_concierge_router(db=db)`.
+  - New TTL index on `concierge_cache.expires_at`.
+
+### Frontend (`pages/Search.jsx`)
+- Added `Sparkles` + `Loader2` icons and `toast` import.
+- New state: `conciergeBusy`, `conciergeHint`.
+- New `askConcierge()` handler: validates query, POSTs to `/search/concierge`, sets the picker slug on success, surfaces toast on error.
+- **AI button** (✨ violet pill) sits between the city input and the Submit button in the search form. Shows spinner while LLM is thinking.
+- **Hint banner** appears below the form after a successful classification:
+  *"AI picked: 🏚️ Roofing — El usuario solicita reparación de techos…"* with an **Undo** link to revert.
+- Hint clears automatically when the user types a new query.
+
+### Tests
+- **NEW** `backend/tests/test_iter81_search_concierge.py` — 6 tests:
+  1. Too-short query → 422.
+  2. Spanish "techo con goteras" → `slug=techos`.
+  3. English "fix my AC" → maps to a valid slug containing "hvac" or "ac".
+  4. Repeat call → `from_cache=true`.
+  5. Cache hit <500 ms.
+  6. Nonsense input → either empty slug OR a real catalog slug (never invented).
+
+### Verification
+- Live LLM round-trips validated on real preview backend. 6/6 tests pass in 7.2 s.
+- Mobile screenshot @ 393×852: full flow works — query → AI button → banner with reasoning → filter card updates → results refresh.
+
+### Files
+- **NEW**: `backend/routes/search_concierge.py`, `backend/tests/test_iter81_search_concierge.py`
+- **MODIFIED**: `backend/server.py`, `frontend/src/pages/Search.jsx`

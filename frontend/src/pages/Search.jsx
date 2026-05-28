@@ -4,7 +4,8 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, X } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, X, Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
 import ProvidersMap from "../components/ProvidersMap";
@@ -35,6 +36,8 @@ export default function Search() {
   });
   const [stuck, setStuck] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false); // Section 79
+  const [conciergeBusy, setConciergeBusy] = useState(false); // Section 81
+  const [conciergeHint, setConciergeHint] = useState(null); // {slug, name_es, emoji, reasoning_es}
   const [view, setView] = useState(() => {
     const v = params.get("view");
     return v === "map" || v === "split" ? v : "list";
@@ -171,6 +174,34 @@ export default function Search() {
   }, [q, city, category, verifiedOnly, language, hasVideo, position?.lat, position?.lng, radiusMiles, view]);
   useRefreshable(refresh);
 
+  // Section 81 — AI Concierge: classifies the free-text query to a real
+  // subcategory slug via /search/concierge (Gemini Flash + 7-day cache).
+  // Triggered manually by the ✨ button to keep traffic low and explicit.
+  const askConcierge = async () => {
+    const text = (q || "").trim();
+    if (text.length < 5) {
+      toast.message(lang === "en" ? "Type at least a few words." : "Escribe al menos unas palabras.");
+      return;
+    }
+    setConciergeBusy(true);
+    setConciergeHint(null);
+    try {
+      const { data } = await api.post("/search/concierge", { query: text, lang });
+      if (!data?.slug) {
+        toast.message(lang === "en" ? "Couldn't auto-detect a service." : "No detecté una categoría exacta.");
+        setConciergeBusy(false);
+        return;
+      }
+      setConciergeHint(data);
+      setCategory(data.slug);
+      setTimeout(() => doSearch(null, {}), 0);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || (lang === "en" ? "AI unavailable" : "IA no disponible"));
+    } finally {
+      setConciergeBusy(false);
+    }
+  };
+
   // Section 18F — auto-research when user enables "Near me"
   useEffect(() => {
     if (position) doSearch();
@@ -211,7 +242,7 @@ export default function Search() {
           <form onSubmit={doSearch} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 flex flex-col md:flex-row gap-2 mb-4" data-testid="search-form">
             <div className="flex items-center gap-2 px-3 flex-1">
               <SearchIcon className="w-5 h-5 text-slate-400" />
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder={t("hero.search.placeholder")} className="w-full py-3 outline-none bg-transparent" data-testid="search-q-input" />
+              <input value={q} onChange={e => { setQ(e.target.value); setConciergeHint(null); }} placeholder={t("hero.search.placeholder")} className="w-full py-3 outline-none bg-transparent" data-testid="search-q-input" />
             </div>
             <div className="flex items-center gap-2 px-3 md:border-l border-slate-200 md:max-w-[280px] flex-1 md:flex-initial">
               <div className="flex-1 min-w-0">
@@ -230,8 +261,52 @@ export default function Search() {
                 />
               </div>
             </div>
-            <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
+            <div className="flex gap-2">
+              {/* Section 81 — AI Concierge: ✨ icon button beside Search.
+                  One tap → LLM classifies the query → auto-selects best category. */}
+              <button
+                type="button"
+                onClick={askConcierge}
+                disabled={conciergeBusy}
+                className={`inline-flex items-center justify-center h-11 px-3 rounded-xl border transition shrink-0 ${conciergeBusy ? "bg-slate-100 border-slate-200 cursor-wait" : "bg-white border-violet-200 hover:border-violet-400 hover:bg-violet-50"}`}
+                aria-label={lang === "en" ? "AI search" : "Búsqueda con IA"}
+                title={lang === "en" ? "Let AI find the right category" : "Que la IA encuentre la categoría"}
+                data-testid="ai-concierge-btn"
+              >
+                {conciergeBusy ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-violet-500" />
+                )}
+                <span className="ml-1.5 text-xs font-semibold text-violet-700 hidden sm:inline">{lang === "en" ? "AI" : "IA"}</span>
+              </button>
+              <button type="submit" className="btn-primary" data-testid="search-submit">{t("hero.search.cta")}</button>
+            </div>
           </form>
+
+          {/* Section 81 — AI Concierge reasoning banner */}
+          {conciergeHint && (
+            <div
+              className="-mt-2 mb-4 px-3 py-2 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 flex items-start gap-2"
+              data-testid="ai-concierge-hint"
+            >
+              <Sparkles className="w-4 h-4 mt-0.5 text-violet-500 shrink-0" />
+              <div className="flex-1 text-xs text-slate-700">
+                <span className="font-semibold">{lang === "en" ? "AI picked" : "La IA eligió"}: </span>
+                <span className="text-base mr-1">{conciergeHint.emoji}</span>
+                <span className="font-bold text-slate-900">{lang === "en" ? conciergeHint.name_en : conciergeHint.name_es}</span>
+                <span className="text-slate-500"> — {conciergeHint.reasoning_es}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setConciergeHint(null); setCategory(""); setTimeout(() => doSearch(), 0); }}
+                className="text-[11px] text-violet-600 hover:text-violet-800 underline shrink-0"
+                data-testid="ai-concierge-undo"
+              >
+                {lang === "en" ? "Undo" : "Deshacer"}
+              </button>
+            </div>
+          )}
 
           {/* Section 80b — Service picker now lives INSIDE the filter
               card (see <aside> below), not outside. Removed the standalone
