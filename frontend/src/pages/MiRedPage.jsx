@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
 import FollowButton from "../components/FollowButton";
 import EarningsPanel from "../components/EarningsPanel";
+import MyInvitesPanel from "../components/MyInvitesPanel";
 import EmptyState from "../components/EmptyState";
 
 /**
@@ -19,15 +20,16 @@ import EmptyState from "../components/EmptyState";
  * follow each other, they can refer leads to one another (5% comission).
  */
 const TABS = [
+  { id: "invites",     labelEs: "Invitaciones", labelEn: "Invites" },
   { id: "following",   labelEs: "Sigo a",     labelEn: "Following" },
   { id: "followers",   labelEs: "Me siguen",  labelEn: "Followers" },
   { id: "suggestions", labelEs: "Sugerencias", labelEn: "Suggestions" },
-  { id: "earnings",    labelEs: "Ganancias",   labelEn: "Earnings" },
+  { id: "earnings",    labelEs: "Comisiones",  labelEn: "Commissions" },
 ];
 
 export default function MiRedPage() {
   const { lang } = useI18n();
-  const [tab, setTab] = useState("following");
+  const [tab, setTab] = useState("invites");
   const [following, setFollowing] = useState(null);
   const [followers, setFollowers] = useState(null);
   const [network, setNetwork] = useState(null);
@@ -103,7 +105,9 @@ export default function MiRedPage() {
 
       {/* Body */}
       <div className="p-3">
-        {tab === "earnings" ? (
+        {tab === "invites" ? (
+          <MyInvitesPanel />
+        ) : tab === "earnings" ? (
           <EarningsPanel network={network} />
         ) : data === null ? (
           <div className="space-y-2">
