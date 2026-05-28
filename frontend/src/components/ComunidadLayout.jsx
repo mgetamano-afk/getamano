@@ -63,9 +63,14 @@ export default function ComunidadLayout() {
     <div className="min-h-screen bg-slate-50" data-testid="comunidad-layout">
       <Header />
 
-      {/* Section 63 — Sticky tab bar (always visible, no auto-hide). */}
+      {/* Section 69 — Sticky tab bar.
+          Uses `sticky` (not `fixed`) so the bar stays in the document flow
+          and scrolls naturally with the page until it hits the top, then
+          locks in place. `top-14 md:top-16` aligns it right under the
+          global Header (which is `sticky top-0 z-50`). z-40 keeps it
+          below the Header (z-50) but above all page content. */}
       <div
-        className="fixed top-14 md:top-16 left-0 right-0 z-30 bg-white border-b border-slate-200 lg:hidden"
+        className="sticky top-14 md:top-16 z-40 bg-white border-b border-slate-200 shadow-sm lg:hidden"
         data-testid="comunidad-tabbar"
       >
         <nav
@@ -100,8 +105,10 @@ export default function ComunidadLayout() {
         </nav>
       </div>
 
-      {/* Active sub-route content — padded only on mobile/tablet to clear the slim 44px tabbar */}
-      <div className="pt-[44px] lg:pt-0" data-testid="comunidad-outlet">
+      {/* Active sub-route content. With the new `sticky` tabbar, the bar
+          is part of the flow so we no longer need the 44px top spacer
+          that the old `fixed` implementation required. */}
+      <div data-testid="comunidad-outlet">
         <div className="container mx-auto px-0 lg:px-4">
           <div className="lg:flex lg:gap-6 lg:max-w-7xl lg:mx-auto">
             {/* Desktop LeftNav (Section 62) — replaces the old in-page LeftNav */}

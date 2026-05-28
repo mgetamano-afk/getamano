@@ -119,10 +119,16 @@ a[href*="app.emergent.sh"] {
   --safe-right: env(safe-area-inset-right, 0px);
 }
 
-/* CRITICAL: Never allow horizontal scroll anywhere */
+/* CRITICAL: Never allow horizontal scroll anywhere.
+   Section 69 fix — uses `overflow-x: clip` instead of `hidden`.
+   `hidden` forces the browser to set overflow-y: auto, which creates a
+   scroll container on body/#root and breaks `position: sticky` on every
+   descendant. `clip` blocks horizontal overflow at the paint level WITHOUT
+   establishing a scroll container, so descendant sticky elements anchor
+   to the viewport as expected. */
 html, body, #root {
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Allow modal content to scroll INSIDE the modal without affecting body
