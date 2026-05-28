@@ -82,6 +82,15 @@ export default function AboutPage() {
         ],
         quote: "“A platform that finally treats service pros and families like people, not transactions.”",
         quoteAttr: "— Founding provider, Sallisaw OK",
+        founderEyebrow: "Meet the founder",
+        founderName: "E. Hernandez",
+        founderRole: "Founder · Mexican-American tech entrepreneur",
+        founderBioParas: [
+          "I'm passionate about technology and obsessed with one question: how do we give people — every person in the US, not just our Latino community — honest, affordable and functional services?",
+          "getamano is one answer. Tiangix, my sister project, is the other: a marketplace for Latino products and small Latino businesses that sell to every household in America, the same way getamano does for services.",
+          "If you believe quality work and honest trade deserve a real platform, you're in the right place. Welcome.",
+        ],
+        founderProjects: ["getamano · services", "Tiangix · Latino products"],
         ctaTitle: "Ready to experience it?",
         ctaSub: "Whether you need a pro or are one, getamano is open to you.",
         ctaFind: "Find a pro near me",
@@ -134,6 +143,15 @@ export default function AboutPage() {
         ],
         quote: "“Una plataforma que por fin trata a los pros y a las familias como personas, no como transacciones.”",
         quoteAttr: "— Proveedor fundador, Sallisaw OK",
+        founderEyebrow: "Conoce al fundador",
+        founderName: "E. Hernández",
+        founderRole: "Fundador · Emprendedor tecnológico mexicano-americano",
+        founderBioParas: [
+          "Soy apasionado por la tecnología y obsesionado con una pregunta: ¿cómo le damos a la gente — a toda persona en USA, no solo a nuestra comunidad latina — servicios honestos, económicos y funcionales?",
+          "getamano es una respuesta. Tiangix, mi proyecto hermano, es la otra: un marketplace de productos latinos y pequeños negocios latinos que venden a cada hogar en USA, igual que getamano lo hace con servicios.",
+          "Si crees que el trabajo de calidad y el comercio honesto merecen una plataforma real, estás en el lugar correcto. Bienvenido.",
+        ],
+        founderProjects: ["getamano · servicios", "Tiangix · productos latinos"],
         ctaTitle: "¿Listo para experimentarlo?",
         ctaSub: "Necesites un pro o lo seas tú, getamano está abierto para ti.",
         ctaFind: "Buscar un profesional",
@@ -241,6 +259,87 @@ export default function AboutPage() {
             {c.quote}
           </p>
           <p className="mt-4 text-sm text-slate-500 font-semibold">{c.quoteAttr}</p>
+        </section>
+
+        {/* ─── Founder ──────────────────────────────────────────────── */}
+        <section
+          className="relative overflow-hidden"
+          style={{ background: "linear-gradient(180deg, #F7F6F2 0%, #FFFFFF 100%)" }}
+          data-testid="about-founder"
+        >
+          <div className="max-w-5xl mx-auto px-5 md:px-8 py-16 md:py-20">
+            <div className="flex items-center gap-2 mb-8">
+              <Sparkles className="w-4 h-4" style={{ color: "#F97316" }} />
+              <p className="text-[11px] uppercase tracking-[1.5px] font-bold text-slate-500" data-testid="about-founder-eyebrow">
+                {c.founderEyebrow}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 md:gap-10 items-start">
+              {/* Portrait with mint ring */}
+              <div className="relative mx-auto md:mx-0 flex-shrink-0">
+                <div
+                  className="absolute -inset-2 rounded-full opacity-20"
+                  style={{ background: "radial-gradient(circle, #5DCAA5 0%, transparent 70%)" }}
+                  aria-hidden="true"
+                />
+                <img
+                  src="/avatars/founder-e-hernandez.png"
+                  alt="E. Hernandez, founder of getamano"
+                  loading="lazy"
+                  className="relative w-40 h-40 md:w-48 md:h-48 rounded-full object-cover shadow-xl"
+                  style={{ border: "4px solid #FFFFFF", boxShadow: "0 12px 40px -10px rgba(2,95,103,0.35)" }}
+                  data-testid="about-founder-image"
+                />
+                <span
+                  className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full text-white text-base font-bold flex items-center justify-center shadow-lg border-2 border-white"
+                  style={{ background: "#5DCAA5" }}
+                  aria-hidden="true"
+                >
+                  🇲🇽
+                </span>
+              </div>
+
+              {/* Bio */}
+              <div className="min-w-0">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight" data-testid="about-founder-name">
+                  {c.founderName}
+                </h2>
+                <p className="mt-1 text-sm font-semibold" style={{ color: "#025F67" }} data-testid="about-founder-role">
+                  {c.founderRole}
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  {c.founderBioParas.map((p, i) => (
+                    <p
+                      key={i}
+                      className={i === c.founderBioParas.length - 1
+                        ? "text-base font-semibold text-slate-900 leading-relaxed"
+                        : "text-base text-slate-700 leading-relaxed"}
+                      data-testid={`about-founder-bio-${i}`}
+                    >
+                      {p}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Project badges */}
+                <div className="mt-5 flex flex-wrap gap-2" data-testid="about-founder-projects">
+                  {c.founderProjects.map((proj, i) => (
+                    <span
+                      key={proj}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold"
+                      style={i === 0
+                        ? { background: "#025F67", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(2,95,103,0.25)" }
+                        : { background: "#FEF3C7", color: "#92400E", border: "1.5px solid #F59E0B" }}
+                    >
+                      {i === 0 ? "🤝" : "🛍️"} {proj}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* ─── CTA ──────────────────────────────────────────────────── */}
