@@ -2475,3 +2475,35 @@ The Sprint A "🔥 ¡Te falta 1!" pulsing badge used `transform: scale(1.06)` in
 **Files modified**: `EarningsWidget.jsx`, `ReferralProgressCard.jsx`.
 **Verified**: Lint passed + screenshot confirms no header overlap, no scroll jank.
 
+
+
+---
+
+## About / Nosotros page (2026-05-27)
+
+**Goal**: Dedicated home for the Latino origin story now that the landing speaks universally (Section 67 corollary).
+
+### Frontend
+- **NEW `pages/AboutPage.jsx`** — bilingual ES/EN. Sections:
+  1. Hero (teal gradient) with "Latino-built · America-wide" pill, double-line headline "Born in our community. / Built for every family in America." (ES: "Nacimos en nuestra comunidad. / Construido para cada familia en USA."), and intro paragraph.
+  2. 3 stat cards (100% verified · EN·ES bilingual · 50+ cities) floating with negative top margin to overlap the hero.
+  3. "Why getamano exists" 4-paragraph origin story narrative.
+  4. "What we stand for" — 4 value cards (Verified always · Real reviews · Bilingual by design · Pros first, then platform).
+  5. Pull quote testimonial — "A platform that finally treats service pros and families like people, not transactions."
+  6. CTA block (teal gradient) — orange "Find a pro near me" + outline "Join as a provider".
+- Uses named `{ SeoHead }` import (component re-exported by name, not default).
+- All sections + values have stable `data-testid` for testing.
+
+### Routes (App.js)
+- `/about` and `/nosotros` (both render `<AboutPage />`) — lazy-loaded.
+
+### Footer
+- Added "About us / Sobre nosotros" link in the "Platform" column.
+- New i18n key `footer.about` (ES + EN).
+
+### Lint
+All checks passed.
+
+### E2E verified
+- `/nosotros` renders the full page (hero + stats + story + values + quote + CTA + footer with About link). Screenshots confirm visual quality.
+

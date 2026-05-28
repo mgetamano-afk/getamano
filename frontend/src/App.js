@@ -61,6 +61,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 const AdminOpsPage = lazy(() => import("./pages/AdminOpsPage"));
 const PrintCard = lazy(() => import("./pages/PrintCard"));
 const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
+const AboutPage = lazy(() => import("./pages/AboutPage"));
 
 // Admin Zone 4 — all code-split (rarely on critical path)
 const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
@@ -215,6 +216,10 @@ function AppRouter() {
       <Route path="/privacidad" element={<Privacy />} />
       <Route path="/politica-resenas" element={<ReviewsPolicy />} />
       <Route path="/cookies" element={<Cookies />} />
+
+      {/* About / Nosotros — Section 67 corollary */}
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/nosotros" element={<AboutPage />} />
 
       {/* SEO hub routes */}
       <Route path="/servicios" element={<SeoServicesIndex />} />
