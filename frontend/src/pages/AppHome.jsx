@@ -22,7 +22,7 @@ import MilestoneOfTheWeekWidget from "../components/MilestoneOfTheWeekWidget";
 import OnboardingTour from "../components/OnboardingTour";
 import InviterWelcomeBanner from "../components/InviterWelcomeBanner";
 import ThankInviterModal from "../components/ThankInviterModal";
-import AudienceCards from "../components/AudienceCards";
+import UniversalServicesCard from "../components/UniversalServicesCard";
 
 /**
  * AppHome — Section 63 Block 5 (app-first home).
@@ -355,8 +355,10 @@ export default function AppHome() {
         </section>
       )}
 
-      {/* ── Section 67 — Dual-audience cards ─────────────────────────── */}
-      <AudienceCards />
+      {/* ── Section 67 (corrected) — ONE universal services card, no
+            ethnic segmentation. Latino pride lives in the footer +
+            About page + provider badges, not as a client filter. ───── */}
+      <UniversalServicesCard />
 
       {/* ── Become a provider banner (guests + clients) ───────────────── */}
       {!isProvider && (

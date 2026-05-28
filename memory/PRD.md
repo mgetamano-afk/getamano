@@ -2420,7 +2420,7 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 - **`AppHome.jsx` hero (logged-out)** rewritten to "Find trusted service professionals near you" / "Encuentra profesionales de confianza cerca de ti" + dual-audience subheadline + pulsing pill "🫂 Latino-built · America-wide" badge under the title (`data-testid="apphome-latino-built-badge"`).
 - **`AppHome.jsx` tagline tail** updated to "Latino-built · America-wide. Verified service pros across the US."
 - **`AppHome.jsx` "Become a provider" CTA** copy now reads "Are you a service pro? — Create your free profile — open to all".
-- **NEW `components/AudienceCards.jsx`** — 3-card section mounted between Featured providers and the provider CTA, addressing American families (blue), Latino families (teal, ES copy intentional), and service professionals (amber). Hover lift, responsive 3→1 col, data-testids per card.
+- **NEW `components/UniversalServicesCard.jsx`** (Section 67 corrected) — ONE single universal card replacing any 3-card ethnic split. Eyebrow "Home services you can trust", emoji row 🏠🔧⚡🌿, headline "Find the right professional for your home — wherever you're from" / "Encuentra el profesional ideal para tu hogar — sin importar de dónde eres", trust badges row (✓ Verified · ⭐ Real reviews · 🗣️ EN & ES · 📍 Near you), and 2 CTAs (client primary teal + provider outline). NO ethnic segmentation in the landing — Latino pride lives only in footer pill + About page + provider badges.
 - **NEW `components/LanguageBadges.jsx`** — reusable flag-pill row. 3 variants (light/glass/dark) + optional prominent "🗣️ English-friendly" standout badge when `en` is present in the languages array. Used on eCard (prominent + sidebar).
 - **`components/WhatsAppButton.jsx`** rewritten to use `useI18n`. WA prefilled message switches EN/ES based on visitor's UI language; now also accepts `category` to enrich the message ("...quote for Cleaning services").
 - **`ProviderECard.jsx`** — new prominent `<LanguageBadges variant="dark">` row right under category/identity row + sidebar bilingual "Languages spoken / Idiomas que habla" section. `category` prop now flows into the WA button.
@@ -2444,7 +2444,7 @@ Execute the 5 CEO-supplied prompts (sections 44 NavBar/Provider clean-up, 45 bid
 All JavaScript + Python lint passed.
 
 ### Files NEW
-- `components/AudienceCards.jsx`
+- `components/UniversalServicesCard.jsx` (Section 67 — corrected to single universal card, no ethnic segmentation)
 - `components/LanguageBadges.jsx`
 
 ### Files MODIFIED
