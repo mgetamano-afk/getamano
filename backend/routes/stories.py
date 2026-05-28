@@ -29,6 +29,70 @@ class StoryCreateIn(BaseModel):
     caption: Optional[str] = Field(default=None, max_length=140)
 
 
+# Like-count thresholds that trigger a one-time celebration push.
+# Tuned for the early creator economy: 10 = first social validation,
+# 50 = warm reach, 100 = viral by getamano standards.
+_MILESTONE_TIERS = {
+    10:  {"emoji": "🔥", "label_es": "primeros 10 likes", "label_en": "first 10 likes"},
+    50:  {"emoji": "🌟", "label_es": "50 likes",          "label_en": "50 likes"},
+    100: {"emoji": "🚀", "label_es": "100 likes",         "label_en": "100 likes"},
+}
+
+
+async def _emit_story_milestone(db, story: dict, story_id: str, threshold: int) -> None:
+    """Fire an in-app + push notification when a story hits a like milestone.
+
+    Idempotent: a unique `notification_key` per (story, threshold) prevents
+    duplicate notifications even under race conditions.
+    """
+    tier = _MILESTONE_TIERS.get(threshold)
+    if not tier:
+        return
+    owner_id = story.get("provider_user_id")
+    if not owner_id:
+        return
+    notif_key = f"story_milestone:{story_id}:{threshold}"
+    existing = await db.notifications.find_one({"notification_key": notif_key}, {"_id": 0, "notification_id": 1})
+    if existing:
+        return  # already sent — atomic guard
+
+    now = datetime.now(timezone.utc)
+    body = f"{tier['emoji']} Tu historia acaba de cruzar los {tier['label_es']}"
+    try:
+        await db.notifications.insert_one({
+            "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+            "notification_key": notif_key,
+            "user_id": owner_id,
+            "category": "story_milestone",
+            "title": f"{tier['emoji']} ¡Tu historia está en racha!",
+            "body": body,
+            "cta_label": "Ver historia",
+            "cta_url": "/comunidad",
+            "icon": "heart",
+            "priority": "high",
+            "is_read": False,
+            "dismissed_at": None,
+            "story_id": story_id,
+            "threshold": threshold,
+            "created_at": now.isoformat(),
+        })
+    except Exception:
+        pass  # never let notification failures break the like flow
+
+    # Web Push (sandbox-safe; fails silently if no subscription)
+    try:
+        from routes.push import send_push_to_user
+        await send_push_to_user(db, owner_id, {
+            "title": f"{tier['emoji']} ¡Tu historia está en racha!",
+            "body": body,
+            "url": "/comunidad",
+            "tag": notif_key,
+            "icon": "/icon-192x192.png",
+        })
+    except Exception:
+        pass
+
+
 def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
@@ -150,10 +214,16 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
 
     @router.post("/stories/{story_id}/like")
     async def toggle_story_like(story_id: str, user: User = Depends(get_current_user)) -> dict:
-        """Like/unlike a story. Idempotent per user. Story owner cannot like own."""
+        """Like/unlike a story. Idempotent per user. Story owner cannot like own.
+
+        Side-effects on a *new* like:
+        - If the story crosses 10/50/100 likes, fire a one-time milestone
+          notification (in-app + push) to the owner. The notification_key
+          guarantees idempotency even under race conditions.
+        """
         story = await db.stories.find_one(
             {"story_id": story_id},
-            {"_id": 0, "provider_user_id": 1, "expires_at": 1},
+            {"_id": 0, "provider_user_id": 1, "expires_at": 1, "image_url": 1, "caption": 1},
         )
         if not story:
             raise HTTPException(status_code=404, detail="Historia no encontrada.")
@@ -182,7 +252,13 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             await db.stories.update_one({"story_id": story_id}, {"$inc": {"likes_count": 1}})
             liked = True
         fresh = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "likes_count": 1})
-        return {"liked": liked, "likes_count": (fresh or {}).get("likes_count", 0)}
+        new_count = (fresh or {}).get("likes_count", 0)
+
+        # Milestone notifications — only on a *new* like that lands on a threshold.
+        if liked and new_count in (10, 50, 100):
+            await _emit_story_milestone(db, story, story_id, new_count)
+
+        return {"liked": liked, "likes_count": new_count}
 
     @router.get("/stories/{story_id}/like-state")
     async def get_story_like_state(story_id: str, user: User = Depends(get_current_user)) -> dict:

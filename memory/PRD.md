@@ -2685,3 +2685,44 @@ User asked: *"Hay que poner me gusta dentro de las historias y contarlas, y elim
 ### Files
 - **NEW**: `backend/routes/reviews.py`, `backend/tests/test_iter71_reviews_refactor.py`, `backend/tests/test_iter71_critical_path.py`, `backend/tests/test_iter72_stories_likes_ttl.py`
 - **MODIFIED**: `backend/server.py`, `backend/routes/stories.py`, `frontend/src/components/StoriesCarousel.jsx`
+
+---
+
+## Section 73 — Story like spectacle + milestone push notifications (2026-02-28)
+
+### Why
+User: *"Sii hazlo ya, pero haz que esas historias se vean bonitas y los likes 👍 o corazón están flotando y hagan un efecto más espectacular"* — wanted a polished, dopamine-rich interaction.
+
+### What changed
+**Backend — milestone push (`routes/stories.py`)**
+- Added `_MILESTONE_TIERS = {10, 50, 100}` with bilingual emoji/labels (🔥 / 🌟 / 🚀).
+- Added `_emit_story_milestone(db, story, story_id, threshold)` helper:
+  - Writes a one-time `db.notifications` doc with a unique `notification_key = story_milestone:{story_id}:{n}`.
+  - Fires Web Push via `routes.push.send_push_to_user` (sandbox-safe — wrapped in try/except).
+  - **Idempotent** under races — second call writes nothing.
+- `toggle_story_like` now invokes the helper when a *new* like lands on 10, 50, or 100.
+
+**Frontend — `StoriesCarousel.jsx`**
+- Viewer LikeButton: bumped to `celebrationLevel="milestone"` → 10 heart particles + 4 sparkles + warm palette.
+- **Double-tap-to-like** on the image (Instagram pattern): `handleImageTap` debounces via `lastTapRef`; only triggers the API on transition from unliked→liked. Already-liked taps still pop the center heart for tactile delight.
+- **Giant center-heart burst** (`CenterHeartBurst` component): mounts on each like via a counter `key`, drives a custom `gtm-center-heart` keyframe (scale 0.2 → 1.25 → 0.92 → 1.08 → 0.6 over 1.2s with cubic-bezier ease, plus glow drop-shadow).
+- **Vignette overlays**: top (`bg-gradient-to-b from-black/50`) + bottom (`bg-gradient-to-t from-black/70 via-black/30`) so captions and action buttons stay legible against any photo.
+- Added "Doble toque para dar like" hint text below the LikeButton.
+
+**CSS — `App.css`**
+- New `@keyframes gtm-center-heart` + `.gtm-center-heart` class with `drop-shadow(0 0 24px rgba(244,63,94,0.6))`.
+
+### Tests
+- **NEW** `backend/tests/test_iter73_story_milestones.py` — 4 tests:
+  1. `_MILESTONE_TIERS` spec lock (exactly {10, 50, 100}, all with emoji + ES/EN labels).
+  2. Idempotent insert: 2 calls = 1 notification row, with full shape assertions (user_id, category, threshold, story_id, is_read, emoji in title/body).
+  3. Unknown threshold is a no-op.
+  4. Missing owner is a no-op (no crash, no write).
+
+### Verification
+- 38 tests passing across iter56 + iter57 + iter71 + iter72 + iter73. No regressions.
+- Screenshot: like animation captured mid-flight shows giant center heart, button counter "1", "+1" floater, and vignette darkening. UX is visibly Instagram-grade.
+
+### Files
+- **NEW**: `backend/tests/test_iter73_story_milestones.py`
+- **MODIFIED**: `backend/routes/stories.py`, `frontend/src/components/StoriesCarousel.jsx`, `frontend/src/App.css`

@@ -167,6 +167,9 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
   // Section 61 — Story like state
   const [likeStates, setLikeStates] = useState({}); // story_id → liked bool
   const [likePending, setLikePending] = useState({});
+  // Section 72.5 — Double-tap to like + giant center heart animation
+  const [centerHeart, setCenterHeart] = useState(0); // increment to retrigger anim
+  const lastTapRef = useRef(0);
 
   const isOwner = user && group && user.user_id === group.provider_user_id;
 
@@ -206,6 +209,8 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
     setLikePending((cur) => ({ ...cur, [s.story_id]: true }));
     const wasLiked = !!likeStates[s.story_id];
     setLikeStates((cur) => ({ ...cur, [s.story_id]: !wasLiked }));
+    // Trigger big center-heart burst when transitioning to liked
+    if (!wasLiked) setCenterHeart((n) => n + 1);
     // Optimistic count update on the story object
     setStories((cur) => cur.map((st, i) => i === activeIdx ? { ...st, likes_count: (st.likes_count || 0) + (wasLiked ? -1 : 1) } : st));
     try {
@@ -219,6 +224,25 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
       toast.error(e?.response?.data?.detail || "Error");
     } finally {
       setLikePending((cur) => { const n = { ...cur }; delete n[s.story_id]; return n; });
+    }
+  };
+
+  // Double-tap on the story image → trigger like (Instagram pattern).
+  // Only fires the API call when the user goes from unliked → liked.
+  const handleImageTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 320) {
+      lastTapRef.current = 0;
+      const s = stories[activeIdx];
+      if (!s || isOwner || !user) return;
+      if (likeStates[s.story_id]) {
+        // Already liked — still flash the heart for delight
+        setCenterHeart((n) => n + 1);
+        return;
+      }
+      toggleStoryLike();
+    } else {
+      lastTapRef.current = now;
     }
   };
 
@@ -344,14 +368,25 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
             </button>
           </div>
 
-          {/* Story image */}
+          {/* Vignette gradient — improves readability of caption + action buttons on any image */}
+          <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none z-[1] bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-32 pointer-events-none z-[1] bg-gradient-to-b from-black/50 to-transparent" />
+
+          {/* Story image — tap area also handles double-tap-to-like */}
           <img
             {...lazyImg(buildFileUrl(active.image_url), { priority: true })}
             alt={active.caption || group.business_name}
-            className="object-contain"
+            className="object-contain select-none"
             style={{ maxWidth: "100%", maxHeight: "100vh", width: "auto", height: "auto" }}
             data-testid="story-viewer-image"
+            onClick={handleImageTap}
+            draggable={false}
           />
+
+          {/* Giant center-screen heart burst on like (Instagram-style) */}
+          {centerHeart > 0 && (
+            <CenterHeartBurst key={centerHeart} />
+          )}
 
           {/* Caption */}
           {active.caption && (
@@ -397,7 +432,11 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
                 variant="floating"
                 testid="story-viewer-like"
                 ariaLabel={lang === "en" ? "Like this story" : "Dar like a esta historia"}
+                celebrationLevel="milestone"
               />
+              <p className="text-white/70 text-[10px] font-medium mt-1.5 ml-2 drop-shadow-md select-none">
+                {lang === "en" ? "Double-tap to like" : "Doble toque para dar like"}
+              </p>
             </div>
           )}
 
@@ -418,6 +457,26 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
       )}
     </div>
   ), document.body);
+}
+
+/**
+ * CenterHeartBurst — Instagram-style giant heart that pops in the middle
+ * of the story when the user double-taps OR likes via button. Mounted with
+ * a `key` prop bound to a counter so each like remounts the element and
+ * replays the animation. CSS-only — see `gtm-center-heart` keyframes in
+ * `index.css`.
+ */
+function CenterHeartBurst() {
+  return (
+    <div className="absolute inset-0 z-[12] flex items-center justify-center pointer-events-none" data-testid="story-center-heart">
+      <Heart
+        className="gtm-center-heart text-rose-500 drop-shadow-[0_8px_24px_rgba(244,63,94,0.6)]"
+        style={{ width: 160, height: 160 }}
+        fill="currentColor"
+        strokeWidth={0}
+      />
+    </div>
+  );
 }
 
 /**
