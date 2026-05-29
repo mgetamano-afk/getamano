@@ -4,6 +4,23 @@
    carousels (categories, featured providers). Mobile-first: WebKit
    browsers, Firefox and IE11. */
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Section 77 — premium "fade-up" entrance for the hero blocks.
+   `prefers-reduced-motion` is respected so users with motion sensitivity
+   see a static layout. The intro fires only once on mount via inline
+   `animation-delay` staggered per block (0ms, 80ms, 160ms, 240ms…). */
+@keyframes gtm-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.gtm-fade-up {
+  opacity: 0;
+  animation: gtm-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gtm-fade-up { animation: none; opacity: 1; }
+}
+
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 
 

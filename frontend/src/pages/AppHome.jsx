@@ -176,14 +176,17 @@ export default function AppHome() {
         <FuturisticDecor variant="navy" />
 
         <div className="relative max-w-7xl mx-auto px-5 md:px-6 py-7 md:py-10">
-          <p className="text-[#90E0EF] text-[13px] md:text-sm mb-1 font-medium">
+          <p
+            className="text-[#90E0EF] text-[13px] md:text-sm mb-1 font-medium gtm-fade-up"
+            style={{ animationDelay: "0ms" }}
+          >
             {user
               ? (lang === "en" ? `Hi, ${firstName} 👋` : `Hola, ${firstName} 👋`)
               : (lang === "en" ? "Welcome to" : "Bienvenido a")}
           </p>
           <h1
-            className={`text-white font-display font-extrabold tracking-tight mb-3 ${user ? "text-xl md:text-2xl" : "text-[26px] md:text-4xl"}`}
-            style={{ letterSpacing: "-0.5px", lineHeight: 1.1 }}
+            className={`text-white font-display font-extrabold tracking-tight mb-3 gtm-fade-up ${user ? "text-xl md:text-2xl" : "text-[26px] md:text-4xl"}`}
+            style={{ letterSpacing: "-0.5px", lineHeight: 1.1, animationDelay: "80ms" }}
             data-testid="apphome-greeting"
           >
             {user
@@ -195,13 +198,21 @@ export default function AppHome() {
 
           {/* Section 67 — dual-audience subhead + "Latino-built" pride badge */}
           {!user && (
-            <p className="text-white/90 text-[13px] md:text-[15px] mb-4 max-w-2xl leading-snug" data-testid="apphome-subhead">
+            <p
+              className="text-white/90 text-[13px] md:text-[15px] mb-4 max-w-2xl leading-snug gtm-fade-up"
+              style={{ animationDelay: "160ms" }}
+              data-testid="apphome-subhead"
+            >
               {lang === "en"
                 ? "Plumbers, electricians, cleaning, landscaping & more — verified pros with real reviews."
                 : "Plomeros, electricistas, limpieza, jardinería y más — proveedores verificados con reseñas reales."}
             </p>
           )}
-          <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 text-[11px] font-semibold text-white" data-testid="apphome-latino-built-badge">
+          <div
+            className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 text-[11px] font-semibold text-white gtm-fade-up"
+            style={{ animationDelay: "200ms" }}
+            data-testid="apphome-latino-built-badge"
+          >
             🫂 <span>Latino-built · America-wide</span>
           </div>
 
@@ -209,12 +220,13 @@ export default function AppHome() {
           <button
             type="button"
             onClick={() => navigate("/search")}
-            className="group w-full max-w-2xl rounded-2xl px-2 py-2 flex items-center gap-2 text-left transition shadow-2xl shadow-[#00B4D8]/20 hover:shadow-[#00B4D8]/40"
+            className="group w-full max-w-2xl rounded-2xl px-2 py-2 flex items-center gap-2 text-left transition shadow-2xl shadow-[#00B4D8]/20 hover:shadow-[#00B4D8]/40 gtm-fade-up"
             style={{
               background: "rgba(255, 255, 255, 0.92)",
               backdropFilter: "blur(18px) saturate(140%)",
               WebkitBackdropFilter: "blur(18px) saturate(140%)",
               border: "1px solid rgba(255, 255, 255, 0.4)",
+              animationDelay: "280ms",
             }}
             data-testid="apphome-search-trigger"
           >
@@ -240,7 +252,11 @@ export default function AppHome() {
 
           {/* Section 77 — quick search tags as glass pills */}
           {!user && (
-            <div className="mt-3 flex flex-wrap gap-2" data-testid="apphome-quick-tags">
+            <div
+              className="mt-3 flex flex-wrap gap-2 gtm-fade-up"
+              style={{ animationDelay: "360ms" }}
+              data-testid="apphome-quick-tags"
+            >
               {[
                 { es: "Limpieza", en: "Cleaning", slug: "limpieza" },
                 { es: "Plomería", en: "Plumbing", slug: "plomeria" },
