@@ -6,6 +6,7 @@ import { useI18n } from "../../contexts/I18nContext";
 import { api } from "../../lib/api";
 import { toast } from "sonner";
 import LanguageToggle from "./LanguageToggle";
+import CityscapeBackdrop from "../CityscapeBackdrop";
 
 /**
  * OnboardingLogin — Section 70 (screen 3 of 3).
@@ -138,20 +139,24 @@ export default function OnboardingLogin({ onFinish }) {
 
   return (
     <div
-      className="min-h-[100dvh] w-full flex flex-col items-center font-poppins"
+      className="relative w-full flex flex-col items-center font-poppins overflow-x-hidden"
       style={{
+        minHeight: "100dvh",
         backgroundColor: "var(--gtm-blue-surface, #CAF0F8)",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
       }}
       data-testid="onb-login"
     >
+      <CityscapeBackdrop />
+
       {/* Top-right language toggle */}
-      <div className="w-full px-4 flex justify-end">
+      <div className="relative z-10 w-full px-4 flex justify-end">
         <LanguageToggle />
       </div>
 
-      <div className="flex-1 w-full max-w-md mx-auto px-6 py-6 flex flex-col">
+      <div className="relative z-10 flex-1 w-full max-w-md mx-auto px-4 sm:px-6 py-4 flex flex-col">
+        <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl shadow-[#0077B6]/15 border border-white/40 p-6 sm:p-8">
         <img src="/getamano-logo-mark.png" alt="getamano" className="w-16 h-16 mx-auto mb-4 object-contain" draggable={false} />
         <h1 className="text-2xl font-bold text-center" style={{ letterSpacing: "-0.02em", color: "#03045E" }} data-testid="onb-login-title">
           {t("onb.login.title")}
@@ -381,6 +386,7 @@ export default function OnboardingLogin({ onFinish }) {
             {t("onb.login.signup_cta")}
           </Link>
         </p>
+        </div>{/* /card */}
       </div>
     </div>
   );

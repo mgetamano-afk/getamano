@@ -52,6 +52,10 @@ import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
 import VerifyEmail from "./pages/VerifyEmail";
 import EmpleosPage from "./pages/EmpleosPage";
+// Section 87 — `/register` and `/registro` now mount the real Register
+// wizard (was previously aliased to LoginPage which only let users SIGN
+// IN — there was no way to CREATE a new account at all).
+import Register from "./pages/Register";
 const SavedECardsPage = lazy(() => import("./pages/SavedECardsPage"));
 const BannerGalleryPage = lazy(() => import("./pages/BannerGalleryPage"));
 const ServicesRouteResolver = lazy(() => import("./pages/ServicesRouteResolver"));
@@ -144,9 +148,10 @@ function AppRouter() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/signin" element={<LoginPage />} />
-      <Route path="/register" element={<LoginPage />} />
-      <Route path="/signup" element={<LoginPage />} />
-      <Route path="/registro" element={<LoginPage />} />
+      {/* Section 87 — proper account creation flow (was 404/loop) */}
+      <Route path="/register" element={<Register />} />
+      <Route path="/signup" element={<Register />} />
+      <Route path="/registro" element={<Register />} />
       <Route path="/auth/select-role" element={<SelectRolePage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />

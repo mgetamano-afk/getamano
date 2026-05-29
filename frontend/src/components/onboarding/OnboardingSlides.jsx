@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, MapPin, Megaphone, MessageSquareQuote } from "lucide-react";
 import { useI18n } from "../../contexts/I18nContext";
 import LanguageToggle from "./LanguageToggle";
+import CityscapeBackdrop from "../CityscapeBackdrop";
 
 /**
  * OnboardingSlides — Section 70 (screen 2 of 3).
@@ -73,8 +74,9 @@ export default function OnboardingSlides({ onDone }) {
 
   return (
     <div
-      className="min-h-[100dvh] w-full flex flex-col text-[#03045E] font-poppins"
+      className="relative w-full flex flex-col text-[#03045E] font-poppins overflow-x-hidden"
       style={{
+        minHeight: "100dvh",
         backgroundColor: "var(--gtm-blue-surface, #CAF0F8)",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)",
@@ -83,13 +85,15 @@ export default function OnboardingSlides({ onDone }) {
       onTouchEnd={onTouchEnd}
       data-testid="onb-slides"
     >
+      <CityscapeBackdrop />
+
       {/* Top bar: language toggle + Skip */}
-      <div className="w-full px-4 flex items-center justify-between">
+      <div className="relative z-10 w-full px-4 flex items-center justify-between">
         <LanguageToggle />
         <button
           type="button"
           onClick={onDone}
-          className="text-sm font-semibold text-[#03045E]/70 hover:text-[#03045E] transition px-2 py-1"
+          className="text-sm font-semibold text-white/95 bg-black/15 backdrop-blur hover:bg-black/25 transition px-3 py-1.5 rounded-full"
           data-testid="onb-slides-skip"
         >
           {t("onb.slide.skip")}
@@ -97,14 +101,14 @@ export default function OnboardingSlides({ onDone }) {
       </div>
 
       {/* Main slide */}
-      <div className="flex-1 w-full max-w-md mx-auto px-6 flex flex-col items-center justify-center text-center">
+      <div className="relative z-10 flex-1 w-full max-w-md mx-auto px-6 flex flex-col items-center justify-center text-center">
         <div
           key={active}
-          className="flex flex-col items-center"
+          className="flex flex-col items-center bg-white/90 backdrop-blur rounded-3xl shadow-2xl shadow-[#0077B6]/20 border border-white/40 px-6 py-8 w-full"
           style={{ animation: "gtm-slide-in 320ms cubic-bezier(0.22,1,0.36,1) both" }}
         >
           <div
-            className="w-28 h-28 rounded-full flex items-center justify-center mb-8 shadow-md"
+            className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center mb-6 shadow-md"
             style={{
               background: "linear-gradient(135deg, var(--gtm-blue-light, #90E0EF) 0%, var(--gtm-blue-accent, #00B4D8) 100%)",
             }}
@@ -124,7 +128,7 @@ export default function OnboardingSlides({ onDone }) {
       </div>
 
       {/* Dots indicator */}
-      <div className="w-full flex justify-center gap-2 mb-6" data-testid="onb-slides-dots">
+      <div className="relative z-10 w-full flex justify-center gap-2 mb-6 mt-4" data-testid="onb-slides-dots">
         {slides.map((_, i) => (
           <button
             key={i}
@@ -134,7 +138,8 @@ export default function OnboardingSlides({ onDone }) {
             className="h-2 rounded-full transition-all"
             style={{
               width: i === active ? 28 : 8,
-              backgroundColor: i === active ? "#03045E" : "rgba(3, 4, 94, 0.25)",
+              backgroundColor: i === active ? "#FFFFFF" : "rgba(255, 255, 255, 0.45)",
+              boxShadow: i === active ? "0 0 8px rgba(255,255,255,0.7)" : "none",
             }}
             data-testid={`onb-slides-dot-${i}`}
           />
@@ -142,11 +147,11 @@ export default function OnboardingSlides({ onDone }) {
       </div>
 
       {/* CTA */}
-      <div className="w-full max-w-md mx-auto px-6">
+      <div className="relative z-10 w-full max-w-md mx-auto px-6">
         <button
           type="button"
           onClick={next}
-          className="w-full h-14 rounded-2xl text-white font-bold text-base shadow-lg active:scale-[0.98] transition-transform"
+          className="w-full h-14 rounded-2xl text-white font-bold text-base shadow-2xl active:scale-[0.98] transition-transform"
           style={{ backgroundColor: "var(--gtm-blue-primary, #0077B6)" }}
           data-testid="onb-slides-cta"
         >
