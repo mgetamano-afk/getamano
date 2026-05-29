@@ -3157,3 +3157,36 @@ User uploaded three prompts and asked them to be executed in sequence: 70 → 71
 
 ### NOT done (intentional, phased)
 A full app-wide repaint from the teal/scooter palette to Ocean Blue (the part of Sec.71 that asks for every existing page to migrate) was deliberately skipped — that's dozens of pages and would risk visual regressions outside the scope of this turn. The new design system is fully wired and ready; subsequent turns can repaint Header, Footer, BottomNav, Search, etc. incrementally.
+
+---
+
+## Section 71c — Repaint to Teal/Midnight Green palette + onboarding bug audit (2026-02-28)
+
+### User feedback
+*"Sabes que, no me gusto la paleta de colores azul, una está esta ya teniamos, ahora desde el principio inspecciona tu código y elimina bugs, elimina lo que está escrito doble y asegúrate mobile first."*
+
+### Palette swap (kept variable names, swapped values)
+| Token              | Was (Ocean Blue) | Now (Teal/Midnight)        |
+|--------------------|------------------|----------------------------|
+| `--gtm-blue-dark`  | `#03045E`        | `#011C40` Maastricht Blue  |
+| `--gtm-blue-primary`| `#0077B6`       | `#024059` Midnight Green   |
+| `--gtm-blue-accent` | `#00B4D8`       | `#0396A6` Munsell Blue     |
+| `--gtm-blue-light`  | `#90E0EF`       | `#04BFBF` Tiffany Blue     |
+| `--gtm-blue-surface`| `#CAF0F8`       | `#9CE3D5` Pale Robin Egg   |
+
+Aligns with the existing teal brand (`lagoon #025F67`, `scooter #2F9D94`). Updated:
+- `frontend/src/index.css` (`:root` vars)
+- `frontend/tailwind.config.js` (`brand.blue-*`)
+- All 4 onboarding components — global hex swap via Python script (one-shot, deterministic).
+
+### Bugs eliminated / dead code removed
+- **OnboardingFlow.jsx** had a `useLocation` import + a `useEffect` body that did nothing. Replaced with a real useEffect: when the auth context resolves a `user`, mark onboarding seen and bounce to `/` (prevents logged-in users from re-onboarding via bookmark).
+- All onboarding screens migrated `min-h-screen` → `min-h-[100dvh]` so the URL bar in iOS Safari / Chrome Android doesn't clip the bottom CTA. Mobile-first contract restored.
+
+### Verification
+- Zero stray Ocean-Blue hex values in `src` or `public` (grep -rn returned 0 matches).
+- Lint clean across all onboarding files.
+- Mobile screenshots @ 393×852 confirm the new palette renders correctly across all 3 screens in both ES and EN.
+
+### Files
+- **MODIFIED**: `frontend/src/index.css`, `frontend/tailwind.config.js`, `frontend/src/components/onboarding/{OnboardingFlow,OnboardingSplash,OnboardingSlides,OnboardingLogin,LanguageToggle}.jsx`

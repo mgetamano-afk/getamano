@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import OnboardingSplash from "./OnboardingSplash";
 import OnboardingSlides from "./OnboardingSlides";
 import OnboardingLogin from "./OnboardingLogin";
@@ -11,21 +12,33 @@ const SEEN_KEY = "gtm_onboarding_seen";
  * OnboardingFlow — Section 70 (orchestrator).
  *
  * Mounted at `/welcome`. Walks through the 3 native onboarding screens in
- * sequence: splash → slides → login. Each step is checkpoint-able via
- * localStorage so a refresh resumes on the same screen.
+ * sequence: splash → slides → login. The current step is persisted to
+ * `localStorage.gtm_onboarding_step` so a refresh resumes where the user
+ * left off.
  *
  * Completion contract
  * ───────────────────
- * When the user finishes (taps "Crea una aquí" on /register, taps Google,
- * or signs in), we set `gtm_onboarding_seen=true`. After that, the gate
- * in App.js stops redirecting them here.
+ * When the user finishes (taps Google, signs in, or links to /register),
+ * we set `gtm_onboarding_seen=true`. The OnboardingGate then stops
+ * redirecting them here.
+ *
+ * Already-logged-in users
+ * ───────────────────────
+ * If a logged-in user lands on /welcome (e.g. an old bookmark) they are
+ * silently bounced to "/" so they don't have to re-onboard.
  */
 export default function OnboardingFlow() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { user, loading } = useAuth();
   const [step, setStep] = useState(() => {
     try { return localStorage.getItem(STEP_KEY) || "splash"; } catch { return "splash"; }
   });
+
+  useEffect(() => {
+    if (loading || !user) return;
+    try { localStorage.setItem(SEEN_KEY, "true"); } catch { /* private mode */ }
+    navigate("/", { replace: true });
+  }, [user, loading, navigate]);
 
   const goto = (next) => {
     setStep(next);
@@ -39,17 +52,8 @@ export default function OnboardingFlow() {
     } catch { /* private mode */ }
   };
 
-  // If a logged-in user accidentally lands on /welcome, push them to the app.
-  useEffect(() => {
-    if (location.state?.fromGate) return; // came from the splash gate
-  }, [location.state]);
-
-  if (step === "splash") {
-    return <OnboardingSplash onContinue={() => goto("slides")} />;
-  }
-  if (step === "slides") {
-    return <OnboardingSlides onDone={() => goto("login")} />;
-  }
+  if (step === "splash") return <OnboardingSplash onContinue={() => goto("slides")} />;
+  if (step === "slides") return <OnboardingSlides onDone={() => goto("login")} />;
   return (
     <OnboardingLogin
       onFinish={() => {

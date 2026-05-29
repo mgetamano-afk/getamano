@@ -9,7 +9,7 @@ import LanguageToggle from "./LanguageToggle";
  *
  * Visual spec
  * ───────────
- *  · Background : #03045E (Section 71 token `--gtm-blue-dark`)
+ *  · Background : #011C40 (Section 71 token `--gtm-blue-dark`)
  *  · Logo size  : 96 × 96 (logo512.png — already in /public)
  *  · Title      : 32px Poppins 700
  *  · CTA        : white pill, navy text, 56px tall, 16px radius
@@ -24,9 +24,9 @@ export default function OnboardingSplash({ onContinue }) {
   const { t } = useI18n();
   return (
     <div
-      className="min-h-screen w-full flex flex-col items-center justify-between text-white font-poppins overflow-hidden relative"
+      className="min-h-[100dvh] w-full flex flex-col items-center justify-between text-white font-poppins overflow-hidden relative"
       style={{
-        backgroundColor: "var(--gtm-blue-dark, #03045E)",
+        backgroundColor: "var(--gtm-blue-dark, #011C40)",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
       }}
@@ -62,7 +62,7 @@ export default function OnboardingSplash({ onContinue }) {
         <button
           type="button"
           onClick={onContinue}
-          className="w-full h-14 rounded-2xl bg-white text-[#03045E] font-bold text-base shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
+          className="w-full h-14 rounded-2xl bg-white text-[#011C40] font-bold text-base shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
           data-testid="onb-splash-cta"
         >
           {t("onb.splash.cta")} →

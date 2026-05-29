@@ -73,9 +73,9 @@ export default function OnboardingSlides({ onDone }) {
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col text-[#03045E] font-poppins"
+      className="min-h-[100dvh] w-full flex flex-col text-[#011C40] font-poppins"
       style={{
-        backgroundColor: "var(--gtm-blue-surface, #CAF0F8)",
+        backgroundColor: "var(--gtm-blue-surface, #9CE3D5)",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.25rem)",
       }}
@@ -89,7 +89,7 @@ export default function OnboardingSlides({ onDone }) {
         <button
           type="button"
           onClick={onDone}
-          className="text-sm font-semibold text-[#03045E]/70 hover:text-[#03045E] transition px-2 py-1"
+          className="text-sm font-semibold text-[#011C40]/70 hover:text-[#011C40] transition px-2 py-1"
           data-testid="onb-slides-skip"
         >
           {t("onb.slide.skip")}
@@ -106,7 +106,7 @@ export default function OnboardingSlides({ onDone }) {
           <div
             className="w-28 h-28 rounded-full flex items-center justify-center mb-8 shadow-md"
             style={{
-              background: "linear-gradient(135deg, var(--gtm-blue-light, #90E0EF) 0%, var(--gtm-blue-accent, #00B4D8) 100%)",
+              background: "linear-gradient(135deg, var(--gtm-blue-light, #04BFBF) 0%, var(--gtm-blue-accent, #0396A6) 100%)",
             }}
           >
             {(() => {
@@ -114,10 +114,10 @@ export default function OnboardingSlides({ onDone }) {
               return <Icon className="w-12 h-12 text-white" strokeWidth={2.2} />;
             })()}
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" style={{ letterSpacing: "-0.02em", color: "#03045E" }}>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" style={{ letterSpacing: "-0.02em", color: "#011C40" }}>
             {slides[active].title}
           </h2>
-          <p className="text-base sm:text-[17px] text-[#03045E]/80 leading-relaxed max-w-sm">
+          <p className="text-base sm:text-[17px] text-[#011C40]/80 leading-relaxed max-w-sm">
             {slides[active].desc}
           </p>
         </div>
@@ -134,7 +134,7 @@ export default function OnboardingSlides({ onDone }) {
             className="h-2 rounded-full transition-all"
             style={{
               width: i === active ? 28 : 8,
-              backgroundColor: i === active ? "#03045E" : "rgba(3, 4, 94, 0.25)",
+              backgroundColor: i === active ? "#011C40" : "rgba(1, 28, 64, 0.25)",
             }}
             data-testid={`onb-slides-dot-${i}`}
           />
@@ -147,7 +147,7 @@ export default function OnboardingSlides({ onDone }) {
           type="button"
           onClick={next}
           className="w-full h-14 rounded-2xl text-white font-bold text-base shadow-lg active:scale-[0.98] transition-transform"
-          style={{ backgroundColor: "var(--gtm-blue-primary, #0077B6)" }}
+          style={{ backgroundColor: "var(--gtm-blue-primary, #024059)" }}
           data-testid="onb-slides-cta"
         >
           {isLast ? t("onb.slide.done") : t("onb.slide.next")} →

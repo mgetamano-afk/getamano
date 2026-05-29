@@ -68,9 +68,9 @@ export default function OnboardingLogin({ onFinish }) {
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col items-center font-poppins"
+      className="min-h-[100dvh] w-full flex flex-col items-center font-poppins"
       style={{
-        backgroundColor: "var(--gtm-blue-surface, #CAF0F8)",
+        backgroundColor: "var(--gtm-blue-surface, #9CE3D5)",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
       }}
@@ -83,10 +83,10 @@ export default function OnboardingLogin({ onFinish }) {
 
       <div className="flex-1 w-full max-w-md mx-auto px-6 py-6 flex flex-col">
         <img src="/getamano-logo-mark.png" alt="getamano" className="w-16 h-16 mx-auto mb-4 object-contain" draggable={false} />
-        <h1 className="text-2xl font-bold text-center" style={{ letterSpacing: "-0.02em", color: "#03045E" }} data-testid="onb-login-title">
+        <h1 className="text-2xl font-bold text-center" style={{ letterSpacing: "-0.02em", color: "#011C40" }} data-testid="onb-login-title">
           {t("onb.login.title")}
         </h1>
-        <p className="text-sm text-center text-[#03045E]/65 mt-1.5 mb-6">
+        <p className="text-sm text-center text-[#011C40]/65 mt-1.5 mb-6">
           {t("onb.login.subtitle")}
         </p>
 
@@ -105,8 +105,8 @@ export default function OnboardingLogin({ onFinish }) {
                 aria-pressed={active}
                 className={`h-14 rounded-2xl border-2 flex items-center justify-center gap-2 transition-colors font-semibold ${
                   active
-                    ? "border-[#0077B6] bg-white text-[#03045E] shadow-sm"
-                    : "border-transparent bg-white/65 text-[#03045E]/65"
+                    ? "border-[#024059] bg-white text-[#011C40] shadow-sm"
+                    : "border-transparent bg-white/65 text-[#011C40]/65"
                 }`}
                 data-testid={`onb-login-role-${id}`}
               >
@@ -124,7 +124,7 @@ export default function OnboardingLogin({ onFinish }) {
           <button
             type="button"
             onClick={googleLogin}
-            className="w-full h-12 rounded-2xl bg-white border border-slate-200 hover:border-[#0077B6] hover:shadow-sm flex items-center justify-center gap-2.5 font-semibold text-[#03045E] transition"
+            className="w-full h-12 rounded-2xl bg-white border border-slate-200 hover:border-[#024059] hover:shadow-sm flex items-center justify-center gap-2.5 font-semibold text-[#011C40] transition"
             data-testid="onb-login-google"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -163,42 +163,42 @@ export default function OnboardingLogin({ onFinish }) {
         </div>
 
         {/* Divider */}
-        <div className="flex items-center gap-3 mb-5 text-xs text-[#03045E]/50">
-          <div className="h-px flex-1 bg-[#03045E]/12" />
+        <div className="flex items-center gap-3 mb-5 text-xs text-[#011C40]/50">
+          <div className="h-px flex-1 bg-[#011C40]/12" />
           <span>{t("onb.login.divider")}</span>
-          <div className="h-px flex-1 bg-[#03045E]/12" />
+          <div className="h-px flex-1 bg-[#011C40]/12" />
         </div>
 
         {/* Email / password form */}
         <form onSubmit={onSubmit} className="space-y-3" data-testid="onb-login-form">
           <div className="relative">
-            <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#03045E]/50" />
+            <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#011C40]/50" />
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t("onb.login.email")}
-              className="w-full h-12 pl-10 pr-3 rounded-2xl bg-white border border-slate-200 outline-none focus:border-[#0077B6] focus:ring-2 focus:ring-[#0077B6]/20 text-[#03045E]"
+              className="w-full h-12 pl-10 pr-3 rounded-2xl bg-white border border-slate-200 outline-none focus:border-[#024059] focus:ring-2 focus:ring-[#024059]/20 text-[#011C40]"
               data-testid="onb-login-email"
             />
           </div>
           <div className="relative">
-            <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#03045E]/50" />
+            <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#011C40]/50" />
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t("onb.login.password")}
-              className="w-full h-12 pl-10 pr-3 rounded-2xl bg-white border border-slate-200 outline-none focus:border-[#0077B6] focus:ring-2 focus:ring-[#0077B6]/20 text-[#03045E]"
+              className="w-full h-12 pl-10 pr-3 rounded-2xl bg-white border border-slate-200 outline-none focus:border-[#024059] focus:ring-2 focus:ring-[#024059]/20 text-[#011C40]"
               data-testid="onb-login-password"
             />
           </div>
           <div className="flex justify-end">
             <Link
               to="/forgot-password"
-              className="text-xs font-semibold text-[#0077B6] hover:underline"
+              className="text-xs font-semibold text-[#024059] hover:underline"
               data-testid="onb-login-forgot"
             >
               {t("onb.login.forgot")}
@@ -208,7 +208,7 @@ export default function OnboardingLogin({ onFinish }) {
             type="submit"
             disabled={loading}
             className="w-full h-14 rounded-2xl text-white font-bold text-base shadow-md active:scale-[0.98] transition-transform disabled:opacity-60 flex items-center justify-center gap-2"
-            style={{ backgroundColor: "var(--gtm-blue-primary, #0077B6)" }}
+            style={{ backgroundColor: "var(--gtm-blue-primary, #024059)" }}
             data-testid="onb-login-submit"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -216,11 +216,11 @@ export default function OnboardingLogin({ onFinish }) {
           </button>
         </form>
 
-        <p className="text-center text-sm text-[#03045E]/70 mt-6">
+        <p className="text-center text-sm text-[#011C40]/70 mt-6">
           {t("onb.login.signup_q")}{" "}
           <Link
             to="/register"
-            className="font-bold text-[#0077B6] hover:underline"
+            className="font-bold text-[#024059] hover:underline"
             onClick={onFinish}
             data-testid="onb-login-signup"
           >

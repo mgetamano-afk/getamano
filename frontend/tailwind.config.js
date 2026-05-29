@@ -60,12 +60,13 @@ module.exports = {
                                 heather: '#BCC5CC',
                                 lagoon: '#025F67',
                                 sapphire: '#063154',
-                                /* Section 71 — Ocean Blue palette (Latin Ventures LLC, 2026) */
-                                'blue-dark':    '#03045E',
-                                'blue-primary': '#0077B6',
-                                'blue-accent':  '#00B4D8',
-                                'blue-light':   '#90E0EF',
-                                'blue-surface': '#CAF0F8',
+                                /* Section 71b — Teal/Midnight Green palette
+                                   (unified with existing scooter/lagoon brand) */
+                                'blue-dark':    '#011C40',
+                                'blue-primary': '#024059',
+                                'blue-accent':  '#0396A6',
+                                'blue-light':   '#04BFBF',
+                                'blue-surface': '#9CE3D5',
                         },
                         /* Override 'orange' so legacy classes map to Scooter teal scale */
                         orange: {

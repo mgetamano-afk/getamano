@@ -49,8 +49,8 @@ export default function LanguageToggle() {
             aria-pressed={active}
             className={`min-w-[44px] h-9 px-3 rounded-full text-xs font-bold tracking-wide transition-colors ${
               active
-                ? "bg-[#03045E] text-white shadow-sm"
-                : "text-[#03045E]/70 hover:text-[#03045E]"
+                ? "bg-[#011C40] text-white shadow-sm"
+                : "text-[#011C40]/70 hover:text-[#011C40]"
             }`}
             data-testid={`onb-lang-${opt.code}`}
           >
