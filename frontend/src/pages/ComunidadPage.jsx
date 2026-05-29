@@ -53,7 +53,7 @@ function NewPostBox({ onPosted }) {
   if (!user) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 mb-4 text-center text-sm text-slate-600" data-testid="comunidad-newpost-anon">
-        <Link to="/login" className="font-semibold text-teal-700 hover:underline">Inicia sesión</Link> para publicar en la comunidad.
+        <Link to="/login" className="font-semibold text-[#0077B6] hover:underline">Inicia sesión</Link> para publicar en la comunidad.
       </div>
     );
   }
@@ -156,7 +156,7 @@ function NewPostBox({ onPosted }) {
                 type="button"
                 onClick={pickImage}
                 disabled={uploading || !!imageUrl}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 hover:bg-teal-50 px-2 py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#0077B6] hover:bg-[#CAF0F8]/40 px-2 py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
                 data-testid="comunidad-newpost-image-button"
               >
                 {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
@@ -261,7 +261,7 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
                         <span className="text-xs font-bold text-slate-900">{a.name}</span>
                       )}
                       {a.is_provider && (
-                        <span className="text-[9px] font-bold text-teal-700 bg-teal-100 px-1 py-0.5 rounded">✓</span>
+                        <span className="text-[9px] font-bold text-[#0077B6] bg-[#CAF0F8] px-1 py-0.5 rounded">✓</span>
                       )}
                     </div>
                     <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap" data-testid={`inline-comment-content-${c.comment_id}`}>
@@ -323,7 +323,7 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
           </div>
         </div>
       ) : (
-        <Link to="/login" className="block text-center text-xs font-semibold text-teal-700 hover:underline py-2" data-testid={`inline-comments-anon-${post.post_id}`}>
+        <Link to="/login" className="block text-center text-xs font-semibold text-[#0077B6] hover:underline py-2" data-testid={`inline-comments-anon-${post.post_id}`}>
           Inicia sesión para comentar →
         </Link>
       )}
@@ -387,7 +387,7 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
               <span className="font-semibold text-sm text-slate-900 truncate">{a.name}</span>
             )}
             {a.is_provider && (
-              <span className="text-[9px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#0077B6] bg-[#CAF0F8]/40 border border-[#90E0EF] px-1.5 py-0.5 rounded-full">
                 ✓ Verificado
               </span>
             )}
@@ -435,7 +435,7 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
           onClick={() => setCommentsOpen(v => !v)}
           aria-expanded={commentsOpen}
           aria-controls={`inline-comments-${post.post_id}`}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${commentsOpen ? "text-teal-700 bg-teal-50" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${commentsOpen ? "text-[#0077B6] bg-[#CAF0F8]/40" : "text-slate-500 hover:bg-slate-50 hover:text-[#0077B6]"}`}
           data-testid={`comunidad-post-comments-${post.post_id}`}
         >
           <MessageCircle className="w-4 h-4" />
@@ -454,7 +454,7 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
               }
             } catch (_e) {/* user cancelled */}
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-teal-700 transition ml-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-[#0077B6] transition ml-auto"
           data-testid={`comunidad-post-share-${post.post_id}`}
         >
           <Share2 className="w-4 h-4" />
@@ -653,7 +653,7 @@ function PostFeed() {
           data-testid="comunidad-pull-indicator"
         >
           <div className="w-10 h-10 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center">
-            <RefreshCw className={`w-5 h-5 text-teal-600 transition-transform ${isPulling ? "rotate-180" : ""}`} />
+            <RefreshCw className={`w-5 h-5 text-[#0077B6] transition-transform ${isPulling ? "rotate-180" : ""}`} />
           </div>
         </div>
       )}
@@ -706,7 +706,7 @@ function PostFeed() {
           type="button"
           onClick={loadMore}
           disabled={loadingMore}
-          className="w-full mt-3 py-2.5 rounded-full bg-white border border-slate-200 text-sm font-semibold text-slate-700 hover:border-teal-300 disabled:opacity-50"
+          className="w-full mt-3 py-2.5 rounded-full bg-white border border-slate-200 text-sm font-semibold text-slate-700 hover:border-[#90E0EF] disabled:opacity-50"
           data-testid="comunidad-load-more"
         >
           {loadingMore ? "Cargando…" : "Cargar más"}
@@ -735,7 +735,7 @@ function LeftNav() {
           <Link
             key={it.to}
             to={it.to}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-teal-700 transition"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#0077B6] transition"
             data-testid={it.testid}
           >
             <it.icon className="w-5 h-5" />
@@ -745,7 +745,7 @@ function LeftNav() {
         {user?.role === "provider" && (
           <Link
             to="/dashboard/provider"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-teal-700 transition"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-[#0077B6] transition"
             data-testid="comunidad-nav-dashboard"
           >
             <Settings className="w-5 h-5" />
@@ -823,7 +823,7 @@ function RightSidebar() {
         {user && suggested.length > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4" data-testid="comunidad-suggested">
             <h3 className="font-display font-bold text-slate-900 text-sm mb-3 flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-teal-700" /> Sugeridos
+              <Users className="w-4 h-4 text-[#0077B6]" /> Sugeridos
             </h3>
             <ul className="space-y-2.5">
               {suggested.slice(0, 5).map(p => {
@@ -848,7 +848,7 @@ function RightSidebar() {
                       className={`text-[11px] font-bold px-3 py-1 rounded-full border whitespace-nowrap transition ${
                         isFollowing
                           ? "bg-slate-100 border-slate-200 text-slate-700"
-                          : "bg-teal-600 border-teal-600 text-white hover:bg-teal-700"
+                          : "bg-[#0077B6] border-[#0077B6] text-white hover:bg-[#03045E]"
                       }`}
                       data-testid={`comunidad-follow-${p.provider_id}`}
                     >
@@ -861,8 +861,8 @@ function RightSidebar() {
           </div>
         )}
 
-        <div className="rounded-2xl bg-teal-50 border border-teal-100 p-4 text-xs text-slate-600 leading-relaxed" data-testid="comunidad-about">
-          <p className="font-bold text-teal-800 mb-1">¿Por qué Getamano?</p>
+        <div className="rounded-2xl bg-[#CAF0F8]/40 border border-[#90E0EF] p-4 text-xs text-slate-600 leading-relaxed" data-testid="comunidad-about">
+          <p className="font-bold text-[#03045E] mb-1">¿Por qué Getamano?</p>
           <p>Conectamos a la comunidad latina en USA con proveedores verificados. Productos y servicios latinos, a la mano.</p>
         </div>
       </div>

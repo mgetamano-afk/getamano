@@ -89,17 +89,17 @@ export default function ComunidadLayout() {
                 type="button"
                 onClick={() => navigate(tab.path)}
                 className={`relative flex items-center gap-1.5 px-3 sm:px-4 h-11 text-xs sm:text-sm font-semibold transition-colors duration-200 whitespace-nowrap flex-shrink-0 ${
-                  isActive ? "text-teal-700" : "text-slate-500 hover:text-slate-800"
+                  isActive ? "text-[#0077B6]" : "text-slate-500 hover:text-slate-800"
                 }`}
                 data-testid={`comunidad-tab-${tab.id}`}
                 aria-current={isActive ? "page" : undefined}
               >
-                <tab.Icon className={`w-4 h-4 ${isActive ? "text-teal-600" : "text-slate-400"}`} strokeWidth={isActive ? 2.5 : 2} />
+                <tab.Icon className={`w-4 h-4 ${isActive ? "text-[#0077B6]" : "text-slate-400"}`} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{tab.shortLabel}</span>
                 {isActive && (
                   <span
                     className="absolute left-2 right-2 bottom-0 h-0.5 rounded-full"
-                    style={{ background: "linear-gradient(90deg, #0077B6, #14B8A6)" }}
+                    style={{ background: "linear-gradient(90deg, #0077B6, #00B4D8)" }}
                     aria-hidden="true"
                   />
                 )}
@@ -126,16 +126,16 @@ export default function ComunidadLayout() {
                       to={tab.path}
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                         isActive
-                          ? "bg-teal-50 text-teal-700 shadow-sm"
+                          ? "bg-[#CAF0F8]/40 text-[#0077B6] shadow-sm"
                           : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                       data-testid={`comunidad-nav-${tab.id === "feed" ? "feed" : tab.id === "wall-of-fame" ? "wall" : tab.id}`}
                       aria-current={isActive ? "page" : undefined}
                     >
-                      <tab.Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-teal-600" : "text-slate-400"}`} strokeWidth={isActive ? 2.5 : 2} />
+                      <tab.Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-[#0077B6]" : "text-slate-400"}`} strokeWidth={isActive ? 2.5 : 2} />
                       <span>{tab.label}</span>
                       {isActive && (
-                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-teal-500" aria-hidden="true" />
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00B4D8]" aria-hidden="true" />
                       )}
                     </Link>
                   );

@@ -54,7 +54,7 @@ function Typewriter({ text, speed = 70, className }) {
   return (
     <span className={className}>
       {text.slice(0, n)}
-      {!done && <span className="inline-block w-1 h-[0.9em] bg-orange-400 ml-1 animate-pulse align-middle" />}
+      {!done && <span className="inline-block w-1 h-[0.9em] bg-[#00B4D8] ml-1 animate-pulse align-middle" />}
     </span>
   );
 }
@@ -199,7 +199,7 @@ export default function Landing() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-20 md:pt-20 md:pb-32">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="min-w-0">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-300 text-xs font-semibold tracking-widest uppercase border border-orange-400/20">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00B4D8]/10 text-[#90E0EF] text-xs font-semibold tracking-widest uppercase border border-[#0077B6]/30">
                 <Sparkles className="w-3.5 h-3.5" /> {t("hero.eyebrow")}
               </span>
               <h1 className="font-display mt-5 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1] break-words">
@@ -209,7 +209,7 @@ export default function Landing() {
                 {t("hero.subtitle")}
               </p>
 
-              <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 transition-shadow" style={{ boxShadow: "0 0 40px rgba(255, 107, 44, 0.25)" }} data-testid="hero-search-form">
+              <form onSubmit={onSearch} className="mt-8 bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 transition-shadow" style={{ boxShadow: "0 0 40px rgba(0, 180, 216, 0.30)" }} data-testid="hero-search-form">
                 <div className="flex-1 min-w-0">
                   <SmartServiceSearch
                     value={q}
@@ -274,7 +274,7 @@ export default function Landing() {
                     {lang === "en" ? "Get the app" : "Descarga la app"}
                     <span
                       className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full"
-                      style={{ background: "#FF6B2C", boxShadow: "0 0 0 4px rgba(255,107,44,0.25)", animation: "pulse-dot 1.8s infinite" }}
+                      style={{ background: "#00B4D8", boxShadow: "0 0 0 4px rgba(0,180,216,0.30)", animation: "pulse-dot 1.8s infinite" }}
                     />
                   </button>
                 )}
@@ -294,7 +294,7 @@ export default function Landing() {
             </div>
 
             <div className="relative hidden lg:block">
-              <div className="absolute -inset-6 bg-gradient-to-br from-blue-500/20 via-transparent to-orange-500/20 rounded-[3rem] blur-3xl" />
+              <div className="absolute -inset-6 bg-gradient-to-br from-[#0077B6]/30 via-transparent to-[#00B4D8]/20 rounded-[3rem] blur-3xl" />
               <img
                 src={HERO_IMG}
                 alt="getamano marketplace"
@@ -311,13 +311,13 @@ export default function Landing() {
               />
               <div className="absolute -bottom-4 -left-4 rounded-2xl p-4 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.2)", animation: "float 4s ease-in-out infinite" }} data-testid="hero-rating-card">
                 <div className="flex -space-x-2">
-                  <div className="w-9 h-9 rounded-full bg-orange-400 border-2 border-white/40" />
-                  <div className="w-9 h-9 rounded-full bg-blue-400 border-2 border-white/40" />
-                  <div className="w-9 h-9 rounded-full bg-green-400 border-2 border-white/40" />
+                  <div className="w-9 h-9 rounded-full bg-[#00B4D8] border-2 border-white/40" />
+                  <div className="w-9 h-9 rounded-full bg-[#90E0EF] border-2 border-white/40" />
+                  <div className="w-9 h-9 rounded-full bg-[#0077B6] border-2 border-white/40" />
                 </div>
                 <div className="text-white">
-                  <div className="flex items-center gap-1"><Star className="w-4 h-4 fill-orange-400 text-orange-400" /> {ratingCount.toFixed(1)} / 5</div>
-                  <div className="text-xs text-white/70 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400" style={{ animation: "pulse-dot 1.5s infinite" }} /> En vivo · +1,200 reseñas</div>
+                  <div className="flex items-center gap-1"><Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {ratingCount.toFixed(1)} / 5</div>
+                  <div className="text-xs text-white/70 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8]" style={{ animation: "pulse-dot 1.5s infinite" }} /> En vivo · +1,200 reseñas</div>
                 </div>
               </div>
             </div>
@@ -337,7 +337,7 @@ export default function Landing() {
       {/* CATEGORY SLIDER */}
       <section className="bg-white py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-          <span className="inline-block text-xs uppercase tracking-widest font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full">✦ Servicios disponibles</span>
+          <span className="inline-block text-xs uppercase tracking-widest font-semibold text-[#0077B6] bg-[#CAF0F8] px-3 py-1 rounded-full">✦ Servicios disponibles</span>
           <h2 className="font-display mt-3 text-3xl md:text-5xl font-bold text-slate-900 tracking-tight">Encuentra el profesional perfecto</h2>
           <p className="text-slate-500 mt-2">Más de {stats.providers} proveedores verificados en todo Estados Unidos</p>
         </div>
@@ -375,17 +375,17 @@ export default function Landing() {
             }
           }
         `}</style>
-        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 50% 0%, rgba(255,140,68,0.18), transparent 50%)" }} />
+        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 50% 0%, rgba(0,180,216,0.20), transparent 50%)" }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-white">Cómo funciona</h2>
           <div className="mt-12 grid md:grid-cols-3 gap-6 relative">
             {[
-              { icon: Search, title: "Busca", desc: "Filtra por ciudad, categoría, idioma o reputación.", color: "from-blue-500/20 to-blue-500/0", border: "border-blue-400/30" },
-              { icon: Heart, title: "Conecta", desc: "Llama, escribe o pide cotización directamente.", color: "from-orange-500/20 to-orange-500/0", border: "border-orange-400/30" },
-              { icon: ShieldCheck, title: "Confía", desc: "Todos los destacados están verificados.", color: "from-green-500/20 to-green-500/0", border: "border-green-400/30" },
+              { icon: Search, title: "Busca", desc: "Filtra por ciudad, categoría, idioma o reputación.", color: "from-[#0077B6]/25 to-[#0077B6]/0", border: "border-[#0077B6]/30" },
+              { icon: Heart, title: "Conecta", desc: "Llama, escribe o pide cotización directamente.", color: "from-[#00B4D8]/25 to-[#00B4D8]/0", border: "border-[#00B4D8]/30" },
+              { icon: ShieldCheck, title: "Confía", desc: "Todos los destacados están verificados.", color: "from-[#90E0EF]/25 to-[#90E0EF]/0", border: "border-[#90E0EF]/40" },
             ].map((s, i) => (
               <div key={i} className={`relative p-8 rounded-3xl border ${s.border} backdrop-blur bg-gradient-to-br ${s.color}`} data-testid={`how-step-${i + 1}`}>
-                <div className="absolute -top-4 -left-4 w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center font-display font-bold text-2xl text-white">{i + 1}</div>
+                <div className="absolute -top-4 -left-4 w-12 h-12 rounded-2xl bg-[#0077B6] flex items-center justify-center font-display font-bold text-2xl text-white shadow-lg">{i + 1}</div>
                 <s.icon className="w-12 h-12 mx-auto mb-4 text-white" />
                 <h3 className="font-display font-bold text-2xl text-white">{s.title}</h3>
                 <p className="text-white/80 mt-3 leading-relaxed">{s.desc}</p>
@@ -401,7 +401,7 @@ export default function Landing() {
           <h3 className="font-display text-3xl font-bold text-white">Para clientes</h3>
           <ul className="mt-6 space-y-3 text-white/90">
             {["Servicios reales y verificados", "Profesionales que hablan tu idioma", "Reseñas auténticas de la comunidad"].map((b, i) => (
-              <li key={i} className="flex items-start gap-3"><CheckCircle2 className="w-5 h-5 text-orange-300 mt-0.5" /> {b}</li>
+              <li key={i} className="flex items-start gap-3"><CheckCircle2 className="w-5 h-5 text-[#90E0EF] mt-0.5" /> {b}</li>
             ))}
           </ul>
           <Link to="/buscar" className="btn-primary inline-flex mt-8">Explorar servicios</Link>
@@ -415,7 +415,7 @@ export default function Landing() {
                 <li key={i} className="flex items-start gap-3"><TrendingUp className="w-5 h-5 text-white mt-0.5" /> {b}</li>
               ))}
             </ul>
-            <Link to="/registro?intent=provider" className="inline-flex mt-8 px-6 py-3 rounded-full bg-white text-orange-600 font-medium hover:brightness-105">Quiero abrir mi eCard</Link>
+            <Link to="/registro?role=provider" className="inline-flex mt-8 px-6 py-3 rounded-full bg-white text-[#03045E] font-semibold hover:brightness-105 shadow-lg">Quiero abrir mi eCard</Link>
           </div>
         </div>
       </section>
@@ -427,7 +427,7 @@ export default function Landing() {
           <p className="text-slate-500 mt-2">Profesionales verificados por getamano.</p>
           <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featured.map(p => (
-              <Link key={p.provider_id} to={`/proveedor/${p.slug}`} className={`card-lift bg-white rounded-2xl border ${p.plan === "premium" ? "border-orange-300 shadow-orange-100 shadow-xl" : "border-slate-200"} overflow-hidden block`} data-testid={`featured-provider-${p.slug}`}>
+              <Link key={p.provider_id} to={`/proveedor/${p.slug}`} className={`card-lift bg-white rounded-2xl border ${p.plan === "premium" ? "border-[#0077B6]/40 shadow-[#0077B6]/15 shadow-xl" : "border-slate-200"} overflow-hidden block`} data-testid={`featured-provider-${p.slug}`}>
                 <div className="h-40 bg-slate-100 relative">
                   {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" loading="lazy" />}
                   <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> Verificado</div>
@@ -437,7 +437,7 @@ export default function Landing() {
                   <h3 className="font-display font-semibold text-lg text-slate-900">{p.business_name}</h3>
                   <p className="text-sm text-slate-500">{p.city}{p.state ? `, ${p.state}` : ""}</p>
                   <div className="mt-3 flex items-center gap-3 text-sm">
-                    {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800"><Star className="w-4 h-4 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)}</span>}
+                    {p.rating_count > 0 && <span className="flex items-center gap-1 text-slate-800"><Star className="w-4 h-4 fill-amber-500 text-amber-500" /> {p.rating_avg.toFixed(1)}</span>}
                     {(p.likes_count || 0) > 0 && <span className="text-slate-600">👍 {p.likes_count}</span>}
                   </div>
                 </div>
@@ -564,15 +564,15 @@ export default function Landing() {
 
       {/* TESTIMONIALS dark */}
       <section className="relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#03045E" }}>
-        <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(circle at 50% 100%, rgba(255,140,68,0.22), transparent 60%)" }} />
+        <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(circle at 50% 100%, rgba(0,180,216,0.22), transparent 60%)" }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-center text-white">Lo que dice la comunidad</h2>
           <div className="mt-12 grid md:grid-cols-3 gap-6">
             {testimonials.map((tt, i) => (
               <div key={i} className="relative p-6 rounded-3xl border border-white/10 backdrop-blur" style={{ background: "rgba(255,255,255,0.04)" }} data-testid={`testimonial-${i}`}>
-                <span className="absolute top-0 left-2 font-display text-[120px] leading-none text-orange-500/20 select-none">"</span>
-                <div className="relative flex items-center gap-1 text-orange-400 mb-3">
-                  {[...Array(5)].map((_, k) => <Star key={k} className="w-4 h-4 fill-orange-400" />)}
+                <span className="absolute top-0 left-2 font-display text-[120px] leading-none text-[#00B4D8]/30 select-none">"</span>
+                <div className="relative flex items-center gap-1 text-amber-400 mb-3">
+                  {[...Array(5)].map((_, k) => <Star key={k} className="w-4 h-4 fill-amber-400" />)}
                 </div>
                 <p className="relative text-white/85 leading-relaxed">"{tt.text}"</p>
                 <div className="relative mt-4 text-sm"><div className="font-semibold">{tt.name}</div><div className="text-white/50">{tt.city}</div></div>
@@ -613,7 +613,7 @@ export default function Landing() {
 function StatPill({ icon: Icon, value, label }) {
   return (
     <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm text-white" style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.15)" }}>
-      <Icon className="w-4 h-4 text-orange-400" />
+      <Icon className="w-4 h-4 text-[#00B4D8]" />
       <strong>{value}</strong> <span className="text-white/70">{label}</span>
     </span>
   );

@@ -224,7 +224,7 @@ export default function Community({ embedded = false }) {
               </button>
             ))}
             <div className="ml-auto text-xs text-slate-500 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00B4D8] animate-pulse" />
               {filtered.length} logros mostrados
             </div>
           </div>

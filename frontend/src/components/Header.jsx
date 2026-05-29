@@ -224,10 +224,10 @@ export default function Header() {
                 <span className="font-semibold text-slate-500">Latin Ventures LLC</span>. Todos los derechos reservados © {new Date().getFullYear()}.
               </p>
               <div className="flex flex-wrap gap-x-3 gap-y-1" data-testid="mobile-menu-legal-links">
-                <Link to="/terminos" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Términos</Link>
-                <Link to="/privacidad" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Privacidad</Link>
-                <Link to="/cookies" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Cookies</Link>
-                <Link to="/politica-resenas" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-teal-600 hover:underline transition-colors">Reseñas</Link>
+                <Link to="/terminos" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-[#0077B6] hover:underline transition-colors">Términos</Link>
+                <Link to="/privacidad" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-[#0077B6] hover:underline transition-colors">Privacidad</Link>
+                <Link to="/cookies" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-[#0077B6] hover:underline transition-colors">Cookies</Link>
+                <Link to="/politica-resenas" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-[#0077B6] hover:underline transition-colors">Reseñas</Link>
               </div>
               <p className="text-[10px] text-slate-300 mt-2">getamano v2.0 · Powered by Latin Ventures LLC</p>
             </div>

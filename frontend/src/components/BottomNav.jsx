@@ -206,7 +206,7 @@ function renderItem(item, isActive, tappingPath, setTappingPath, compact) {
         onClick={handleTap}
         className={`relative inline-flex items-center gap-2 px-3 lg:px-4 h-11 rounded-full text-sm font-semibold transition-all ${
           active
-            ? "bg-teal-50 text-teal-700 shadow-sm"
+            ? "bg-[#CAF0F8]/50 text-[#0077B6] shadow-sm"
             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
         }`}
         data-testid={`${item.testid}-desktop`}
