@@ -3,7 +3,17 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 29, 2026 · V4 Phase C — Push Notifications wired
+## Latest Update — May 29, 2026 · V4 Phases D–H (6-step closeout)
+- **Paso 1 — Feed/Barrio unification**: `/comunidad` and `/comunidad/barrio` both render `ComunidadPage` in `barrio` mode (city chip + 5-radius selector persisted in `localStorage`, FeaturedStrip, inline TrustScore card between posts #3 and #4), keeping all rich legacy features (inline comments, pull-to-refresh, auto-poll, filters). `Feed` tab removed from `ComunidadLayout`. Extracted reusable chrome → `/components/BarrioOverlay.jsx` (`useBarrio`, `BarrioHeader`, `FeaturedStrip`, `InlineTrustCard`, `barrioCityFilter`).
+- **Paso 2 — Story tag de proveedor**: Anyone can post a 24h story by tagging a provider (`StoryCreateIn.tagged_provider_id`); providers still post without a tag. Story doc carries `tagged_provider_*` snapshot, `/stories/active` aggregation surfaces them, viewer CTA becomes "Ver {business_name} →", and tagged provider gets a Web Push. `StoryCreator` has a debounced provider autocomplete chip.
+- **Paso 3 — Reels (Phase E)**: New `/routes/reels.py` (CRUD + view dedupe + like toggle). New `ReelsPage` at `/reels` (vertical scroll-snap fullscreen, IntersectionObserver autoplay/pause, mute toggle, back button, floating + CTA). New `ReelCreator` modal uploads via `/api/upload` then posts to `/api/reels`. Throttle 10 reels/24h per provider.
+- **Paso 4 — Featured weekly rotation (Phase F)**: New `/routes/featured.py` with `compute_featured_for_week` (Trust Score + reviews_last_7d×6 + activity_last_7d×3), `/api/providers/featured` (public, city-aware, backward-compat with `rating_avg`/`rating_count`/`category` aliases for AppHome+Landing), `/api/admin/featured` + `/api/admin/featured/run-now`. Scheduler job runs every Monday after 06:00 UTC (idempotent via scheduler_state). `BarrioOverlay.FeaturedStrip` now reads `/providers/featured`. Legacy endpoint kept under `/providers/featured-legacy`.
+- **Paso 5 — Lead Pipeline (Phase G)**: Pipeline statuses `new → contacted → quoted → won/lost` (legacy `pending/accepted/declined/completed` aliased). `POST /service-requests` now creates `status="new"`. New `GET /api/leads/pipeline` returns `{counts, buckets, total}`. Provider dashboard `solicitudes` tab now renders `<LeadPipeline>` (5 colored count cards + 5-column Kanban + per-card status dropdown + tel:link).
+- **Paso 6 — Refactor (Phase H)**: Extracted service-requests + leads pipeline endpoints from `server.py` to new `/routes/leads.py`. Net change: -120 lines from server.py.
+- **Tests**: 5 new test files (`test_iter92` story tag + unify, `test_iter93` reels, `test_iter94` featured, `test_iter95` lead pipeline) — 25 new tests. Full cumulative V3+V4 regression: **69/69 pass**.
+- **Testing agent verification**: 100% backend (79/79 including in-agent re-runs) + 100% on frontend flows tested. Single minor non-blocking UX note about "Tu historia" label click target — fixed.
+
+## Previous Update — May 29, 2026 · V4 Phase C — Push Notifications wired
 - **Push triggers** added at 4 critical events (Phase C):
   1. `POST /api/reviews` → push to provider: "{name} dejó una reseña ⭐⭐⭐⭐⭐"
   2. `POST /api/service-requests` → push to provider: "Nueva solicitud de cotización"

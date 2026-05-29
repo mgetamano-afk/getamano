@@ -132,9 +132,16 @@ export default function StoriesCarousel() {
                 >
                   <Plus className="w-3.5 h-3.5" strokeWidth={3} />
                 </button>
-                <span className="text-[11px] font-medium text-slate-700 max-w-[72px] truncate">
+                {/* Label is a clickable shortcut to the creator — wider
+                    touch target so users don't have to hit the 24px "+" badge. */}
+                <button
+                  type="button"
+                  onClick={() => setShowCreator(true)}
+                  className="text-[11px] font-medium text-slate-700 max-w-[72px] truncate hover:text-teal-700 transition"
+                  data-testid="story-tile-self-label"
+                >
                   {lang === "en" ? "Your story" : "Tu historia"}
-                </span>
+                </button>
               </div>
             ) : (
               <button
