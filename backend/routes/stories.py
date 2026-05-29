@@ -58,6 +58,10 @@ class StoryCreateIn(BaseModel):
     image_url: str = Field(..., min_length=4, max_length=600)
     caption: Optional[str] = Field(default=None, max_length=140)
     stickers: Optional[List[StickerIn]] = Field(default=None, max_length=3)
+    # Section 89 v4 — clients can post testimonial stories that tag a
+    # provider. When set, the story is OWNED by the author but features
+    # the tagged provider's snapshot for the "Ver perfil →" CTA.
+    tagged_provider_id: Optional[str] = Field(default=None, max_length=64)
 
 
 # Like-count thresholds that trigger a one-time celebration push.
@@ -129,18 +133,37 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
 
     @router.post("/stories")
     async def create_story(payload: StoryCreateIn, user: User = Depends(get_current_user)) -> dict:
-        """Create a 24h ephemeral story. Providers only."""
-        if user.role != "provider":
-            raise HTTPException(status_code=403, detail="Solo proveedores pueden crear historias.")
-        profile = await db.provider_profiles.find_one(
-            {"user_id": user.user_id},
-            {"_id": 0, "provider_id": 1, "slug": 1, "business_name": 1, "logo_url": 1,
-             "verification_status": 1},
-        )
-        if not profile:
-            raise HTTPException(status_code=404, detail="Sin perfil de proveedor.")
+        """Create a 24h ephemeral story.
 
-        # Throttle: max 5 active stories per provider at any time
+        Section 89 v4 — Stories are now open to *any* logged-in user
+        when they tag a provider (client testimonial). Providers can
+        still post their own stories without a tag.
+        """
+        profile = await db.provider_profiles.find_one(
+            {"user_id": user.user_id, "is_active": True},
+            {"_id": 0, "provider_id": 1, "slug": 1, "business_name": 1, "logo_url": 1,
+             "verification_status": 1, "user_id": 1},
+        )
+        is_author_provider = profile is not None
+        if not is_author_provider and not payload.tagged_provider_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Etiqueta a un proveedor para publicar tu historia.",
+            )
+
+        # Resolve tagged provider snapshot (if any)
+        tagged = None
+        if payload.tagged_provider_id:
+            tagged = await db.provider_profiles.find_one(
+                {"provider_id": payload.tagged_provider_id, "is_active": True},
+                {"_id": 0, "provider_id": 1, "user_id": 1, "slug": 1,
+                 "business_name": 1, "logo_url": 1, "verification_status": 1,
+                 "getamano_code": 1},
+            )
+            if not tagged:
+                raise HTTPException(status_code=404, detail="Proveedor etiquetado no encontrado.")
+
+        # Throttle: max 5 active stories per author at any time
         now = datetime.now(timezone.utc)
         active = await db.stories.count_documents({
             "provider_user_id": user.user_id,
@@ -169,12 +192,17 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
 
         doc = {
             "story_id": story_id,
+            # Author identity (kept on `provider_user_id` for legacy
+            # aggregation compat — every existing query groups stories
+            # by provider_user_id and that's still correct: it's the
+            # author either way).
             "provider_user_id": user.user_id,
-            "provider_id": profile.get("provider_id"),
-            "provider_slug": profile.get("slug"),
-            "business_name": profile.get("business_name"),
-            "logo_url": profile.get("logo_url"),
-            "verified": profile.get("verification_status") == "approved",
+            "provider_id": (profile or {}).get("provider_id"),
+            "provider_slug": (profile or {}).get("slug"),
+            "business_name": (profile or {}).get("business_name") or user.name,
+            "logo_url": (profile or {}).get("logo_url"),
+            "verified": (profile or {}).get("verification_status") == "approved",
+            "is_provider_author": is_author_provider,
             "image_url": payload.image_url,
             "caption": (payload.caption or "").strip() or None,
             "stickers": stickers_out,
@@ -183,7 +211,32 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "created_at": now,
             "expires_at": now + timedelta(hours=24),
         }
+        # Section 89 v4 — Tagged provider snapshot (testimonial mode)
+        if tagged:
+            doc["tagged_provider_id"] = tagged["provider_id"]
+            doc["tagged_provider_user_id"] = tagged["user_id"]
+            doc["tagged_provider_slug"] = tagged.get("slug")
+            doc["tagged_business_name"] = tagged.get("business_name")
+            doc["tagged_logo_url"] = tagged.get("logo_url")
+            doc["tagged_verified"] = tagged.get("verification_status") == "approved"
+            doc["tagged_getamano_code"] = tagged.get("getamano_code")
+
         await db.stories.insert_one(doc)
+
+        # Push to the tagged provider (fire-and-forget)
+        if tagged and tagged["user_id"] != user.user_id:
+            try:
+                from routes.push import send_push_to_user
+                await send_push_to_user(db, tagged["user_id"], {
+                    "title": f"{user.name} compartió una historia sobre tu trabajo",
+                    "body": (payload.caption or "")[:140] or "Toca para ver el testimonio.",
+                    "icon": (profile or {}).get("logo_url") or "/icon-192x192.png",
+                    "url": "/comunidad",
+                    "tag": f"story_tag_{story_id}",
+                })
+            except Exception:
+                pass
+
         out = {**doc}
         out["created_at"] = out["created_at"].isoformat()
         out["expires_at"] = out["expires_at"].isoformat()
@@ -224,6 +277,14 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
                 "created_at": "$latest.created_at",
                 "likes_count": {"$ifNull": ["$latest.likes_count", 0]},
                 "views_count": {"$ifNull": ["$latest.views_count", 0]},
+                # Section 89 v4 — testimonial tagged provider
+                "is_provider_author": {"$ifNull": ["$latest.is_provider_author", True]},
+                "tagged_provider_id": {"$ifNull": ["$latest.tagged_provider_id", None]},
+                "tagged_provider_slug": {"$ifNull": ["$latest.tagged_provider_slug", None]},
+                "tagged_business_name": {"$ifNull": ["$latest.tagged_business_name", None]},
+                "tagged_logo_url": {"$ifNull": ["$latest.tagged_logo_url", None]},
+                "tagged_verified": {"$ifNull": ["$latest.tagged_verified", False]},
+                "tagged_getamano_code": {"$ifNull": ["$latest.tagged_getamano_code", None]},
             }},
         ]
         rows = await db.stories.aggregate(pipeline).to_list(limit)

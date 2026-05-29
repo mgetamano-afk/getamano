@@ -370,7 +370,17 @@ class ServiceRequestIn(BaseModel):
     preferred_date: Optional[str] = ""
 
 class ServiceRequestStatusIn(BaseModel):
-    status: Literal["pending", "accepted", "declined", "completed"]
+    # Section 89 v4 Phase G — Pipeline statuses replace the legacy 4.
+    #   new       (default on creation, was "pending")
+    #   contacted (provider has reached out, opt-in)
+    #   quoted    (provider sent a price, was "accepted")
+    #   won       (client confirmed the booking, was "completed")
+    #   lost      (deal didn't happen, was "declined")
+    # Legacy values still accepted so old clients don't break.
+    status: Literal[
+        "new", "contacted", "quoted", "won", "lost",
+        "pending", "accepted", "declined", "completed",
+    ]
 
 class CategoryIn(BaseModel):
     slug: str
@@ -835,6 +845,18 @@ async def seed():
         await _v4_indexes(db)
     except Exception as e:
         logger.warning(f"v4 indexes warn: {e}")
+
+    # Section 89 v4 Phase E — Reels indexes.
+    try:
+        await _reels_indexes(db)
+    except Exception as e:
+        logger.warning(f"reels indexes warn: {e}")
+
+    # Section 89 v4 Phase F — Featured providers indexes.
+    try:
+        await _featured_indexes(db)
+    except Exception as e:
+        logger.warning(f"featured indexes warn: {e}")
 
     if await db.categories.count_documents({}) == 0:
         docs = []
@@ -1514,8 +1536,13 @@ async def providers_map(
         })
     return {"items": items, "geocoded_this_call": geocoded_this_call, "total_with_coords": len(items), "total_matched": len(providers)}
 
-@api_router.get("/providers/featured")
-async def featured_providers():
+@api_router.get("/providers/featured-legacy")
+async def featured_providers_legacy():
+    """Section 33 legacy — kept under a new path for backward compat after
+    Section 89 v4 Phase F overrode `/providers/featured` with the weekly
+    rotating pool. Anyone consuming the old behaviour should migrate to
+    `/providers/featured` (now returns the weekly pool with city filter).
+    """
     providers = await db.provider_profiles.find(
         {"is_active": True, "verification_status": "approved", **PUBLIC_GUARD}, {"_id": 0}
     ).sort("rating_avg", -1).limit(6).to_list(6)
@@ -2123,75 +2150,7 @@ async def reactivate_my_subscription(request: Request, user: User = Depends(get_
 
 
 # ============ SERVICE REQUESTS ============
-@api_router.post("/service-requests")
-async def create_service_request(payload: ServiceRequestIn, user: User = Depends(get_current_user)):
-    provider = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
-    if provider["user_id"] == user.user_id:
-        raise HTTPException(status_code=400, detail="Cannot request from yourself")
-    now = datetime.now(timezone.utc).isoformat()
-    req = {
-        "request_id": f"req_{uuid.uuid4().hex[:12]}",
-        "client_id": user.user_id,
-        "client_name": user.name,
-        "client_phone": payload.contact_phone or user.phone or "",
-        "provider_id": payload.provider_id,
-        "provider_user_id": provider["user_id"],
-        "business_name": provider["business_name"],
-        "slug": provider["slug"],
-        "message": payload.message,
-        "service_type": payload.service_type or "",
-        "preferred_date": payload.preferred_date or "",
-        "status": "pending",
-        "created_at": now,
-        "updated_at": now,
-    }
-    await db.service_requests.insert_one(req)
-    await db.provider_profiles.update_one({"provider_id": payload.provider_id}, {"$inc": {"contact_clicks": 1}})
-
-    # SMS notify provider
-    prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
-    if prov_user and prov_user.get("phone"):
-        send_sms(prov_user["phone"], f"[getamano] Nueva solicitud de cotización de {user.name}: {payload.message[:120]}", event="new_quote_request")
-
-    # Section 89 v4 (Phase C) — Web Push to provider
-    try:
-        from routes.push import send_push_to_user
-        await send_push_to_user(db, provider["user_id"], {
-            "title": "Nueva solicitud de cotización",
-            "body": f"{user.name}: {(payload.message or '')[:120]}",
-            "icon": "/getamano-logo-mark.png",
-            "url": "/dashboard/provider?tab=solicitudes",
-            "tag": f"quote_{req['request_id']}",
-        })
-    except Exception as _e:
-        logger.warning(f"push send_push (service_request) failed: {_e}")
-
-    req.pop("_id", None)
-    return req
-
-@api_router.get("/service-requests")
-async def list_service_requests(user: User = Depends(get_current_user)):
-    q = {"$or": [{"client_id": user.user_id}, {"provider_user_id": user.user_id}]}
-    items = await db.service_requests.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
-    return items
-
-@api_router.put("/service-requests/{request_id}/status")
-async def update_request_status(request_id: str, payload: ServiceRequestStatusIn, user: User = Depends(get_current_user)):
-    req = await db.service_requests.find_one({"request_id": request_id}, {"_id": 0})
-    if not req:
-        raise HTTPException(status_code=404, detail="Not found")
-    if req["provider_user_id"] != user.user_id:
-        raise HTTPException(status_code=403, detail="Only the provider can change status")
-    await db.service_requests.update_one({"request_id": request_id}, {"$set": {"status": payload.status, "updated_at": datetime.now(timezone.utc).isoformat()}})
-
-    # SMS notify client
-    client_user = await db.users.find_one({"user_id": req["client_id"]}, {"_id": 0})
-    if client_user and client_user.get("phone"):
-        label = {"accepted": "aceptó", "declined": "rechazó", "completed": "marcó como completada"}.get(payload.status, payload.status)
-        send_sms(client_user["phone"], f"[getamano] {req['business_name']} {label} tu solicitud.", event=f"request_{payload.status}")
-    return {"ok": True}
+# Section 89 v4 Phase H — service-requests + leads pipeline live in routes/leads.py
 
 # ============ ADMIN: REVIEWS MODERATION ============
 # Admin reviews endpoints (`GET /admin/reviews`, `POST /admin/reviews/{id}/flag`,
@@ -4748,6 +4707,31 @@ async def _run_client_nudge_job():
     return {"sent": sent, "errors": errors, "scanned": len(pending)}
 
 
+async def _run_weekly_featured_job():
+    """Section 89 v4 Phase F — recompute the Featured Providers pool every
+    Monday after 06:00 UTC. Idempotent per ISO week via scheduler_state.
+    """
+    now = datetime.now(timezone.utc)
+    # Monday = 0
+    if now.weekday() != 0 or now.hour < 6:
+        return None
+    week_key = _featured_week_key(now)
+    # Reuse the existing scheduler_state mechanism — one snapshot per ISO week
+    week_start_iso = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).isoformat()
+    if not await _job_should_run("weekly_featured_providers", week_start_iso):
+        return None
+    try:
+        count = await _featured_compute(db, week_key)
+    except Exception as e:
+        logger.warning(f"[scheduler] featured providers failed: {e}")
+        return None
+    await _job_mark_done("weekly_featured_providers", {"week": week_key, "count": count})
+    logger.info(f"[scheduler] Featured providers rebuilt: week={week_key} count={count}")
+    return {"week": week_key, "count": count}
+
+
 async def _scheduler_loop():
     """Background task. Loops forever until cancelled at shutdown."""
     logger.info("[scheduler] Background scheduler started")
@@ -4768,6 +4752,10 @@ async def _scheduler_loop():
             await _run_client_nudge_job()
         except Exception:
             logger.exception("[scheduler] client nudge job failed")
+        try:
+            await _run_weekly_featured_job()
+        except Exception:
+            logger.exception("[scheduler] weekly featured providers job failed")
         await asyncio.sleep(SCHEDULER_TICK_SECONDS)
 
 
@@ -9713,6 +9701,14 @@ from routes.search_concierge import build_concierge_router as _make_concierge_ro
 from routes.founders import build_founders_router as _make_founders_router  # noqa: E402
 from routes.v3_provider import build_router as _make_v3_router, run_v3_migration as _v3_migration  # noqa: E402
 from routes.v4_social import build_router as _make_v4_social_router, ensure_indexes as _v4_indexes  # noqa: E402
+from routes.reels import make_router as _make_reels_router, ensure_reels_indexes as _reels_indexes  # noqa: E402
+from routes.featured import (  # noqa: E402
+    make_router as _make_featured_router,
+    ensure_featured_indexes as _featured_indexes,
+    compute_featured_for_week as _featured_compute,
+    current_week_key as _featured_week_key,
+)
+from routes.leads import make_router as _make_leads_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9882,6 +9878,27 @@ api_router.include_router(
 # Section 89 — v4 social features: Portfolio + Gremios.
 api_router.include_router(
     _make_v4_social_router(db=db, get_current_user=get_current_user)
+)
+
+# Section 89 v4 Phase E — Reels (vertical short-form video).
+api_router.include_router(
+    _make_reels_router(db=db, User=User, get_current_user=get_current_user)
+)
+
+# Section 89 v4 Phase F — Weekly Featured Providers rotation.
+api_router.include_router(
+    _make_featured_router(db=db, User=User, get_current_user=get_current_user, require_admin=require_admin)
+)
+
+# Section 89 v4 Phase G+H — Leads / service-requests pipeline.
+api_router.include_router(
+    _make_leads_router(
+        db=db, User=User,
+        ServiceRequestIn=ServiceRequestIn,
+        ServiceRequestStatusIn=ServiceRequestStatusIn,
+        get_current_user=get_current_user,
+        send_sms=send_sms,
+    )
 )
 
 

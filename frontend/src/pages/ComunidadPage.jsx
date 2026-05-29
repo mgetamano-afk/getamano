@@ -18,6 +18,13 @@ import MentionedText from "../components/MentionedText";
 import FollowingFeed from "../components/FollowingFeed";
 import { SeoHead } from "../components/seo/SeoHead";
 import useRefreshable from "../hooks/useRefreshable";
+import {
+  useBarrio,
+  BarrioHeader,
+  FeaturedStrip,
+  InlineTrustCard,
+  barrioCityFilter,
+} from "../components/BarrioOverlay";
 
 const MAX_LEN = 500;
 
@@ -471,7 +478,7 @@ function PostCard({ post, onLike, onDelete, currentUserId, onCommentCountChanged
 }
 
 // ─── Post Feed ──────────────────────────────────────────────────────────
-function PostFeed() {
+function PostFeed({ barrio = false }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const activeFilter = searchParams.get("filter") || "";
@@ -636,6 +643,10 @@ function PostFeed() {
     } finally { setLoadingMore(false); }
   };
 
+  // Section 89 v4 — always call the hook (React rules); only render
+  // the chrome and apply the city filter when `barrio` is on.
+  const barrioCtx = useBarrio();
+  const renderPosts = barrio ? barrioCityFilter(posts, barrioCtx.city) : posts;
   if (loading) {
     return (
       <div className="space-y-3">
@@ -675,10 +686,30 @@ function PostFeed() {
         </button>
       )}
 
+      {/* Section 89 v4 (Barrio) — city chip + 5-radius selector */}
+      {barrio && (
+        <BarrioHeader
+          city={barrioCtx.city}
+          state={barrioCtx.state}
+          radius={barrioCtx.radius}
+          onRadiusChange={barrioCtx.setRadius}
+        />
+      )}
+
       {/* Section 60 — Stories carousel (24h ephemeral) — appears first */}
       <StoriesCarousel />
+
+      {/* Section 89 v4 (Barrio) — featured providers carousel */}
+      {barrio && (
+        <FeaturedStrip
+          providers={barrioCtx.featured}
+          loading={barrioCtx.featuredLoading}
+          city={barrioCtx.city}
+        />
+      )}
+
       <NewPostBox onPosted={onPosted} />
-      {posts.length === 0 && !loading && (
+      {renderPosts.length === 0 && !loading && (
         <EmptyState
           testid="comunidad-empty"
           icon={<HeartHandshake className="w-9 h-9" />}
@@ -687,19 +718,24 @@ function PostFeed() {
           tip="💡 Tip: las publicaciones con foto reciben 3× más respuestas"
         />
       )}
-      {posts.map(p => (
-        <PostCard
-          key={p.post_id}
-          post={p}
-          onLike={onLike}
-          onDelete={onDelete}
-          currentUserId={user?.user_id}
-          onCommentCountChanged={(delta) => {
-            setPosts(prev => prev.map(post => post.post_id === p.post_id
-              ? { ...post, comments_count: Math.max(0, (post.comments_count || 0) + delta) }
-              : post));
-          }}
-        />
+      {renderPosts.map((p, idx) => (
+        <div key={p.post_id}>
+          <PostCard
+            post={p}
+            onLike={onLike}
+            onDelete={onDelete}
+            currentUserId={user?.user_id}
+            onCommentCountChanged={(delta) => {
+              setPosts(prev => prev.map(post => post.post_id === p.post_id
+                ? { ...post, comments_count: Math.max(0, (post.comments_count || 0) + delta) }
+                : post));
+            }}
+          />
+          {/* Section 89 v4 — inline Trust Score nudge between posts #3 and #4 */}
+          {barrio && barrioCtx.myProfile?.provider_id && idx === 2 && (
+            <InlineTrustCard profile={barrioCtx.myProfile} />
+          )}
+        </div>
       ))}
       {nextBefore && (
         <button
@@ -871,11 +907,13 @@ function RightSidebar() {
 }
 
 // ─── Main page ──────────────────────────────────────────────────────────
-export default function ComunidadPage({ embedded = false }) {
+export default function ComunidadPage({ embedded = false, barrio = false }) {
   const seoNode = !embedded ? (
     <SeoHead
-      title="Comunidad"
-      description="Lo que está pasando en la comunidad latina en USA — ahora mismo."
+      title={barrio ? "Barrio" : "Comunidad"}
+      description={barrio
+        ? "Lo que está pasando en tu barrio — ahora mismo."
+        : "Lo que está pasando en la comunidad latina en USA — ahora mismo."}
       lang="es"
     />
   ) : null;
@@ -886,22 +924,27 @@ export default function ComunidadPage({ embedded = false }) {
         <div className="flex-1 min-w-0 max-w-2xl mx-auto">
           {!embedded && (
             <header className="mb-5">
-              <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">Comunidad</h1>
-              <p className="text-sm text-slate-500 mt-1">Lo que está pasando en la comunidad latina en USA — ahora mismo.</p>
+              <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+                {barrio ? "Barrio" : "Comunidad"}
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                {barrio
+                  ? "Lo que está pasando en tu barrio — ahora mismo."
+                  : "Lo que está pasando en la comunidad latina en USA — ahora mismo."}
+              </p>
             </header>
           )}
-          {/* Section 76 — single unified stories carousel (was two rows). */}
-          <PostFeed />
+          <PostFeed barrio={barrio} />
         </div>
         {!embedded && <RightSidebar />}
       </div>
     </main>
   );
   if (embedded) {
-    return <div className="tab-content-enter" data-testid="comunidad-feed-embedded">{body}</div>;
+    return <div className="tab-content-enter" data-testid={barrio ? "barrio-page" : "comunidad-feed-embedded"}>{body}</div>;
   }
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50" data-testid="comunidad-page">
+    <div className="min-h-screen flex flex-col bg-slate-50" data-testid={barrio ? "barrio-page" : "comunidad-page"}>
       {seoNode}
       <Header />
       {body}

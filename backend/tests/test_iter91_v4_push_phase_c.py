@@ -87,7 +87,9 @@ def test_push_wired_into_reviews():
 
 
 def test_push_wired_into_service_requests():
-    src = _read("backend/server.py")
+    # Section 89 v4 Phase H — the service-requests POST handler was
+    # extracted from server.py into routes/leads.py.
+    src = _read("backend/routes/leads.py")
     assert "Nueva solicitud de cotización" in src
     assert "from routes.push import send_push_to_user" in src
 

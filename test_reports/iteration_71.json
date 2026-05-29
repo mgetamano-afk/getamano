@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 96 — V4 Phases A-G end-to-end regression. All 79 backend pytest tests pass (38 new iter89/92-95 + 41 regression iter83/86/87/88/90/91). Frontend smoke confirms: Paso 1 unification — /comunidad renders Barrio mode (BarrioHeader + city chip 'Toda EE.UU.' + 5 radius chips 10/25/50/100/160 + FeaturedStrip 'DESTACADOS ESTA SEMANA' with Verified badges, GM-XXXX, TrustScore tiles + NewPostBox + posts + InlineTrustCard between posts #3 and #4 for client/provider session); Feed tab removed from sidebar; radius persistence verified (click 25→localStorage 'barrio_radius'=25→reload→25 still active); /comunidad/barrio legacy URL renders same. Paso 3 Reels — /reels renders empty state with back button + mute toggle. Paso 4 Featured — /api/providers/featured returns 6 providers with backward-compat rating_avg + category object. Paso 5 Pipeline — provider /dashboard/provider?tab=solicitudes shows 5 colored count cards (new:1 contacted:0 quoted:1 won:6 lost:6, total=14, conversion=43%) + 5-column Kanban + per-card status dropdown + 'Open full inbox →'; /api/leads/pipeline returns expected schema. Paso 2 Story tag — /api/providers?q=mar returns María; client session shows 'Tu historia' StoryCreator avatar; backend test asserts mandatory tag enforcement (403 'Etiqueta a un proveedor...') passes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/comunidad StoryCreator", "issues": ["The 'Tu historia' avatar opens StoryCreator on click of the circular avatar/+ icon only; clicking the text label 'Tu historia' did not trigger the modal in our automation run. Backend tag-enforcement and autocomplete code are verified by pytest, but consider widening the click target to the entire avatar+label area for better UX."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter89_v4_social.py",
+    "/app/backend/tests/test_iter92_v4_story_tag_and_unify.py",
+    "/app/backend/tests/test_iter93_v4_reels.py",
+    "/app/backend/tests/test_iter94_v4_featured_rotation.py",
+    "/app/backend/tests/test_iter95_v4_lead_pipeline.py",
+    "/app/test_reports/pytest/iter95_combined.xml",
+    "/app/test_reports/pytest/iter95_regression.xml"
+  ],
+  "action_items": [
+    "(Optional) Make 'Tu historia' label clickable (currently only avatar/+ triggers StoryCreator modal)."
+  ],
+  "critical_code_review_comments": [
+    "server.py extraction to routes/leads.py is clean — service-requests + /leads/pipeline preserved; api_router.include_router wiring verified by passing iter91/iter95 tests.",
+    "Featured rotation endpoint correctly exposes BOTH new-style (rating_avg+rating_count) AND legacy nested category object — keeps Landing/AppHome carousels working without changes; consider documenting the dual shape as the canonical schema.",
+    "Pipeline status legacy aliases (pending→new, accepted→quoted, declined→lost, completed→won) are honored — test_legacy_statuses_accepted passes — but document the canonical statuses in API.md so new integrations stop using the legacy values.",
+    "Reels throttle (10/24h) is enforced server-side per iter93 tests; consider surfacing the rate-limit reason in the ReelCreator modal UI (currently relies on backend error toast)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (79/79: 38 V4 iter89/92-95 + 41 regression iter83/86/87/88/90/91)", "frontend": "100% on Barrio/Reels/Pipeline flows verified; StoryCreator modal trigger needs avatar-not-label click"},
+  "test_credentials": "Used credentials from /app/memory/test_credentials.md — admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123.",
+  "seed_data_creation": "iter95 pipeline tests create leads against demo.provider (iter95 lead xxxxxx) — these accumulate in the WON/LOST buckets per run (visible in screenshot: 14 leads, 6 won + 6 lost include test artifacts). iter93 reels test creates a reel doc + cleans it up. iter94 featured admin run-now recomputes the weekly pool deterministically. No cleanup needed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "V4 backend is locked by 79 cumulative tests (iter83+86+87+88+89+90+91+92+93+94+95). Key frontend testids: barrio-radius-{10,25,50,100,160} (radius chips with localStorage 'barrio_radius'), Feed tab removed from ComunidadLayout sidebar (only Barrio/Gremios/Explorar/Ranking/eCards/Hall of Fame). /reels empty state copy: 'No reels yet · Providers can post 60-second vertical videos. Tap + to be the first.' Lead Pipeline counts header copy: 'Lead pipeline · {N} leads · conversion {X}%'. Featured pool currently: maria-cleaning-services-sallisaw-ok (verified TrustScore=55, GM-1335), Juan roofin (25, GM-9734), Tomas law care (25, GM-2168), CantinflasFood MX (0), Iter35 Limpieza, Taxas Pro (0). Story tag autocomplete debounces 250ms, requires 2+ chars; /api/providers?q=mar returns 2 results including María. /api/providers/featured returns 6 providers with rating_avg AND category object (backward compat for AppHome/Landing). /api/leads/pipeline schema: {counts:{new,contacted,quoted,won,lost}, buckets:{...}, total, won_value_estimate_usd}.",
+  "rca of the issue": "N/A — no functional defects. Single minor design note about StoryCreator label vs avatar click target is non-blocking; backend tag-enforcement (403 'Etiqueta a un proveedor para publicar tu historia.') is verified by passing pytest."
+}

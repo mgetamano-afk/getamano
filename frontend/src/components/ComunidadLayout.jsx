@@ -17,8 +17,7 @@ import Header from "./Header";
  * feed) and Gremios tab (private per-category communities).
  */
 const buildTabs = (lang) => [
-  { id: "barrio",       label: lang === "en" ? "Neighborhood" : "Barrio",  shortLabel: lang === "en" ? "Nbhd" : "Barrio",  Icon: MapPin,    path: "/comunidad/barrio" },
-  { id: "feed",         label: lang === "en" ? "Feed"        : "Feed",        shortLabel: "Feed",    Icon: Newspaper, path: "/comunidad" },
+  { id: "barrio",       label: lang === "en" ? "Neighborhood" : "Barrio",  shortLabel: lang === "en" ? "Nbhd" : "Barrio",  Icon: MapPin,    path: "/comunidad" },
   { id: "gremios",      label: lang === "en" ? "Guilds"      : "Gremios",     shortLabel: lang === "en" ? "Guilds" : "Gremios",  Icon: Users,     path: "/comunidad/gremios" },
   { id: "explorar",     label: lang === "en" ? "Explore"     : "Explorar",    shortLabel: lang === "en" ? "Explore" : "Explorar", Icon: Compass,   path: "/comunidad/explorar" },
   { id: "ranking",      label: lang === "en" ? "Ranking"     : "Ranking",     shortLabel: "Ranking", Icon: Trophy,    path: "/comunidad/ranking" },

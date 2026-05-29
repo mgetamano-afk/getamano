@@ -27,6 +27,7 @@ import ProviderPreferences from "../components/ProviderPreferences";
 import GMCodeBadge from "../components/GMCodeBadge";
 import Portfolio from "../components/Portfolio";
 import TrustScore from "../components/TrustScore";
+import LeadPipeline from "../components/LeadPipeline";
 import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
 import SubscriptionManager from "../components/SubscriptionManager";
@@ -686,31 +687,7 @@ export default function ProviderDashboard() {
 
             {tab === "solicitudes" && (
               <div data-testid="dashboard-requests">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h3 className="font-display font-semibold text-lg text-slate-900">Solicitudes de cotización</h3>
-                    <p className="text-sm text-slate-500">{requests.filter(r => r.status === "pending").length} pendientes</p>
-                  </div>
-                  <Link to="/requests" className="btn-outline text-sm">Ver todas</Link>
-                </div>
-                {requests.length === 0 ? (
-                  <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-10 text-center text-slate-500">
-                    <Inbox className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                    <p>Aún no recibes solicitudes.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl">
-                    {requests.slice(0, 5).map(r => (
-                      <Link key={r.request_id} to="/requests" className="block p-4 hover:bg-slate-50">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-medium text-slate-900 text-sm">{r.client_name}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${r.status === "pending" ? "bg-yellow-50 text-yellow-700" : r.status === "accepted" ? "bg-blue-50 text-blue-700" : r.status === "completed" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{r.status}</span>
-                        </div>
-                        <p className="text-xs text-slate-500 truncate mt-1">{r.message}</p>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                <LeadPipeline />
               </div>
             )}
 

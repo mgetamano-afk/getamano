@@ -171,17 +171,26 @@ def test_anonymous_cannot_post_in_gremio():
 
 def test_routes_mounted():
     src = _read("frontend/src/App.js")
-    assert '<Route path="barrio" element={<BarrioPage />}' in src
+    # Section 89 v4 unified — `/comunidad` now uses the rich
+    # ComunidadPage in barrio mode; legacy `/comunidad/barrio` aliases
+    # to the same component.
+    assert '<Route path="barrio" element={<ComunidadPage embedded barrio />}' in src
     assert '<Route path="gremios" element={<GremiosPage />}' in src
 
 
 def test_pages_exist():
     barrio = _read("frontend/src/pages/BarrioPage.jsx")
     gremios = _read("frontend/src/pages/GremiosPage.jsx")
-    assert "barrio-page" in barrio
+    comunidad = _read("frontend/src/pages/ComunidadPage.jsx")
+    overlay = _read("frontend/src/components/BarrioOverlay.jsx")
+    # BarrioPage is now a thin wrapper that delegates to ComunidadPage
+    # in barrio mode.
+    assert "ComunidadPage embedded barrio" in barrio
     assert "gremios-page" in gremios
-    assert "BarrioFeed" in barrio
-    assert "GremioFeed" in gremios
+    assert "barrio-page" in comunidad  # rendered by ComunidadPage when barrio
+    assert "barrio-header" in overlay
+    assert "BarrioHeader" in overlay
+    assert "FeaturedStrip" in overlay
 
 
 def test_search_result_renders_trust_tile():

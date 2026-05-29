@@ -628,18 +628,22 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
                   {lang === "en" ? "Double-tap to like" : "Doble toque para dar like"}
                 </p>
               </div>
-              {/* Section 89 v4 — "Ver perfil →" CTA on provider stories.
-                  Renders only when the story comes from a provider with a
-                  public slug. Drives traffic from passive story viewers
-                  to the full eCard. */}
-              {active.provider_slug && (
+              {/* Section 89 v4 — "Ver perfil →" CTA.
+                  Resolves to the tagged provider when present (client
+                  testimonial), otherwise falls back to the author's own
+                  provider slug. */}
+              {(active.tagged_provider_slug || active.provider_slug) && (
                 <Link
-                  to={`/p/${active.provider_slug}`}
+                  to={`/p/${active.tagged_provider_slug || active.provider_slug}`}
                   className="inline-flex items-center gap-1.5 px-4 h-11 rounded-full bg-white text-[#03045E] font-bold text-sm shadow-2xl shadow-black/40 active:scale-95 transition flex-shrink-0"
                   data-testid="story-viewer-cta-ecard"
                   aria-label={lang === "en" ? "View profile" : "Ver perfil"}
                 >
-                  {lang === "en" ? "View profile" : "Ver perfil"} →
+                  {active.tagged_business_name
+                    ? (lang === "en"
+                        ? `View ${active.tagged_business_name}`
+                        : `Ver ${active.tagged_business_name}`)
+                    : (lang === "en" ? "View profile" : "Ver perfil")} →
                 </Link>
               )}
             </div>
@@ -806,8 +810,35 @@ function StoryCreator({ onClose, onCreated }) {
   const [creating, setCreating] = useState(false);
   const [stickers, setStickers] = useState([]); // Section 78
   const [editingStickerId, setEditingStickerId] = useState(null);
+  // Section 89 v4 — testimonial tag (clients tag a provider)
+  const [taggedProvider, setTaggedProvider] = useState(null);
+  const [tagQuery, setTagQuery] = useState("");
+  const [tagResults, setTagResults] = useState([]);
+  const [tagSearching, setTagSearching] = useState(false);
   const inputRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // Section 89 v4 — debounced provider search for the tag autocomplete.
+  useEffect(() => {
+    const q = tagQuery.trim();
+    if (q.length < 2 || taggedProvider) {
+      setTagResults([]);
+      return undefined;
+    }
+    let alive = true;
+    setTagSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.get("/providers", { params: { q, limit: 6 } });
+        if (alive) setTagResults(r.data || []);
+      } catch {
+        if (alive) setTagResults([]);
+      } finally {
+        if (alive) setTagSearching(false);
+      }
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [tagQuery, taggedProvider]);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -904,6 +935,7 @@ function StoryCreator({ onClose, onCreated }) {
           id: s.id, type: s.type, x: s.x, y: s.y,
           text: s.text || null, phone: s.phone || null,
         })) : null,
+        tagged_provider_id: taggedProvider?.provider_id || null,
       });
       toast.success(lang === "en" ? "Story posted!" : "¡Historia publicada!");
       onCreated();
@@ -1069,6 +1101,88 @@ function StoryCreator({ onClose, onCreated }) {
             )}
           </div>
         )}
+
+        {/* Section 89 v4 — Tag a provider (testimonial mode).
+            Clients can post a story that features a provider; we push
+            to that provider and surface a "Ver perfil →" CTA. */}
+        <div className="mb-4" data-testid="story-creator-tag">
+          <label className="block text-[11px] uppercase tracking-widest font-bold text-slate-500 mb-1.5">
+            {lang === "en" ? "Tag a provider (optional)" : "Etiquetar a un proveedor (opcional)"}
+          </label>
+          {taggedProvider ? (
+            <div
+              className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2"
+              data-testid="story-creator-tag-chip"
+            >
+              <span className="text-base">🏷️</span>
+              <span className="text-sm font-semibold text-emerald-800 flex-1 min-w-0 truncate">
+                {taggedProvider.business_name}
+              </span>
+              {taggedProvider.getamano_code && (
+                <span className="font-mono text-[10px] font-bold text-emerald-700">
+                  {taggedProvider.getamano_code}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => { setTaggedProvider(null); setTagQuery(""); }}
+                className="w-6 h-6 rounded-full bg-white text-emerald-700 hover:bg-emerald-100 flex items-center justify-center"
+                aria-label={lang === "en" ? "Remove tag" : "Quitar etiqueta"}
+                data-testid="story-creator-tag-remove"
+              >
+                <X className="w-3 h-3" strokeWidth={3} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type="text"
+                value={tagQuery}
+                onChange={(e) => setTagQuery(e.target.value)}
+                placeholder={lang === "en" ? "Search a business name…" : "Busca un negocio…"}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
+                data-testid="story-creator-tag-input"
+                maxLength={80}
+              />
+              {tagQuery.length >= 2 && (tagResults.length > 0 || tagSearching) && (
+                <div className="absolute z-20 mt-1 w-full rounded-xl bg-white border border-slate-200 shadow-lg max-h-56 overflow-y-auto" data-testid="story-creator-tag-results">
+                  {tagSearching && (
+                    <div className="px-3 py-2 text-xs text-slate-400 inline-flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> {lang === "en" ? "Searching…" : "Buscando…"}
+                    </div>
+                  )}
+                  {tagResults.map((p) => (
+                    <button
+                      key={p.provider_id}
+                      type="button"
+                      onClick={() => { setTaggedProvider(p); setTagQuery(""); setTagResults([]); }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 inline-flex items-center gap-2"
+                      data-testid={`story-creator-tag-option-${p.slug}`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-slate-100 overflow-hidden flex-shrink-0">
+                        {p.logo_url ? (
+                          <img src={p.logo_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[#03045E] truncate">{p.business_name}</p>
+                        <p className="text-[11px] text-slate-500 truncate">{p.city || ""}{p.state ? `, ${p.state}` : ""}</p>
+                      </div>
+                      {p.getamano_code && (
+                        <span className="font-mono text-[10px] font-bold text-slate-400 flex-shrink-0">{p.getamano_code}</span>
+                      )}
+                    </button>
+                  ))}
+                  {!tagSearching && !tagResults.length && (
+                    <div className="px-3 py-2 text-xs text-slate-400">
+                      {lang === "en" ? "No matches" : "Sin resultados"}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Caption */}
         <div className="mb-2">

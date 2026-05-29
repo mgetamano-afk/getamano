@@ -66,6 +66,7 @@ import ComunidadExplorar from "./pages/ComunidadExplorar";
 import ComunidadECards from "./pages/ComunidadECards";
 const BarrioPage = lazy(() => import("./pages/BarrioPage"));
 const GremiosPage = lazy(() => import("./pages/GremiosPage"));
+const ReelsPage = lazy(() => import("./pages/ReelsPage"));
 import QuickActionsFAB from "./components/QuickActionsFAB";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -169,13 +170,16 @@ function AppRouter() {
           wins, and the eCard is still reachable via /provider/{slug}. */}
       <Route path="/wall" element={<Community />} />
 
+      {/* Section 89 v4 Phase E — Reels (vertical short video feed) */}
+      <Route path="/reels" element={<ReelsPage />} />
+
       {/* Section 39 — Persistent /comunidad layout with sticky tab bar.
           The wrapper ComunidadLayout mounts once and the active sub-route
           renders into its <Outlet />. Window scroll position is remembered
           per sub-path so swapping tabs feels app-native. */}
       <Route path="/comunidad" element={<ComunidadLayout />}>
-        <Route index element={<ComunidadPage embedded />} />
-        <Route path="barrio" element={<BarrioPage />} />
+        <Route index element={<ComunidadPage embedded barrio />} />
+        <Route path="barrio" element={<ComunidadPage embedded barrio />} />
         <Route path="gremios" element={<GremiosPage />} />
         <Route path="explorar" element={<ComunidadExplorar />} />
         <Route path="chambas" element={<EmpleosPage embedded />} />
@@ -184,8 +188,8 @@ function AppRouter() {
         <Route path="wall-of-fame" element={<Community embedded />} />
       </Route>
       <Route path="/community" element={<ComunidadLayout />}>
-        <Route index element={<ComunidadPage embedded />} />
-        <Route path="barrio" element={<BarrioPage />} />
+        <Route index element={<ComunidadPage embedded barrio />} />
+        <Route path="barrio" element={<ComunidadPage embedded barrio />} />
         <Route path="gremios" element={<GremiosPage />} />
         <Route path="explorar" element={<ComunidadExplorar />} />
         <Route path="chambas" element={<EmpleosPage embedded />} />
