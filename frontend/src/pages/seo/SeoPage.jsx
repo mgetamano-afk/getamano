@@ -50,7 +50,7 @@ export default function SeoPage() {
   const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
 
   if (loading) {
-    return <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}><Header /><div className="max-w-7xl mx-auto px-4 py-12 text-slate-500">Cargando…</div><Footer /></div>;
+    return <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}><Header /><div className="max-w-7xl mx-auto px-4 py-12 text-slate-500">Cargando…</div><Footer /></div>;
   }
   if (!data) {
     return <div className="min-h-screen"><Header /><div className="max-w-7xl mx-auto px-4 py-12">No encontrado</div><Footer /></div>;
@@ -135,7 +135,7 @@ export default function SeoPage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}>
       <SeoHead
         title={title}
         description={description}
@@ -156,7 +156,7 @@ export default function SeoPage() {
             <span className="category-icon-wrap brand" aria-hidden="true">
               <CategoryIcon slug={category.slug} size={36} color="#FFFFFF" stroke={1.6} />
             </span>
-            <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#025F67" }} data-testid="seo-h1">
+            <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#03045E" }} data-testid="seo-h1">
               {title}
             </h1>
           </div>
@@ -180,7 +180,7 @@ export default function SeoPage() {
 
           {aiContent && (
             <div className="mt-6 max-w-3xl rounded-xl p-5" style={{ backgroundColor: "#FFFFFF", border: "1px solid #BCC5CC" }} data-testid="seo-ai-content">
-              <p className="text-base leading-relaxed" style={{ color: "#063154" }}>{aiContent}</p>
+              <p className="text-base leading-relaxed" style={{ color: "#03045E" }}>{aiContent}</p>
             </div>
           )}
         </header>
@@ -188,14 +188,14 @@ export default function SeoPage() {
         {/* Providers list */}
         {providers.length === 0 ? (
           <div className="bg-white rounded-2xl border p-10 text-center mb-12" style={{ borderColor: "#BCC5CC" }}>
-            <Award className="w-12 h-12 mx-auto mb-3" style={{ color: "#2F9D94" }} />
-            <h2 className="font-display text-xl font-bold mb-2" style={{ color: "#025F67" }}>Sé el primero en {city.name}</h2>
+            <Award className="w-12 h-12 mx-auto mb-3" style={{ color: "#0077B6" }} />
+            <h2 className="font-display text-xl font-bold mb-2" style={{ color: "#03045E" }}>Sé el primero en {city.name}</h2>
             <p className="text-slate-600 mb-4">Aún no hay proveedores latinos de {category.name_es.toLowerCase()} en {city.name}. Si eres uno, regístrate gratis y aprovecha el código <strong>GETAMANO50</strong> para 1 año de Plan Pro gratis.</p>
             <Link to="/register?intent=provider" className="btn-primary inline-block" data-testid="empty-cta">Registrarme como proveedor</Link>
           </div>
         ) : (
           <section className="mb-12" data-testid="seo-providers-list">
-            <h2 className="font-display text-2xl font-bold mb-4" style={{ color: "#025F67" }}>Proveedores destacados</h2>
+            <h2 className="font-display text-2xl font-bold mb-4" style={{ color: "#03045E" }}>Proveedores destacados</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {providers.map(p => (
                 <Link
@@ -214,13 +214,13 @@ export default function SeoPage() {
                     )}
                   </div>
                   <div className="p-4">
-                    <h3 className="font-display font-bold text-base mb-1 truncate" style={{ color: "#025F67" }}>{p.business_name}</h3>
+                    <h3 className="font-display font-bold text-base mb-1 truncate" style={{ color: "#03045E" }}>{p.business_name}</h3>
                     <p className="text-xs text-slate-500 flex items-center gap-1 mb-2">
                       <MapPin className="w-3 h-3" /> {p.city}, {p.state}
                     </p>
                     <div className="flex items-center gap-2 flex-wrap">
                       {p.rating_count > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-xs font-semibold" style={{ color: "#063154" }}>
+                        <span className="inline-flex items-center gap-0.5 text-xs font-semibold" style={{ color: "#03045E" }}>
                           <Star className="w-3 h-3 fill-current" style={{ color: "#F59E0B" }} />
                           {Number(p.rating_avg).toFixed(1)} <span className="text-slate-400 font-normal">({p.rating_count})</span>
                         </span>
@@ -236,27 +236,27 @@ export default function SeoPage() {
 
         {/* Why getamano */}
         <section className="bg-white rounded-2xl border p-6 md:p-8 mb-12" style={{ borderColor: "#BCC5CC" }} data-testid="seo-why">
-          <h2 className="font-display text-2xl font-bold mb-4" style={{ color: "#025F67" }}>¿Por qué contratar {category.name_es.toLowerCase()} en getamano?</h2>
+          <h2 className="font-display text-2xl font-bold mb-4" style={{ color: "#03045E" }}>¿Por qué contratar {category.name_es.toLowerCase()} en getamano?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: "#EBF8F7" }}>
-                <ShieldCheck className="w-5 h-5" style={{ color: "#025F67" }} />
+                <ShieldCheck className="w-5 h-5" style={{ color: "#03045E" }} />
               </div>
-              <h3 className="font-display font-semibold mb-1" style={{ color: "#025F67" }}>Proveedores verificados</h3>
+              <h3 className="font-display font-semibold mb-1" style={{ color: "#03045E" }}>Proveedores verificados</h3>
               <p className="text-sm text-slate-600">Cada negocio pasa por verificación de identidad, dirección y referencias antes de aparecer.</p>
             </div>
             <div>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: "#EBF8F7" }}>
-                <MessageCircle className="w-5 h-5" style={{ color: "#025F67" }} />
+                <MessageCircle className="w-5 h-5" style={{ color: "#03045E" }} />
               </div>
-              <h3 className="font-display font-semibold mb-1" style={{ color: "#025F67" }}>Cotización en español</h3>
+              <h3 className="font-display font-semibold mb-1" style={{ color: "#03045E" }}>Cotización en español</h3>
               <p className="text-sm text-slate-600">Solicita cotización en 30 segundos y recibe respuestas en español de proveedores que entienden tu cultura.</p>
             </div>
             <div>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: "#EBF8F7" }}>
-                <Star className="w-5 h-5" style={{ color: "#025F67" }} />
+                <Star className="w-5 h-5" style={{ color: "#03045E" }} />
               </div>
-              <h3 className="font-display font-semibold mb-1" style={{ color: "#025F67" }}>Reseñas reales</h3>
+              <h3 className="font-display font-semibold mb-1" style={{ color: "#03045E" }}>Reseñas reales</h3>
               <p className="text-sm text-slate-600">Solo clientes que contactaron al proveedor pueden dejar reseñas. Cero fake reviews.</p>
             </div>
           </div>
@@ -264,11 +264,11 @@ export default function SeoPage() {
 
         {/* FAQ */}
         <section className="mb-12" data-testid="seo-faq">
-          <h2 className="font-display text-2xl font-bold mb-4" style={{ color: "#025F67" }}>Preguntas frecuentes</h2>
+          <h2 className="font-display text-2xl font-bold mb-4" style={{ color: "#03045E" }}>Preguntas frecuentes</h2>
           <div className="space-y-3">
             {faq.map((item, idx) => (
               <details key={idx} className="bg-white rounded-xl border p-4 group" style={{ borderColor: "#BCC5CC" }}>
-                <summary className="cursor-pointer font-medium list-none flex justify-between items-center" style={{ color: "#025F67" }}>
+                <summary className="cursor-pointer font-medium list-none flex justify-between items-center" style={{ color: "#03045E" }}>
                   <span>{item.q}</span>
                   <span className="text-slate-400 group-open:rotate-180 transition-transform">▾</span>
                 </summary>
@@ -281,14 +281,14 @@ export default function SeoPage() {
         {/* Related: other cities for same category */}
         {related_cities.length > 0 && (
           <section className="mb-10">
-            <h2 className="font-display text-xl font-bold mb-3" style={{ color: "#025F67" }}>{category.name_es} en otras ciudades</h2>
+            <h2 className="font-display text-xl font-bold mb-3" style={{ color: "#03045E" }}>{category.name_es} en otras ciudades</h2>
             <div className="flex flex-wrap gap-2">
               {related_cities.map(c => (
                 <Link
                   key={c.slug}
                   to={`/servicios/${category.slug}/${c.slug}`}
                   className="px-4 py-2 rounded-full border bg-white text-sm transition hover:shadow-sm"
-                  style={{ borderColor: "#BCC5CC", color: "#025F67" }}
+                  style={{ borderColor: "#BCC5CC", color: "#03045E" }}
                   data-testid={`related-city-${c.slug}`}
                 >
                   {category.name_es} en {c.name}, {c.state}
@@ -301,14 +301,14 @@ export default function SeoPage() {
         {/* Related: other categories in same city */}
         {related_categories.length > 0 && (
           <section className="mb-10">
-            <h2 className="font-display text-xl font-bold mb-3" style={{ color: "#025F67" }}>Otros servicios en {city.name}</h2>
+            <h2 className="font-display text-xl font-bold mb-3" style={{ color: "#03045E" }}>Otros servicios en {city.name}</h2>
             <div className="flex flex-wrap gap-2">
               {related_categories.map(rc => (
                 <Link
                   key={rc.category_id}
                   to={`/servicios/${rc.slug}/${city.slug}`}
                   className="px-4 py-2 rounded-full border bg-white text-sm transition hover:shadow-sm"
-                  style={{ borderColor: "#BCC5CC", color: "#025F67" }}
+                  style={{ borderColor: "#BCC5CC", color: "#03045E" }}
                   data-testid={`related-cat-${rc.slug}`}
                 >
                   {rc.name_es} en {city.name}
@@ -319,10 +319,10 @@ export default function SeoPage() {
         )}
 
         {/* Final CTA */}
-        <section className="rounded-2xl p-6 md:p-10 text-center" style={{ background: "linear-gradient(135deg, #2F9D94 0%, #025F67 100%)" }}>
+        <section className="rounded-2xl p-6 md:p-10 text-center" style={{ background: "linear-gradient(135deg, #0077B6 0%, #03045E 100%)" }}>
           <h2 className="font-display text-2xl md:text-3xl font-bold text-white mb-3">¿No encuentras lo que buscas?</h2>
           <p className="text-white/90 mb-5 max-w-xl mx-auto">Cuéntanos lo que necesitas y conecta gratis con proveedores latinos verificados en {city.name}.</p>
-          <Link to="/search" className="inline-block bg-white px-6 py-3 rounded-full font-semibold transition hover:scale-105" style={{ color: "#025F67" }} data-testid="final-cta">
+          <Link to="/search" className="inline-block bg-white px-6 py-3 rounded-full font-semibold transition hover:scale-105" style={{ color: "#03045E" }} data-testid="final-cta">
             Buscar más proveedores en {city.name}
           </Link>
         </section>

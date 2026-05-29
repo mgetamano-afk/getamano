@@ -69,8 +69,8 @@ export default function Header() {
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2 min-w-0" data-testid="header-logo-link" aria-label="getamano home">
             <img src="/getamano-logo-mark.png" alt="" className="w-9 h-9 md:w-10 md:h-10 object-contain flex-shrink-0" />
-            <span className="font-display font-bold text-lg md:text-xl truncate" style={{ color: "#025F67" }}>
-              get<span style={{ color: "#2F9D94" }}>amano</span>
+            <span className="font-display font-bold text-lg md:text-xl truncate" style={{ color: "#03045E" }}>
+              get<span style={{ color: "#0077B6" }}>amano</span>
             </span>
           </Link>
 
@@ -100,7 +100,7 @@ export default function Header() {
                 >
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    style={{ background: user.role === "provider" ? "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" : "linear-gradient(135deg, #F97316 0%, #FB923C 100%)" }}
+                    style={{ background: user.role === "provider" ? "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" : "linear-gradient(135deg, #F97316 0%, #FB923C 100%)" }}
                     aria-hidden="true"
                   >
                     {user.role === "provider" ? "⚙" : initials}
@@ -146,8 +146,8 @@ export default function Header() {
             aria-label="Menu"
           >
             <div className="flex items-center justify-between px-5 pb-4 border-b border-slate-100">
-              <span className="font-display font-bold text-lg" style={{ color: "#025F67" }}>
-                get<span style={{ color: "#2F9D94" }}>amano</span>
+              <span className="font-display font-bold text-lg" style={{ color: "#03045E" }}>
+                get<span style={{ color: "#0077B6" }}>amano</span>
               </span>
               <button
                 onClick={() => setOpen(false)}
@@ -180,7 +180,7 @@ export default function Header() {
                   >
                     <span
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                      style={{ background: user.role === "provider" ? "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" : "linear-gradient(135deg, #F97316 0%, #FB923C 100%)" }}
+                      style={{ background: user.role === "provider" ? "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" : "linear-gradient(135deg, #F97316 0%, #FB923C 100%)" }}
                       aria-hidden="true"
                     >
                       {user.role === "provider" ? "⚙" : initials}

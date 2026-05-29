@@ -72,7 +72,7 @@ export default function ProviderLeftNav({
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition relative ${
                   active ? "text-white" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
-                style={active ? { background: "#025F67" } : undefined}
+                style={active ? { background: "#03045E" } : undefined}
                 data-testid={`leftnav-${id}`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
@@ -122,7 +122,7 @@ export default function ProviderLeftNav({
               <div className="flex items-center gap-1 mt-0.5">
                 <span
                   className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                  style={{ background: "#E1F5EE", color: "#025F67" }}
+                  style={{ background: "#E1F5EE", color: "#03045E" }}
                 >
                   {planLabel}
                 </span>

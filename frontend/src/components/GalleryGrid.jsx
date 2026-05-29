@@ -65,8 +65,8 @@ export default function GalleryGrid({ items = [], testid = "gallery-grid" }) {
             onClick={() => setFilter("all")}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${filter === "all" ? "text-white" : "text-slate-700 bg-white hover:bg-slate-50"}`}
             style={{
-              borderColor: filter === "all" ? "#025F67" : "#BCC5CC",
-              backgroundColor: filter === "all" ? "#025F67" : undefined,
+              borderColor: filter === "all" ? "#03045E" : "#BCC5CC",
+              backgroundColor: filter === "all" ? "#03045E" : undefined,
             }}
             data-testid={`${testid}-filter-all`}
           >
@@ -82,8 +82,8 @@ export default function GalleryGrid({ items = [], testid = "gallery-grid" }) {
                 onClick={() => setFilter(cat)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${active ? "text-white" : "text-slate-700 bg-white hover:bg-slate-50"}`}
                 style={{
-                  borderColor: active ? "#025F67" : "#BCC5CC",
-                  backgroundColor: active ? "#025F67" : undefined,
+                  borderColor: active ? "#03045E" : "#BCC5CC",
+                  backgroundColor: active ? "#03045E" : undefined,
                 }}
                 data-testid={`${testid}-filter-${cat}`}
               >

@@ -42,7 +42,7 @@ function Tile({ item }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
             <span className="font-display font-semibold text-sm text-slate-900 truncate">{item.first_name}</span>
-            {item.latino_owned && <span className="text-[10px]" title="Dueño Latino" style={{ color: "#025F67" }}>🤝</span>}
+            {item.latino_owned && <span className="text-[10px]" title="Dueño Latino" style={{ color: "#03045E" }}>🤝</span>}
             {item.city && (
               <span className="text-xs text-slate-500 inline-flex items-center gap-0.5">
                 <MapPin className="w-2.5 h-2.5" /> {item.city}{item.state ? `, ${item.state}` : ""}
@@ -97,7 +97,7 @@ export default function Community({ embedded = false }) {
       <main className="pb-16" data-testid="community-page">
         {/* HERO */}
         <section className="relative overflow-hidden">
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #063154 0%, #0A4D5E 55%, #025F67 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #03045E 0%, #0A4D5E 55%, #03045E 100%)" }} />
           <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "28px 28px" }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
             <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-14 items-center">
@@ -155,12 +155,12 @@ export default function Community({ embedded = false }) {
               <div className="relative hidden lg:block" data-testid="community-hero-image">
                 {/* Decorative corner badge */}
                 <div className="absolute -top-3 -left-3 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest shadow-xl"
-                     style={{ backgroundColor: "#F59E0B", color: "#063154" }}>
+                     style={{ backgroundColor: "#F59E0B", color: "#03045E" }}>
                   <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
                   Nuestra gente · USA
                 </div>
                 <div className="relative rounded-3xl overflow-hidden shadow-2xl"
-                     style={{ borderColor: "rgba(245, 158, 11, 0.3)", borderWidth: "2px", borderStyle: "solid", boxShadow: "0 25px 60px -20px rgba(2, 95, 103, 0.6)" }}>
+                     style={{ borderColor: "rgba(245, 158, 11, 0.3)", borderWidth: "2px", borderStyle: "solid", boxShadow: "0 25px 60px -20px rgba(3, 4, 94, 0.6)" }}>
                   <picture>
                     <source srcSet="/community-hero.webp" type="image/webp" />
                     <img
@@ -190,7 +190,7 @@ export default function Community({ embedded = false }) {
                 <div className="absolute -right-3 top-12 z-20 flex flex-col gap-2">
                   {[
                     { label: "Construcción", color: "#F59E0B" },
-                    { label: "Salud", color: "#2F9D94" },
+                    { label: "Salud", color: "#0077B6" },
                     { label: "Gastronomía", color: "#E15A2F" },
                   ].map(tag => (
                     <span key={tag.label}

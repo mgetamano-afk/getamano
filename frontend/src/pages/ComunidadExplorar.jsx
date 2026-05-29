@@ -34,7 +34,7 @@ export default function ComunidadExplorar() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <header className="mb-6">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
-               style={{ background: "rgba(2,95,103,0.08)", color: "#025F67" }}>
+               style={{ background: "rgba(2,95,103,0.08)", color: "#03045E" }}>
             <Compass className="w-3 h-3" /> Explorar
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 mt-2 tracking-tight">
@@ -61,7 +61,7 @@ export default function ComunidadExplorar() {
                 data-testid={`explorar-cat-${c.slug}`}
               >
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg mb-2"
-                     style={{ background: "#E1F5EE", color: "#025F67" }}>
+                     style={{ background: "#E1F5EE", color: "#03045E" }}>
                   {categoryEmoji(c.icon, c.name_es)}
                 </div>
                 <h3 className="font-display font-semibold text-sm text-slate-900 leading-tight">
@@ -91,7 +91,7 @@ export default function ComunidadExplorar() {
           <Link
             to="/buscar"
             className="inline-flex items-center gap-1.5 mt-3 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-sm"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="explorar-cta-buscar"
           >
             Ir a búsqueda completa <ArrowRight className="w-4 h-4" />

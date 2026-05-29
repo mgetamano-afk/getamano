@@ -77,7 +77,7 @@ export default function SmartSearchEmptyState({ q, city, onSuggestionClick }) {
         className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
         style={{ background: "rgba(2,95,103,0.08)" }}
       >
-        <Search className="w-7 h-7" style={{ color: "#025F67" }} />
+        <Search className="w-7 h-7" style={{ color: "#03045E" }} />
       </div>
 
       <h2 className="font-display font-bold text-xl sm:text-2xl text-slate-900 leading-snug" data-testid="empty-state-title">
@@ -98,7 +98,7 @@ export default function SmartSearchEmptyState({ q, city, onSuggestionClick }) {
                 type="button"
                 onClick={() => handleSuggestion(alt)}
                 className="px-4 py-2 rounded-full text-sm font-medium transition border"
-                style={{ background: "rgba(2,95,103,0.06)", borderColor: "rgba(2,95,103,0.18)", color: "#025F67" }}
+                style={{ background: "rgba(2,95,103,0.06)", borderColor: "rgba(2,95,103,0.18)", color: "#03045E" }}
                 data-testid={`empty-state-suggestion-${alt}`}
               >
                 {alt}

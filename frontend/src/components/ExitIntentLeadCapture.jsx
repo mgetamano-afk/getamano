@@ -161,7 +161,7 @@ export default function ExitIntentLeadCapture() {
         {/* Header with gradient */}
         <div
           className="relative px-5 sm:px-6 py-5 sm:py-6 text-white"
-          style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+          style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
         >
           <button
             type="button"
@@ -269,7 +269,7 @@ export default function ExitIntentLeadCapture() {
               type="submit"
               disabled={submitting}
               className="w-full text-sm font-bold text-white rounded-full px-4 py-3 transition disabled:opacity-60 flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="exit-lead-submit"
             >
               {submitting ? (

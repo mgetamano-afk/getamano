@@ -68,7 +68,7 @@ export default function DailyBrief() {
 
   return (
     <div className="relative overflow-hidden rounded-3xl p-6 md:p-7 mb-6"
-      style={{ background: "linear-gradient(135deg, #063154 0%, #0A4D5E 50%, #025F67 100%)" }}
+      style={{ background: "linear-gradient(135deg, #03045E 0%, #0A4D5E 50%, #03045E 100%)" }}
       data-testid="daily-brief">
       <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full bg-orange-500/20 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-amber-400/15 blur-3xl pointer-events-none" />

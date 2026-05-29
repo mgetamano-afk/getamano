@@ -108,12 +108,12 @@ export default function PushOptInBanner() {
       <style>{`@keyframes push-optin-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div
         className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 sm:p-5 backdrop-blur"
-        style={{ boxShadow: "0 20px 60px rgba(2, 95, 103, 0.18)" }}
+        style={{ boxShadow: "0 20px 60px rgba(3, 4, 94, 0.18)" }}
       >
         <div className="flex items-start gap-3">
           <div
             className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           >
             <Bell className="w-5 h-5 text-white" />
           </div>
@@ -143,7 +143,7 @@ export default function PushOptInBanner() {
             onClick={onActivate}
             disabled={busy}
             className="flex-1 text-sm font-semibold text-white rounded-full px-4 py-2.5 transition disabled:opacity-60"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="push-optin-activate"
           >
             {busy

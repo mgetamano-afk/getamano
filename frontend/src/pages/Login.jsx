@@ -39,7 +39,7 @@ export default function Login() {
       <main className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
           <img src="/getamano-logo-mark.png" alt="getamano" className="w-16 h-16 mx-auto mb-3 object-contain" />
-          <h1 className="font-display text-3xl font-bold text-center" style={{ color: "#025F67" }} data-testid="login-title">{t("auth.welcome")}</h1>
+          <h1 className="font-display text-3xl font-bold text-center" style={{ color: "#03045E" }} data-testid="login-title">{t("auth.welcome")}</h1>
           <p className="text-slate-500 text-center mt-2">{t("auth.login")}</p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4" data-testid="login-form">

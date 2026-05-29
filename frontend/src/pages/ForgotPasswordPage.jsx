@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
           {!sent ? (
             <>
               <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "#E1F5EE" }}>
-                <Mail className="w-5 h-5" style={{ color: "#025F67" }} />
+                <Mail className="w-5 h-5" style={{ color: "#03045E" }} />
               </div>
               <h1 className="font-display text-2xl font-bold text-slate-900 text-center mb-2">¿Olvidaste tu contraseña?</h1>
               <p className="text-sm text-slate-500 text-center mb-6 leading-relaxed">
@@ -62,7 +62,7 @@ export default function ForgotPasswordPage() {
                   type="submit"
                   disabled={loading || !email}
                   className="w-full py-3 rounded-full text-white font-bold disabled:opacity-50 transition"
-                  style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                  style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                   data-testid="forgot-submit"
                 >
                   {loading ? "Enviando..." : "Enviar enlace"}

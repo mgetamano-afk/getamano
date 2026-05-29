@@ -136,7 +136,7 @@ function LoginPrompt({ action, onClose }) {
           </button>
           <span
             className="w-12 h-12 rounded-2xl flex items-center justify-center text-white mb-3"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           >
             <Lock className="w-6 h-6" />
           </span>
@@ -150,7 +150,7 @@ function LoginPrompt({ action, onClose }) {
               type="button"
               onClick={goLogin}
               className="w-full h-11 rounded-xl text-white font-bold text-sm transition hover:brightness-110"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="auth-gate-login-btn"
             >
               {lang === "en" ? "Sign in" : "Iniciar sesión"}

@@ -15,7 +15,7 @@
 const STYLES = {
   latino: {
     bg: "#E1F5EE",
-    color: "#025F67",
+    color: "#03045E",
     border: "#A6E1DA",
     label: "Dueño Latino",
   },

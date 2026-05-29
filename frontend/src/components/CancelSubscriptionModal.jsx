@@ -151,7 +151,7 @@ export default function CancelSubscriptionModal({ sub, onClose, onSuccess, lang 
                 type="button"
                 onClick={() => setStep(2)}
                 className="w-full py-3 rounded-2xl text-white font-bold inline-flex items-center justify-center gap-2 hover:opacity-95 transition"
-                style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                 data-testid="cancel-step1-continue"
               >
                 {lang === "en" ? "I'd rather stay" : "Mejor me quedo"}
@@ -190,7 +190,7 @@ export default function CancelSubscriptionModal({ sub, onClose, onSuccess, lang 
                   className={`w-full text-left px-4 py-3 rounded-2xl border transition ${reason === r.id ? "border-teal-700 bg-teal-50/60" : "border-slate-200 hover:border-slate-300 bg-white"}`}
                   data-testid={`cancel-reason-${r.id}`}
                 >
-                  <span className="text-sm font-medium" style={{ color: reason === r.id ? "#025F67" : "#0F172A" }}>
+                  <span className="text-sm font-medium" style={{ color: reason === r.id ? "#03045E" : "#0F172A" }}>
                     {lang === "en" ? r.labelEn : r.labelEs}
                   </span>
                 </button>
@@ -254,7 +254,7 @@ export default function CancelSubscriptionModal({ sub, onClose, onSuccess, lang 
               type="button"
               onClick={() => onSuccess(cancelledSub || sub)}
               className="mt-6 w-full py-3 rounded-2xl text-white font-bold inline-flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="cancel-step3-done"
             >
               {lang === "en" ? "Got it" : "Entendido"}

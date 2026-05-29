@@ -169,7 +169,7 @@ function NewPostBox({ onPosted }) {
               onClick={submit}
               disabled={posting || uploading || (content.trim().length < 4 && !imageUrl)}
               className="px-5 py-2 rounded-full text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="comunidad-newpost-submit"
             >
               {posting ? "Publicando…" : "Publicar"}
@@ -314,7 +314,7 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
               onClick={send}
               disabled={sending || content.trim().length < 1}
               className="p-1.5 rounded-full text-white disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               aria-label="Enviar"
               data-testid={`inline-comments-send-${post.post_id}`}
             >

@@ -6,7 +6,7 @@ import { api } from "../lib/api";
  * Confetti pieces with random positions/colors. CSS-driven, no library.
  */
 function Confetti({ count = 60 }) {
-  const colors = ["#2F9D94", "#025F67", "#063154", "#4EBAAE", "#74CFC5", "#A6E1DA", "#BCC5CC"];
+  const colors = ["#0077B6", "#03045E", "#03045E", "#4EBAAE", "#74CFC5", "#A6E1DA", "#BCC5CC"];
   const pieces = Array.from({ length: count }, (_, i) => ({
     id: i,
     left: Math.random() * 100,

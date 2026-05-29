@@ -6,11 +6,11 @@
 
 body {
     margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #F7F6F2;
-    color: #063154;
+    background-color: #F8FCFD;
+    color: #03045E;
 }
 
 /* Use :where() so any Tailwind text-color utility (text-white, text-slate-900, etc.)
@@ -19,34 +19,38 @@ body {
 :where(h1, h2, h3, h4, h5, h6, .font-display) {
     font-family: 'Poppins', system-ui, sans-serif;
     letter-spacing: -0.02em;
-    color: #025F67;
+    color: #03045E;
 }
 
 @layer base {
     :root {
-        /* Alabaster base */
-        --background: 44 25% 96%;
-        --foreground: 213 87% 17%;
+        /* Section 73b — Ocean Blue palette as the global design system.
+           Background is a near-white with a hint of blue (#F8FCFD) to feel
+           on-brand without saturating the entire app. Foreground is the
+           deep navy (#03045E). Primary CTAs are the bright Atlantic blue
+           (#0077B6). Accent for highlights and badges is cyan (#00B4D8). */
+        --background: 195 60% 98%;
+        --foreground: 240 96% 19%;
         --card: 0 0% 100%;
-        --card-foreground: 213 87% 17%;
+        --card-foreground: 240 96% 19%;
         --popover: 0 0% 100%;
-        --popover-foreground: 213 87% 17%;
-        /* Scooter primary */
-        --primary: 175 54% 40%;
+        --popover-foreground: 240 96% 19%;
+        /* Primary — Atlantic Blue */
+        --primary: 200 100% 36%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 207 17% 84%;
-        --secondary-foreground: 213 87% 17%;
-        --muted: 44 25% 96%;
-        --muted-foreground: 207 16% 45%;
-        /* Blue Lagoon accent */
-        --accent: 185 96% 20%;
+        --secondary: 192 78% 88%;
+        --secondary-foreground: 240 96% 19%;
+        --muted: 195 60% 98%;
+        --muted-foreground: 215 25% 45%;
+        /* Accent — Cyan */
+        --accent: 191 100% 42%;
         --accent-foreground: 0 0% 100%;
         --destructive: 0 84% 60%;
         --destructive-foreground: 0 0% 100%;
-        /* Heather */
-        --border: 207 17% 84%;
-        --input: 207 17% 84%;
-        --ring: 175 54% 40%;
+        /* Border / inputs / focus ring */
+        --border: 195 25% 86%;
+        --input: 195 25% 86%;
+        --ring: 200 100% 36%;
         --radius: 0.75rem;
     }
 }
@@ -58,13 +62,13 @@ body {
 
 /* Subtle textured background pattern */
 .bg-grid-slate {
-    background-image: radial-gradient(circle at 1px 1px, rgba(2, 95, 103, 0.06) 1px, transparent 0);
+    background-image: radial-gradient(circle at 1px 1px, rgba(3, 4, 94, 0.06) 1px, transparent 0);
     background-size: 24px 24px;
 }
 
 /* Custom selection */
 ::selection {
-    background-color: #2F9D94;
+    background-color: #0077B6;
     color: white;
 }
 
@@ -87,9 +91,11 @@ html { scroll-behavior: smooth; }
     color: #1a1a2e;
     cursor: pointer;
 }
-.pac-item:hover { background: #F7F6F2; }
+.pac-item:hover { background: #F8FCFD; }
+.pac-item:active { background: #CAF0F8; }
+.pac-matched { color: #0077B6; font-weight: 600; }
 .pac-item-selected { background: #E6F7F5; }
-.pac-matched { color: #2F9D94; font-weight: 600; }
+.pac-matched { color: #0077B6; font-weight: 600; }
 .pac-icon { display: none; }
 
 /* BUG-07 PRE-LAUNCH — Hide the platform-injected "Made with Emergent" badge

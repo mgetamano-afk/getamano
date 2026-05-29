@@ -159,7 +159,7 @@ export default function Landing() {
       {/* HERO with animated background */}
       <section className="hero-section relative overflow-hidden">
         <div className="hero-background absolute inset-0" style={{
-          background: "linear-gradient(135deg, #063154 0%, #0A4D5E 50%, #025F67 100%)",
+          background: "linear-gradient(135deg, #03045E 0%, #0A4D5E 50%, #03045E 100%)",
           backgroundSize: "300% 300%",
           animation: "auroraShift 60s ease infinite",
         }} />
@@ -176,10 +176,10 @@ export default function Landing() {
              The default 3-stop teal gradient is too saturated when it covers
              100% of a phone viewport — it reads as a wall of green. On mobile
              we transition from deep brand black to a very desaturated teal,
-             letting #025F67 show only as a soft accent at the bottom. */
+             letting #03045E show only as a soft accent at the bottom. */
           @media (max-width: 767px) {
             .hero-background {
-              background: linear-gradient(170deg, #0A0A0A 0%, #0D1F1E 45%, #0A3535 75%, #025F67 100%) !important;
+              background: linear-gradient(170deg, #0A0A0A 0%, #0D1F1E 45%, #0A3535 75%, #03045E 100%) !important;
               background-size: 100% 100% !important;
               animation: none !important;
             }
@@ -297,7 +297,7 @@ export default function Landing() {
                   // Bug B5 (Section 61) — fallback if Unsplash CDN fails to load.
                   e.currentTarget.onerror = null;
                   e.currentTarget.src = "/getamano-logo-full.png";
-                  e.currentTarget.style.background = "linear-gradient(135deg, #025F67 0%, #012830 100%)";
+                  e.currentTarget.style.background = "linear-gradient(135deg, #03045E 0%, #012830 100%)";
                   e.currentTarget.style.objectFit = "contain";
                   e.currentTarget.style.padding = "60px";
                 }}
@@ -356,7 +356,7 @@ export default function Landing() {
       </section>
 
       {/* CÓMO FUNCIONA (dark) */}
-      <section className="how-it-works-section relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#063154" }}>
+      <section className="how-it-works-section relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#03045E" }}>
         <style>{`
           /* SECTION 21 — Soften this dark section on mobile so it doesn't read
              as a second wall of saturated navy after the hero. */
@@ -390,7 +390,7 @@ export default function Landing() {
 
       {/* DUAL AUDIENCE split */}
       <section className="grid md:grid-cols-2">
-        <div className="text-white p-12 md:p-16" style={{ backgroundColor: "#063154" }}>
+        <div className="text-white p-12 md:p-16" style={{ backgroundColor: "#03045E" }}>
           <h3 className="font-display text-3xl font-bold text-white">Para clientes</h3>
           <ul className="mt-6 space-y-3 text-white/90">
             {["Servicios reales y verificados", "Profesionales que hablan tu idioma", "Reseñas auténticas de la comunidad"].map((b, i) => (
@@ -399,7 +399,7 @@ export default function Landing() {
           </ul>
           <Link to="/buscar" className="btn-primary inline-flex mt-8">Explorar servicios</Link>
         </div>
-        <div className="relative text-white p-12 md:p-16 overflow-hidden" style={{ background: "linear-gradient(135deg, #2F9D94, #025F67)" }}>
+        <div className="relative text-white p-12 md:p-16 overflow-hidden" style={{ background: "linear-gradient(135deg, #0077B6, #03045E)" }}>
           <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "repeating-linear-gradient(45deg, white 0, white 1px, transparent 1px, transparent 20px)" }} />
           <div className="relative">
             <h3 className="font-display text-3xl font-bold text-white">Para proveedores</h3>
@@ -444,16 +444,16 @@ export default function Landing() {
       {withVideo.length > 0 && (
         <section
           className="py-16 md:py-24"
-          style={{ background: "linear-gradient(180deg, #F7F6F2 0%, #EBF8F7 100%)" }}
+          style={{ background: "linear-gradient(180deg, #F8FCFD 0%, #EBF8F7 100%)" }}
           data-testid="landing-featured-video-section"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
               <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-3" style={{ backgroundColor: "#025F67", color: "#FFFFFF" }}>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-3" style={{ backgroundColor: "#03045E", color: "#FFFFFF" }}>
                   <Video className="w-3.5 h-3.5" /> NUEVO
                 </div>
-                <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight" style={{ color: "#025F67" }}>
+                <h2 className="font-display text-3xl md:text-4xl font-bold tracking-tight" style={{ color: "#03045E" }}>
                   Conoce a tu próximo proveedor en video
                 </h2>
                 <p className="text-slate-600 mt-2 max-w-xl">
@@ -463,7 +463,7 @@ export default function Landing() {
               <Link
                 to="/buscar?has_video=true"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
-                style={{ color: "#025F67" }}
+                style={{ color: "#03045E" }}
                 data-testid="landing-video-see-all"
               >
                 Ver todos con video <ArrowRight className="w-4 h-4" />
@@ -494,7 +494,7 @@ export default function Landing() {
                           {p.cover_url ? (
                             <img src={p.cover_url} alt={p.business_name} className="absolute inset-0 w-full h-full object-cover opacity-80" loading="lazy" />
                           ) : (
-                            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #2F9D94 0%, #025F67 100%)" }} />
+                            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #0077B6 0%, #03045E 100%)" }} />
                           )}
                           <button
                             type="button"
@@ -504,12 +504,12 @@ export default function Landing() {
                             aria-label={`Reproducir video de ${p.business_name}`}
                           >
                             <span className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
-                              <Play className="w-7 h-7 ml-1" style={{ color: "#025F67" }} fill="currentColor" />
+                              <Play className="w-7 h-7 ml-1" style={{ color: "#03045E" }} fill="currentColor" />
                             </span>
                           </button>
                           <span
                             className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white"
-                            style={{ backgroundColor: "rgba(2, 95, 103, 0.92)" }}
+                            style={{ backgroundColor: "rgba(3, 4, 94, 0.92)" }}
                           >
                             <Video className="w-3 h-3" /> Video
                           </span>
@@ -518,11 +518,11 @@ export default function Landing() {
                     </div>
                     <div className="p-4 flex-1 flex flex-col">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-display font-semibold text-base truncate" style={{ color: "#025F67" }}>
+                        <h3 className="font-display font-semibold text-base truncate" style={{ color: "#03045E" }}>
                           {p.business_name}
                         </h3>
                         {p.rating_count > 0 && (
-                          <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#063154" }}>
+                          <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#03045E" }}>
                             <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#F59E0B" }} /> {Number(p.rating_avg).toFixed(1)}
                           </span>
                         )}
@@ -532,7 +532,7 @@ export default function Landing() {
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         {p.verification_status === "approved" && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#025F67", border: "1px solid #A6E1DA" }}>
+                          <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#03045E", border: "1px solid #A6E1DA" }}>
                             <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                           </span>
                         )}
@@ -541,7 +541,7 @@ export default function Landing() {
                       <Link
                         to={`/proveedor/${p.slug}`}
                         className="mt-3 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
-                        style={{ color: "#025F67" }}
+                        style={{ color: "#03045E" }}
                         data-testid={`landing-video-card-link-${p.slug}`}
                       >
                         Ver perfil completo <ArrowRight className="w-3.5 h-3.5" />
@@ -556,7 +556,7 @@ export default function Landing() {
       )}
 
       {/* TESTIMONIALS dark */}
-      <section className="relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#063154" }}>
+      <section className="relative text-white py-16 md:py-24 overflow-hidden" style={{ backgroundColor: "#03045E" }}>
         <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(circle at 50% 100%, rgba(255,140,68,0.22), transparent 60%)" }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-center text-white">Lo que dice la comunidad</h2>

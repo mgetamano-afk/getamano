@@ -242,8 +242,8 @@ export default function MilestoneCelebrationModal({ summary, onClose }) {
           <div
             className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
             style={{
-              background: "linear-gradient(135deg, #063154 0%, #025F67 100%)",
-              boxShadow: "0 8px 24px -10px rgba(2, 95, 103, 0.4)",
+              background: "linear-gradient(135deg, #03045E 0%, #03045E 100%)",
+              boxShadow: "0 8px 24px -10px rgba(3, 4, 94, 0.4)",
             }}
             data-testid="milestone-modal-credit"
           >

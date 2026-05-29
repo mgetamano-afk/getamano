@@ -147,7 +147,7 @@ export default function CouponsCard() {
                   onClick={() => redeem(c.coupon_id)}
                   disabled={redeeming === c.coupon_id}
                   className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-white text-xs font-bold whitespace-nowrap disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                  style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                   data-testid={`coupon-redeem-${c.coupon_id}`}
                 >
                   <Award className="w-3.5 h-3.5" />

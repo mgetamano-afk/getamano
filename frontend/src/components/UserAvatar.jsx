@@ -27,7 +27,7 @@ const SIZE_CLASSES = {
 };
 
 const EMOJI_BG = "linear-gradient(135deg, #FEF3C7 0%, #FED7AA 100%)"; // soft amber for emoji
-const INITIAL_BG = "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)";
+const INITIAL_BG = "linear-gradient(135deg, #03045E 0%, #0077B6 100%)";
 
 export default function UserAvatar({
   name,

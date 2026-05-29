@@ -235,7 +235,7 @@ const FALLBACK_COPY = {
   ],
 };
 
-const FALLBACK_VISUAL = { gradient: "linear-gradient(145deg, #025F67 0%, #2F9D94 50%, #0ABAB5 100%)", accent: "#5EEAD4" };
+const FALLBACK_VISUAL = { gradient: "linear-gradient(145deg, #03045E 0%, #0077B6 50%, #0ABAB5 100%)", accent: "#5EEAD4" };
 
 export default function CategoryHub() {
   const { slug } = useParams();
@@ -370,7 +370,7 @@ export default function CategoryHub() {
                 <Link
                   to={`/buscar?category=${slug}${cityFilter ? `&city=${encodeURIComponent(cityFilter)}` : ""}`}
                   className="px-5 py-2.5 rounded-full font-semibold text-sm inline-flex items-center gap-2 hover:scale-[1.02] transition"
-                  style={{ background: "white", color: "#025F67" }}
+                  style={{ background: "white", color: "#03045E" }}
                   data-testid="category-cta-search"
                 >
                   <Sparkles className="w-4 h-4" /> {lang === "es" ? "Ver todos los proveedores" : "See all providers"}
@@ -416,7 +416,7 @@ export default function CategoryHub() {
                 ? "Estamos creciendo. Publica tu eCard gratis y sé de los primeros en esta categoría."
                 : "We're growing. Publish your free eCard and be among the first in this category."}
             </p>
-            <Link to="/registro?intent=provider" className="mt-4 inline-flex px-5 py-2.5 rounded-full font-semibold text-white" style={{ backgroundColor: "#025F67" }} data-testid="category-empty-onboard">
+            <Link to="/registro?intent=provider" className="mt-4 inline-flex px-5 py-2.5 rounded-full font-semibold text-white" style={{ backgroundColor: "#03045E" }} data-testid="category-empty-onboard">
               {lang === "es" ? "Soy proveedor" : "I'm a provider"}
             </Link>
           </div>
@@ -471,7 +471,7 @@ export default function CategoryHub() {
           <Link
             to={`/buscar?category=${slug}`}
             className="inline-flex mt-5 px-6 py-3 rounded-full bg-white font-semibold text-sm hover:scale-[1.02] transition gap-2 items-center"
-            style={{ color: "#025F67" }}
+            style={{ color: "#03045E" }}
             data-testid="category-bottom-cta"
           >
             <MessageSquare className="w-4 h-4" /> {lang === "es" ? "Solicita una cotización" : "Get a free quote"}
@@ -488,7 +488,7 @@ function TrustItem({ icon: Icon, title, body }) {
   return (
     <div className="flex gap-3 items-start">
       <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-sm flex-shrink-0">
-        <Icon className="w-5 h-5" style={{ color: "#025F67" }} />
+        <Icon className="w-5 h-5" style={{ color: "#03045E" }} />
       </div>
       <div>
         <p className="font-semibold text-slate-900 text-sm">{title}</p>

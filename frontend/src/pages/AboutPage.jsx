@@ -189,7 +189,7 @@ export default function AboutPage() {
         {/* ─── Hero ─────────────────────────────────────────────────── */}
         <section
           className="relative overflow-hidden"
-          style={{ background: "linear-gradient(160deg, #025F67 0%, #014a52 60%, #013840 100%)" }}
+          style={{ background: "linear-gradient(160deg, #03045E 0%, #014a52 60%, #013840 100%)" }}
           data-testid="about-hero"
         >
           {/* Decorative dots */}
@@ -221,7 +221,7 @@ export default function AboutPage() {
                 className="rounded-2xl bg-white border-2 p-5 text-center shadow-sm"
                 style={{ borderColor: "#5DCAA5" }}
               >
-                <div className="text-3xl md:text-4xl font-extrabold tracking-tight" style={{ color: "#025F67" }}>{s.value}</div>
+                <div className="text-3xl md:text-4xl font-extrabold tracking-tight" style={{ color: "#03045E" }}>{s.value}</div>
                 <div className="mt-1.5 text-xs uppercase tracking-wider text-slate-500 font-semibold">{s.label}</div>
               </div>
             ))}
@@ -264,7 +264,7 @@ export default function AboutPage() {
                   data-testid={`about-value-${i}`}
                 >
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: "#EFF9F7" }}>
-                    <Icon className="w-5 h-5" style={{ color: "#025F67" }} />
+                    <Icon className="w-5 h-5" style={{ color: "#03045E" }} />
                   </div>
                   <h3 className="text-base font-bold text-slate-900 mb-1.5">{title}</h3>
                   <p className="text-sm text-slate-600 leading-relaxed">{text}</p>
@@ -276,7 +276,7 @@ export default function AboutPage() {
 
         {/* ─── Pull quote ───────────────────────────────────────────── */}
         <section className="max-w-3xl mx-auto px-5 md:px-8 py-16 md:py-20 text-center" data-testid="about-quote">
-          <Quote className="w-8 h-8 mx-auto mb-4 opacity-30" style={{ color: "#025F67" }} />
+          <Quote className="w-8 h-8 mx-auto mb-4 opacity-30" style={{ color: "#03045E" }} />
           <p className="text-xl md:text-2xl font-bold text-slate-900 leading-snug italic">
             {c.quote}
           </p>
@@ -286,7 +286,7 @@ export default function AboutPage() {
         {/* ─── Founder ──────────────────────────────────────────────── */}
         <section
           className="relative overflow-hidden"
-          style={{ background: "linear-gradient(180deg, #F7F6F2 0%, #FFFFFF 100%)" }}
+          style={{ background: "linear-gradient(180deg, #F8FCFD 0%, #FFFFFF 100%)" }}
           data-testid="about-founder"
         >
           <div className="max-w-5xl mx-auto px-5 md:px-8 py-16 md:py-20">
@@ -338,7 +338,7 @@ export default function AboutPage() {
                 <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight" data-testid="about-founder-name">
                   {c.founderName}
                 </h2>
-                <p className="mt-1 text-sm font-semibold" style={{ color: "#025F67" }} data-testid="about-founder-role">
+                <p className="mt-1 text-sm font-semibold" style={{ color: "#03045E" }} data-testid="about-founder-role">
                   {c.founderRole}
                 </p>
                 <p className="mt-0.5 text-[11px] font-bold uppercase tracking-[1.2px] text-slate-400" data-testid="about-founder-tagline">
@@ -373,7 +373,7 @@ export default function AboutPage() {
                 </div>
 
                 {/* Welcome close */}
-                <p className="mt-4 text-xl font-extrabold" style={{ color: "#025F67" }} data-testid="about-founder-close">
+                <p className="mt-4 text-xl font-extrabold" style={{ color: "#03045E" }} data-testid="about-founder-close">
                   {c.founderClose}
                 </p>
 
@@ -387,7 +387,7 @@ export default function AboutPage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-bold transition hover:-translate-y-0.5 hover:shadow-md"
                       style={i === 0
-                        ? { background: "#025F67", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(2,95,103,0.25)" }
+                        ? { background: "#03045E", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(2,95,103,0.25)" }
                         : { background: "#FEF3C7", color: "#92400E", border: "1.5px solid #F59E0B" }}
                       data-testid={`about-founder-link-${i}`}
                     >
@@ -399,7 +399,7 @@ export default function AboutPage() {
                 {/* Trust pill */}
                 <div
                   className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold"
-                  style={{ background: "#EFF9F7", color: "#025F67", border: "1px solid #5DCAA5" }}
+                  style={{ background: "#EFF9F7", color: "#03045E", border: "1px solid #5DCAA5" }}
                   data-testid="about-founder-trust"
                 >
                   {c.founderTrust}
@@ -413,7 +413,7 @@ export default function AboutPage() {
         <section className="max-w-5xl mx-auto px-5 md:px-8 pb-20" data-testid="about-cta">
           <div
             className="relative overflow-hidden rounded-3xl p-8 md:p-12 text-center"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #014a52 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #014a52 100%)" }}
           >
             <Users className="absolute top-4 right-4 w-20 h-20 opacity-5" style={{ color: "#5DCAA5" }} aria-hidden="true" />
             <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">{c.ctaTitle}</h2>

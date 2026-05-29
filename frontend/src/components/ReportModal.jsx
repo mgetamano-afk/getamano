@@ -65,7 +65,7 @@ export default function ReportModal({ open, onClose, targetId, targetRole, targe
               <AlertTriangle className="w-5 h-5" style={{ color: "#DC2626" }} />
             </div>
             <div>
-              <h3 className="font-display font-bold text-lg" style={{ color: "#025F67" }}>Reportar {targetRole === "provider" ? "proveedor" : "cliente"}</h3>
+              <h3 className="font-display font-bold text-lg" style={{ color: "#03045E" }}>Reportar {targetRole === "provider" ? "proveedor" : "cliente"}</h3>
               <p className="text-xs text-slate-500">{targetName}</p>
             </div>
           </div>
@@ -75,27 +75,27 @@ export default function ReportModal({ open, onClose, targetId, targetRole, targe
         {submitted ? (
           <div className="p-8 text-center" data-testid="report-success">
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: "#EBF8F7" }}>
-              <CheckCircle className="w-8 h-8" style={{ color: "#025F67" }} />
+              <CheckCircle className="w-8 h-8" style={{ color: "#03045E" }} />
             </div>
-            <h4 className="font-display font-bold text-xl mb-2" style={{ color: "#025F67" }}>Reporte enviado</h4>
+            <h4 className="font-display font-bold text-xl mb-2" style={{ color: "#03045E" }}>Reporte enviado</h4>
             <p className="text-sm text-slate-600 mb-5">Nuestro equipo revisará el caso en las próximas 24-48 horas. Te notificaremos por email si tomamos acción.</p>
             <button onClick={onClose} className="btn-primary" data-testid="report-done-btn">Cerrar</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#025F67" }}>Motivo del reporte</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: "#03045E" }}>Motivo del reporte</label>
               <div className="space-y-1.5">
                 {reasons.map(r => (
-                  <label key={r.key} className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition ${reason === r.key ? "bg-teal-50" : "hover:bg-slate-50"}`} style={{ borderColor: reason === r.key ? "#2F9D94" : "#BCC5CC" }} data-testid={`report-reason-${r.key}`}>
+                  <label key={r.key} className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition ${reason === r.key ? "bg-teal-50" : "hover:bg-slate-50"}`} style={{ borderColor: reason === r.key ? "#0077B6" : "#BCC5CC" }} data-testid={`report-reason-${r.key}`}>
                     <input type="radio" name="reason" value={r.key} checked={reason === r.key} onChange={() => setReason(r.key)} className="mt-0.5" />
-                    <span className="text-sm" style={{ color: "#063154" }}>{r.label}</span>
+                    <span className="text-sm" style={{ color: "#03045E" }}>{r.label}</span>
                   </label>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#025F67" }}>Descripción <span className="text-xs text-slate-400">(mínimo 20 caracteres)</span></label>
+              <label className="block text-sm font-medium mb-2" style={{ color: "#03045E" }}>Descripción <span className="text-xs text-slate-400">(mínimo 20 caracteres)</span></label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
@@ -109,10 +109,10 @@ export default function ReportModal({ open, onClose, targetId, targetRole, targe
               <div className="text-xs text-slate-400 mt-1 text-right">{description.length}/2000</div>
             </div>
             <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
-              <strong style={{ color: "#025F67" }}>Importante:</strong> Los reportes falsos o malintencionados pueden resultar en la suspensión de tu cuenta. Solo reporta situaciones reales que violan las <a href="/politica-resenas" target="_blank" rel="noopener" className="underline" style={{ color: "#2F9D94" }}>políticas de getamano</a>.
+              <strong style={{ color: "#03045E" }}>Importante:</strong> Los reportes falsos o malintencionados pueden resultar en la suspensión de tu cuenta. Solo reporta situaciones reales que violan las <a href="/politica-resenas" target="_blank" rel="noopener" className="underline" style={{ color: "#0077B6" }}>políticas de getamano</a>.
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 rounded-full border text-sm font-medium" style={{ borderColor: "#BCC5CC", color: "#025F67" }}>Cancelar</button>
+              <button type="button" onClick={onClose} className="px-4 py-2 rounded-full border text-sm font-medium" style={{ borderColor: "#BCC5CC", color: "#03045E" }}>Cancelar</button>
               <button type="submit" disabled={submitting} className="btn-primary inline-flex items-center gap-2 disabled:opacity-60" data-testid="report-submit-btn">
                 <Send className="w-4 h-4" />
                 {submitting ? "Enviando..." : "Enviar reporte"}

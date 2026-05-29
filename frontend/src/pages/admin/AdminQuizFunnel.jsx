@@ -84,8 +84,8 @@ export default function AdminQuizFunnel() {
 
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Kpi icon={Users} label="Sesiones" value={t.sessions || 0} color="#025F67" />
-          <Kpi icon={Award} label="Completaron" value={t.completed || 0} sub={`${r.completion_rate_pct || 0}% de conversión`} color="#2F9D94" />
+          <Kpi icon={Users} label="Sesiones" value={t.sessions || 0} color="#03045E" />
+          <Kpi icon={Award} label="Completaron" value={t.completed || 0} sub={`${r.completion_rate_pct || 0}% de conversión`} color="#0077B6" />
           <Kpi icon={ArrowDownRight} label="Abandonos" value={t.abandoned || 0} sub={`${t.q2 - t.completed} pasaron Q2 sin terminar`} color="#F59E0B" />
           <Kpi icon={Mail} label="Emails rescatados" value={t.email_captured || 0} sub={`${r.recovery_rate_pct || 0}% de los abandonos`} color="#7C3AED" />
         </div>
@@ -102,7 +102,7 @@ export default function AdminQuizFunnel() {
                   <span className="text-xs font-medium text-slate-700 w-28 flex-shrink-0">{s.label}</span>
                   <div className="flex-1 h-7 bg-slate-100 rounded-lg overflow-hidden">
                     <div className="h-full flex items-center justify-end px-3 transition-all duration-700"
-                         style={{ width: `${w}%`, background: `linear-gradient(90deg, #025F67 0%, #2F9D94 100%)` }}>
+                         style={{ width: `${w}%`, background: `linear-gradient(90deg, #03045E 0%, #0077B6 100%)` }}>
                       <span className="text-xs font-bold text-white">{s.count || 0}</span>
                     </div>
                   </div>
@@ -258,7 +258,7 @@ function MultiExperimentSection({ experiments }) {
             key={name}
             onClick={() => setActive(name)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${active === name ? "text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-            style={active === name ? { backgroundColor: "#025F67" } : {}}
+            style={active === name ? { backgroundColor: "#03045E" } : {}}
             data-testid={`ab-tab-${name}`}
           >
             {META[name]?.label || name}

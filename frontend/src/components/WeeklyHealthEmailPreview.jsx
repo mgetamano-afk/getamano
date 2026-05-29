@@ -49,7 +49,7 @@ export default function WeeklyHealthEmailPreview() {
           className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: "#E1F5EE" }}
         >
-          <Mail className="w-4 h-4" style={{ color: "#025F67" }} />
+          <Mail className="w-4 h-4" style={{ color: "#03045E" }} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900">Lunes te llega tu resumen</p>
@@ -83,7 +83,7 @@ export default function WeeklyHealthEmailPreview() {
 
           {next && (
             <div className="bg-white rounded-lg p-3 border border-slate-100">
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#025F67" }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#03045E" }}>
                 Tu próximo paso
               </p>
               <p className="text-sm font-bold text-slate-900">{next.label}</p>

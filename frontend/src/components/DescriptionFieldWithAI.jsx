@@ -145,9 +145,9 @@ export default function DescriptionFieldWithAI({
               disabled={loading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all disabled:opacity-50"
               style={{
-                background: hasContent ? "white" : "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)",
-                color: hasContent ? "#025F67" : "white",
-                border: hasContent ? "1.5px solid #025F67" : "1.5px solid transparent",
+                background: hasContent ? "white" : "linear-gradient(135deg, #03045E 0%, #0077B6 100%)",
+                color: hasContent ? "#03045E" : "white",
+                border: hasContent ? "1.5px solid #03045E" : "1.5px solid transparent",
                 boxShadow: hasContent ? "none" : "0 2px 8px -2px rgba(2,95,103,0.35)",
               }}
               data-testid="description-ai-suggest-btn"

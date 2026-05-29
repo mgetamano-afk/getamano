@@ -108,7 +108,7 @@ export default function InboxView({ currentUser }) {
           </div>
           <div className="flex gap-1 mt-2 overflow-x-auto pb-1">
             {FILTERS.map(f => (
-              <button key={f.v} onClick={() => setFilter(f.v)} className={`text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition ${filter === f.v ? "text-white" : "text-slate-600 hover:bg-slate-100"}`} style={{ backgroundColor: filter === f.v ? "#025F67" : "transparent" }} data-testid={`inbox-filter-${f.v}`}>
+              <button key={f.v} onClick={() => setFilter(f.v)} className={`text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap transition ${filter === f.v ? "text-white" : "text-slate-600 hover:bg-slate-100"}`} style={{ backgroundColor: filter === f.v ? "#03045E" : "transparent" }} data-testid={`inbox-filter-${f.v}`}>
                 {f.lbl}
               </button>
             ))}
@@ -133,12 +133,12 @@ export default function InboxView({ currentUser }) {
                 data-testid={`inbox-conv-${c.conversation_id}`}
               >
                 <div className="flex items-start gap-2">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-white flex-shrink-0 text-sm" style={{ backgroundColor: "#2F9D94" }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-white flex-shrink-0 text-sm" style={{ backgroundColor: "#0077B6" }}>
                     {(c.participant_name || "?").charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-sm truncate" style={{ color: "#025F67" }}>{c.participant_name}</p>
+                      <p className="font-medium text-sm truncate" style={{ color: "#03045E" }}>{c.participant_name}</p>
                       {unread > 0 && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold text-white flex-shrink-0" style={{ backgroundColor: "#EF4444" }} data-testid={`inbox-unread-${c.conversation_id}`}>{unread}</span>
                       )}
@@ -172,13 +172,13 @@ export default function InboxView({ currentUser }) {
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate" style={{ color: "#025F67" }} data-testid="inbox-active-name">{active.participant_name}</p>
+                <p className="font-medium text-sm truncate" style={{ color: "#03045E" }} data-testid="inbox-active-name">{active.participant_name}</p>
                 <p className="text-[11px] text-slate-500 truncate">{(TYPE_LABELS[active.conversation_type] || TYPE_LABELS.direct).lbl}</p>
               </div>
               <div className="flex gap-1">
                 {active.participant_phone && (
                   <a href={`tel:${active.participant_phone}`} className="p-2 rounded-lg hover:bg-slate-100" title="Llamar" data-testid="inbox-call">
-                    <Phone className="w-4 h-4" style={{ color: "#025F67" }} />
+                    <Phone className="w-4 h-4" style={{ color: "#03045E" }} />
                   </a>
                 )}
                 {active.participant_phone && (
@@ -197,7 +197,7 @@ export default function InboxView({ currentUser }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50" data-testid="inbox-thread">
               {messages.map(m => (
                 <div key={m.message_id} className={`flex ${isFromMe(m) ? "justify-end" : "justify-start"}`} data-testid={`inbox-msg-${m.message_id}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${isFromMe(m) ? "text-white rounded-br-sm" : "bg-white border rounded-bl-sm"}`} style={{ backgroundColor: isFromMe(m) ? "#2F9D94" : undefined, borderColor: isFromMe(m) ? undefined : "#BCC5CC" }}>
+                  <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${isFromMe(m) ? "text-white rounded-br-sm" : "bg-white border rounded-bl-sm"}`} style={{ backgroundColor: isFromMe(m) ? "#0077B6" : undefined, borderColor: isFromMe(m) ? undefined : "#BCC5CC" }}>
                     <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
                     <p className={`text-[10px] mt-0.5 ${isFromMe(m) ? "text-white/70" : "text-slate-400"}`}>
                       {new Date(m.created_at).toLocaleString("es", { hour: "2-digit", minute: "2-digit" })}
@@ -219,7 +219,7 @@ export default function InboxView({ currentUser }) {
                 style={{ borderColor: "#BCC5CC", maxHeight: 120 }}
                 data-testid="inbox-input"
               />
-              <button type="submit" disabled={sending || !body.trim()} className="p-2.5 rounded-full text-white disabled:opacity-50" style={{ backgroundColor: "#2F9D94" }} data-testid="inbox-send-btn" aria-label="Enviar">
+              <button type="submit" disabled={sending || !body.trim()} className="p-2.5 rounded-full text-white disabled:opacity-50" style={{ backgroundColor: "#0077B6" }} data-testid="inbox-send-btn" aria-label="Enviar">
                 <Send className="w-4 h-4" />
               </button>
             </form>

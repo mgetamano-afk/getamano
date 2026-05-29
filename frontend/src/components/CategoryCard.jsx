@@ -31,9 +31,9 @@ export const CATEGORY_VISUALS = {
   mantenimiento: { icon: Wrench, gradient: "linear-gradient(145deg, #065F46 0%, #047857 50%, #10B981 100%)", accent: "#34D399" },
 
   // Auto — getamano teal
-  auto: { icon: Car, gradient: "linear-gradient(145deg, #025F67 0%, #0E7B7F 50%, #14B8A6 100%)", accent: "#2DD4BF" },
-  automotive: { icon: Car, gradient: "linear-gradient(145deg, #025F67 0%, #0E7B7F 50%, #14B8A6 100%)", accent: "#2DD4BF" },
-  automotriz: { icon: Car, gradient: "linear-gradient(145deg, #025F67 0%, #0E7B7F 50%, #14B8A6 100%)", accent: "#2DD4BF" },
+  auto: { icon: Car, gradient: "linear-gradient(145deg, #03045E 0%, #0E7B7F 50%, #14B8A6 100%)", accent: "#2DD4BF" },
+  automotive: { icon: Car, gradient: "linear-gradient(145deg, #03045E 0%, #0E7B7F 50%, #14B8A6 100%)", accent: "#2DD4BF" },
+  automotriz: { icon: Car, gradient: "linear-gradient(145deg, #03045E 0%, #0E7B7F 50%, #14B8A6 100%)", accent: "#2DD4BF" },
 
   // Plumbing — navy → blue
   plumbing: { icon: Droplet, gradient: "linear-gradient(145deg, #1E3A5F 0%, #1E40AF 50%, #3B82F6 100%)", accent: "#93C5FD" },
@@ -79,7 +79,7 @@ export const CATEGORY_VISUALS = {
   salud: { icon: Stethoscope, gradient: "linear-gradient(145deg, #064E3B 0%, #047857 50%, #14B8A6 100%)", accent: "#5EEAD4" },
 };
 
-const FALLBACK = { icon: Briefcase, gradient: "linear-gradient(145deg, #025F67 0%, #2F9D94 50%, #0ABAB5 100%)", accent: "#5EEAD4" };
+const FALLBACK = { icon: Briefcase, gradient: "linear-gradient(145deg, #03045E 0%, #0077B6 50%, #0ABAB5 100%)", accent: "#5EEAD4" };
 
 /**
  * CategoryCard — gradient + icon design, no external images.

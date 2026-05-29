@@ -142,11 +142,11 @@ export default function ProviderOnboarding() {
                 type="button"
                 onClick={() => setShowScanner(true)}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-dashed hover:bg-teal-50/50 transition group"
-                style={{ borderColor: "#2F9D9466", backgroundColor: "#F0FDFA" }}
+                style={{ borderColor: "#0077B666", backgroundColor: "#F0FDFA" }}
                 data-testid="onboarding-open-scanner"
               >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#025F6720" }}>
-                  <ScanLine className="w-5 h-5" style={{ color: "#025F67" }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#03045E20" }}>
+                  <ScanLine className="w-5 h-5" style={{ color: "#03045E" }} />
                 </div>
                 <div className="text-left flex-1">
                   <div className="text-sm font-semibold text-slate-900">¿Tienes tarjeta de presentación?</div>
@@ -349,9 +349,9 @@ export default function ProviderOnboarding() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">¿Cómo describes tu negocio? <span className="text-slate-400 font-normal">(opcional)</span></label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
-                    { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#025F67", border: "#A6E1DA" },
+                    { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#03045E", border: "#A6E1DA" },
                     { id: "american", label: "Dueño Americano", emoji: "🤝", bg: "#E6F1FB", color: "#185FA5", border: "#BFD9F2" },
-                    { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F7F6F2", color: "#475569", border: "#BCC5CC" },
+                    { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F8FCFD", color: "#475569", border: "#BCC5CC" },
                   ].map(opt => {
                     const active = form.owner_identity === opt.id;
                     return (

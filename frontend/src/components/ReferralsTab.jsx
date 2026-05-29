@@ -26,7 +26,7 @@ export default function ReferralsTab() {
 
   return (
     <div data-testid="referrals-tab">
-      <div className="rounded-2xl p-6 mb-5 text-white" style={{ background: "linear-gradient(135deg, #2F9D94, #025F67)" }}>
+      <div className="rounded-2xl p-6 mb-5 text-white" style={{ background: "linear-gradient(135deg, #0077B6, #03045E)" }}>
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0">
             <Gift className="w-6 h-6 text-white" />
@@ -60,7 +60,7 @@ export default function ReferralsTab() {
           </button>
         </div>
         <p className="text-[10px] uppercase tracking-wider text-slate-400 mt-3">
-          Tu código: <strong style={{ color: "#025F67" }}>{data.ref_code}</strong>
+          Tu código: <strong style={{ color: "#03045E" }}>{data.ref_code}</strong>
         </p>
       </div>
 
@@ -106,7 +106,7 @@ export default function ReferralsTab() {
 function Stat({ label, value, testid }) {
   return (
     <div className="rounded-xl border bg-white p-3 text-center" style={{ borderColor: "#BCC5CC" }} data-testid={testid}>
-      <div className="font-display text-2xl font-bold" style={{ color: "#025F67" }}>{value}</div>
+      <div className="font-display text-2xl font-bold" style={{ color: "#03045E" }}>{value}</div>
       <div className="text-xs text-slate-500 mt-1">{label}</div>
     </div>
   );

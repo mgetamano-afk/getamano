@@ -66,7 +66,7 @@ export default function AdminReports() {
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard icon={Clock} label="Pendientes" value={data.pending} color="#F59E0B" testid="stat-pending" />
-          <StatCard icon={AlertTriangle} label="Últimos 90 días" value={data.total_90d} color="#2F9D94" testid="stat-90d" />
+          <StatCard icon={AlertTriangle} label="Últimos 90 días" value={data.total_90d} color="#0077B6" testid="stat-90d" />
           <StatCard icon={Flag} label="Usuarios marcados" value={data.flagged_users} color="#DC2626" testid="stat-flagged" />
         </div>
 
@@ -170,7 +170,7 @@ export default function AdminReports() {
             />
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setActionModal(null)} className="px-4 py-2 rounded-full bg-slate-700 text-white text-sm">Cancelar</button>
-              <button onClick={handleAction} className="px-4 py-2 rounded-full text-sm font-semibold inline-flex items-center gap-1" style={{ backgroundColor: "#2F9D94", color: "white" }} data-testid="action-confirm-btn">
+              <button onClick={handleAction} className="px-4 py-2 rounded-full text-sm font-semibold inline-flex items-center gap-1" style={{ backgroundColor: "#0077B6", color: "white" }} data-testid="action-confirm-btn">
                 <CheckCircle className="w-4 h-4" /> Confirmar
               </button>
             </div>

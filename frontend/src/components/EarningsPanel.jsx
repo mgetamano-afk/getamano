@@ -60,7 +60,7 @@ export default function EarningsPanel({ network }) {
             type="button"
             onClick={() => setShowCreate(true)}
             className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 h-10 rounded-full text-white font-bold text-sm shadow-md hover:brightness-110 transition"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="earnings-new-referral-btn"
           >
             <Plus className="w-4 h-4" />
@@ -442,7 +442,7 @@ function CreateReferralModal({ network, onClose, onCreated }) {
               <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder={lang === "en" ? "Service the client needs..." : "Servicio que necesita el cliente..."} className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm" data-testid="new-referral-desc" />
               <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={lang === "en" ? "Estimated amount (optional)" : "Monto estimado (opcional)"} className="w-full h-11 px-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 text-sm" />
               {err && <p className="text-xs text-red-600">{err}</p>}
-              <button onClick={submit} disabled={busy} className="w-full h-11 rounded-xl text-white font-bold text-sm disabled:opacity-50" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }} data-testid="new-referral-submit">
+              <button onClick={submit} disabled={busy} className="w-full h-11 rounded-xl text-white font-bold text-sm disabled:opacity-50" style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }} data-testid="new-referral-submit">
                 {busy ? <RefreshCw className="w-4 h-4 animate-spin inline" /> : (lang === "en" ? "Send referral" : "Enviar referencia")}
               </button>
               <p className="text-[11px] text-slate-500 text-center">{lang === "en" ? "You earn 5% commission when the ally completes the job." : "Ganas 5% de comisión cuando el aliado complete el trabajo."}</p>

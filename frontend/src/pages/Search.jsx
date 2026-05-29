@@ -209,7 +209,7 @@ export default function Search() {
   }, [position?.lat, position?.lng]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}>
       <SeoHead
         title={lang === "en" ? "Search service pros" : "Buscar profesionales"}
         description={lang === "en"
@@ -232,7 +232,7 @@ export default function Search() {
           backgroundColor: stuck ? "rgba(247, 246, 242, 0.92)" : "transparent",
           backdropFilter: stuck ? "blur(14px)" : "none",
           WebkitBackdropFilter: stuck ? "blur(14px)" : "none",
-          boxShadow: stuck ? "0 4px 16px -8px rgba(6, 49, 84, 0.12)" : "none",
+          boxShadow: stuck ? "0 4px 16px -8px rgba(3, 4, 94, 0.12)" : "none",
           borderBottom: stuck ? "1px solid rgba(188, 197, 204, 0.4)" : "1px solid transparent",
         }}
         data-testid="search-sticky-bar"
@@ -315,7 +315,7 @@ export default function Search() {
           {/* Section 18F — Radius selector (only when "Near me" is active) */}
           {position && (
             <div className="mb-4 flex items-center gap-2 flex-wrap bg-teal-50/60 border border-teal-100 rounded-2xl px-3 py-2.5" data-testid="radius-selector">
-              <Navigation className="w-4 h-4 flex-shrink-0" style={{ color: "#025F67" }} />
+              <Navigation className="w-4 h-4 flex-shrink-0" style={{ color: "#03045E" }} />
               <span className="text-xs font-medium text-slate-700">
                 {lang === "en" ? "Within:" : "Radio:"}
               </span>
@@ -330,7 +330,7 @@ export default function Search() {
                       doSearch(null, { radiusMiles: r });
                     }}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition ${active ? "text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-                    style={active ? { backgroundColor: "#025F67" } : {}}
+                    style={active ? { backgroundColor: "#03045E" } : {}}
                     data-testid={`radius-chip-${r}`}
                     aria-pressed={active}
                   >
@@ -365,9 +365,9 @@ export default function Search() {
             }}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all border"
             style={{
-              backgroundColor: hasVideo ? "#025F67" : "#FFFFFF",
-              color: hasVideo ? "#FFFFFF" : "#025F67",
-              borderColor: hasVideo ? "#025F67" : "#BCC5CC",
+              backgroundColor: hasVideo ? "#03045E" : "#FFFFFF",
+              color: hasVideo ? "#FFFFFF" : "#03045E",
+              borderColor: hasVideo ? "#03045E" : "#BCC5CC",
             }}
             data-testid="filter-has-video"
             aria-pressed={hasVideo}
@@ -383,7 +383,7 @@ export default function Search() {
               type="button"
               onClick={() => setView("list")}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition"
-              style={{ backgroundColor: view === "list" ? "#025F67" : "transparent", color: view === "list" ? "#FFFFFF" : "#025F67" }}
+              style={{ backgroundColor: view === "list" ? "#03045E" : "transparent", color: view === "list" ? "#FFFFFF" : "#03045E" }}
               data-testid="view-toggle-list"
               aria-pressed={view === "list"}
             >
@@ -393,7 +393,7 @@ export default function Search() {
               type="button"
               onClick={() => setView("split")}
               className="hidden md:inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition border-l border-r"
-              style={{ backgroundColor: view === "split" ? "#025F67" : "transparent", color: view === "split" ? "#FFFFFF" : "#025F67", borderColor: "#BCC5CC" }}
+              style={{ backgroundColor: view === "split" ? "#03045E" : "transparent", color: view === "split" ? "#FFFFFF" : "#03045E", borderColor: "#BCC5CC" }}
               data-testid="view-toggle-split"
               aria-pressed={view === "split"}
             >
@@ -403,7 +403,7 @@ export default function Search() {
               type="button"
               onClick={() => setView("map")}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition"
-              style={{ backgroundColor: view === "map" ? "#025F67" : "transparent", color: view === "map" ? "#FFFFFF" : "#025F67" }}
+              style={{ backgroundColor: view === "map" ? "#03045E" : "transparent", color: view === "map" ? "#FFFFFF" : "#03045E" }}
               data-testid="view-toggle-map"
               aria-pressed={view === "map"}
             >
@@ -418,7 +418,7 @@ export default function Search() {
         {view === "split" ? (
           /* SPLIT VIEW: list on left, sticky map on right (desktop only) */
           <div data-testid="split-view">
-            <h2 className="font-display text-2xl font-semibold mb-4" style={{ color: "#025F67" }}>
+            <h2 className="font-display text-2xl font-semibold mb-4" style={{ color: "#03045E" }}>
               {t("search.results")} <span className="text-slate-400 text-base font-normal">({mapProviders.length})</span>
             </h2>
             <div className="grid lg:grid-cols-2 gap-5">
@@ -441,7 +441,7 @@ export default function Search() {
                       onClick={() => handleMarkerClick(p.provider_id)}
                       className="card-lift bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all"
                       style={{
-                        borderColor: isHighlighted ? "#2F9D94" : "#E2E8F0",
+                        borderColor: isHighlighted ? "#0077B6" : "#E2E8F0",
                         boxShadow: isHighlighted ? "0 8px 24px -8px rgba(47,157,148,0.35)" : undefined,
                         transform: isHighlighted ? "translateY(-2px)" : undefined,
                       }}
@@ -454,9 +454,9 @@ export default function Search() {
                         </div>
                         <div className="flex-1 p-4 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <Link to={`/provider/${p.slug}`} onClick={e => e.stopPropagation()} className="font-display font-semibold text-base truncate hover:underline" style={{ color: "#025F67" }}>{p.business_name}</Link>
+                            <Link to={`/provider/${p.slug}`} onClick={e => e.stopPropagation()} className="font-display font-semibold text-base truncate hover:underline" style={{ color: "#03045E" }}>{p.business_name}</Link>
                             {p.rating_count > 0 && (
-                              <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#063154" }}>
+                              <span className="inline-flex items-center gap-0.5 text-xs font-semibold flex-shrink-0" style={{ color: "#03045E" }}>
                                 <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#F59E0B" }} /> {Number(p.rating_avg).toFixed(1)}
                               </span>
                             )}
@@ -464,19 +464,19 @@ export default function Search() {
                           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> {p.city}{p.state ? `, ${p.state}` : ""}
                             {typeof p.distance_miles === "number" && p.distance_miles < 9999 && (
-                              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-split-${p.slug}`}>
+                              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#03045E" }} data-testid={`distance-badge-split-${p.slug}`}>
                                 <Navigation className="w-2.5 h-2.5" /> {p.distance_miles.toFixed(1)} mi
                               </span>
                             )}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {p.verified && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#025F67", border: "1px solid #A6E1DA" }}>
+                              <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#03045E", border: "1px solid #A6E1DA" }}>
                                 <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                               </span>
                             )}
                             {p.video_url && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: "#025F67" }} data-testid={`split-video-badge-${p.slug}`}>
+                              <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium text-white" style={{ backgroundColor: "#03045E" }} data-testid={`split-video-badge-${p.slug}`}>
                                 <Video className="w-2.5 h-2.5" /> Video
                               </span>
                             )}
@@ -570,7 +570,7 @@ export default function Search() {
 
           {/* Results */}
           <div>
-            <h2 className="font-display text-2xl font-semibold mb-4" style={{ color: "#025F67" }} data-testid="search-results-title">
+            <h2 className="font-display text-2xl font-semibold mb-4" style={{ color: "#03045E" }} data-testid="search-results-title">
               {t("search.results")} <span className="text-slate-400 text-base font-normal">({providers.length})</span>
             </h2>
             {view === "map" ? (
@@ -611,7 +611,7 @@ export default function Search() {
                       {p.video_url && (
                         <div
                           className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white shadow"
-                          style={{ backgroundColor: "rgba(2, 95, 103, 0.92)" }}
+                          style={{ backgroundColor: "rgba(3, 4, 94, 0.92)" }}
                           data-testid={`card-video-badge-${p.slug}`}
                         >
                           <Video className="w-3 h-3" /> Video
@@ -625,7 +625,7 @@ export default function Search() {
                           <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                             {p.city}{p.state ? `, ${p.state}` : ""}
                             {typeof p.distance_miles === "number" && p.distance_miles < 9999 && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#025F67" }} data-testid={`distance-badge-${p.slug}`}>
+                              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#03045E" }} data-testid={`distance-badge-${p.slug}`}>
                                 <Navigation className="w-2.5 h-2.5" /> {p.distance_miles.toFixed(1)} {lang === "en" ? "mi" : "mi"}
                               </span>
                             )}

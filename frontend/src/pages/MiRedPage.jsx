@@ -59,7 +59,7 @@ export default function MiRedPage() {
         <div className="flex items-center gap-3 mb-3">
           <span
             className="w-10 h-10 rounded-2xl flex items-center justify-center text-white"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           >
             <Users className="w-5 h-5" />
           </span>
@@ -193,7 +193,7 @@ function NetworkRow({ u, lang, kind }) {
               {isProvider ? prof.business_name : u.name}
             </span>
             {prof?.verification_status === "approved" && (
-              <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#025F67" }} />
+              <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#03045E" }} />
             )}
           </div>
           <div className="text-[12px] text-slate-500 truncate flex items-center gap-1.5">

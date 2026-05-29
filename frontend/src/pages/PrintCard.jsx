@@ -104,7 +104,7 @@ export default function PrintCard() {
 
   if (loading || busy) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F6F2]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FCFD]">
         <div className="text-slate-500 text-sm">{lang === "es" ? "Cargando…" : "Loading…"}</div>
       </div>
     );
@@ -160,7 +160,7 @@ export default function PrintCard() {
 
   if (!profile.slug) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F6F2] px-6">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FCFD] px-6">
         <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-lg border border-slate-200">
           <Info className="w-10 h-10 text-amber-500 mx-auto mb-3" />
           <p className="text-slate-700">{T.needsSlug}</p>
@@ -184,10 +184,10 @@ export default function PrintCard() {
           --card-w: 89mm;
           --card-h: 51mm;
           --card-radius: 3mm;
-          --brand-teal: #025F67;
-          --brand-teal-dark: #063154;
-          --brand-accent: #2F9D94;
-          --brand-cream: #F7F6F2;
+          --brand-teal: #03045E;
+          --brand-teal-dark: #03045E;
+          --brand-accent: #0077B6;
+          --brand-cream: #F8FCFD;
         }
 
         /* Card body (shared) */
@@ -195,7 +195,7 @@ export default function PrintCard() {
           width: var(--card-w);
           height: var(--card-h);
           border-radius: var(--card-radius);
-          background: linear-gradient(135deg, #063154 0%, #0A4D5E 60%, #025F67 100%);
+          background: linear-gradient(135deg, #03045E 0%, #0A4D5E 60%, #03045E 100%);
           color: white;
           padding: 3.5mm 4mm;
           box-sizing: border-box;
@@ -356,7 +356,7 @@ export default function PrintCard() {
         }
         .pc-single .pc-card {
           margin: 0 auto;
-          box-shadow: 0 24px 60px rgba(2, 95, 103, 0.25);
+          box-shadow: 0 24px 60px rgba(3, 4, 94, 0.25);
           transform: scale(2.2);
           transform-origin: top center;
         }
@@ -442,7 +442,7 @@ export default function PrintCard() {
               type="button"
               onClick={handlePrint}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm text-white"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="print-card-print-btn"
             >
               <Printer className="w-4 h-4" /> {T.print}
@@ -452,7 +452,7 @@ export default function PrintCard() {
       </div>
 
       {/* Header (hidden when printing) */}
-      <div className="pc-no-print bg-[#F7F6F2]">
+      <div className="pc-no-print bg-[#F8FCFD]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 leading-tight" data-testid="print-card-title">
             {T.title}
@@ -516,7 +516,7 @@ export default function PrintCard() {
             type="button"
             onClick={handlePrint}
             className="mt-4 inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-sm text-white"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="print-card-print-btn-bottom"
           >
             <Download className="w-4 h-4" /> {T.print}
@@ -564,7 +564,7 @@ function CardFace({ profile, qrUrl, displayUrl, lang, style = "brand", photoBgUr
           value={qrUrl}
           size={130}
           level="M"
-          fgColor="#025F67"
+          fgColor="#03045E"
           bgColor="#FFFFFF"
           includeMargin={false}
           style={{ width: "32mm", height: "32mm" }}

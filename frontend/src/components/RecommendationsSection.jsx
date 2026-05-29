@@ -102,7 +102,7 @@ function RecommendationItem({ rec, lang }) {
   return (
     <div className="rounded-2xl bg-white border border-slate-100 p-3.5 flex items-start gap-3" data-testid={`recommendation-${rec.recommendation_id}`}>
       <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white font-display font-bold text-xs"
-           style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}>
+           style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}>
         {initials || "💚"}
       </div>
       <div className="flex-1 min-w-0">

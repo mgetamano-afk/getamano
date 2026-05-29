@@ -21,7 +21,7 @@ export default function SeoCitiesIndex() {
   const breadcrumbs = [{ label: "Inicio", to: "/" }, { label: "Ciudades" }];
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}>
       <SeoHead
         title={isEn ? "Cities with Latino providers" : "Ciudades con proveedores latinos"}
         description={isEn
@@ -35,7 +35,7 @@ export default function SeoCitiesIndex() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12" data-testid="seo-cities-index">
         <Breadcrumbs items={breadcrumbs} />
-        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#025F67" }} data-testid="seo-h1">Proveedores latinos por ciudad</h1>
+        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#03045E" }} data-testid="seo-h1">Proveedores latinos por ciudad</h1>
         <p className="text-slate-600 mb-10 text-base md:text-lg">Explora proveedores verificados en las principales ciudades de USA con presencia latina.</p>
 
         {loading ? (
@@ -51,11 +51,11 @@ export default function SeoCitiesIndex() {
                 data-testid={`city-link-${c.slug}`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <MapPin className="w-4 h-4" style={{ color: "#2F9D94" }} />
-                  <span className="font-display font-bold text-lg" style={{ color: "#025F67" }}>{c.name}</span>
+                  <MapPin className="w-4 h-4" style={{ color: "#0077B6" }} />
+                  <span className="font-display font-bold text-lg" style={{ color: "#03045E" }}>{c.name}</span>
                 </div>
                 <div className="text-xs text-slate-500">{c.state}</div>
-                <div className="text-xs mt-2 font-medium" style={{ color: c.providers_count > 0 ? "#025F67" : "#94A3B8" }}>
+                <div className="text-xs mt-2 font-medium" style={{ color: c.providers_count > 0 ? "#03045E" : "#94A3B8" }}>
                   {c.providers_count > 0
                     ? `${c.providers_count} ${c.providers_count === 1 ? "proveedor" : "proveedores"}`
                     : "Sé el primero — únete como proveedor →"}

@@ -33,8 +33,8 @@ export default function BillingToggle({ cycle, onChange, lang = "es", savingsLab
       <div
         className="relative inline-flex items-center rounded-full p-1 shadow-sm"
         style={{
-          background: "rgba(2, 95, 103, 0.06)",
-          border: "1px solid rgba(2, 95, 103, 0.12)",
+          background: "rgba(3, 4, 94, 0.06)",
+          border: "1px solid rgba(3, 4, 94, 0.12)",
         }}
       >
         {/* Sliding indicator — pure CSS, animated via transform */}
@@ -46,14 +46,14 @@ export default function BillingToggle({ cycle, onChange, lang = "es", savingsLab
             left: 4,
             right: 4,
             // Border-radius matches the parent pill for visual continuity
-            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(2, 95, 103, 0.06)",
+            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(3, 4, 94, 0.06)",
           }}
         />
         <button
           type="button"
           onClick={() => onChange("monthly")}
           className="relative z-10 px-5 sm:px-6 py-2.5 text-sm font-semibold rounded-full transition-colors"
-          style={{ color: cycle === "monthly" ? "#025F67" : "#64748B" }}
+          style={{ color: cycle === "monthly" ? "#03045E" : "#64748B" }}
           aria-pressed={cycle === "monthly"}
           data-testid="billing-toggle-monthly"
         >
@@ -63,7 +63,7 @@ export default function BillingToggle({ cycle, onChange, lang = "es", savingsLab
           type="button"
           onClick={() => onChange("annual")}
           className="relative z-10 px-5 sm:px-6 py-2.5 text-sm font-semibold rounded-full transition-colors"
-          style={{ color: cycle === "annual" ? "#025F67" : "#64748B" }}
+          style={{ color: cycle === "annual" ? "#03045E" : "#64748B" }}
           aria-pressed={cycle === "annual"}
           data-testid="billing-toggle-annual"
         >

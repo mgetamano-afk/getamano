@@ -168,7 +168,7 @@ function renderItem(item, isActive, tappingPath, setTappingPath, compact) {
           <span className="relative">
             <Icon
               className={`w-5 h-5 transition-colors gtm-nav-icon ${tapping ? "tapping" : ""}`}
-              style={{ color: active ? "#025F67" : "#64748B" }}
+              style={{ color: active ? "#03045E" : "#64748B" }}
               strokeWidth={active ? 2.5 : 2}
             />
             {item.badge > 0 && (
@@ -183,14 +183,14 @@ function renderItem(item, isActive, tappingPath, setTappingPath, compact) {
           </span>
           <span
             className={`text-[10px] font-medium leading-none tracking-tight gtm-nav-label ${tapping ? "tapping" : ""}`}
-            style={{ color: active ? "#025F67" : "#64748B" }}
+            style={{ color: active ? "#03045E" : "#64748B" }}
           >
             {item.label}
           </span>
           {active && (
             <span
               className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
-              style={{ background: "#025F67" }}
+              style={{ background: "#03045E" }}
             />
           )}
         </Link>

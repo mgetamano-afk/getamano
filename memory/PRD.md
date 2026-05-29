@@ -3242,3 +3242,48 @@ User uploaded prompt 73 (login/social/colors unification). Two prompt-level conf
 ### Files
 - **NEW**: `backend/routes/founders.py`, `backend/tests/test_iter82_founders_setrole.py`, `frontend/src/pages/auth/LoginPage.jsx`, `frontend/src/pages/auth/SelectRolePage.jsx`
 - **MODIFIED**: `backend/server.py`, `backend/routes/auth.py`, `frontend/src/App.js`, `frontend/src/components/onboarding/OnboardingLogin.jsx`, `frontend/src/contexts/I18nContext.jsx`, `frontend/src/index.css`, `frontend/tailwind.config.js`, plus the 4 onboarding files (palette re-swap)
+
+---
+
+## Section 73d — Global Ocean Blue repaint applied app-wide (2026-02-28)
+
+User request: *"aplica esta paleta a toda nuestra web"*. Strategy: token-level repaint so the change cascades to all 108 affected files without manual per-component edits.
+
+### Changes
+1. **`frontend/src/index.css`**:
+   - Body bg `#F7F6F2` → `#F8FCFD` (near-white with hint of blue).
+   - Body text + heading default color `#063154/#025F67` → `#03045E` navy.
+   - All shadcn HSL CSS variables (`--primary`, `--accent`, `--ring`, `--background`, etc.) re-tuned to Ocean Blue HSL equivalents.
+   - `::selection` and `.bg-grid-slate` colors swapped.
+   - `.pac-matched` autocomplete styling swapped.
+
+2. **`frontend/tailwind.config.js`** — brand tokens re-aliased (NAMES kept stable so existing consumers don't break):
+   - `brand.scooter` `#2F9D94` → `#0077B6` (Atlantic blue, primary CTA)
+   - `brand.lagoon` `#025F67` → `#03045E` (deep navy)
+   - `brand.sapphire` `#063154` → `#03045E` (consolidated navy)
+   - `brand.alabaster` `#F7F6F2` → `#F8FCFD` (page bg, blue-tinted off-white)
+   - `brand.heather` stays neutral grey.
+   - Tailwind's `orange-*` and `amber-*` scales (legacy overrides) re-aliased to navy gradients so any `text-orange-500` / `bg-amber-50` in old code automatically picks up Ocean Blue.
+
+3. **Bulk hex replacement** across 107 files:
+   - `#2F9D94/#2f9d94` → `#0077B6`
+   - `#025F67/#025f67` → `#03045E`
+   - `#063154` → `#03045E`
+   - `#F7F6F2/#f7f6f2` → `#F8FCFD`
+   - `rgba(2,95,103,…)` → `rgba(3,4,94,…)`
+   - `rgba(47,157,148,…)` → `rgba(0,119,182,…)`
+   - `rgba(6,49,84,…)` → `rgba(3,4,94,…)`
+   - **~533 occurrences** swapped via a deterministic Python script (idempotent, line-preserving, JS+JSX+CSS only).
+
+### Bugs caught + fixed during repaint
+- `tailwind.config.js`: an extra `},` left from a previous edit caused webpack to fail compile. Removed.
+- `pages/auth/LoginPage.jsx`: import path was `../components/...` instead of `../../components/...`. Fixed.
+
+### Verification
+- `grep -rn '#2F9D94|#025F67|#063154|#F7F6F2' src/` → **0 matches** anywhere.
+- Webpack: `Compiled successfully!`.
+- Mobile screenshots @ 393×852 confirm AppHome, Search, and Comunidad all display the new palette cohesively.
+- Lint clean on 5 highest-traffic pages.
+
+### Files
+- **MODIFIED**: 107 files across `src/` (`.jsx`, `.js`, `.css`) — see git diff for the full list. Plus `tailwind.config.js`, `index.css` (manual edits).

@@ -86,7 +86,7 @@ export default function StreakWidget() {
     : {
         bg: "rgba(2,95,103,0.04)",
         border: "rgba(2,95,103,0.18)",
-        accent: "#025F67",
+        accent: "#03045E",
         accentBg: "rgba(2,95,103,0.10)",
         icon: <Flame className="w-7 h-7 text-slate-400" />,
         title: "Empieza tu racha hoy",

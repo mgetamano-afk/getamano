@@ -159,7 +159,7 @@ export default function ReferralPanel() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 mt-4" data-testid="referral-stats">
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
-          <Users className="w-4 h-4 mx-auto" style={{ color: "#025F67" }} />
+          <Users className="w-4 h-4 mx-auto" style={{ color: "#03045E" }} />
           <p className="text-xl font-display font-bold text-slate-900 mt-1" data-testid="referral-stat-invited">{totals.invited}</p>
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Referidos</p>
         </div>
@@ -178,7 +178,7 @@ export default function ReferralPanel() {
       {/* Invite form */}
       <form onSubmit={sendInvite} className="mt-5 rounded-xl border border-slate-200 p-4" data-testid="referral-invite-form">
         <div className="flex items-center gap-2 mb-2">
-          <Mail className="w-4 h-4" style={{ color: "#025F67" }} />
+          <Mail className="w-4 h-4" style={{ color: "#03045E" }} />
           <h4 className="font-semibold text-slate-900 text-sm">Envía una invitación personal</h4>
         </div>
         <input
@@ -204,7 +204,7 @@ export default function ReferralPanel() {
             type="submit"
             disabled={sending || !inviteEmail.trim()}
             className="px-4 py-2 rounded-full text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="referral-invite-submit"
           >
             {sending ? "Enviando…" : "Enviar invitación →"}
@@ -219,7 +219,7 @@ export default function ReferralPanel() {
             <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Escanea para registrarse</p>
             <h4 className="font-display font-bold text-slate-900 mt-1 text-base">Código: {data.ref_code}</h4>
             <div className="mt-4 mx-auto inline-block p-3 rounded-xl bg-white border border-slate-200">
-              <QRCodeSVG value={shareUrl} size={192} fgColor="#025F67" bgColor="#FFFFFF" level="M" data-testid="referral-qr-svg" />
+              <QRCodeSVG value={shareUrl} size={192} fgColor="#03045E" bgColor="#FFFFFF" level="M" data-testid="referral-qr-svg" />
             </div>
             <p className="mt-3 text-[10px] text-slate-400 break-all">{shareUrl}</p>
             <button onClick={() => setShowQR(false)} className="mt-4 px-4 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Cerrar</button>

@@ -42,7 +42,7 @@ export default function FollowingFeed() {
       <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center" data-testid="following-feed-guest">
         <span
           className="inline-flex w-12 h-12 rounded-2xl items-center justify-center text-white mb-3"
-          style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+          style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
         >
           <Users className="w-6 h-6" />
         </span>
@@ -58,7 +58,7 @@ export default function FollowingFeed() {
           type="button"
           onClick={() => navigate("/login?redirect=/comunidad")}
           className="px-5 h-10 rounded-full text-white font-bold text-sm transition hover:brightness-110"
-          style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+          style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           data-testid="following-feed-signin-btn"
         >
           {lang === "en" ? "Sign in" : "Iniciar sesión"}

@@ -151,7 +151,7 @@ export default function FirstStepsPanel({ provider, open, onClose, onProfileUpda
               style={{
                 width: `${pct}%`,
                 background: allDone
-                  ? "linear-gradient(90deg, #10B981 0%, #2F9D94 100%)"
+                  ? "linear-gradient(90deg, #10B981 0%, #0077B6 100%)"
                   : "linear-gradient(90deg, #F59E0B 0%, #F97316 100%)",
               }}
               data-testid="first-steps-progress"
@@ -214,7 +214,7 @@ export default function FirstStepsPanel({ provider, open, onClose, onProfileUpda
               type="button"
               onClick={onClose}
               className="text-sm font-bold px-4 h-9 rounded-full text-white"
-              style={{ background: "linear-gradient(135deg, #10B981 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #10B981 0%, #0077B6 100%)" }}
               data-testid="first-steps-finish"
             >
               {lang === "en" ? "Awesome 🎉" : "¡Genial! 🎉"}

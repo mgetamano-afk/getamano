@@ -99,7 +99,7 @@ export default function ComunidadLayout() {
                 {isActive && (
                   <span
                     className="absolute left-2 right-2 bottom-0 h-0.5 rounded-full"
-                    style={{ background: "linear-gradient(90deg, #2F9D94, #14B8A6)" }}
+                    style={{ background: "linear-gradient(90deg, #0077B6, #14B8A6)" }}
                     aria-hidden="true"
                   />
                 )}

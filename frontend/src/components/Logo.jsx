@@ -16,8 +16,8 @@ export default function Logo({ variant = "inline", size = "w-9 h-9", linkTo = "/
       <div className="flex items-center gap-2">
         <img src={markSrc} alt="getamano" className={`object-contain ${size}`} />
         {showText && variant === "inline" && (
-          <span className={`font-display font-bold text-xl ${textClassName}`} style={textClassName ? undefined : { color: "#025F67" }}>
-            get<span style={{ color: "#2F9D94" }}>amano</span>
+          <span className={`font-display font-bold text-xl ${textClassName}`} style={textClassName ? undefined : { color: "#03045E" }}>
+            get<span style={{ color: "#0077B6" }}>amano</span>
           </span>
         )}
       </div>

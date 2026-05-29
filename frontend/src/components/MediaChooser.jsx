@@ -38,9 +38,9 @@ const BANNER_STYLES = [
   { id: "minimal",      labelEs: "Minimal",     labelEn: "Minimal" },
   { id: "warm",         labelEs: "Cálido",      labelEn: "Warm" },
 ];
-const COLORS = ["#2F9D94", "#025F67", "#F97316", "#EF4444", "#0EA5E9", "#8B5CF6", "#10B981", "#F59E0B"];
+const COLORS = ["#0077B6", "#03045E", "#F97316", "#EF4444", "#0EA5E9", "#8B5CF6", "#10B981", "#F59E0B"];
 
-export default function MediaChooser({ target = "logo", onSaved, onCancel, initialColor = "#2F9D94" }) {
+export default function MediaChooser({ target = "logo", onSaved, onCancel, initialColor = "#0077B6" }) {
   const { lang } = useI18n();
   const [mode, setMode] = useState("ai"); // "ai" | "upload"
   const [color, setColor] = useState(initialColor);
@@ -235,7 +235,7 @@ export default function MediaChooser({ target = "logo", onSaved, onCancel, initi
                   onClick={handleUseAi}
                   disabled={saving}
                   className="flex-1 h-11 rounded-xl text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 transition"
-                  style={{ background: "linear-gradient(135deg, #2F9D94 0%, #025F67 100%)" }}
+                  style={{ background: "linear-gradient(135deg, #0077B6 0%, #03045E 100%)" }}
                   data-testid="media-chooser-use-ai-btn"
                 >
                   {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

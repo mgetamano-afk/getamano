@@ -52,10 +52,10 @@ export default function LicenseSection({ profile, setProfile }) {
     <div className="rounded-2xl border bg-white p-5" style={{ borderColor: "#BCC5CC" }} data-testid="license-section">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#EBF8F7" }}>
-          <Award className="w-5 h-5" style={{ color: "#025F67" }} />
+          <Award className="w-5 h-5" style={{ color: "#03045E" }} />
         </div>
         <div>
-          <h3 className="font-display font-semibold text-base" style={{ color: "#025F67" }}>🪪 Licencia de oficio (opcional)</h3>
+          <h3 className="font-display font-semibold text-base" style={{ color: "#03045E" }}>🪪 Licencia de oficio (opcional)</h3>
           <p className="text-xs text-slate-500 mt-0.5">Información autodeclarada. getamano no verifica licencias.</p>
         </div>
       </div>
@@ -105,7 +105,7 @@ export default function LicenseSection({ profile, setProfile }) {
         {saving ? "Guardando..." : "Guardar información de licencia"}
       </button>
 
-      <div className="mt-4 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: "#F7F6F2" }}>
+      <div className="mt-4 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: "#F8FCFD" }}>
         <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#475569" }} />
         <p className="text-xs text-slate-600 leading-relaxed">
           La información de licencia es <strong>autodeclarada</strong>. getamano no verifica licencias profesionales. Por favor verifica directamente con la agencia estatal correspondiente.
@@ -124,7 +124,7 @@ export function LicenseBadge({ license }) {
   const masked = (license.license_number || "").slice(-4) || "";
   return (
     <div className="rounded-xl p-3 border" style={{ borderColor: "#A6E1DA", backgroundColor: "#F0FAF9" }} data-testid="ecard-license">
-      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#025F67" }}>
+      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "#03045E" }}>
         <Award className="w-4 h-4" /> Licencia de oficio
       </div>
       <p className="text-sm text-slate-700 mt-1">

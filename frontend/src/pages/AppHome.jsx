@@ -130,7 +130,7 @@ export default function AppHome() {
           <Link to="/" className="flex items-center gap-2 font-display font-extrabold text-[22px] tracking-tight" style={{ letterSpacing: "-0.5px" }}>
             <img src="/getamano-logo-mark.png" alt="" className="w-9 h-9 object-contain flex-shrink-0" />
             <span>
-              <span style={{ color: "#025F67" }}>get</span>
+              <span style={{ color: "#03045E" }}>get</span>
               <span style={{ color: "#111827" }}>amano</span>
             </span>
           </Link>
@@ -168,7 +168,7 @@ export default function AppHome() {
       {/* ── Hero with greeting + search ───────────────────────────────── */}
       <section
         className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #025F67 0%, #014a52 60%, #013840 100%)" }}
+        style={{ background: "linear-gradient(135deg, #03045E 0%, #014a52 60%, #013840 100%)" }}
         data-testid="apphome-hero"
       >
         {/* Decorative city silhouette */}
@@ -218,7 +218,7 @@ export default function AppHome() {
             className="w-full max-w-2xl bg-white rounded-2xl shadow-xl px-4 py-3.5 flex items-center gap-3 text-left hover:shadow-2xl transition"
             data-testid="apphome-search-trigger"
           >
-            <Search className="w-5 h-5 flex-shrink-0" style={{ color: "#025F67" }} />
+            <Search className="w-5 h-5 flex-shrink-0" style={{ color: "#03045E" }} />
             <span className="text-slate-400 text-[15px]">
               {lang === "en" ? "What service do you need?" : "¿Qué servicio necesitas?"}
             </span>
@@ -240,7 +240,7 @@ export default function AppHome() {
       <section className="max-w-7xl mx-auto px-5 pt-5 md:pt-7" data-testid="apphome-quick-actions">
         <div className="grid grid-cols-4 gap-2">
           <QuickAction
-            icon={<Search className="w-[22px] h-[22px]" style={{ color: "#025F67" }} />}
+            icon={<Search className="w-[22px] h-[22px]" style={{ color: "#03045E" }} />}
             label={lang === "en" ? "Search" : "Buscar"}
             bgColor="#EFF9F7"
             onClick={() => navigate("/search")}
@@ -317,7 +317,7 @@ export default function AppHome() {
             type="button"
             onClick={() => navigate("/search")}
             className="text-[13px] font-semibold inline-flex items-center gap-0.5"
-            style={{ color: "#025F67" }}
+            style={{ color: "#03045E" }}
             data-testid="apphome-categories-seeall"
           >
             {lang === "en" ? "See all" : "Ver todas"} <ChevronRight className="w-3.5 h-3.5" />
@@ -352,7 +352,7 @@ export default function AppHome() {
               type="button"
               onClick={() => navigate("/search?sort=rating")}
               className="text-[13px] font-semibold inline-flex items-center gap-0.5"
-              style={{ color: "#025F67" }}
+              style={{ color: "#03045E" }}
               data-testid="apphome-featured-seeall"
             >
               {lang === "en" ? "See all" : "Ver todos"} <ChevronRight className="w-3.5 h-3.5" />
@@ -377,7 +377,7 @@ export default function AppHome() {
               type="button"
               onClick={() => navigate("/empleos")}
               className="text-[13px] font-semibold inline-flex items-center gap-0.5"
-              style={{ color: "#025F67" }}
+              style={{ color: "#03045E" }}
               data-testid="apphome-jobs-seeall"
             >
               {lang === "en" ? "See all" : "Ver todas"} <ChevronRight className="w-3.5 h-3.5" />
@@ -401,7 +401,7 @@ export default function AppHome() {
         <section className="max-w-7xl mx-auto px-5 pt-6 md:pt-8" data-testid="apphome-provider-banner">
           <div
             className="rounded-3xl p-5 flex items-center justify-between gap-3 shadow-lg"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #014a52 60%, #013840 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #014a52 60%, #013840 100%)" }}
           >
             <div className="min-w-0">
               <p className="text-white/80 text-[12px] mb-1">
@@ -506,7 +506,7 @@ function ProviderCard({ provider, navigate, lang }) {
         {provider.verification_status === "approved" && (
           <span
             className="absolute top-1.5 right-1.5 bg-white/95 backdrop-blur px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide"
-            style={{ color: "#025F67" }}
+            style={{ color: "#03045E" }}
           >
             ✓ {lang === "en" ? "VERIFIED" : "VERIFICADO"}
           </span>
@@ -539,7 +539,7 @@ function JobRow({ job, navigate }) {
         className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ background: "#EFF9F7" }}
       >
-        <Briefcase className="w-5 h-5" style={{ color: "#025F67" }} />
+        <Briefcase className="w-5 h-5" style={{ color: "#03045E" }} />
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-[14px] font-semibold text-slate-900 truncate">{job.title}</p>

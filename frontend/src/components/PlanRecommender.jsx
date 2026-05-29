@@ -618,7 +618,7 @@ function ResultTestimonial({ recommended, lang }) {
       <div className="flex gap-3 items-start">
         {/* Initials avatar */}
         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-display font-bold text-white text-sm"
-             style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}>
+             style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}>
           {t.author.split(" ").map(w => w[0]).slice(0, 2).join("")}
         </div>
         <div className="flex-1 min-w-0">

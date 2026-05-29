@@ -126,8 +126,8 @@ export default function BusinessCardScanner({ open, onClose, onExtracted }) {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#025F6715" }}>
-              <ScanLine className="w-5 h-5" style={{ color: "#025F67" }} />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#03045E15" }}>
+              <ScanLine className="w-5 h-5" style={{ color: "#03045E" }} />
             </div>
             <div>
               <h3 className="font-display font-semibold text-slate-900 text-sm sm:text-base">{T.title}</h3>
@@ -142,8 +142,8 @@ export default function BusinessCardScanner({ open, onClose, onExtracted }) {
         {/* IDLE — show two CTAs */}
         {state === "idle" && (
           <div className="p-6 space-y-3" data-testid="card-scanner-idle">
-            <div className="rounded-2xl p-6 sm:p-8 text-center" style={{ background: "linear-gradient(135deg, #F0FDFA 0%, #ECFEFF 100%)", border: "2px dashed #2F9D9466" }}>
-              <ScanLine className="w-12 h-12 mx-auto mb-3" style={{ color: "#025F67" }} />
+            <div className="rounded-2xl p-6 sm:p-8 text-center" style={{ background: "linear-gradient(135deg, #F0FDFA 0%, #ECFEFF 100%)", border: "2px dashed #0077B666" }}>
+              <ScanLine className="w-12 h-12 mx-auto mb-3" style={{ color: "#03045E" }} />
               <p className="text-sm text-slate-600 mb-4 max-w-xs mx-auto">
                 {lang === "en" ? "Position your card in frame. JPG/PNG/WebP under 5MB." : "Coloca la tarjeta enfocada. JPG/PNG/WebP máximo 5MB."}
               </p>
@@ -158,7 +158,7 @@ export default function BusinessCardScanner({ open, onClose, onExtracted }) {
                 <button
                   onClick={() => camRef.current?.click()}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm shadow-sm hover:opacity-90"
-                  style={{ backgroundColor: "#025F67" }}
+                  style={{ backgroundColor: "#03045E" }}
                   data-testid="card-scanner-camera-btn"
                 >
                   <Camera className="w-4 h-4" /> {T.takePhoto}
@@ -190,7 +190,7 @@ export default function BusinessCardScanner({ open, onClose, onExtracted }) {
                 <style>{`@keyframes scanline { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }`}</style>
               </div>
             )}
-            <Loader2 className="w-6 h-6 mx-auto animate-spin" style={{ color: "#025F67" }} />
+            <Loader2 className="w-6 h-6 mx-auto animate-spin" style={{ color: "#03045E" }} />
             <p className="text-sm text-slate-500 mt-2">{T.scanning}</p>
           </div>
         )}
@@ -209,7 +209,7 @@ export default function BusinessCardScanner({ open, onClose, onExtracted }) {
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" style={{ color: "#2F9D94" }} />
+                  <CheckCircle2 className="w-4 h-4" style={{ color: "#0077B6" }} />
                   <h4 className="font-semibold text-slate-900 text-sm">{T.review}</h4>
                 </div>
                 <p className="text-xs text-slate-500 -mt-2">{T.reviewSub}</p>
@@ -239,7 +239,7 @@ export default function BusinessCardScanner({ open, onClose, onExtracted }) {
               {!unavailableNote && (
                 <button onClick={apply}
                   className="flex-1 py-2.5 rounded-full text-white font-semibold text-sm shadow-sm hover:opacity-90"
-                  style={{ backgroundColor: "#025F67" }}
+                  style={{ backgroundColor: "#03045E" }}
                   data-testid="card-scanner-apply"
                 >
                   {T.apply}

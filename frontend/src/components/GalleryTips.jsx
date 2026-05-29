@@ -28,7 +28,7 @@ export default function GalleryTips({ currentCount = 0, minPhotos = 3 }) {
       title: "Tú en acción",
       hint: "Una foto trabajando es 3× más confiable que un logo solo.",
       tint: "#E1F5EE",
-      tintIcon: "#025F67",
+      tintIcon: "#03045E",
     },
     {
       Icon: Users,
@@ -46,7 +46,7 @@ export default function GalleryTips({ currentCount = 0, minPhotos = 3 }) {
       data-testid="gallery-tips"
     >
       <div className="flex items-start gap-2 mb-3">
-        <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#025F67" }} />
+        <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#03045E" }} />
         <div className="flex-1 min-w-0">
           <h4 className="font-display font-bold text-sm text-slate-900">
             Sube {remaining === 1 ? "1 foto más" : `${remaining} fotos`} que vendan tu trabajo

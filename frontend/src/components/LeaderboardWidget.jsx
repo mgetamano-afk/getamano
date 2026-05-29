@@ -47,10 +47,10 @@ export default function LeaderboardWidget() {
       >
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(2,95,103,0.10)" }}>
-            <Trophy className="w-6 h-6" style={{ color: "#025F67" }} />
+            <Trophy className="w-6 h-6" style={{ color: "#03045E" }} />
           </div>
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: "rgba(2,95,103,0.10)", color: "#025F67" }}>
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest" style={{ background: "rgba(2,95,103,0.10)", color: "#03045E" }}>
               <Sparkles className="w-3 h-3" /> Ranking del mes
             </div>
             <h3 className="font-display font-bold text-slate-900 text-lg mt-1.5" data-testid="leaderboard-widget-title">
@@ -92,11 +92,11 @@ export default function LeaderboardWidget() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
-                 style={{ background: "rgba(0,0,0,0.06)", color: isPodium ? "#9A3412" : "#025F67" }}>
+                 style={{ background: "rgba(0,0,0,0.06)", color: isPodium ? "#9A3412" : "#03045E" }}>
               <Sparkles className="w-3 h-3" /> Ranking del mes
             </div>
             <Link to="/ranking" className="text-xs font-semibold inline-flex items-center gap-1 whitespace-nowrap"
-                  style={{ color: isPodium ? "#9A3412" : "#025F67" }}
+                  style={{ color: isPodium ? "#9A3412" : "#03045E" }}
                   data-testid="leaderboard-widget-see-ranking">
               Ver ranking <ChevronRight className="w-3 h-3" />
             </Link>
@@ -155,7 +155,7 @@ export default function LeaderboardWidget() {
               </span>
             )}
             {me.breakdown.active_pro_bonus > 0 && (
-              <span className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{ background: "rgba(255,255,255,0.6)", color: "#025F67" }}>
+              <span className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{ background: "rgba(255,255,255,0.6)", color: "#03045E" }}>
                 ✓ {me.breakdown.active_pro_bonus} bonus Pro
               </span>
             )}

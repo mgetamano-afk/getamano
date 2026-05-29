@@ -124,7 +124,7 @@ export default function AIDescriptionAssistant({
           {/* Avatar */}
           <div
             className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           >
             {stage === "loading"
               ? <Loader2 className="w-4 h-4 text-white animate-spin" />
@@ -133,7 +133,7 @@ export default function AIDescriptionAssistant({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#025F67" }}>{T.title}</span>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#03045E" }}>{T.title}</span>
               <Sparkles className="w-3 h-3" style={{ color: "#FF6B2C" }} />
             </div>
 
@@ -146,7 +146,7 @@ export default function AIDescriptionAssistant({
                     type="button"
                     onClick={handleOffer}
                     className="px-4 py-2 rounded-full text-white text-sm font-semibold inline-flex items-center gap-1.5 hover:opacity-95 active:scale-[0.98] transition"
-                    style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                    style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                     data-testid={`${testid}-yes`}
                   >
                     <Wand2 className="w-3.5 h-3.5" /> {T.yes}
@@ -195,7 +195,7 @@ export default function AIDescriptionAssistant({
                     type="button"
                     onClick={handleAccept}
                     className="px-4 py-2 rounded-full text-white text-sm font-semibold inline-flex items-center gap-1.5 hover:opacity-95 active:scale-[0.98] transition"
-                    style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                    style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                     data-testid={`${testid}-accept`}
                   >
                     <Check className="w-3.5 h-3.5" /> {T.use}

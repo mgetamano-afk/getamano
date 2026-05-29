@@ -110,7 +110,7 @@ export default function FollowButton({ targetUserId, compact = false, onChange, 
                 : "bg-teal-50 text-teal-700 ring-1 ring-teal-200")
             : "text-white hover:brightness-110"
         }`}
-        style={!following ? { background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" } : undefined}
+        style={!following ? { background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" } : undefined}
         data-testid="follow-btn"
       >
         <Icon className="w-4 h-4" />

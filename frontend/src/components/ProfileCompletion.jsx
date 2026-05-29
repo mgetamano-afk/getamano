@@ -28,7 +28,7 @@ export default function ProfileCompletion({ onTabChange }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           {score >= 80 ? <Sparkles className="w-5 h-5" style={{ color: "#10B981" }} /> : <CheckCircle2 className="w-5 h-5 text-slate-400" />}
-          <h3 className="font-display font-semibold text-base" style={{ color: "#025F67" }}>
+          <h3 className="font-display font-semibold text-base" style={{ color: "#03045E" }}>
             Tu perfil está al <span style={{ color: barColor }} data-testid="completion-score">{score}%</span>
           </h3>
         </div>
@@ -47,7 +47,7 @@ export default function ProfileCompletion({ onTabChange }) {
                   type="button"
                   onClick={() => handleTap(m.deep_link)}
                   className="inline-flex items-center gap-1 text-sm hover:underline"
-                  style={{ color: "#2F9D94" }}
+                  style={{ color: "#0077B6" }}
                   data-testid={`completion-suggestion-${i}`}
                 >
                   → {m.label} <span className="text-slate-400">(+{m.points}%)</span> <ArrowRight className="w-3 h-3" />

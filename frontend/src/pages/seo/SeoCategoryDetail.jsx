@@ -20,7 +20,7 @@ export default function SeoCategoryDetail() {
   }, [categorySlug]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
-  if (loading) return <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}><Header /><div className="max-w-7xl mx-auto px-4 py-12 text-slate-500">Cargando…</div><Footer /></div>;
+  if (loading) return <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}><Header /><div className="max-w-7xl mx-auto px-4 py-12 text-slate-500">Cargando…</div><Footer /></div>;
   if (!data) return <div className="min-h-screen"><Header /><div className="max-w-7xl mx-auto px-4 py-12">Categoría no encontrada</div><Footer /></div>;
 
   const { category, cities, total_cities } = data;
@@ -32,7 +32,7 @@ export default function SeoCategoryDetail() {
   const totalProviders = cities.reduce((s, c) => s + c.providers_count, 0);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}>
       <SeoHead
         title={isEn
           ? `${category.name_en} in USA — Verified Latino providers`
@@ -52,13 +52,13 @@ export default function SeoCategoryDetail() {
           <span className="category-icon-wrap brand" aria-hidden="true">
             <CategoryIcon slug={category.slug} size={36} color="#FFFFFF" stroke={1.6} />
           </span>
-          <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#025F67" }} data-testid="seo-h1">{category.name_es} — Proveedores latinos</h1>
+          <h1 className="font-display text-4xl md:text-5xl font-bold" style={{ color: "#03045E" }} data-testid="seo-h1">{category.name_es} — Proveedores latinos</h1>
         </div>
         <p className="text-slate-600 mb-10 text-base md:text-lg">
           {totalProviders > 0
             ? `${totalProviders} proveedores latinos verificados de ${category.name_es.toLowerCase()} activos en ${total_cities} ciudades de USA.`
             : `Aún no hay proveedores activos en esta categoría. ¿Eres uno? `}
-          {totalProviders === 0 && <Link to="/register?intent=provider" className="underline" style={{ color: "#2F9D94" }}>Únete a getamano</Link>}
+          {totalProviders === 0 && <Link to="/register?intent=provider" className="underline" style={{ color: "#0077B6" }}>Únete a getamano</Link>}
         </p>
 
         {category.license_flag === "red" && (
@@ -83,7 +83,7 @@ export default function SeoCategoryDetail() {
                 data-testid={`cat-city-link-${c.slug}`}
               >
                 <div>
-                  <div className="font-medium" style={{ color: "#025F67" }}>{c.name}</div>
+                  <div className="font-medium" style={{ color: "#03045E" }}>{c.name}</div>
                   <div className="text-xs text-slate-500">{c.state}</div>
                 </div>
                 <span className="text-xs text-slate-400">{c.providers_count} {c.providers_count === 1 ? "negocio" : "negocios"}</span>

@@ -39,7 +39,7 @@ const COPY = {
 };
 
 // Vibrant confetti colors
-const CONFETTI_COLORS = ["#f43f5e", "#f97316", "#facc15", "#10b981", "#0ea5e9", "#8b5cf6", "#ec4899", "#2F9D94"];
+const CONFETTI_COLORS = ["#f43f5e", "#f97316", "#facc15", "#10b981", "#0ea5e9", "#8b5cf6", "#ec4899", "#0077B6"];
 
 export default function MilestoneConfetti({ metric, value, providerKey, label }) {
   const { lang } = useI18n();

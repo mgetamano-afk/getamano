@@ -57,22 +57,22 @@ export default function ProviderCTASection() {
           </p>
           <ul className="text-sm text-slate-700 space-y-1.5 mt-4">
             <li className="flex items-start gap-2">
-              <Globe className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#025F67" }} />
+              <Globe className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#03045E" }} />
               Perfil en español e inglés
             </li>
             <li className="flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#025F67" }} />
+              <ShieldCheck className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#03045E" }} />
               Verificación de identidad incluida
             </li>
             <li className="flex items-start gap-2">
-              <Sun className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#025F67" }} />
+              <Sun className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#03045E" }} />
               Clientes que ya hablan tu idioma
             </li>
           </ul>
           <Link
             to="/registro?intent=provider&lang=es"
             className="mt-5 inline-flex w-full items-center justify-center gap-2 py-3 px-5 rounded-2xl text-white font-bold transition active:scale-[0.98] shadow-sm"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="provider-cta-latino-button"
           >
             Crear mi eCard gratis →

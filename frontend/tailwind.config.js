@@ -53,13 +53,17 @@ module.exports = {
                                 '4': 'hsl(var(--chart-4))',
                                 '5': 'hsl(var(--chart-5))'
                         },
-                        /* getamano brand tokens */
+                        /* getamano brand tokens — Section 73b: re-aliased
+                           to the Ocean Blue palette. Token NAMES kept stable
+                           so existing components don't break; only HEX
+                           values changed. New components should prefer
+                           `blue-dark/primary/accent/light/surface` below. */
                         brand: {
-                                scooter: '#2F9D94',
-                                alabaster: '#F7F6F2',
-                                heather: '#BCC5CC',
-                                lagoon: '#025F67',
-                                sapphire: '#063154',
+                                scooter: '#0077B6',     /* primary CTA blue (was teal #2F9D94) */
+                                alabaster: '#F8FCFD',   /* page bg, near-white w/ hint of blue (was cream) */
+                                heather: '#BCC5CC',     /* neutral grey — kept */
+                                lagoon: '#03045E',      /* deep navy (was dark teal #025F67) */
+                                sapphire: '#03045E',    /* deep navy — same as lagoon (was #063154) */
                                 /* Section 73 — Ocean Blue palette (canonical) */
                                 'blue-dark':    '#03045E',
                                 'blue-primary': '#0077B6',
@@ -67,33 +71,37 @@ module.exports = {
                                 'blue-light':   '#90E0EF',
                                 'blue-surface': '#CAF0F8',
                         },
-                        /* Override 'orange' so legacy classes map to Scooter teal scale */
+                        /* Section 73b — `orange-*` legacy utilities re-aliased
+                           to the new Atlantic Blue scale so any component
+                           still using `text-orange-500`, `bg-orange-50`, etc.
+                           automatically picks up the Ocean Blue palette. */
                         orange: {
-                                50:  '#EBF8F7',
-                                100: '#D2F0EC',
-                                200: '#A6E1DA',
-                                300: '#74CFC5',
-                                400: '#4EBAAE',
-                                500: '#2F9D94',
-                                600: '#207F77',
-                                700: '#1B6962',
-                                800: '#16544E',
-                                900: '#134541',
-                                950: '#0A2D29'
+                                50:  '#E6F4FA',
+                                100: '#CCE9F5',
+                                200: '#99D2EB',
+                                300: '#66BCE1',
+                                400: '#33A5D7',
+                                500: '#0077B6',
+                                600: '#00669B',
+                                700: '#005580',
+                                800: '#004466',
+                                900: '#03045E',
+                                950: '#02033A'
                         },
-                        /* Override 'amber' to complement teal palette (toward Lagoon) */
+                        /* Section 73b — `amber-*` legacy utilities re-aliased
+                           to navy gradient (matches the new dark accents). */
                         amber: {
-                                50:  '#E6F2F3',
-                                100: '#CFE5E7',
-                                200: '#9FCBCF',
-                                300: '#6FB0B6',
-                                400: '#3F969E',
-                                500: '#025F67',
-                                600: '#024F56',
-                                700: '#023F45',
-                                800: '#012F34',
-                                900: '#011F22',
-                                950: '#000F11'
+                                50:  '#E6E7F2',
+                                100: '#CDCFE5',
+                                200: '#9B9FCC',
+                                300: '#696FB2',
+                                400: '#373F99',
+                                500: '#03045E',
+                                600: '#02034E',
+                                700: '#02033E',
+                                800: '#01022E',
+                                900: '#01021F',
+                                950: '#000110'
                         }
                 },
                 keyframes: {

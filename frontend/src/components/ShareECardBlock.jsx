@@ -122,7 +122,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
         data-testid="ecard-share-block"
       >
         <div className="flex items-center gap-2 mb-1">
-          <Smartphone className="w-5 h-5" style={{ color: "#025F67" }} />
+          <Smartphone className="w-5 h-5" style={{ color: "#03045E" }} />
           <h3 className="font-display font-bold text-slate-900 text-base sm:text-lg leading-tight">{T.title}</h3>
         </div>
         <p className="text-xs sm:text-sm text-slate-600">{T.subtitle}</p>
@@ -148,7 +148,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
             className="flex flex-col items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl py-3 transition active:scale-[0.98]"
             data-testid="ecard-share-native"
           >
-            <Share2 className="w-5 h-5" style={{ color: "#025F67" }} />
+            <Share2 className="w-5 h-5" style={{ color: "#03045E" }} />
             <span className="text-[11px] font-semibold text-slate-700">{T.share}</span>
           </button>
           <button
@@ -157,7 +157,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
             className="flex flex-col items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl py-3 transition active:scale-[0.98]"
             data-testid="ecard-share-qr"
           >
-            <QrCode className="w-5 h-5" style={{ color: "#025F67" }} />
+            <QrCode className="w-5 h-5" style={{ color: "#03045E" }} />
             <span className="text-[11px] font-semibold text-slate-700">{T.qr}</span>
           </button>
           <button
@@ -203,7 +203,7 @@ export default function ShareECardBlock({ provider, lang = "es" }) {
               <QRCodeSVG
                 value={url}
                 size={192}
-                fgColor="#025F67"
+                fgColor="#03045E"
                 bgColor="#FFFFFF"
                 level="M"
                 includeMargin={false}

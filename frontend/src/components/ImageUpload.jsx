@@ -213,7 +213,7 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
           onClick={openPicker}
           disabled={disabled || isBusy}
           className={`relative aspect-square w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-          style={{ borderColor: "#2F9D94", backgroundColor: "#F0FBFA", color: "#025F67" }}
+          style={{ borderColor: "#0077B6", backgroundColor: "#F0FBFA", color: "#03045E" }}
           data-testid={testid}
           aria-label="Añadir más fotos"
         >
@@ -221,7 +221,7 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
             <Loader2 className="w-8 h-8 animate-spin" />
           ) : (
             <>
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: "#2F9D94" }}>+</div>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: "#0077B6" }}>+</div>
               <span className="text-xs font-medium">Añadir más fotos</span>
             </>
           )}
@@ -256,7 +256,7 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
                   <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full transition-all" style={{
                       width: `${it.progress}%`,
-                      backgroundColor: it.status === "error" ? "#DC2626" : it.status === "done" ? "#10B981" : "#2F9D94",
+                      backgroundColor: it.status === "error" ? "#DC2626" : it.status === "done" ? "#10B981" : "#0077B6",
                     }} />
                   </div>
                 </div>
@@ -320,7 +320,7 @@ export function GalleryUpload({ onUploaded, disabled = false, remaining = null, 
                     className="h-full transition-all"
                     style={{
                       width: `${it.progress}%`,
-                      backgroundColor: it.status === "error" ? "#DC2626" : it.status === "done" ? "#10B981" : "#2F9D94",
+                      backgroundColor: it.status === "error" ? "#DC2626" : it.status === "done" ? "#10B981" : "#0077B6",
                     }}
                   />
                 </div>

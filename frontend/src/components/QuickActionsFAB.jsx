@@ -119,14 +119,14 @@ export default function QuickActionsFAB() {
   // Build action list per role
   const actions = isProvider
     ? [
-        { id: "publicar-chamba", label: "Publicar chamba", Icon: Briefcase, color: "#025F67", onClick: () => { setOpen(false); navigate("/empleos"); } },
-        { id: "compartir-ecard", label: "Compartir mi eCard", Icon: Share2, color: "#2F9D94", onClick: handleShareECard },
+        { id: "publicar-chamba", label: "Publicar chamba", Icon: Briefcase, color: "#03045E", onClick: () => { setOpen(false); navigate("/empleos"); } },
+        { id: "compartir-ecard", label: "Compartir mi eCard", Icon: Share2, color: "#0077B6", onClick: handleShareECard },
         { id: "pedir-resena", label: "Pedir reseña", Icon: Star, color: "#F59E0B", onClick: handleAskReview },
         { id: "mensajes", label: "Mensajes", Icon: MessageCircle, color: "#1D9E75", onClick: () => { setOpen(false); navigate("/messages"); } },
       ]
     : [
-        { id: "buscar", label: "Buscar proveedor", Icon: Search, color: "#025F67", onClick: () => { setOpen(false); navigate("/buscar"); } },
-        { id: "publicar-chamba", label: "Publicar chamba", Icon: Briefcase, color: "#2F9D94", onClick: () => { setOpen(false); navigate("/empleos"); } },
+        { id: "buscar", label: "Buscar proveedor", Icon: Search, color: "#03045E", onClick: () => { setOpen(false); navigate("/buscar"); } },
+        { id: "publicar-chamba", label: "Publicar chamba", Icon: Briefcase, color: "#0077B6", onClick: () => { setOpen(false); navigate("/empleos"); } },
         { id: "mensajes", label: "Mensajes", Icon: MessageCircle, color: "#1D9E75", onClick: () => { setOpen(false); navigate("/messages"); } },
       ];
 
@@ -172,7 +172,7 @@ export default function QuickActionsFAB() {
         style={{
           background: open
             ? "#0F172A"
-            : "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)",
+            : "linear-gradient(135deg, #03045E 0%, #0077B6 100%)",
           boxShadow: "0 8px 24px -6px rgba(2,95,103,0.5)",
         }}
         aria-label={open ? "Cerrar acciones rápidas" : "Abrir acciones rápidas"}

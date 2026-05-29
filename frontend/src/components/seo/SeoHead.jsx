@@ -59,9 +59,9 @@ export function Breadcrumbs({ items }) {
           <li key={idx} className="flex items-center gap-1">
             {idx > 0 && <ChevronRight className="w-3 h-3 text-slate-300" aria-hidden="true" />}
             {it.to && idx < items.length - 1 ? (
-              <Link to={it.to} className="hover:underline" style={{ color: "#025F67" }}>{it.label}</Link>
+              <Link to={it.to} className="hover:underline" style={{ color: "#03045E" }}>{it.label}</Link>
             ) : (
-              <span className={idx === items.length - 1 ? "font-medium" : ""} style={{ color: idx === items.length - 1 ? "#063154" : undefined }}>{it.label}</span>
+              <span className={idx === items.length - 1 ? "font-medium" : ""} style={{ color: idx === items.length - 1 ? "#03045E" : undefined }}>{it.label}</span>
             )}
           </li>
         ))}

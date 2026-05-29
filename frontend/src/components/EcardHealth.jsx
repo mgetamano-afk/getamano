@@ -55,7 +55,7 @@ const SEVERITY_COLOR = {
 
 function ringStrokeColor(score) {
   if (score >= 90) return "#1D9E75";
-  if (score >= 70) return "#2F9D94";
+  if (score >= 70) return "#0077B6";
   if (score >= 50) return "#F59E0B";
   return "#EF4444";
 }
@@ -157,7 +157,7 @@ export default function EcardHealth() {
             {isPerfect ? (
               <Trophy className="w-3.5 h-3.5" style={{ color: "#1D9E75" }} />
             ) : (
-              <Sparkles className="w-3.5 h-3.5" style={{ color: "#025F67" }} />
+              <Sparkles className="w-3.5 h-3.5" style={{ color: "#03045E" }} />
             )}
             <h3 className="font-display font-bold text-sm text-slate-900">
               {isPerfect ? "¡Tu eCard está perfecta!" : "Salud de tu eCard"}
@@ -186,7 +186,7 @@ export default function EcardHealth() {
         >
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ background: "#025F67" }}
+            style={{ background: "#03045E" }}
           >
             {(() => {
               const Icon = ICON_MAP[nextItem.icon] || Circle;
@@ -195,7 +195,7 @@ export default function EcardHealth() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#025F67" }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#03045E" }}>
                 Tu próximo paso
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: SEVERITY_COLOR[nextItem.severity] }}>

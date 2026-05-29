@@ -194,7 +194,7 @@ export default function MyInvitesPanel() {
       {/* Progress to next milestone */}
       <div
         className="rounded-2xl p-5 text-white shadow-md relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #025F67 0%, #014a52 100%)" }}
+        style={{ background: "linear-gradient(135deg, #03045E 0%, #014a52 100%)" }}
         data-testid="my-invites-progress"
       >
         <div className="flex items-center justify-between mb-2">

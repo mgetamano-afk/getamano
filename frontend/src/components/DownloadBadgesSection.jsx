@@ -45,7 +45,7 @@ export default function DownloadBadgesSection() {
   return (
     <section
       className="relative overflow-hidden text-white"
-      style={{ background: "linear-gradient(160deg, #063154 0%, #025F67 60%, #2F9D94 100%)" }}
+      style={{ background: "linear-gradient(160deg, #03045E 0%, #03045E 60%, #0077B6 100%)" }}
       data-testid="download-badges-section"
     >
       {/* Subtle texture overlay */}
@@ -75,7 +75,7 @@ export default function DownloadBadgesSection() {
                 type="button"
                 onClick={openInstallModal}
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full text-sm font-bold transition hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                style={{ background: "white", color: "#025F67", minHeight: 48 }}
+                style={{ background: "white", color: "#03045E", minHeight: 48 }}
                 data-testid="download-section-install"
               >
                 <Smartphone className="w-4 h-4" /> {T.install}
@@ -126,7 +126,7 @@ export default function DownloadBadgesSection() {
                 size={196}
                 level="M"
                 includeMargin={false}
-                fgColor="#025F67"
+                fgColor="#03045E"
                 bgColor="#FFFFFF"
               />
             </div>

@@ -193,7 +193,7 @@ export default function VerifyEmail() {
               ? "Open this page from your registration email or log in first."
               : "Abre esta página desde tu correo de registro o inicia sesión primero."}
           </p>
-          <Link to="/login" className="inline-flex mt-5 px-5 py-2.5 rounded-full text-white font-semibold" style={{ backgroundColor: "#025F67" }}>
+          <Link to="/login" className="inline-flex mt-5 px-5 py-2.5 rounded-full text-white font-semibold" style={{ backgroundColor: "#03045E" }}>
             {lang === "en" ? "Go to login" : "Ir al login"}
           </Link>
         </main>
@@ -215,7 +215,7 @@ export default function VerifyEmail() {
             <button
               onClick={() => navigate(user ? "/dashboard" : "/")}
               className="mt-6 px-6 py-3 rounded-full text-white font-semibold inline-flex items-center gap-2"
-              style={{ backgroundColor: "#025F67" }}
+              style={{ backgroundColor: "#03045E" }}
               data-testid="verify-email-go-dashboard"
             >
               {T.goDashboard}
@@ -235,7 +235,7 @@ export default function VerifyEmail() {
         </button>
 
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}>
             <ShieldCheck className="w-7 h-7 text-white" />
           </div>
           <h1 className="font-display font-bold text-2xl sm:text-3xl text-slate-900 leading-tight" data-testid="verify-email-title">{T.title}</h1>
@@ -260,7 +260,7 @@ export default function VerifyEmail() {
                 onKeyDown={(e) => onKeyDown(i, e)}
                 disabled={verifying}
                 className="flex-1 max-w-[52px] aspect-square text-center text-2xl sm:text-3xl font-bold tabular-nums rounded-xl border-2 border-slate-200 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 outline-none disabled:opacity-60 transition"
-                style={{ color: "#025F67" }}
+                style={{ color: "#03045E" }}
                 data-testid={`verify-email-digit-${i}`}
               />
             ))}
@@ -272,7 +272,7 @@ export default function VerifyEmail() {
             onClick={() => doVerify()}
             disabled={verifying || digits.some((d) => !d)}
             className="mt-5 w-full py-3 rounded-2xl text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="verify-email-submit"
           >
             {verifying ? <><Loader2 className="w-4 h-4 animate-spin" /> {T.verifying}</> : T.verifyBtn}
@@ -283,7 +283,7 @@ export default function VerifyEmail() {
               onClick={doResend}
               disabled={cooldown > 0 || resending}
               className="text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ color: cooldown > 0 ? "#94A3B8" : "#025F67" }}
+              style={{ color: cooldown > 0 ? "#94A3B8" : "#03045E" }}
               data-testid="verify-email-resend"
             >
               <RefreshCw className={`w-4 h-4 ${resending ? "animate-spin" : ""}`} />

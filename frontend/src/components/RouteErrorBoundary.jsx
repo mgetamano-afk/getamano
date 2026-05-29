@@ -53,7 +53,7 @@ export default class RouteErrorBoundary extends React.Component {
             <button
               onClick={() => { this.reset(); window.location.reload(); }}
               className="px-5 py-2.5 rounded-full text-white font-semibold inline-flex items-center justify-center gap-2"
-              style={{ backgroundColor: "#025F67" }}
+              style={{ backgroundColor: "#03045E" }}
               data-testid="route-error-reload"
             >
               <RefreshCw className="w-4 h-4" /> Refrescar

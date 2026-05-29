@@ -32,8 +32,8 @@ const STYLE_OPTIONS = [
 ];
 
 const COLOR_PALETTE = [
-  { name: "Teal getamano", value: "#2F9D94" },
-  { name: "Azul profundo", value: "#063154" },
+  { name: "Teal getamano", value: "#0077B6" },
+  { name: "Azul profundo", value: "#03045E" },
   { name: "Naranja", value: "#F97316" },
   { name: "Rojo coral", value: "#EF4444" },
   { name: "Verde esmeralda", value: "#10B981" },

@@ -72,8 +72,8 @@ export default function SmartSubcategoryPicker({
       {/* Sugeridas */}
       <div>
         <div className="flex items-center gap-1.5 mb-2">
-          <Sparkles className="w-3.5 h-3.5" style={{ color: "#025F67" }} />
-          <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: "#025F67" }}>
+          <Sparkles className="w-3.5 h-3.5" style={{ color: "#03045E" }} />
+          <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: "#03045E" }}>
             Especializaciones de {mainCategory}
           </h4>
         </div>
@@ -90,7 +90,7 @@ export default function SmartSubcategoryPicker({
                     ? "text-white shadow-sm scale-[1.03]"
                     : "bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100"
                 }`}
-                style={isSelected ? { background: "#025F67" } : undefined}
+                style={isSelected ? { background: "#03045E" } : undefined}
                 data-testid={`smart-sub-${sub.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}`}
                 aria-pressed={isSelected}
               >
@@ -151,7 +151,7 @@ export default function SmartSubcategoryPicker({
           style={{ background: "#E1F5EE", border: "1px solid rgba(2,95,103,0.15)" }}
           data-testid="smart-subpicker-summary"
         >
-          <p className="text-xs font-semibold mb-1" style={{ color: "#025F67" }}>
+          <p className="text-xs font-semibold mb-1" style={{ color: "#03045E" }}>
             {selectedSubs.length} especializaci{selectedSubs.length === 1 ? "ón" : "ones"} elegida{selectedSubs.length === 1 ? "" : "s"}:
           </p>
           <p className="text-xs text-slate-700 leading-relaxed">

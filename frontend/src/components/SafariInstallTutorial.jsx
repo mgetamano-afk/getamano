@@ -84,8 +84,8 @@ export default function SafariInstallTutorial({ className = "" }) {
               <animate attributeName="r" values="14;22;14" dur="1.4s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="0;0.35;0" dur="1.4s" repeatCount="indefinite" />
             </circle>
-            <rect x="-5" y="-2" width="10" height="9" rx="1.2" fill="none" stroke="#025F67" strokeWidth="1.4" />
-            <path d="M 0 -7 l 0 7 m -2.5 -4.5 l 2.5 -2.5 l 2.5 2.5" stroke="#025F67" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="-5" y="-2" width="10" height="9" rx="1.2" fill="none" stroke="#03045E" strokeWidth="1.4" />
+            <path d="M 0 -7 l 0 7 m -2.5 -4.5 l 2.5 -2.5 l 2.5 2.5" stroke="#03045E" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </g>
           {/* Tabs */}
           <rect x="111" y="210" width="12" height="10" rx="1.5" fill="none" stroke="#94A3B8" strokeWidth="1.2" />
@@ -109,7 +109,7 @@ export default function SafariInstallTutorial({ className = "" }) {
           <rect x="78" y="125" width="12" height="2" rx="1" fill="#CBD5E1" />
           {/* Site row */}
           <rect x="20" y="133" width="128" height="20" rx="4" fill="#F1F5F9" />
-          <rect x="24" y="138" width="10" height="10" rx="2" fill="#025F67" />
+          <rect x="24" y="138" width="10" height="10" rx="2" fill="#03045E" />
           <text x="38" y="146" fill="#0F172A" fontSize="5.5" fontFamily="Arial, sans-serif" fontWeight="600">getamano.us</text>
           {/* List items */}
           <rect x="20" y="158" width="128" height="14" fill="white" />
@@ -158,7 +158,7 @@ export default function SafariInstallTutorial({ className = "" }) {
                   <g key={`${row}-${col}`} style={{ animation: "gtm-iconPop 8s infinite ease-out", transformOrigin: `${x + 11}px ${y + 11}px` }}>
                     {/* Soft glow halo */}
                     <rect x={x - 4} y={y - 4} width="30" height="30" rx="9" fill="white" opacity="0.25" />
-                    <rect x={x} y={y} width="22" height="22" rx="6" fill="#025F67" stroke="white" strokeWidth="1.2" />
+                    <rect x={x} y={y} width="22" height="22" rx="6" fill="#03045E" stroke="white" strokeWidth="1.2" />
                     <text x={x + 11} y={y + 15} textAnchor="middle" fill="white" fontSize="11" fontFamily="Arial, sans-serif" fontWeight="800">g</text>
                     <text x={x + 11} y={y + 32} textAnchor="middle" fill="white" fontSize="4.5" fontFamily="Arial, sans-serif" fontWeight="600">getamano</text>
                     {/* Sparkle */}
@@ -182,7 +182,7 @@ export default function SafariInstallTutorial({ className = "" }) {
         <defs>
           <linearGradient id="gtmGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#0E4F56" />
-            <stop offset="100%" stopColor="#025F67" />
+            <stop offset="100%" stopColor="#03045E" />
           </linearGradient>
         </defs>
       </svg>

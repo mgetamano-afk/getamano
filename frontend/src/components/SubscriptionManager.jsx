@@ -85,7 +85,7 @@ export default function SubscriptionManager() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6" data-testid="subscription-manager">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(2,95,103,0.08)" }}>
-            <Sparkles className="w-5 h-5" style={{ color: "#025F67" }} />
+            <Sparkles className="w-5 h-5" style={{ color: "#03045E" }} />
           </div>
           <div className="flex-1">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{lang === "en" ? "Your plan" : "Tu plan"}</p>
@@ -98,7 +98,7 @@ export default function SubscriptionManager() {
             <Link
               to="/plans"
               className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold hover:opacity-95 active:scale-[0.98] transition"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="subscription-upgrade-btn"
             >
               {lang === "en" ? "Upgrade my plan" : "Mejorar mi plan"} <ArrowUpRight className="w-4 h-4" />
@@ -132,7 +132,7 @@ export default function SubscriptionManager() {
               onClick={onReactivate}
               disabled={reactivating}
               className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold hover:opacity-95 active:scale-[0.98] transition disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+              style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
               data-testid="subscription-reactivate-btn"
             >
               {reactivating

@@ -8,7 +8,7 @@ import OwnerIdentityBadge from "./OwnerIdentityBadge";
 
 // Custom teardrop marker in Scooter teal. Inline SVG so no asset fetch needed.
 const buildMarkerIcon = ({ isLatino = false, isAmerican = false, highlighted = false } = {}) => {
-  const accent = isLatino ? "#025F67" : isAmerican ? "#185FA5" : "#2F9D94";
+  const accent = isLatino ? "#03045E" : isAmerican ? "#185FA5" : "#0077B6";
   const scale = highlighted ? 1.25 : 1;
   const w = Math.round(34 * scale);
   const h = Math.round(44 * scale);
@@ -16,7 +16,7 @@ const buildMarkerIcon = ({ isLatino = false, isAmerican = false, highlighted = f
     <svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 34 44'>
       <defs>
         <filter id='s' x='-20%' y='-20%' width='140%' height='140%'>
-          <feDropShadow dx='0' dy='${highlighted ? 3 : 1.5}' stdDeviation='${highlighted ? 2.5 : 1.2}' flood-color='#063154' flood-opacity='${highlighted ? 0.5 : 0.35}'/>
+          <feDropShadow dx='0' dy='${highlighted ? 3 : 1.5}' stdDeviation='${highlighted ? 2.5 : 1.2}' flood-color='#03045E' flood-opacity='${highlighted ? 0.5 : 0.35}'/>
         </filter>
       </defs>
       <path filter='url(#s)' fill='${accent}' stroke='${highlighted ? "#F59E0B" : "white"}' stroke-width='${highlighted ? 3 : 2}'
@@ -133,7 +133,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
       <div className="relative" style={{ height: "min(78vh, 760px)" }}>
         {loading && (
           <div className="absolute inset-0 z-[400] flex items-center justify-center pointer-events-none">
-            <div className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ backgroundColor: "rgba(247,246,242,0.92)", color: "#025F67", border: "1px solid #BCC5CC" }}>
+            <div className="text-xs px-3 py-1.5 rounded-full font-medium" style={{ backgroundColor: "rgba(247,246,242,0.92)", color: "#03045E", border: "1px solid #BCC5CC" }}>
               Cargando mapa…
             </div>
           </div>
@@ -141,7 +141,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
 
         {items.length === 0 && !loading && (
           <div className="absolute inset-0 z-[400] flex items-center justify-center pointer-events-none">
-            <div className="text-sm px-4 py-2 rounded-xl text-center" style={{ backgroundColor: "rgba(247,246,242,0.95)", color: "#025F67", border: "1px solid #BCC5CC" }} data-testid="map-empty-state">
+            <div className="text-sm px-4 py-2 rounded-xl text-center" style={{ backgroundColor: "rgba(247,246,242,0.95)", color: "#03045E", border: "1px solid #BCC5CC" }} data-testid="map-empty-state">
               No hay proveedores con ubicación que coincidan con tus filtros.
             </div>
           </div>
@@ -168,8 +168,8 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
                 center={[userPosition.lat, userPosition.lng]}
                 radius={radiusMiles * 1609.34 /* miles → meters */}
                 pathOptions={{
-                  color: "#025F67",
-                  fillColor: "#2F9D94",
+                  color: "#03045E",
+                  fillColor: "#0077B6",
                   fillOpacity: 0.10,
                   weight: 1.5,
                   dashArray: "6 4",
@@ -181,7 +181,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
                 pathOptions={{
                   color: "#FFFFFF",
                   weight: 3,
-                  fillColor: "#2F9D94",
+                  fillColor: "#0077B6",
                   fillOpacity: 1,
                 }}
               >
@@ -214,22 +214,22 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
                 <Popup>
                   <div style={{ minWidth: 220 }} data-testid={`map-popup-${p.slug}`}>
                     {p.cover_url && (
-                      <div className="w-full h-20 rounded-lg overflow-hidden mb-2" style={{ backgroundColor: "#F7F6F2" }}>
+                      <div className="w-full h-20 rounded-lg overflow-hidden mb-2" style={{ backgroundColor: "#F8FCFD" }}>
                         <img src={p.cover_url} alt={p.business_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       </div>
                     )}
-                    <h4 className="font-display font-bold text-base mb-0.5" style={{ color: "#025F67" }}>{p.business_name}</h4>
+                    <h4 className="font-display font-bold text-base mb-0.5" style={{ color: "#03045E" }}>{p.business_name}</h4>
                     <div className="text-xs text-slate-500 flex items-center gap-1 mb-2">
                       <MapPinIcon className="w-3 h-3" /> {p.city}{p.state ? `, ${p.state}` : ""}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 mb-2">
                       {p.verified && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#025F67", border: "1px solid #A6E1DA" }}>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#03045E", border: "1px solid #A6E1DA" }}>
                           <ShieldCheck className="w-2.5 h-2.5" /> Verificado
                         </span>
                       )}
                       {p.rating_count > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold" style={{ color: "#063154" }}>
+                        <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold" style={{ color: "#03045E" }}>
                           <Star className="w-3 h-3 fill-current" style={{ color: "#F59E0B" }} /> {Number(p.rating_avg).toFixed(1)}
                         </span>
                       )}
@@ -238,7 +238,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
                     <Link
                       to={`/provider/${p.slug}`}
                       className="inline-block w-full text-center text-xs font-semibold px-3 py-1.5 rounded-full transition"
-                      style={{ backgroundColor: "#2F9D94", color: "white" }}
+                      style={{ backgroundColor: "#0077B6", color: "white" }}
                       data-testid={`map-popup-cta-${p.slug}`}
                     >
                       Ver perfil
@@ -251,7 +251,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
         </MapContainer>
 
         {items.length > 0 && (
-          <div className="absolute top-3 left-3 z-[400] text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(247,246,242,0.92)", color: "#025F67", border: "1px solid #BCC5CC" }} data-testid="map-count-badge">
+          <div className="absolute top-3 left-3 z-[400] text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(247,246,242,0.92)", color: "#03045E", border: "1px solid #BCC5CC" }} data-testid="map-count-badge">
             {items.length} {items.length === 1 ? "proveedor" : "proveedores"} en el mapa
           </div>
         )}
@@ -264,8 +264,8 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
             className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold shadow-lg transition hover:scale-105"
             style={{
               backgroundColor: "#FFFFFF",
-              color: "#025F67",
-              border: "1.5px solid #2F9D94",
+              color: "#03045E",
+              border: "1.5px solid #0077B6",
               boxShadow: "0 8px 24px -8px rgba(2,95,103,0.4)",
             }}
             data-testid="map-search-area-btn"
@@ -283,7 +283,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
         .getamano-marker { background: transparent !important; border: none !important; transition: transform 180ms ease; }
         .getamano-marker-active { z-index: 1000 !important; }
         .getamano-user-tooltip {
-          background: #025F67 !important;
+          background: #03045E !important;
           color: white !important;
           border: none !important;
           border-radius: 9999px !important;
@@ -292,7 +292,7 @@ export default function ProvidersMap({ providers, loading, highlightedId, onMark
           padding: 3px 10px !important;
           box-shadow: 0 4px 12px -4px rgba(2,95,103,0.4) !important;
         }
-        .getamano-user-tooltip::before { border-top-color: #025F67 !important; }
+        .getamano-user-tooltip::before { border-top-color: #03045E !important; }
       `}</style>
     </div>
   );

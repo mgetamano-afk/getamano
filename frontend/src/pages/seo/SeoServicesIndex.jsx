@@ -21,7 +21,7 @@ export default function SeoServicesIndex() {
   const breadcrumbs = [{ label: "Inicio", to: "/" }, { label: "Servicios" }];
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}>
       <SeoHead
         title={isEn ? "All services" : "Todos los servicios"}
         description={isEn
@@ -35,7 +35,7 @@ export default function SeoServicesIndex() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12" data-testid="seo-services-index">
         <Breadcrumbs items={breadcrumbs} />
-        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#025F67" }} data-testid="seo-h1">
+        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#03045E" }} data-testid="seo-h1">
           {isEn ? "All services on getamano" : "Todos los servicios en getamano"}
         </h1>
         <p className="text-slate-600 mb-10 text-base md:text-lg">
@@ -61,7 +61,7 @@ export default function SeoServicesIndex() {
                       key={cat.category_id}
                       to={`${isEn ? "/services" : "/servicios"}/${cat.slug}`}
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white hover:shadow-sm transition text-sm min-w-0"
-                      style={{ borderColor: "#BCC5CC", color: "#025F67" }}
+                      style={{ borderColor: "#BCC5CC", color: "#03045E" }}
                       data-testid={`cat-link-${cat.slug}`}
                     >
                       <CategoryIcon slug={cat.slug} size={18} color={sec.color} stroke={1.8} className="flex-shrink-0" />

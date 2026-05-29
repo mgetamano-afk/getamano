@@ -61,7 +61,7 @@ function GigCard({ gig, lang, onApply, onClose, currentUserId, currentRole }) {
           className="w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center"
           style={{ background: "rgba(2,95,103,0.08)" }}
         >
-          <Briefcase className="w-5 h-5" style={{ color: "#025F67" }} />
+          <Briefcase className="w-5 h-5" style={{ color: "#03045E" }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -110,7 +110,7 @@ function GigCard({ gig, lang, onApply, onClose, currentUserId, currentRole }) {
                 type="button"
                 onClick={() => onApply?.(gig)}
                 className="px-4 py-2 rounded-full text-white text-xs font-bold hover:opacity-95 active:scale-[0.98] transition inline-flex items-center gap-1.5"
-                style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                 data-testid={`gig-card-apply-${gig.gig_id}`}
               >
                 <Send className="w-3.5 h-3.5" /> {T.apply}
@@ -119,7 +119,7 @@ function GigCard({ gig, lang, onApply, onClose, currentUserId, currentRole }) {
               <Link
                 to={`/empleos/${gig.gig_id}`}
                 className="text-xs font-semibold inline-flex items-center gap-1"
-                style={{ color: "#025F67" }}
+                style={{ color: "#03045E" }}
                 data-testid={`gig-card-open-${gig.gig_id}`}
               >
                 {T.open} →
@@ -209,7 +209,7 @@ function ApplyGigModal({ gig, onClose, onSuccess, lang }) {
           onClick={submit}
           disabled={submitting || message.trim().length < 20}
           className="mt-6 w-full py-3 rounded-2xl text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition"
-          style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+          style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           data-testid="gig-apply-submit"
         >
           {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> {lang === "en" ? "Sending…" : "Enviando…"}</> : <><Send className="w-4 h-4" /> {lang === "en" ? "Send application" : "Enviar aplicación"}</>}
@@ -306,7 +306,7 @@ function PostGigModal({ onClose, onSuccess, lang }) {
           <span className="text-sm text-slate-700"><Flame className="w-3.5 h-3.5 inline text-orange-500" /> {lang === "en" ? "Mark as urgent" : "Marcar como urgente"}</span>
         </label>
 
-        <button type="button" onClick={submit} disabled={submitting} className="mt-6 w-full py-3 rounded-2xl text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }} data-testid="post-gig-submit">
+        <button type="button" onClick={submit} disabled={submitting} className="mt-6 w-full py-3 rounded-2xl text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition" style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }} data-testid="post-gig-submit">
           {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> {lang === "en" ? "Publishing…" : "Publicando…"}</> : (lang === "en" ? "Publish gig" : "Publicar chamba")}
         </button>
       </div>
@@ -396,7 +396,7 @@ export default function EmpleosPage({ embedded = false }) {
             type="button"
             onClick={() => user ? setShowPost(true) : navigate(`/login?next=${encodeURIComponent("/empleos")}`)}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-white text-sm font-bold hover:opacity-95 active:scale-[0.98] transition shadow-md"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="empleos-post-cta"
           >
             <Plus className="w-4 h-4" /> {user ? T.postCta : T.loginToPost}
@@ -434,7 +434,7 @@ export default function EmpleosPage({ embedded = false }) {
                 type="button"
                 onClick={() => user ? setShowPost(true) : navigate(`/login?next=${encodeURIComponent("/empleos")}`)}
                 className="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-white text-xs font-semibold"
-                style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                 data-testid="empleos-empty-cta"
               >
                 <Plus className="w-3.5 h-3.5" /> {T.postCta}

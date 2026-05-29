@@ -53,7 +53,7 @@ import {
 } from "@tabler/icons-react";
 
 export const ICON_DEFAULT_SIZE = 24;
-export const ICON_DEFAULT_COLOR = "#2F9D94"; // brand teal
+export const ICON_DEFAULT_COLOR = "#0077B6"; // brand teal
 
 // Helper: resolve to the first available icon (fallback chain) so missing Tabler exports never crash.
 const pick = (...candidates) => candidates.find(Boolean) || IconBriefcase;

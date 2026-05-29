@@ -1,57 +1,57 @@
 .App { min-height: 100vh; overflow-x: clip; }
 
 .gradient-text {
-    background: linear-gradient(135deg, #025F67 0%, #2F9D94 100%);
+    background: linear-gradient(135deg, #03045E 0%, #0077B6 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
 .hero-vignette {
-    background: radial-gradient(80% 60% at 50% 20%, rgba(2, 95, 103, 0.08), transparent 60%),
-                radial-gradient(60% 50% at 80% 80%, rgba(47, 157, 148, 0.10), transparent 60%);
+    background: radial-gradient(80% 60% at 50% 20%, rgba(3, 4, 94, 0.08), transparent 60%),
+                radial-gradient(60% 50% at 80% 80%, rgba(0, 119, 182, 0.10), transparent 60%);
 }
 
 .card-lift { transition: transform .25s ease, box-shadow .25s ease; }
-.card-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 30px -10px rgba(6, 49, 84, 0.18); }
+.card-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 30px -10px rgba(3, 4, 94, 0.18); }
 
 .btn-primary {
-    background: #2F9D94;
+    background: #0077B6;
     color: white;
     border-radius: 9999px;
     padding: 0.75rem 1.75rem;
     font-weight: 500;
     transition: background-color .2s ease;
 }
-.btn-primary:hover { background: #025F67; }
+.btn-primary:hover { background: #03045E; }
 
 .btn-secondary {
-    background: #025F67;
+    background: #03045E;
     color: white;
     border-radius: 9999px;
     padding: 0.75rem 1.75rem;
     font-weight: 500;
     transition: background-color .2s ease;
 }
-.btn-secondary:hover { background: #063154; }
+.btn-secondary:hover { background: #03045E; }
 
 .btn-outline {
     border: 2px solid #BCC5CC;
-    color: #025F67;
+    color: #03045E;
     border-radius: 9999px;
     padding: calc(0.75rem - 2px) 1.75rem;
     background: transparent;
     font-weight: 500;
     transition: all .2s ease;
 }
-.btn-outline:hover { border-color: #2F9D94; color: #2F9D94; }
+.btn-outline:hover { border-color: #0077B6; color: #0077B6; }
 
 .badge-verified {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
     background: #EBF8F7;
-    color: #025F67;
+    color: #03045E;
     border: 1px solid #A6E1DA;
     border-radius: 9999px;
     padding: 0.25rem 0.75rem;
@@ -80,7 +80,7 @@
 }
 .category-icon-wrap.sm { width: 36px; height: 36px; border-radius: 10px; }
 .category-icon-wrap.lg { width: 72px; height: 72px; border-radius: 20px; }
-.category-icon-wrap.brand { background: #2F9D94; }
+.category-icon-wrap.brand { background: #0077B6; }
 
 .provider-category-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -88,7 +88,7 @@
   background: #F0FAF9;
   border: 1px solid #9FE1CB;
   border-radius: 20px;
-  font-size: 13px; font-weight: 500; color: #025F67;
+  font-size: 13px; font-weight: 500; color: #03045E;
 }
 
 /* Section 38 — fadeSlideUp entrance animation for dashboard cards */

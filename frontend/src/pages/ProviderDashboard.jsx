@@ -286,7 +286,7 @@ export default function ProviderDashboard() {
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <Link to="/empleos" target="_blank" className="px-4 py-2.5 rounded-full text-white text-sm font-bold inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-sm"
-                      style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                      style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                       data-testid="provider-dashboard-publish-chamba">
                   Publicar chamba →
                 </Link>
@@ -454,9 +454,9 @@ export default function ProviderDashboard() {
                 <Section title="Identidad del negocio (opcional)">
                   <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
-                      { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#025F67", border: "#A6E1DA" },
+                      { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#03045E", border: "#A6E1DA" },
                       { id: "american", label: "Dueño Americano", emoji: "🤝", bg: "#E6F1FB", color: "#185FA5", border: "#BFD9F2" },
-                      { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F7F6F2", color: "#475569", border: "#BCC5CC" },
+                      { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F8FCFD", color: "#475569", border: "#BCC5CC" },
                     ].map(opt => {
                       const active = form.owner_identity === opt.id;
                       return (

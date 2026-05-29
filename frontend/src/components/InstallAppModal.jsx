@@ -235,7 +235,7 @@ export default function InstallAppModal() {
         <div className="flex items-center gap-3 mb-5">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md"
-            style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+            style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
           >
             <Sparkles className="w-7 h-7 text-white" />
           </div>
@@ -252,7 +252,7 @@ export default function InstallAppModal() {
               <button
                 onClick={onInstallNative}
                 className="w-full py-3.5 rounded-2xl text-white font-semibold shadow-md hover:opacity-95 active:scale-[0.99] transition inline-flex items-center justify-center gap-2"
-                style={{ backgroundColor: "#025F67" }}
+                style={{ backgroundColor: "#03045E" }}
                 data-testid="install-android-btn"
               >
                 <Download className="w-5 h-5" /> {T.androidCta}
@@ -310,7 +310,7 @@ export default function InstallAppModal() {
               <button
                 onClick={copyLink}
                 className="w-full py-3 rounded-2xl font-semibold text-white shadow-md hover:opacity-95 active:scale-[0.99] transition inline-flex items-center justify-center gap-2"
-                style={{ backgroundColor: "#025F67" }}
+                style={{ backgroundColor: "#03045E" }}
                 data-testid="install-copy-link-btn"
               >
                 {copied ? <><Check className="w-4 h-4" /> {T.copied}</> : <><Copy className="w-4 h-4" /> {T.copy}</>}
@@ -333,7 +333,7 @@ export default function InstallAppModal() {
                 size={180}
                 level="M"
                 includeMargin={false}
-                fgColor="#025F67"
+                fgColor="#03045E"
               />
             </div>
             <p className="text-xs text-slate-500 mt-4 break-all" data-testid="install-link">{url}</p>
@@ -341,7 +341,7 @@ export default function InstallAppModal() {
               <button
                 onClick={onInstallNative}
                 className="mt-5 w-full py-3 rounded-2xl text-white font-semibold shadow-md hover:opacity-95 active:scale-[0.99] transition inline-flex items-center justify-center gap-2"
-                style={{ backgroundColor: "#025F67" }}
+                style={{ backgroundColor: "#03045E" }}
                 data-testid="install-desktop-btn"
               >
                 <Download className="w-5 h-5" /> {T.androidCta}
@@ -371,7 +371,7 @@ function Step({ n, text }) {
     <li className="flex items-start gap-3">
       <div
         className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs shadow-sm"
-        style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+        style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
       >
         {n}
       </div>

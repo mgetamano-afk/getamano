@@ -141,7 +141,7 @@ export default function Install() {
   };
 
   const benefits = [
-    { icon: Smartphone, title: T.benefit1Title, body: T.benefit1Body, color: "#025F67" },
+    { icon: Smartphone, title: T.benefit1Title, body: T.benefit1Body, color: "#03045E" },
     { icon: Wifi, title: T.benefit2Title, body: T.benefit2Body, color: "#FF6B2C" },
     { icon: BellRing, title: T.benefit3Title, body: T.benefit3Body, color: "#22C55E" },
   ];
@@ -169,7 +169,7 @@ export default function Install() {
               </div>
               <p className="font-display font-bold text-xl text-slate-900 mt-4">{T.installedTitle}</p>
               <p className="text-sm text-slate-600 mt-2 leading-relaxed">{T.installedBody}</p>
-              <Link to="/" className="inline-flex mt-6 px-6 py-3 rounded-full text-white font-semibold hover:opacity-95 active:scale-[0.99] transition gap-2 items-center" style={{ backgroundColor: "#025F67" }} data-testid="install-open-app">
+              <Link to="/" className="inline-flex mt-6 px-6 py-3 rounded-full text-white font-semibold hover:opacity-95 active:scale-[0.99] transition gap-2 items-center" style={{ backgroundColor: "#03045E" }} data-testid="install-open-app">
                 <ExternalLink className="w-4 h-4" /> {T.openApp}
               </Link>
             </div>
@@ -215,7 +215,7 @@ export default function Install() {
               <button
                 onClick={copyLink}
                 className="w-full max-w-xs mx-auto py-3.5 rounded-2xl font-semibold text-white shadow-md hover:opacity-95 active:scale-[0.99] transition inline-flex items-center justify-center gap-2"
-                style={{ backgroundColor: "#025F67" }}
+                style={{ backgroundColor: "#03045E" }}
                 data-testid="install-copy-link"
               >
                 {copied ? <><Check className="w-5 h-5" /> {T.copied}</> : <><Copy className="w-5 h-5" /> {T.copyLink}</>}
@@ -226,7 +226,7 @@ export default function Install() {
               <button
                 onClick={onInstallNative}
                 className="w-full max-w-xs mx-auto py-4 rounded-2xl font-bold text-white shadow-md hover:opacity-95 active:scale-[0.99] transition inline-flex items-center justify-center gap-2 text-base"
-                style={{ backgroundColor: "#025F67" }}
+                style={{ backgroundColor: "#03045E" }}
                 data-testid="install-android-btn"
               >
                 <Download className="w-5 h-5" /> {T.androidInstall}
@@ -253,7 +253,7 @@ export default function Install() {
               <p className="font-display font-bold text-lg text-slate-900 mb-2">{T.desktopTitle}</p>
               <p className="text-sm text-slate-600 mb-5">{T.desktopBody}</p>
               <div className="inline-block rounded-2xl bg-white p-4 border border-slate-200 shadow-inner">
-                <QRCodeSVG value={url} size={200} level="M" includeMargin={false} fgColor="#025F67" />
+                <QRCodeSVG value={url} size={200} level="M" includeMargin={false} fgColor="#03045E" />
               </div>
               <p className="text-xs text-slate-500 mt-4 break-all" data-testid="install-page-link">{url}</p>
             </div>

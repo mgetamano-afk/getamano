@@ -200,7 +200,7 @@ export default function ProfileVersionsPanel() {
       {/* Header */}
       <div>
         <h2 className="flex items-center gap-2 text-lg font-extrabold text-slate-900">
-          <History className="w-5 h-5" style={{ color: "#025F67" }} />
+          <History className="w-5 h-5" style={{ color: "#03045E" }} />
           {T.title}
         </h2>
         <p className="text-sm text-slate-500 mt-0.5">{T.subtitle}</p>
@@ -241,7 +241,7 @@ export default function ProfileVersionsPanel() {
           onClick={doSaveNow}
           disabled={savingNew}
           className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg text-white text-sm font-bold transition active:scale-95 hover:brightness-110 disabled:opacity-60"
-          style={{ background: "#025F67" }}
+          style={{ background: "#03045E" }}
           data-testid="versions-save-now"
         >
           <Save className="w-4 h-4" />

@@ -106,7 +106,7 @@ function ECardTile({ provider, lang }) {
         {provider.verification_status === "approved" && (
           <span
             className="absolute top-2 left-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/95 backdrop-blur text-[10px] font-extrabold tracking-wide"
-            style={{ color: "#025F67" }}
+            style={{ color: "#03045E" }}
           >
             <ShieldCheck className="w-3 h-3" />
             {lang === "en" ? "VERIFIED" : "VERIFICADO"}
@@ -129,7 +129,7 @@ function ECardTile({ provider, lang }) {
           <span className="text-[11px] text-slate-400 truncate inline-flex items-center gap-0.5">
             <MapPin className="w-2.5 h-2.5" /> {provider.city || ""}
           </span>
-          <span className="text-[11px] font-bold inline-flex items-center gap-0.5" style={{ color: "#025F67" }}>
+          <span className="text-[11px] font-bold inline-flex items-center gap-0.5" style={{ color: "#03045E" }}>
             <ExternalLink className="w-3 h-3" />
           </span>
         </div>

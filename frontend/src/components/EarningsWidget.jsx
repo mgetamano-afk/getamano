@@ -95,8 +95,8 @@ export default function EarningsWidget() {
       to="/dashboard/provider?tab=red&subtab=earnings"
       className="group relative block rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
       style={{
-        background: "linear-gradient(135deg, #063154 0%, #0A4D5E 55%, #025F67 100%)",
-        boxShadow: "0 8px 24px -10px rgba(2, 95, 103, 0.4)",
+        background: "linear-gradient(135deg, #03045E 0%, #0A4D5E 55%, #03045E 100%)",
+        boxShadow: "0 8px 24px -10px rgba(3, 4, 94, 0.4)",
         touchAction: "pan-y",
       }}
       data-testid="earnings-widget"

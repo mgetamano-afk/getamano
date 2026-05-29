@@ -20,7 +20,7 @@ export default function SeoCityDetail() {
   }, [citySlug]);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://getamano.us";
-  if (loading) return <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}><Header /><div className="max-w-7xl mx-auto px-4 py-12 text-slate-500">Cargando…</div><Footer /></div>;
+  if (loading) return <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}><Header /><div className="max-w-7xl mx-auto px-4 py-12 text-slate-500">Cargando…</div><Footer /></div>;
   if (!data) return <div className="min-h-screen"><Header /><div className="max-w-7xl mx-auto px-4 py-12">Ciudad no encontrada</div><Footer /></div>;
 
   const { city, categories, total_providers } = data;
@@ -31,7 +31,7 @@ export default function SeoCityDetail() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F6F2" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#F8FCFD" }}>
       <SeoHead
         title={isEn
           ? `Latino providers in ${city.name}, ${city.state}`
@@ -48,7 +48,7 @@ export default function SeoCityDetail() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12" data-testid="seo-city-detail">
         <Breadcrumbs items={breadcrumbs} />
         <div className="flex items-center gap-2 mb-2 text-sm text-slate-500"><MapPin className="w-4 h-4" /> {city.name}, {city.state}</div>
-        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#025F67" }} data-testid="seo-h1">Proveedores latinos en {city.name}</h1>
+        <h1 className="font-display text-4xl md:text-5xl font-bold mb-3" style={{ color: "#03045E" }} data-testid="seo-h1">Proveedores latinos en {city.name}</h1>
         <p className="text-slate-600 mb-10 text-base md:text-lg">{total_providers} proveedores latinos verificados activos en {city.name}, {city.state}.</p>
 
         {categories.length === 0 ? (
@@ -66,7 +66,7 @@ export default function SeoCityDetail() {
                 style={{ borderColor: "#BCC5CC" }}
                 data-testid={`city-cat-link-${cat.slug}`}
               >
-                <span className="font-medium" style={{ color: "#025F67" }}>{cat.name_es}</span>
+                <span className="font-medium" style={{ color: "#03045E" }}>{cat.name_es}</span>
                 <span className="text-xs text-slate-400">{cat.providers_count} {cat.providers_count === 1 ? "negocio" : "negocios"}</span>
               </Link>
             ))}

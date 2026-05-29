@@ -76,7 +76,7 @@ export default function IosInstallModal({ open, onClose }) {
     <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" data-testid="ios-install-modal">
       <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-4 fade-in">
         {/* Header */}
-        <div className="relative p-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}>
+        <div className="relative p-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}>
           <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white" data-testid="ios-modal-close">
             <X className="w-4 h-4" />
           </button>
@@ -107,7 +107,7 @@ export default function IosInstallModal({ open, onClose }) {
           <ol className="space-y-4">
             {/* Step 1 — Share button */}
             <li className="flex gap-3" data-testid="ios-step-1">
-              <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: "#025F67" }}>1</span>
+              <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: "#03045E" }}>1</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-slate-900">
                   {T.step1}{" "}
@@ -122,7 +122,7 @@ export default function IosInstallModal({ open, onClose }) {
 
             {/* Step 2 — Add to home screen */}
             <li className="flex gap-3" data-testid="ios-step-2">
-              <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: "#025F67" }}>2</span>
+              <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: "#03045E" }}>2</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-slate-900">
                   {T.step2}{" "}
@@ -135,7 +135,7 @@ export default function IosInstallModal({ open, onClose }) {
 
             {/* Step 3 — confirm */}
             <li className="flex gap-3" data-testid="ios-step-3">
-              <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: "#025F67" }}>3</span>
+              <span className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: "#03045E" }}>3</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-slate-900">
                   {T.step3}{" "}
@@ -148,7 +148,7 @@ export default function IosInstallModal({ open, onClose }) {
             </li>
           </ol>
 
-          <button onClick={onClose} className="mt-6 w-full py-3 rounded-full text-white font-semibold shadow-sm hover:opacity-90 inline-flex items-center justify-center gap-1" style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }} data-testid="ios-modal-done">
+          <button onClick={onClose} className="mt-6 w-full py-3 rounded-full text-white font-semibold shadow-sm hover:opacity-90 inline-flex items-center justify-center gap-1" style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }} data-testid="ios-modal-done">
             <Check className="w-4 h-4" /> {T.closeBtn} <ChevronRight className="w-4 h-4" />
           </button>
         </div>

@@ -12,14 +12,14 @@ const SOCIAL_LINKS = [
 export default function Footer() {
   const { t } = useI18n();
   return (
-    <footer className="text-slate-300 mt-24" style={{ backgroundColor: "#063154" }}>
+    <footer className="text-slate-300 mt-24" style={{ backgroundColor: "#03045E" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="md:col-span-2">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center p-1.5" style={{ backgroundColor: "#F7F6F2" }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center p-1.5" style={{ backgroundColor: "#F8FCFD" }}>
               <img src="/getamano-logo-mark.png" alt="" className="w-full h-full object-contain" />
             </div>
-            <span className="font-display font-bold text-2xl text-white">get<span style={{ color: "#2F9D94" }}>amano</span></span>
+            <span className="font-display font-bold text-2xl text-white">get<span style={{ color: "#0077B6" }}>amano</span></span>
           </div>
           <p className="text-slate-400 text-sm max-w-md leading-relaxed">{t("footer.tagline")}</p>
           {/* Section 67 — dual-audience pride badge */}

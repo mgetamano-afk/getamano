@@ -78,7 +78,7 @@ export default function ChambasNearby({ city, role = "client", limit = 3 }) {
         <Link
           to="/empleos"
           className="text-xs font-semibold inline-flex items-center gap-1 hover:underline whitespace-nowrap"
-          style={{ color: "#025F67" }}
+          style={{ color: "#03045E" }}
           data-testid="chambas-nearby-see-all"
         >
           {T.seeAll} <ArrowRight className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ export default function ChambasNearby({ city, role = "client", limit = 3 }) {
                 </div>
                 <p className="text-sm font-semibold text-slate-900 mt-0.5 leading-tight truncate">{g.title}</p>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-                  <span className="inline-flex items-center gap-0.5 font-semibold" style={{ color: "#025F67" }}>{budget}</span>
+                  <span className="inline-flex items-center gap-0.5 font-semibold" style={{ color: "#03045E" }}>{budget}</span>
                   {g.city && (
                     <span className="inline-flex items-center gap-0.5">
                       <MapPin className="w-3 h-3" /> {g.city}{g.state ? `, ${g.state}` : ""}
@@ -119,7 +119,7 @@ export default function ChambasNearby({ city, role = "client", limit = 3 }) {
               <Link
                 to="/empleos"
                 className="self-center inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold text-white whitespace-nowrap"
-                style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+                style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
                 data-testid={`chambas-nearby-cta-${g.gig_id}`}
               >
                 {role === "provider" ? T.apply : T.open}

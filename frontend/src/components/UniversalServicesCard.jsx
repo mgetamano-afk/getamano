@@ -47,7 +47,7 @@ export default function UniversalServicesCard() {
       <div
         className="relative overflow-hidden rounded-3xl p-7 md:p-9 mx-auto max-w-4xl"
         style={{
-          border: "2px solid #025F67",
+          border: "2px solid #03045E",
           background: "linear-gradient(160deg, #EFF9F7 0%, #FFFFFF 60%)",
         }}
       >
@@ -66,7 +66,7 @@ export default function UniversalServicesCard() {
         {/* Headline */}
         <h2
           className="text-xl md:text-2xl font-extrabold leading-tight mb-2.5"
-          style={{ color: "#025F67" }}
+          style={{ color: "#03045E" }}
           data-testid="universal-services-headline"
         >
           {c.headline}
@@ -83,7 +83,7 @@ export default function UniversalServicesCard() {
             <span
               key={b}
               className="inline-flex items-center bg-white text-[12px] font-semibold px-3 py-1 rounded-full"
-              style={{ border: "1.5px solid #5DCAA5", color: "#025F67" }}
+              style={{ border: "1.5px solid #5DCAA5", color: "#03045E" }}
             >
               {b}
             </span>
@@ -96,7 +96,7 @@ export default function UniversalServicesCard() {
             type="button"
             onClick={() => navigate("/search")}
             className="inline-flex items-center gap-1.5 px-5 py-3 rounded-full text-white text-sm font-bold transition active:scale-95 hover:brightness-110"
-            style={{ background: "#025F67", boxShadow: "0 4px 16px rgba(2,95,103,0.25)" }}
+            style={{ background: "#03045E", boxShadow: "0 4px 16px rgba(2,95,103,0.25)" }}
             data-testid="universal-services-cta-client"
           >
             <Search className="w-4 h-4" />
@@ -107,7 +107,7 @@ export default function UniversalServicesCard() {
             type="button"
             onClick={() => navigate("/register?intent=provider")}
             className="inline-flex items-center gap-1 px-4 py-[10px] rounded-full text-sm font-semibold transition hover:bg-teal-50"
-            style={{ border: "1.5px solid #025F67", color: "#025F67", background: "transparent" }}
+            style={{ border: "1.5px solid #03045E", color: "#03045E", background: "transparent" }}
             data-testid="universal-services-cta-provider"
           >
             {c.ctaProvider}

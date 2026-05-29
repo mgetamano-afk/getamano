@@ -45,12 +45,12 @@ export default function LanguageBadges({
         color: "#FFFFFF",
       }
     : variant === "dark"
-      ? { background: "rgba(2,95,103,0.08)", border: "1px solid rgba(2,95,103,0.18)", color: "#025F67" }
-      : { background: "#EFF9F7", border: "1px solid #5DCAA5", color: "#025F67" };
+      ? { background: "rgba(2,95,103,0.08)", border: "1px solid rgba(2,95,103,0.18)", color: "#03045E" }
+      : { background: "#EFF9F7", border: "1px solid #5DCAA5", color: "#03045E" };
 
   const efStyle = variant === "glass"
-    ? { background: "#FFFFFF", color: "#025F67" }
-    : { background: "#025F67", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(2,95,103,0.25)" };
+    ? { background: "#FFFFFF", color: "#03045E" }
+    : { background: "#03045E", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(2,95,103,0.25)" };
 
   return (
     <div className={`flex items-center gap-1.5 flex-wrap ${className}`} data-testid="language-badges">

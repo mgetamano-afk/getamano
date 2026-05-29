@@ -212,7 +212,7 @@ function BulkOnboarding() {
         onClick={submit}
         disabled={!canSubmit}
         className="w-full py-3 rounded-full text-white font-bold disabled:opacity-50"
-        style={{ background: "linear-gradient(135deg, #025F67 0%, #2F9D94 100%)" }}
+        style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
         data-testid="bulk-submit"
       >
         {submitting ? "Creando..." : `Crear ${valid.length} proveedor${valid.length === 1 ? "" : "es"}`}
@@ -440,7 +440,7 @@ export default function AdminOpsPage() {
           <button
             onClick={() => setTab("bulk")}
             className={`px-4 py-2 text-sm font-bold border-b-2 transition ${tab === "bulk" ? "text-teal-700" : "text-slate-400 hover:text-slate-600 border-transparent"}`}
-            style={{ borderColor: tab === "bulk" ? "#025F67" : "transparent" }}
+            style={{ borderColor: tab === "bulk" ? "#03045E" : "transparent" }}
             data-testid="admin-ops-tab-bulk"
           >
             <Users className="w-4 h-4 inline mr-1.5" /> Onboarding masivo
@@ -448,7 +448,7 @@ export default function AdminOpsPage() {
           <button
             onClick={() => setTab("latency")}
             className={`px-4 py-2 text-sm font-bold border-b-2 transition ${tab === "latency" ? "text-teal-700" : "text-slate-400 hover:text-slate-600 border-transparent"}`}
-            style={{ borderColor: tab === "latency" ? "#025F67" : "transparent" }}
+            style={{ borderColor: tab === "latency" ? "#03045E" : "transparent" }}
             data-testid="admin-ops-tab-latency"
           >
             <Clock className="w-4 h-4 inline mr-1.5" /> Latencia de respuesta
@@ -456,7 +456,7 @@ export default function AdminOpsPage() {
           <button
             onClick={() => setTab("cloud")}
             className={`px-4 py-2 text-sm font-bold border-b-2 transition ${tab === "cloud" ? "text-teal-700" : "text-slate-400 hover:text-slate-600 border-transparent"}`}
-            style={{ borderColor: tab === "cloud" ? "#025F67" : "transparent" }}
+            style={{ borderColor: tab === "cloud" ? "#03045E" : "transparent" }}
             data-testid="admin-ops-tab-cloud"
           >
             <Cloud className="w-4 h-4 inline mr-1.5" /> Google Cloud

@@ -57,7 +57,7 @@ export default function FoundingCounter({ variant = "hero" }) {
   // Helpers used by both variant="banner" and variant="hero"
   const recent = Array.isArray(data.recent) ? data.recent.slice(0, 3) : [];
   const avatarBg = (s) => {
-    const colors = ["#2F9D94", "#025F67", "#063154", "#4EBAAE", "#BCC5CC", "#74CFC5"];
+    const colors = ["#0077B6", "#03045E", "#03045E", "#4EBAAE", "#BCC5CC", "#74CFC5"];
     const idx = (s?.charCodeAt(0) || 0) % colors.length;
     return colors[idx];
   };
@@ -245,7 +245,7 @@ export default function FoundingCounter({ variant = "hero" }) {
                     <div
                       key={i}
                       className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 shadow"
-                      style={{ borderColor: "#063154" }}
+                      style={{ borderColor: "#03045E" }}
                       style={{ backgroundColor: avatarBg(m.initial) }}
                       title={`${m.first_name}${m.city ? ` · ${m.city}` : ""}`}
                     >

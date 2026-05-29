@@ -145,16 +145,16 @@ export default function CitySearchInput({
             >
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: geoActive ? "#025F67" : "#E1F5EE" }}
+                style={{ background: geoActive ? "#03045E" : "#E1F5EE" }}
               >
                 {geoLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: geoActive ? "white" : "#025F67" }} />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: geoActive ? "white" : "#03045E" }} />
                 ) : (
-                  <Navigation className="w-3.5 h-3.5" style={{ color: geoActive ? "white" : "#025F67" }} />
+                  <Navigation className="w-3.5 h-3.5" style={{ color: geoActive ? "white" : "#03045E" }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" style={{ color: "#025F67" }}>
+                <p className="text-sm font-semibold" style={{ color: "#03045E" }}>
                   Cerca de mí
                 </p>
                 <p className="text-[11px] text-slate-500">

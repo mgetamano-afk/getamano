@@ -22,7 +22,7 @@ export default function ReferralLanding() {
   }, [code, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F6F2]">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FCFD]">
       <div className="text-sm text-slate-500">Redirigiendo…</div>
     </div>
   );

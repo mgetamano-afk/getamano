@@ -69,7 +69,7 @@ export default function ProviderVideoUpload({ profile, setProfile }) {
           <Lock className="w-5 h-5 text-slate-500" />
         </div>
         <div className="flex-1">
-          <h4 className="font-display font-semibold text-base" style={{ color: "#025F67" }}>
+          <h4 className="font-display font-semibold text-base" style={{ color: "#03045E" }}>
             🎬 Video de presentación — Plan Pro y Premium
           </h4>
           <p className="text-sm text-slate-600 mt-1">
@@ -78,7 +78,7 @@ export default function ProviderVideoUpload({ profile, setProfile }) {
           <Link
             to="/plans"
             className="inline-block mt-3 px-4 py-2 rounded-full text-sm font-semibold text-white"
-            style={{ backgroundColor: "#2F9D94" }}
+            style={{ backgroundColor: "#0077B6" }}
             data-testid="video-upgrade-cta"
           >
             Actualizar mi plan
@@ -96,10 +96,10 @@ export default function ProviderVideoUpload({ profile, setProfile }) {
     >
       <div className="flex items-start gap-3 mb-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#EBF8F7" }}>
-          <Video className="w-5 h-5" style={{ color: "#025F67" }} />
+          <Video className="w-5 h-5" style={{ color: "#03045E" }} />
         </div>
         <div className="flex-1">
-          <h4 className="font-display font-semibold text-base" style={{ color: "#025F67" }}>🎬 Video de presentación</h4>
+          <h4 className="font-display font-semibold text-base" style={{ color: "#03045E" }}>🎬 Video de presentación</h4>
           <p className="text-sm text-slate-500">Máx. 2 minutos · MP4 / MOV / AVI · hasta 200 MB. Solo 1 video por proveedor.</p>
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function ProviderVideoUpload({ profile, setProfile }) {
               onClick={() => inputRef.current?.click()}
               disabled={uploading}
               className="px-4 py-2 rounded-full text-sm font-medium border inline-flex items-center gap-2 disabled:opacity-60"
-              style={{ borderColor: "#BCC5CC", color: "#025F67" }}
+              style={{ borderColor: "#BCC5CC", color: "#03045E" }}
               data-testid="video-replace-btn"
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
@@ -141,7 +141,7 @@ export default function ProviderVideoUpload({ profile, setProfile }) {
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className="w-full py-8 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 hover:border-teal-400 transition disabled:opacity-60"
-          style={{ borderColor: "#BCC5CC", color: "#025F67" }}
+          style={{ borderColor: "#BCC5CC", color: "#03045E" }}
           data-testid="video-upload-trigger"
         >
           {uploading ? (
@@ -149,7 +149,7 @@ export default function ProviderVideoUpload({ profile, setProfile }) {
               <Loader2 className="w-7 h-7 animate-spin" />
               <span className="text-sm font-medium">Subiendo… {progress}%</span>
               <div className="w-2/3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full transition-all" style={{ width: `${progress}%`, backgroundColor: "#2F9D94" }} />
+                <div className="h-full transition-all" style={{ width: `${progress}%`, backgroundColor: "#0077B6" }} />
               </div>
             </>
           ) : (

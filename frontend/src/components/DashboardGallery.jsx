@@ -117,12 +117,12 @@ export default function DashboardGallery({ profile, setProfile }) {
       {isFreeLimitReached && (
         <div
           className="rounded-xl p-4 mb-5 flex items-start gap-3"
-          style={{ backgroundColor: "#FFF8E1", borderLeft: "4px solid #2F9D94" }}
+          style={{ backgroundColor: "#FFF8E1", borderLeft: "4px solid #0077B6" }}
           data-testid="gallery-limit-banner"
         >
-          <Sparkles className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#025F67" }} />
+          <Sparkles className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#03045E" }} />
           <div className="flex-1">
-            <p className="text-sm font-medium" style={{ color: "#025F67" }}>
+            <p className="text-sm font-medium" style={{ color: "#03045E" }}>
               📸 Has llegado al límite de {limit.max} fotos del plan Gratis.
             </p>
             <p className="text-sm text-slate-700 mt-1">
@@ -131,7 +131,7 @@ export default function DashboardGallery({ profile, setProfile }) {
             <Link
               to="/plans"
               className="inline-block mt-3 px-4 py-2 rounded-full text-sm font-semibold text-white"
-              style={{ backgroundColor: "#2F9D94" }}
+              style={{ backgroundColor: "#0077B6" }}
               data-testid="gallery-limit-cta"
             >
               Ver planes
@@ -163,7 +163,7 @@ export default function DashboardGallery({ profile, setProfile }) {
               {idx === 0 && (
                 <span
                   className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white"
-                  style={{ backgroundColor: "#025F67" }}
+                  style={{ backgroundColor: "#03045E" }}
                   data-testid={`gallery-main-badge-${g.id}`}
                 >
                   <Pin className="w-3 h-3" /> Foto principal
