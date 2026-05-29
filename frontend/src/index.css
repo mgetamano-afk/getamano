@@ -150,19 +150,15 @@ html {
   overscroll-behavior-y: auto;
 }
 
-/* ─── Section 71b — Getamano Design System tokens (Teal/Midnight Green palette)
-   Maastricht Blue → Midnight Green → Munsell Blue → Tiffany Blue → Pale Robin.
-   This palette unifies with the existing teal/lagoon brand (already in
-   tailwind.config.js as `scooter`, `lagoon`, `sapphire`). The `--gtm-blue-*`
-   variable NAMES are kept stable so existing consumers don't break, but
-   the underlying HEXES have been re-aliased to the teal family per user
-   feedback. */
+/* ─── Section 73 — Ocean Blue palette (Latin Ventures LLC, 2026)
+   `:root` vars are the source of truth — Tailwind config mirrors these.
+   Token names start with `--gtm-blue-*` for stability across themes. */
 :root {
-  --gtm-blue-dark:    #011C40;  /* Maastricht Blue — hero backgrounds */
-  --gtm-blue-primary: #024059;  /* Midnight Green / Eagle Green — primary actions */
-  --gtm-blue-accent:  #0396A6;  /* Blue (Munsell) — accents, links */
-  --gtm-blue-light:   #04BFBF;  /* Tiffany Blue — bright highlights */
-  --gtm-blue-surface: #9CE3D5;  /* Pale Robin Egg — surfaces, subtle bg */
+  --gtm-blue-dark:    #03045E;
+  --gtm-blue-primary: #0077B6;
+  --gtm-blue-accent:  #00B4D8;
+  --gtm-blue-light:   #90E0EF;
+  --gtm-blue-surface: #CAF0F8;
 }
 
 /* Smooth momentum scrolling on iOS for any inner-scroll containers */

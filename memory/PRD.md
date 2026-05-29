@@ -3190,3 +3190,55 @@ Aligns with the existing teal brand (`lagoon #025F67`, `scooter #2F9D94`). Updat
 
 ### Files
 - **MODIFIED**: `frontend/src/index.css`, `frontend/tailwind.config.js`, `frontend/src/components/onboarding/{OnboardingFlow,OnboardingSplash,OnboardingSlides,OnboardingLogin,LanguageToggle}.jsx`
+
+---
+
+## Section 73 — Unified Login + Social OAuth + Founder Discount (2026-02-28)
+
+User uploaded prompt 73 (login/social/colors unification). Two prompt-level conflicts resolved by user direction:
+1. Color palette → use Ocean Blue (`#03045E/#0077B6/#00B4D8/#90E0EF/#CAF0F8`)
+2. Auth stack → translate Supabase logic to our existing FastAPI + MongoDB stack
+3. Apple/Facebook → "coming soon" pills (no credentials yet)
+
+### Palette swap back to Ocean Blue
+- `frontend/src/index.css`: `:root` vars reverted (`--gtm-blue-*`)
+- `frontend/tailwind.config.js`: `brand.blue-*` reverted
+- All 4 onboarding files re-swapped via deterministic script (zero residual teal hex values)
+
+### Unified login routes (the "one and only one auth screen" rule)
+- **NEW** `frontend/src/pages/auth/LoginPage.jsx`: thin wrapper around the `OnboardingLogin` component.
+- `App.js`: routes `/login`, `/auth/login`, `/signin`, `/register`, `/signup`, `/registro` ALL render the same `LoginPage`. Legacy `Login.jsx` + `Register.jsx` kept on disk but unimported.
+
+### Role selector for new social users
+- **NEW** `frontend/src/pages/auth/SelectRolePage.jsx`: two-card chooser (Client / Provider) for any user that just signed in via OAuth and still has `role === null`. Existing-role users are bounced silently to the right home.
+- **NEW** `POST /api/auth/set-role` (in `routes/auth.py`): validates `role ∈ {client, provider}` (422 otherwise), writes to `db.users`.
+
+### Founder Discount — first 50 providers, 50% off forever
+- **NEW** `backend/routes/founders.py`:
+  - `GET /api/founders/status` — public counter `{slots_total, slots_used, slots_remaining}`.
+  - `POST /api/founders/claim` — auth-required idempotent claim; uses MongoDB `find_one_and_update` with `$inc` + `$lt:50` guard for race-safe capacity capping.
+- **MODIFIED** `backend/server.py`:
+  - Wired the founders router.
+  - Provider profile creation (`POST /providers/me`) now auto-claims a founder slot (try-wrapped, never blocks the create on counter failures).
+- **MODIFIED** `frontend/src/components/onboarding/OnboardingLogin.jsx`: fetches `/founders/status` on mount; renders an animated 🔥 banner *"You're one of the first 50! Only X spots left with 50% lifetime discount"* — ONLY when the user has the "Provider" role selected and slots remain.
+- New i18n keys in ES + EN: `role.*` and `founder.banner_*`.
+
+### Tests
+- **NEW** `backend/tests/test_iter82_founders_setrole.py` — 5 tests:
+  1. `/founders/status` is public, returns the 50-slot math.
+  2. `/founders/claim` requires auth.
+  3. Claim is idempotent (second call returns the same position).
+  4. `/auth/set-role` validates strictly to `{client, provider}` (4 bad values rejected).
+  5. Client user (no provider profile) claiming → 404.
+- All 5 pass; 30/30 across iter71/75/78/79/82.
+
+### Verification
+- Mobile screenshot @ 393×852 confirms:
+  - Client role: 3 social buttons (Google live, Apple/Facebook visual), Sign In CTA, no founder banner.
+  - Provider role: founder banner appears with current `slots_remaining` count, gradient navy→primary blue.
+- `/login` and `/register` both render the same OnboardingLogin component (route consolidation verified).
+- `LoginPage.jsx` import path corrected after first dev-server hot-reload error.
+
+### Files
+- **NEW**: `backend/routes/founders.py`, `backend/tests/test_iter82_founders_setrole.py`, `frontend/src/pages/auth/LoginPage.jsx`, `frontend/src/pages/auth/SelectRolePage.jsx`
+- **MODIFIED**: `backend/server.py`, `backend/routes/auth.py`, `frontend/src/App.js`, `frontend/src/components/onboarding/OnboardingLogin.jsx`, `frontend/src/contexts/I18nContext.jsx`, `frontend/src/index.css`, `frontend/tailwind.config.js`, plus the 4 onboarding files (palette re-swap)

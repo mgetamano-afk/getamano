@@ -1631,6 +1631,37 @@ async def create_provider(payload: ProviderProfileIn, user: User = Depends(get_c
     }
     await db.provider_profiles.insert_one(doc)
     doc.pop("_id", None)
+
+    # Section 73 — Auto-claim Founder Discount slot if any remain.
+    # Wrapped in try so a counter glitch never blocks profile creation.
+    try:
+        from pymongo import ReturnDocument
+        # Ensure counter exists (idempotent)
+        await db.counters.update_one(
+            {"_id": "founders_v1"},
+            {"$setOnInsert": {"used": 0, "total": 50, "created_at": now}},
+            upsert=True,
+        )
+        claimed = await db.counters.find_one_and_update(
+            {"_id": "founders_v1", "used": {"$lt": 50}},
+            {"$inc": {"used": 1}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if claimed is not None:
+            pos = int(claimed["used"])
+            await db.provider_profiles.update_one(
+                {"provider_id": doc["provider_id"]},
+                {"$set": {
+                    "is_founder": True,
+                    "founder_position": pos,
+                    "founder_locked_at": now,
+                }},
+            )
+            doc["is_founder"] = True
+            doc["founder_position"] = pos
+    except Exception as e:
+        logger.warning(f"founder auto-claim failed for {user.user_id}: {e}")
+
     return doc
 
 @api_router.put("/providers/me")
@@ -9540,6 +9571,7 @@ from routes.profile_versions import (  # noqa: E402
 )
 from routes.reviews import build_reviews_router as _make_reviews_router  # noqa: E402
 from routes.search_concierge import build_concierge_router as _make_concierge_router  # noqa: E402
+from routes.founders import build_founders_router as _make_founders_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9694,6 +9726,11 @@ api_router.include_router(
 
 # Section 81 — AI Search Concierge
 api_router.include_router(_make_concierge_router(db=db))
+
+# Section 73 — Founder Discount (first 50 providers, 50% off forever)
+api_router.include_router(
+    _make_founders_router(db=db, User=User, get_current_user=get_current_user)
+)
 
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.

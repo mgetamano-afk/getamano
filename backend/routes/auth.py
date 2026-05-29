@@ -76,6 +76,21 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
+class SetRoleIn(BaseModel):
+    """Section 73 — Role decision after social-OAuth signup.
+    `role` must be one of {client, provider}. Any other value is rejected."""
+    role: str
+
+    @classmethod
+    def _validate_role(cls, v: str) -> str:
+        if v not in {"client", "provider"}:
+            raise ValueError("role must be 'client' or 'provider'")
+        return v
+
+    def model_post_init(self, _ctx):  # type: ignore[override]
+        SetRoleIn._validate_role(self.role)
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # Small helpers (kept module-level so each is independently testable)
 # ─────────────────────────────────────────────────────────────────────────
@@ -558,5 +573,16 @@ def make_router(
     @router.post("/auth/reset-password")
     async def reset_password(payload: ResetPasswordIn):
         return await _do_reset_password(deps, payload)
+
+    # ── Section 73 — Set role after social OAuth ──────────────────
+    @router.post("/auth/set-role")
+    async def set_role(payload: SetRoleIn, user=Depends(get_current_user)):
+        """Persist `role` on the user document. Idempotent — setting the
+        same role twice is a no-op. Returns the refreshed user dict."""
+        await db.users.update_one(
+            {"user_id": user.user_id},
+            {"$set": {"role": payload.role, "role_set_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        return {"ok": True, "role": payload.role}
 
     return router

@@ -283,6 +283,20 @@ const dict = {
     "onb.login.signup_q": "¿Aún no tienes cuenta?",
     "onb.login.signup_cta": "Crea una aquí",
     "onb.lang.aria": "Selecciona idioma",
+
+    // Section 73 — Role selector (post-OAuth for new users)
+    "role.title": "¿Cómo quieres usar getamano?",
+    "role.subtitle": "Puedes cambiar esto más adelante desde tu perfil.",
+    "role.client_title": "Soy Cliente",
+    "role.client_desc": "Quiero encontrar proveedores latinos cerca de mí.",
+    "role.provider_title": "Soy Proveedor",
+    "role.provider_desc": "Quiero ofrecer mis servicios a la comunidad.",
+    "role.saving": "Guardando…",
+
+    // Section 73 — Founder Discount urgency banner
+    "founder.banner_title": "🔥 ¡Eres de los primeros 50!",
+    "founder.banner_left_prefix": "Quedan",
+    "founder.banner_left_suffix": "lugares con 50% de descuento de por vida.",
   },
   en: {
     "nav.explore": "Explore services",
@@ -565,6 +579,20 @@ const dict = {
     "onb.login.signup_q": "Don't have an account yet?",
     "onb.login.signup_cta": "Create one here",
     "onb.lang.aria": "Select language",
+
+    // Section 73 — Role selector (EN)
+    "role.title": "How will you use getamano?",
+    "role.subtitle": "You can change this later from your profile.",
+    "role.client_title": "I'm a Client",
+    "role.client_desc": "I want to find Latino providers near me.",
+    "role.provider_title": "I'm a Provider",
+    "role.provider_desc": "I want to offer my services to the community.",
+    "role.saving": "Saving…",
+
+    // Section 73 — Founder Discount urgency banner
+    "founder.banner_title": "🔥 You're one of the first 50!",
+    "founder.banner_left_prefix": "Only",
+    "founder.banner_left_suffix": "spots left with 50% lifetime discount.",
   }
 };
 

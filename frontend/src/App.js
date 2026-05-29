@@ -32,8 +32,9 @@ const ChunkFallback = () => (
 
 import Landing from "./pages/Landing";
 import AppHome from "./pages/AppHome";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
+// Section 73 — `pages/Login.jsx` + `pages/Register.jsx` are still on disk
+// (deep-linked from some emails), but routes now use the unified LoginPage.
+// Intentionally NOT imported here to keep the bundle clean.
 import AuthCallback from "./pages/AuthCallback";
 import Search from "./pages/Search";
 import ProviderECard from "./pages/ProviderECard";
@@ -67,6 +68,8 @@ const PrintCard = lazy(() => import("./pages/PrintCard"));
 const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow"));
+const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
+const SelectRolePage = lazy(() => import("./pages/auth/SelectRolePage"));
 
 // Admin Zone 4 — all code-split (rarely on critical path)
 const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
@@ -136,12 +139,17 @@ function AppRouter() {
       <Route path="/galeria-banners" element={<BannerGalleryPage />} />
       <Route path="/banner-gallery" element={<BannerGalleryPage />} />
 
-      {/* Auth */}
-      <Route path="/login" element={<Login />} />
+      {/* Auth — Section 73 unified entry: every legacy auth route now
+          renders the same LoginPage (dual-role + Google/Apple/Facebook). */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/signin" element={<LoginPage />} />
+      <Route path="/register" element={<LoginPage />} />
+      <Route path="/signup" element={<LoginPage />} />
+      <Route path="/registro" element={<LoginPage />} />
+      <Route path="/auth/select-role" element={<SelectRolePage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/registro" element={<Register />} />
 
       {/* Zone 2: Client Experience */}
       <Route path="/search" element={<Search />} />
