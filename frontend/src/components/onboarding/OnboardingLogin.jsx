@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Mail, Lock, Loader2, User, Briefcase, Flame } from "lucide-react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { Mail, Lock, Loader2, User, Briefcase, Flame, Gift, X as XIcon } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../contexts/I18nContext";
 import { api } from "../../lib/api";
@@ -22,16 +22,75 @@ import LanguageToggle from "./LanguageToggle";
  * Before sign-in, the user picks a role (Client / Provider). This is
  * stored in localStorage so it can prefill the registration wizard if
  * they tap "Create one here". Existing login does not require the role.
+ *
+ * Section 74 BUG-2 — the landing page CTAs deep-link with `?intent=provider`
+ * (legacy) or `?role=provider` (per the prompt). We honour both query
+ * params on mount so the role picker arrives pre-selected.
  */
 export default function OnboardingLogin({ onFinish }) {
   const { t } = useI18n();
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState(() => localStorage.getItem("gtm_pending_role") || "client");
+  const [searchParams] = useSearchParams();
+  // Resolve the initial role from (in priority order): URL `?role=`,
+  // URL `?intent=`, localStorage fallback, then default to "client".
+  const initialRole = (() => {
+    const fromUrl = (searchParams.get("role") || searchParams.get("intent") || "").toLowerCase();
+    if (fromUrl === "provider" || fromUrl === "client") return fromUrl;
+    try {
+      const stored = localStorage.getItem("gtm_pending_role");
+      if (stored === "provider" || stored === "client") return stored;
+    } catch { /* private mode */ }
+    return "client";
+  })();
+  const [role, setRole] = useState(initialRole);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [founderStatus, setFounderStatus] = useState(null); // Section 73 — {slots_remaining}
+
+  // Section 75 — Referral code state. The code arrives from:
+  //   1. URL `?ref=ABCDEF` (provider link sent via WhatsApp).
+  //   2. sessionStorage `gtm_ref_code` (set by ReferralLanding for /r/CODE).
+  //   3. localStorage `gtm_pending_ref_code` (set if user typed it manually
+  //      but navigated away before finishing signup).
+  // The code is uppercase 6-char alphanumeric, excluding O/0/I/1.
+  const [refCode, setRefCode] = useState(() => {
+    const fromUrl = (searchParams.get("ref") || "").toUpperCase().slice(0, 6);
+    if (fromUrl) return fromUrl;
+    try {
+      return (
+        sessionStorage.getItem("gtm_ref_code")
+        || localStorage.getItem("gtm_pending_ref_code")
+        || ""
+      ).toUpperCase().slice(0, 6);
+    } catch { return ""; }
+  });
+  const [refInputOpen, setRefInputOpen] = useState(false);
+
+  // Persist the resolved role so downstream screens (e.g. /register wizard,
+  // OAuth callback) pick the same choice if the user navigates away first.
+  useEffect(() => {
+    try { localStorage.setItem("gtm_pending_role", initialRole); } catch { /* private mode */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Section 75 — Keep the ref code in localStorage so the post-OAuth
+  // callback / registration form can pick it up even if the user navigates
+  // away from this page before finishing signup. Clears the key when
+  // refCode becomes empty (user clicked "Quitar"). Also mirrors to the
+  // sessionStorage `tx_ref` key consumed by the legacy Google OAuth path.
+  useEffect(() => {
+    try {
+      if (refCode) {
+        localStorage.setItem("gtm_pending_ref_code", refCode);
+        sessionStorage.setItem("tx_ref", refCode);
+      } else {
+        localStorage.removeItem("gtm_pending_ref_code");
+        sessionStorage.removeItem("tx_ref");
+      }
+    } catch { /* private mode */ }
+  }, [refCode]);
 
   // Fetch founder status once so we can show urgency for providers
   useEffect(() => {
@@ -127,6 +186,66 @@ export default function OnboardingLogin({ onFinish }) {
             );
           })}
         </div>
+
+        {/* Section 75 — Optional referral code input (providers only).
+            If the user arrived via /r/CODE → field is pre-filled and shown
+            as a chip with a "Quitar" link. Otherwise a small toggle lets
+            them open the manual input. Hidden for clients since referrals
+            are provider-to-provider only. */}
+        {role === "provider" && (
+          <div className="mb-5" data-testid="onb-referral-row">
+            {refCode ? (
+              <div
+                className="flex items-center gap-2 px-3 py-2.5 rounded-2xl border border-[#90E0EF] bg-[#CAF0F8]/40"
+                data-testid="onb-referral-chip"
+              >
+                <Gift className="w-4 h-4 flex-shrink-0" style={{ color: "#0077B6" }} />
+                <span className="text-sm text-[#03045E] flex-1 min-w-0 truncate">
+                  Referido con código <strong className="font-bold tracking-wider">{refCode}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRefCode("");
+                    try { sessionStorage.removeItem("gtm_ref_code"); } catch { /* */ }
+                  }}
+                  className="text-xs font-semibold text-[#0077B6] hover:underline flex items-center gap-0.5"
+                  data-testid="onb-referral-clear"
+                >
+                  <XIcon className="w-3 h-3" /> Quitar
+                </button>
+              </div>
+            ) : refInputOpen ? (
+              <input
+                type="text"
+                value={refCode}
+                onChange={(e) =>
+                  setRefCode(
+                    e.target.value
+                      .toUpperCase()
+                      .replace(/[^A-Z0-9]/g, "")
+                      .slice(0, 6)
+                  )
+                }
+                placeholder="A1B2C3"
+                maxLength={6}
+                autoFocus
+                className="w-full h-12 px-4 rounded-2xl bg-white border-2 border-[#90E0EF] focus:border-[#0077B6] outline-none text-[#03045E] text-sm font-bold tracking-[0.25em] uppercase placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400"
+                data-testid="onb-referral-input"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRefInputOpen(true)}
+                className="text-xs font-semibold text-[#0077B6] hover:underline flex items-center gap-1"
+                data-testid="onb-referral-open"
+              >
+                <Gift className="w-3.5 h-3.5" />
+                ¿Tienes un código de referido? →
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Section 73 — Founder Discount urgency banner.
             Shown ONLY when the user is in "Proveedor" role and there are

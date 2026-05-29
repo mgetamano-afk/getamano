@@ -294,9 +294,9 @@ const dict = {
     "role.saving": "Guardando…",
 
     // Section 73 — Founder Discount urgency banner
-    "founder.banner_title": "🔥 ¡Eres de los primeros 50!",
+    "founder.banner_title": "🔥 ¡Eres de los primeros 100!",
     "founder.banner_left_prefix": "Quedan",
-    "founder.banner_left_suffix": "lugares con 50% de descuento de por vida.",
+    "founder.banner_left_suffix": "cupos · Plan de pago GRATIS hasta dic 2027.",
 
     // Section 73e — Reviews tabs (eCard)
     "reviews.tab_recent": "Recientes",
@@ -598,9 +598,9 @@ const dict = {
     "role.saving": "Saving…",
 
     // Section 73 — Founder Discount urgency banner
-    "founder.banner_title": "🔥 You're one of the first 50!",
+    "founder.banner_title": "🔥 You're one of the first 100!",
     "founder.banner_left_prefix": "Only",
-    "founder.banner_left_suffix": "spots left with 50% lifetime discount.",
+    "founder.banner_left_suffix": "spots left · Any paid plan FREE until Dec 2027.",
 
     // Section 73e — Reviews tabs (eCard) — EN
     "reviews.tab_recent": "Recent",

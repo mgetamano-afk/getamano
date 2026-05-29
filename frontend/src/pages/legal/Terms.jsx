@@ -26,7 +26,7 @@ export default function Terms() {
       <p>Los pagos se procesan a través de Stripe, Inc. Al suscribirte a un plan de pago, autorizas a getamano a cobrar el monto correspondiente de forma mensual a tu método de pago registrado. Todos los precios están en dólares estadounidenses (USD).</p>
 
       <h2>5. Programa Founding Members</h2>
-      <p>El código promocional <strong>GETAMANO50</strong> otorga acceso gratuito al Plan Pro hasta el 31 de diciembre de 2027, exclusivo para los primeros 50 proveedores registrados. Este beneficio no es transferible y se aplica únicamente al plan Pro.</p>
+      <p>El programa <strong>Founding Members</strong> otorga acceso gratuito a cualquier plan de pago (Básico, Pro o Premium) hasta el 31 de diciembre de 2027, exclusivo para los primeros 100 proveedores registrados. Este beneficio no es transferible. A partir del 1 de enero de 2028, comenzará la facturación normal del plan elegido.</p>
 
       <h2>6. Cancelaciones y reembolsos</h2>
       <p>Puedes cancelar tu suscripción en cualquier momento desde tu panel de proveedor. La cancelación tiene efecto al final del período de facturación en curso. No se ofrecen reembolsos por períodos parciales ya facturados, excepto cuando lo exija la ley aplicable.</p>

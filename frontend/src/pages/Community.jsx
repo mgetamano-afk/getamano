@@ -142,7 +142,7 @@ export default function Community({ embedded = false }) {
                 </div>
 
                 <div className="mt-7 flex flex-wrap gap-2">
-                  <Link to="/registro?intent=provider&promo=GETAMANO50" className="btn-primary inline-flex items-center gap-1" data-testid="wall-cta-join">
+                  <Link to="/registro?role=provider" className="btn-primary inline-flex items-center gap-1" data-testid="wall-cta-join">
                     <Award className="w-4 h-4" /> Abre tu eCard y aparece aquí
                   </Link>
                   <Link to="/buscar" className="px-5 py-2.5 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium text-sm inline-flex items-center gap-1">
@@ -253,7 +253,7 @@ export default function Community({ embedded = false }) {
           <div className="mt-12 rounded-3xl p-6 md:p-8 text-center" style={{ background: "linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%)" }}>
             <h3 className="font-display text-2xl md:text-3xl font-bold text-slate-900">Tu historia merece estar aquí 🧡</h3>
             <p className="mt-2 text-sm text-slate-600 max-w-xl mx-auto">Si eres latino y tienes un negocio en Estados Unidos, este es tu espacio. Únete a la comunidad y empieza a coleccionar logros.</p>
-            <Link to="/registro?intent=provider&promo=GETAMANO50" className="inline-flex items-center gap-2 mt-5 btn-primary" data-testid="wall-bottom-cta">
+            <Link to="/registro?role=provider" className="inline-flex items-center gap-2 mt-5 btn-primary" data-testid="wall-bottom-cta">
               Abrir mi eCard gratis <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

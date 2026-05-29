@@ -37,10 +37,37 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 
-# Standard "1 free month" value used when crediting a milestone. Matches
-# the current Pro Monthly plan price. If pricing changes, update this
-# constant (or migrate to fetch from a settings collection).
-FREE_MONTH_CENTS = 900  # $9.00 USD
+# ─── SECTION 75 — Plan-aware milestone credit values ──────────────────
+# CEO Eloy's spec: credit per referral = referrer's plan price / 2, so
+# every 2 paid referees award the referrer 1 free month of their plan.
+#
+#   Plan       Price  Credit/referee   2-referee milestone
+#   ───────    ─────  ──────────────   ───────────────────
+#   Básico     $10    $5.00            $10  → 1 free month
+#   Pro        $15    $7.50            $15  → 1 free month
+#   Premium    $25    $12.50           $25  → 1 free month
+#
+# Providers on the FREE plan don't earn credits (nothing to discount).
+# This is the value that gets WRITTEN to the ledger when a milestone
+# hits — the credit then applies against the referrer's NEXT invoice.
+PLAN_MONTHLY_CENTS = {
+    "basic": 1000,
+    "pro": 1500,
+    "premium": 2500,
+    "premium_plus": 2500,
+}
+
+
+def _milestone_credit_cents(referrer_plan: Optional[str]) -> int:
+    """Return the cents value of ONE milestone reward for a referrer on
+    the given plan. Returns 0 for free / unknown plans (no credit).
+    The dollar value matches the referrer's current monthly plan price."""
+    return PLAN_MONTHLY_CENTS.get((referrer_plan or "").lower(), 0)
+
+
+# Legacy alias — kept so older imports keep working. New code should use
+# _milestone_credit_cents(plan) instead.
+FREE_MONTH_CENTS = 900  # $9.00 — used only as a fallback when plan unknown
 
 # Every N confirmed paying referees award 1 month free.
 REFEREES_PER_MILESTONE = 2
@@ -49,23 +76,31 @@ REFEREES_PER_MILESTONE = 2
 REFEREE_FREE_DAYS = 30
 
 
-async def _award_milestone_credit(db, referrer_user_id: str, milestone_index: int) -> None:
+async def _award_milestone_credit(db, referrer_user_id: str, milestone_index: int, referrer_plan: Optional[str] = None) -> None:
     """Append a free-month credit to the commission_credits ledger when
     the referrer hits a milestone (2, 4, 6, ... confirmed referees). Then
     fire an in-app + push notification celebrating it.
+
+    Section 75 — `amount_cents` is now plan-aware: it equals the referrer's
+    monthly plan price (Basic=$10, Pro=$15, Premium=$25). Free-plan
+    referrers earn $0 (nothing to discount), but we still record the
+    milestone so the celebration / community post fires.
 
     Idempotent on (source='user_referral_milestone', source_id='milestone_{N}').
     """
     from routes.credits import record_commission_credit
     source_id = f"milestone_{milestone_index}"  # the Nth milestone (1, 2, 3...)
-    await record_commission_credit(
-        db,
-        user_id=referrer_user_id,
-        source_id=source_id,
-        amount_cents=FREE_MONTH_CENTS,
-        note=f"1 mes gratis Pro · hito #{milestone_index} ({REFEREES_PER_MILESTONE * milestone_index} amigos suscritos)",
-        source="user_referral_milestone",
-    )
+    credit_cents = _milestone_credit_cents(referrer_plan)
+    plan_label = (referrer_plan or "free").capitalize()
+    if credit_cents > 0:
+        await record_commission_credit(
+            db,
+            user_id=referrer_user_id,
+            source_id=source_id,
+            amount_cents=credit_cents,
+            note=f"1 mes gratis {plan_label} · hito #{milestone_index} ({REFEREES_PER_MILESTONE * milestone_index} amigos suscritos)",
+            source="user_referral_milestone",
+        )
 
     # Celebration notification (separate from the "credit applied" celebration
     # of Section 71b — this one fires at MILESTONE EARNED, before Stripe
@@ -280,8 +315,16 @@ async def mark_referral_paid(db, referee_user_id: str) -> Optional[dict]:
         "user_id": referral["referrer_user_id"],
         "source": "user_referral_milestone",
     })
+    # Section 75 — credit amount is plan-aware. Look up the referrer's
+    # current subscription plan ONCE so all new milestones in this call
+    # get the right cents value (matches what they'd save next month).
+    referrer_profile = await db.provider_profiles.find_one(
+        {"user_id": referral["referrer_user_id"]},
+        {"_id": 0, "plan": 1},
+    ) or {}
+    referrer_plan = referrer_profile.get("plan")
     for idx in range(existing_credits + 1, milestones_earned + 1):
-        await _award_milestone_credit(db, referral["referrer_user_id"], idx)
+        await _award_milestone_credit(db, referral["referrer_user_id"], idx, referrer_plan)
 
     # Sprint A — "Almost there" anticipation hook. Fires AFTER milestone
     # checks so we don't fire it the moment the referrer EARNED the
@@ -413,6 +456,26 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             sort=[("created_at", -1)],
         )
 
+        # Section 75 — plan-aware reward math. The credit value matches the
+        # referrer's CURRENT monthly plan price so the widget can show
+        # "$7.50 per referido" or "$12.50 per referido" depending on tier.
+        profile = await db.provider_profiles.find_one(
+            {"user_id": me.user_id},
+            {"_id": 0, "plan": 1},
+        ) or {}
+        my_plan = profile.get("plan") or "free"
+        plan_monthly_cents = _milestone_credit_cents(my_plan)
+        # Credit per referee = milestone value / N referees per milestone.
+        credit_per_referee_cents = plan_monthly_cents // REFEREES_PER_MILESTONE if plan_monthly_cents else 0
+        # Wallet balance (pending credits aren't applied to Stripe yet)
+        wallet_pending_cents = 0
+        if my_plan != "free":
+            agg = await db.commission_credits.aggregate([
+                {"$match": {"user_id": me.user_id, "status": "pending"}},
+                {"$group": {"_id": None, "total": {"$sum": "$amount_cents"}}},
+            ]).to_list(1)
+            wallet_pending_cents = int((agg[0] or {}).get("total", 0)) if agg else 0
+
         # Public share URL — frontend resolves window.location.origin
         return {
             "ref_code": code,
@@ -424,7 +487,14 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "needed_for_next": needed_for_next,
             "ratio": REFEREES_PER_MILESTONE,
             "referee_free_days": REFEREE_FREE_DAYS,
-            "free_month_value_cents": FREE_MONTH_CENTS,
+            # Section 75 — plan-aware values for the widget
+            "my_plan": my_plan,
+            "plan_monthly_cents": plan_monthly_cents,
+            "credit_per_referee_cents": credit_per_referee_cents,
+            "wallet_pending_cents": wallet_pending_cents,
+            # Legacy fields kept for backward compatibility — older widgets
+            # still read FREE_MONTH_CENTS to render a fixed value.
+            "free_month_value_cents": plan_monthly_cents or FREE_MONTH_CENTS,
             "latest_milestone": latest_milestone,
             "headline": (
                 f"Tienes {paid_count} amigo{'s' if paid_count != 1 else ''} suscrito{'s' if paid_count != 1 else ''}. "

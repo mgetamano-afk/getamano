@@ -68,7 +68,17 @@ async def _resolve_category_id(db, slug: str) -> Optional[str]:
 
 async def _build_simple_filters(params: _SearchParams, db, public_guard: dict) -> dict:
     """Translate the 9 boolean/string filters into a Mongo query dict."""
-    query: dict[str, Any] = {"is_active": True, **public_guard}
+    # Section 74 BUG-3 — public search must NEVER expose providers that
+    # have not been approved by an admin. The previous behaviour gated
+    # this on the `verified` filter chip, which meant pending/rejected
+    # providers leaked into default results. The chip is now a no-op
+    # (already-approved-only) but is preserved so the URL contract and
+    # existing UI keep working.
+    query: dict[str, Any] = {
+        "is_active": True,
+        "verification_status": "approved",
+        **public_guard,
+    }
     if params.country:
         query["country"] = params.country
     if params.category:
@@ -82,6 +92,9 @@ async def _build_simple_filters(params: _SearchParams, db, public_guard: dict) -
     if params.zip_code:
         query["zip_code"] = params.zip_code
     if params.verified:
+        # Section 74 BUG-3 — `approved` is now ALWAYS enforced in
+        # _build_simple_filters above. This chip is kept as a no-op so
+        # existing UI/URL contracts keep working without surprises.
         query["verification_status"] = "approved"
     if params.language:
         query["languages"] = params.language

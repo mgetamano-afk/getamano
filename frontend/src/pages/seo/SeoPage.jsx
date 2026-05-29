@@ -190,7 +190,7 @@ export default function SeoPage() {
           <div className="bg-white rounded-2xl border p-10 text-center mb-12" style={{ borderColor: "#BCC5CC" }}>
             <Award className="w-12 h-12 mx-auto mb-3" style={{ color: "#0077B6" }} />
             <h2 className="font-display text-xl font-bold mb-2" style={{ color: "#03045E" }}>Sé el primero en {city.name}</h2>
-            <p className="text-slate-600 mb-4">Aún no hay proveedores latinos de {category.name_es.toLowerCase()} en {city.name}. Si eres uno, regístrate gratis y aprovecha el código <strong>GETAMANO50</strong> para 1 año de Plan Pro gratis.</p>
+            <p className="text-slate-600 mb-4">Aún no hay proveedores latinos de {category.name_es.toLowerCase()} en {city.name}. Si eres uno, regístrate gratis — los primeros 100 proveedores obtienen <strong>cualquier plan de pago GRATIS hasta diciembre 2027</strong>.</p>
             <Link to="/register?intent=provider" className="btn-primary inline-block" data-testid="empty-cta">Registrarme como proveedor</Link>
           </div>
         ) : (

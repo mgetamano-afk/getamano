@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Zap,
   MessageSquare,
+  Bookmark,
 } from "lucide-react";
 import CategoryIcon from "./CategoryIcon";
 import OwnerIdentityBadge from "./OwnerIdentityBadge";
@@ -27,8 +28,13 @@ import { useI18n } from "../contexts/I18nContext";
  *
  * NO price is rendered here by product request — pricing is revealed only on
  * the full eCard page when the client opens the profile.
+ *
+ * Section 75 — adds an Airbnb-style "Save to shortlist" button on the hero
+ * photo. Toggles via the `onToggleSave(providerId)` callback. Parent owns
+ * the saved state via `isSaved` so the same component drives both /buscar
+ * and any future "Saved tab" reuse without re-fetching per card.
  */
-export default function SearchResultCard({ provider }) {
+export default function SearchResultCard({ provider, isSaved = false, onToggleSave }) {
   const { t, lang } = useI18n();
   const p = provider || {};
   const [imgIdx, setImgIdx] = useState(0);
@@ -172,7 +178,7 @@ export default function SearchResultCard({ provider }) {
           </div>
         )}
 
-        {/* Top-right overlay: Video + Heart */}
+        {/* Top-right overlay: Video + Save heart */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           {p.video_url && (
             <span
@@ -182,6 +188,33 @@ export default function SearchResultCard({ provider }) {
             >
               <Video className="w-3 h-3" /> Video
             </span>
+          )}
+          {/* Section 75 — Save-to-shortlist heart (Airbnb-style). */}
+          {onToggleSave && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleSave(p.provider_id);
+              }}
+              aria-pressed={isSaved}
+              aria-label={
+                isSaved
+                  ? (lang === "en" ? "Remove from saved" : "Quitar de guardados")
+                  : (lang === "en" ? "Save provider" : "Guardar proveedor")
+              }
+              className="w-9 h-9 rounded-full bg-white/95 shadow-md flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
+              data-testid={`card-save-btn-${p.slug}`}
+              data-saved={isSaved ? "true" : "false"}
+            >
+              <Bookmark
+                className="w-4 h-4 transition-colors"
+                fill={isSaved ? "#EF4444" : "none"}
+                stroke={isSaved ? "#EF4444" : "#03045E"}
+                strokeWidth={2}
+              />
+            </button>
           )}
         </div>
 

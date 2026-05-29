@@ -22,14 +22,18 @@ from tests.test_config import API  # noqa: E402
 
 
 def test_founders_status_is_public():
+    """Section 74: Founder100 redefinition — cap bumped 50 → 100, perk
+    is now any paid plan FREE until 2027-12-31. The endpoint should
+    expose `free_until` so the frontend banner can render it."""
     r = requests.get(f"{API}/founders/status", timeout=10)
     assert r.status_code == 200
     data = r.json()
-    for k in ("slots_total", "slots_used", "slots_remaining"):
-        assert k in data
-    assert data["slots_total"] == 50
+    for k in ("slots_total", "slots_used", "slots_remaining", "free_until"):
+        assert k in data, f"missing key {k!r} in {data}"
+    assert data["slots_total"] == 100
     assert isinstance(data["slots_used"], int)
-    assert data["slots_used"] + data["slots_remaining"] == 50
+    assert data["slots_used"] + data["slots_remaining"] == 100
+    assert data["free_until"] == "2027-12-31"
 
 
 def test_founders_claim_requires_auth():
@@ -45,7 +49,7 @@ def test_founders_claim_idempotent(provider_session):
     body1 = r1.json()
     assert body1["is_founder"] is True
     pos = body1["founder_position"]
-    assert isinstance(pos, int) and 1 <= pos <= 50
+    assert isinstance(pos, int) and 1 <= pos <= 100
 
     r2 = provider_session.post(f"{API}/founders/claim", timeout=10)
     assert r2.status_code == 200

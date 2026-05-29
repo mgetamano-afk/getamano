@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
+import { useAuth } from "../contexts/AuthContext";
 import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, X, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import CategoryIcon from "../components/CategoryIcon";
@@ -21,6 +22,8 @@ import { SeoHead } from "../components/seo/SeoHead";
 export default function Search() {
   const [params, setParams] = useSearchParams();
   const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [q, setQ] = useState(params.get("q") || "");
   const [city, setCity] = useState(params.get("city") || "");
   const [category, setCategory] = useState(params.get("category") || "");
@@ -48,6 +51,59 @@ export default function Search() {
   const [highlightedId, setHighlightedId] = useState(null);
   const sentinelRef = useRef(null);
   const listCardRefs = useRef({});
+
+  // Section 75 — Save-to-shortlist state. Logged-in users get a heart
+  // icon on each card; clicking toggles bookmark via /saved-ecards. We
+  // load the list once on mount so all visible cards render with the
+  // correct state without N extra requests.
+  const [savedIds, setSavedIds] = useState(() => new Set());
+
+  useEffect(() => {
+    if (!user) { setSavedIds(new Set()); return; }
+    let alive = true;
+    api.get("/saved-ecards/me?filter=bookmark")
+      .then((r) => {
+        if (!alive) return;
+        const ids = new Set((r.data || []).map((s) => s.provider_id));
+        setSavedIds(ids);
+      })
+      .catch(() => { /* silent — guest or new account */ });
+    return () => { alive = false; };
+  }, [user]);
+
+  const toggleSaved = useCallback(async (providerId) => {
+    if (!user) {
+      // Section 75 — prompt sign-in so guests don't lose intent. Preserve
+      // current URL via the `next` query so they return to /buscar after.
+      const next = window.location.pathname + window.location.search;
+      navigate(`/login?next=${encodeURIComponent(next)}&role=client`);
+      toast.message(lang === "en" ? "Sign in to save providers." : "Inicia sesión para guardar proveedores.");
+      return;
+    }
+    const wasSaved = savedIds.has(providerId);
+    // Optimistic update
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(providerId); else next.add(providerId);
+      return next;
+    });
+    try {
+      if (wasSaved) {
+        await api.delete(`/saved-ecards/${providerId}`);
+      } else {
+        await api.put("/saved-ecards", { provider_id: providerId, save_type: "bookmark" });
+        toast.success(lang === "en" ? "Saved to your shortlist" : "Guardado en tu lista");
+      }
+    } catch (err) {
+      // Rollback on failure
+      setSavedIds(prev => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(providerId); else next.delete(providerId);
+        return next;
+      });
+      toast.error(err?.response?.data?.detail || "Error");
+    }
+  }, [user, savedIds, navigate, lang]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -603,7 +659,12 @@ export default function Search() {
             ) : (
               <div className="grid md:grid-cols-2 gap-5">
                 {providers.map(p => (
-                  <SearchResultCard key={p.provider_id} provider={p} />
+                  <SearchResultCard
+                    key={p.provider_id}
+                    provider={p}
+                    isSaved={savedIds.has(p.provider_id)}
+                    onToggleSave={toggleSaved}
+                  />
                 ))}
               </div>
             )}

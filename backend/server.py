@@ -787,6 +787,41 @@ async def seed():
     except Exception as e:
         logger.warning(f"owner_identity migration warn: {e}")
 
+    # Section 74 BUG-5 — Strip E2E test reviews that leaked into production
+    # from the regression test suite. Idempotent: matches the same patterns
+    # used by the test files (`E2E test`, `Critical Path`, `E2E Critical
+    # Path` and reviewer_name starting with "TEST"). After purging we
+    # recompute affected providers' rating_avg + rating_count so the
+    # public eCards reflect honest data.
+    try:
+        e2e_match = {
+            "$or": [
+                {"comment": {"$regex": r"\bE2E\b", "$options": "i"}},
+                {"comment": {"$regex": "Critical Path", "$options": "i"}},
+                {"reviewer_name": {"$regex": r"^(TEST|E2E)", "$options": "i"}},
+            ]
+        }
+        affected = await db.reviews.distinct("provider_id", e2e_match)
+        deleted = (await db.reviews.delete_many(e2e_match)).deleted_count
+        if deleted:
+            # Recompute rating for each affected provider
+            for pid in affected:
+                revs = await db.reviews.find({"provider_id": pid}, {"_id": 0, "rating": 1}).to_list(10000)
+                if revs:
+                    avg = sum(r["rating"] for r in revs) / len(revs)
+                    await db.provider_profiles.update_one(
+                        {"provider_id": pid},
+                        {"$set": {"rating_avg": round(avg, 2), "rating_count": len(revs)}},
+                    )
+                else:
+                    await db.provider_profiles.update_one(
+                        {"provider_id": pid},
+                        {"$set": {"rating_avg": 0.0, "rating_count": 0}},
+                    )
+            logger.info(f"BUG-5 cleanup: removed {deleted} E2E test reviews across {len(affected)} providers")
+    except Exception as e:
+        logger.warning(f"E2E review cleanup warn: {e}")
+
     if await db.categories.count_documents({}) == 0:
         docs = []
         for c in DEFAULT_CATEGORIES:
@@ -907,7 +942,10 @@ async def seed():
         "price_range": "$$",
         "verification_status": "approved",
         "is_active": True, "plan": "pro",
-        "rating_avg": 0.0, "rating_count": 0,
+        # Section 74 BUG-5 — DON'T pin rating_avg/rating_count here. The demo
+        # provider gets organic reviews from the test suite and the E2E
+        # cleanup migration above; pinning them to 0 on every startup wiped
+        # the legitimate rating recompute.
         "likes_count": 3,
         "latino_owned": "yes",
         "owner_identity": "latino",
@@ -920,6 +958,10 @@ async def seed():
         demo_set["provider_id"] = f"prov_{uuid.uuid4().hex[:12]}"
         demo_set["views"] = 0
         demo_set["contact_clicks"] = 0
+        # First-time seed defaults for rating (not part of the heal $set so
+        # they don't wipe organic reviews on every restart — see BUG-5).
+        demo_set["rating_avg"] = 0.0
+        demo_set["rating_count"] = 0
         demo_set["created_at"] = now_iso
         await db.provider_profiles.insert_one(demo_set)
         logger.info("Seeded demo provider profile")
@@ -1136,7 +1178,10 @@ async def providers_identity_counts(
 ):
     """Counts of active providers by owner_identity respecting current search filters
     (excluding the owner_identity filter). Used by inclusive identity chips on /search."""
-    query = {"is_active": True, **PUBLIC_GUARD}
+    # Section 74 BUG-3 — public counts must reflect ONLY approved providers,
+    # otherwise the chips inflate the result count with pending/rejected docs
+    # that the listing itself no longer returns.
+    query = {"is_active": True, "verification_status": "approved", **PUBLIC_GUARD}
     if country:
         query["country"] = country
     if category:
@@ -1366,7 +1411,8 @@ async def providers_map(
     (rate-limit safety) and persists them. Supports optional bounding-box filtering for the
     'Buscar en esta zona' feature — when bbox is supplied, only providers with stored coords inside
     the box are returned (no geocoding triggered). City/state/zip filters still apply."""
-    query = {"is_active": True, **PUBLIC_GUARD}
+    # Section 74 BUG-3 — public map must show only approved providers.
+    query = {"is_active": True, "verification_status": "approved", **PUBLIC_GUARD}
     if country:
         query["country"] = country
     if category:

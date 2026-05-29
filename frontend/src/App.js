@@ -195,6 +195,20 @@ function AppRouter() {
       <Route path="/messages" element={<Messages />} />
       <Route path="/profile" element={<UserProfile />} />
       <Route path="/plans" element={<Plans />} />
+      {/* Section 74 BUG-6 — `/account` 404 fix: role-aware redirect.
+          BottomNav uses "Mi cuenta" as the label and several older flows
+          deep-link to `/account`. Send everyone through DashboardRouter
+          which already routes by role. */}
+      <Route path="/account" element={<DashboardRouter />} />
+      <Route path="/cuenta" element={<DashboardRouter />} />
+      <Route path="/mi-cuenta" element={<DashboardRouter />} />
+      {/* Section 75 — Referrals + Wallet shortcuts. The full UI lives in
+          ProviderDashboard tabs, but `/referrals` and `/wallet` deep-links
+          shouldn't 404 either. */}
+      <Route path="/referrals" element={<DashboardRouter />} />
+      <Route path="/referidos" element={<DashboardRouter />} />
+      <Route path="/wallet" element={<DashboardRouter />} />
+      <Route path="/cartera" element={<DashboardRouter />} />
 
       {/* Zone 4: Admin (separate dark layout) */}
       <Route path="/admin" element={<AdminOverview />} />

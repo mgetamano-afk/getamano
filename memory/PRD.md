@@ -3322,3 +3322,55 @@ User request: *"aplica esta paleta a toda nuestra web"*. Strategy: token-level r
 **Not regressed**
 - Backend untouched — search endpoint already exposes `gallery`, `likes_count`, `views`, `rating_count`, etc.
 - Split view + Map view cards left intact (smaller real estate, would not fit Airbnb-sized card).
+
+
+## Iteration 85 (Feb 29, 2026) — Section 74 Bug-fixes + Founder100 + Section 75 Plan-aware referrals + Save button
+**Trigger**: User uploaded `getamano-prompt-seccion74-bugs-criticos-founder100.md` and `getamano-prompt-seccion75-referidos-wallet-completo.md`, instructing: "primero trabaja con el promt 74, luego con el 75, y si agrega el boton de guardar."
+
+### Section 74 — Critical bug fixes
+**BUG-3 (P0)** — Public search exposed pending/rejected providers.
+- `/app/backend/routes/search.py` `_build_simple_filters` now hard-codes `verification_status="approved"` into the base query (verified chip becomes a no-op).
+- `/app/backend/server.py` `/providers/identity-counts` and `/providers/map` queries updated to enforce the same gate.
+- Verified: `/api/providers?limit=20` previously returned 3 docs (María approved + Juan & CantinflasFood pending). Now returns 1 (María only).
+
+**BUG-5 (P1)** — 13 E2E test reviews polluting María's eCard.
+- New idempotent startup migration in `server.py:seed()` removes reviews matching `\bE2E\b` / `Critical Path` / reviewer_name `^(TEST|E2E)` and recomputes `rating_avg`/`rating_count` on affected providers.
+- Also removed `rating_avg`/`rating_count` from the `demo_set` heal $update so organic reviews aren't wiped on every restart (kept as defaults on the FIRST insert only).
+- Verified: María went from 14 reviews (1 real + 13 E2E) to 1 review with rating 5.0.
+
+**BUG-6 (P1)** — `/account` returned 404.
+- Added route aliases in `App.js` for `/account`, `/cuenta`, `/mi-cuenta`, `/referrals`, `/referidos`, `/wallet`, `/cartera` → all dispatched through `DashboardRouter`.
+- `DashboardRouter` now reads the original pathname and forwards providers to `/dashboard/provider?tab=referidos` for wallet/referrals shortcuts. Login redirect preserves the `next` query so the user lands on the right pane after authenticating.
+
+**BUG-2 (P0)** — "Join free" CTA never preselected the provider role.
+- `OnboardingLogin.jsx` reads `?role=provider` or legacy `?intent=provider` from URL params and seeds the role picker before mount. Falls back to `localStorage.gtm_pending_role` then `"client"`.
+- Landing page CTAs + Community wall + LiveActivityTicker + SeoPage all updated to use `?role=provider` (instead of `?intent=provider&promo=GETAMANO50`).
+
+### Section 74 PART B — Founder100 redefinition (was Founder50)
+- `routes/founders.py` constant `FOUNDER_TOTAL_SLOTS` bumped 50 → 100. Added `FOUNDER_FREE_UNTIL = "2027-12-31"` returned on `/founders/status` and stamped on provider profile at claim time as `founder_free_until`.
+- `_counter_doc` migrates legacy counter docs where `total=50` → `total=100` idempotently.
+- `FoundingCounter.jsx` completely rewritten to consume `/founders/status` (was `/promo-codes/founding-status`), display "Cualquier plan de pago GRATIS hasta diciembre 2027", and hide itself when sold out. Three variants: `hero`, `banner`, `compact`.
+- Landing banner copy + i18n strings (`founder.banner_title`, `founder.banner_left_suffix`) updated.
+- `GETAMANO50` promo code text removed from Landing.jsx, Community.jsx, SeoPage.jsx, Terms.jsx, LiveActivityTicker.jsx.
+- New test `test_iter83_section74_75.py::test_founders_status_is_100_and_dated` and updated `test_iter82` lock the contract.
+
+### Section 75 — Plan-aware referral credits + Wallet wiring
+- `routes/user_referrals.py` introduces `PLAN_MONTHLY_CENTS = { "basic": 1000, "pro": 1500, "premium": 2500, "premium_plus": 2500 }` and `_milestone_credit_cents(plan)` helper.
+- `_award_milestone_credit()` now takes `referrer_plan` and writes the matching cents value to `commission_credits`. Free-plan referrers earn $0 (logged but no ledger entry).
+- `mark_referral_paid()` fetches the referrer's plan once before iterating milestones so all new credits in a single call use a consistent value.
+- `/user-referrals/me` response gains `my_plan`, `plan_monthly_cents`, `credit_per_referee_cents`, `wallet_pending_cents`; legacy `free_month_value_cents` mirrors the plan price.
+- `OnboardingLogin.jsx` gets a new optional referral code input (providers only): pre-fills from URL `?ref=`, `sessionStorage.gtm_ref_code` or `localStorage.gtm_pending_ref_code`, shows as a chip with "Quitar" when active, otherwise a "¿Tienes un código de referido?" toggle opens a 6-char uppercase input. Mirrors to `tx_ref` sessionStorage so the existing Google OAuth handler can consume it.
+- `ProviderDashboard.jsx` now reads `?tab=` query param on mount and syncs back when the tab changes (aliases: `wallet`/`red` → `referidos`).
+- New tests in `test_iter83_section74_75.py::test_referral_summary_is_plan_aware` assert `credit_per_referee * 2 === plan_monthly_cents` invariant.
+
+### Save-to-shortlist button on SearchResultCard
+- `SearchResultCard.jsx` accepts `isSaved` and `onToggleSave` props; renders an Airbnb-style 36px white round button with a `Bookmark` icon top-right of the hero photo. Filled red when saved.
+- `Search.jsx` loads `GET /saved-ecards/me?filter=bookmark` once on mount (for logged-in users) and dispatches `PUT /saved-ecards` / `DELETE /saved-ecards/{provider_id}` with optimistic UI on click. Guests get a toast + redirect to `/login?next=...&role=client`.
+
+### Verification
+- 100/100 backend regression tests in iter7x/iter8x suites pass (10s).
+- Lint clean: 6 modified files (JS + Python).
+- Live curl: `/user-referrals/me` for María → `plan_monthly_cents=1500, credit_per_referee_cents=750, wallet_pending_cents=3250` ✓
+- Screenshot @ desktop 1280×900: only María visible (BUG-3 ✓), Save bookmark button visible top-right ✓, "1 review" instead of 14 ✓.
+- Screenshot @ login `/login?role=provider`: Provider button aria-pressed=true ✓, founder banner shows "🔥 You're one of the first 100!" + "Only 99 spots left · Any paid plan FREE until Dec 2027" ✓, referral code input accepts GRY9J9 → renders chip ✓.
+- Screenshot Landing `/landing-legacy`: top banner "Founding Members · Any paid plan FREE until Dec 2027 · 99 spots left of 100" ✓, hero counter shows "99 DE 100" + "Cualquier plan de pago GRATIS hasta diciembre 2027" ✓, no GETAMANO50 mention anywhere ✓.

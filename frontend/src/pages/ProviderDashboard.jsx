@@ -1,5 +1,5 @@
 import { useEffect, useState, createElement } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import AddressAutocomplete from "../components/AddressAutocomplete";
@@ -70,13 +70,36 @@ export default function ProviderDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { t, lang } = useI18n();
   const navigate = useNavigate();
+  // Section 74 BUG-6 / Section 75 — `/wallet`, `/referrals`, `/referidos` and
+  // any other shortcut redirects land here with `?tab=...`. The dashboard
+  // honours that param so the user lands on the right pane in one hop
+  // (otherwise they had to click into "Referidos" themselves).
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [categories, setCategories] = useState([]);
   const [plans, setPlans] = useState([]);
   const [unread, setUnread] = useState(0);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState(() => {
+    const initial = searchParams.get("tab") || "dashboard";
+    // Aliases — wallet/red both point at the referrals tab (the live UI
+    // already lives at "referidos").
+    if (initial === "wallet" || initial === "red") return "referidos";
+    return initial;
+  });
+
+  // Sync tab → URL so deep-link sharing works (and back/forward updates the
+  // visible pane). Doesn't push history — uses replace to avoid bloat.
+  useEffect(() => {
+    const current = searchParams.get("tab");
+    if (current !== tab) {
+      const next = new URLSearchParams(searchParams);
+      if (tab === "dashboard") next.delete("tab"); else next.set("tab", tab);
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [ecardPreviewOpen, setEcardPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);

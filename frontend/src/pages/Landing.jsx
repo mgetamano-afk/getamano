@@ -70,7 +70,7 @@ export default function Landing() {
   const [withVideo, setWithVideo] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); // provider_id or null
   const [stats, setStats] = useState({ providers: 500, states: 38, rating: 4.9 });
-  const [founding, setFounding] = useState({ available: true, used: 0, max: 50 });
+  const [founding, setFounding] = useState({ slots_remaining: 0, slots_total: 100, slots_used: 0, free_until: "2027-12-31" });
   const [openFaq, setOpenFaq] = useState(null);
   const [slideIdx, setSlideIdx] = useState(0);
   const sliderRef = useRef(null);
@@ -92,7 +92,11 @@ export default function Landing() {
         rating: Number(d.rating) > 0 ? Number(d.rating) : 5.0,
       });
     }).catch(() => {});
-    api.get("/promo-codes/founding-status").then(r => setFounding(r.data)).catch(() => {});
+    // Section 74 — Founder100 (was Founder50). Source of truth is the
+    // canonical /founders/status endpoint which returns slots_total=100
+    // and the perk expiry date. The legacy /promo-codes/founding-status
+    // returned max=50 and is no longer used here.
+    api.get("/founders/status").then(r => setFounding(r.data)).catch(() => {});
   }, []);
 
   // Auto-advance slider
@@ -149,10 +153,13 @@ export default function Landing() {
     <div className="min-h-screen bg-neutral-50">
       <Header />
 
-      {/* FOUNDING MEMBER BANNER */}
-      {founding.available && (
-        <Link to="/registro?intent=provider&promo=GETAMANO50" className="block bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white py-2.5 text-center text-sm font-medium hover:brightness-110 transition" data-testid="founding-banner">
-          <Award className="w-4 h-4 inline mr-1.5" /> <strong>Founding Members</strong> · Plan Pro gratis hasta 2027 con código <code className="bg-white/20 px-1.5 py-0.5 rounded">GETAMANO50</code> · {founding.max - founding.used} cupos restantes <ArrowRight className="w-4 h-4 inline ml-1" />
+      {/* FOUNDING MEMBER BANNER — Section 74 (Founder100 redefinition).
+          Was: "Plan Pro gratis hasta 2027 con código GETAMANO50".
+          Now: any paid plan (Básico, Pro o Premium) GRATIS hasta dic 2027
+               for the first 100 providers. No promo code needed. */}
+      {founding.slots_remaining > 0 && (
+        <Link to="/registro?role=provider" className="block bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white py-2.5 text-center text-sm font-medium hover:brightness-110 transition" data-testid="founding-banner">
+          <Award className="w-4 h-4 inline mr-1.5" /> <strong>Founding Members</strong> · {lang === "en" ? "Any paid plan FREE until Dec 2027" : "Cualquier plan de pago GRATIS hasta dic 2027"} · {founding.slots_remaining} {lang === "en" ? "spots left of 100" : "cupos de 100"} <ArrowRight className="w-4 h-4 inline ml-1" />
         </Link>
       )}
 

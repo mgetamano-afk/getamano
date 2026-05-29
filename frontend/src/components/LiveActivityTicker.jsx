@@ -33,7 +33,7 @@ function _formatRelative(iso, lang) {
 function _evergreen(lang) {
   return [
     { icon: "🇺🇸", text: lang === "es" ? "getamano ya está en 38 estados" : "getamano is now in 38 states", link: "/ciudades" },
-    { icon: "💎", text: lang === "es" ? "Founding Members · Plan Pro gratis hasta 2027" : "Founding Members · Free Pro plan until 2027", link: "/registro?intent=provider&promo=GETAMANO50" },
+    { icon: "💎", text: lang === "es" ? "Founding Members · Cualquier plan de pago GRATIS hasta dic 2027" : "Founding Members · Any paid plan FREE until Dec 2027", link: "/registro?role=provider" },
     { icon: "✨", text: lang === "es" ? "Comunidad latina verificada" : "Verified Latino community", link: "/comunidad" },
   ];
 }
