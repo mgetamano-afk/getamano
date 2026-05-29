@@ -201,7 +201,7 @@ export default function GremiosPage() {
                   ) : (
                     <span className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[#0077B6] text-white text-[11px] font-bold flex-shrink-0">
                       <Plus className="w-3 h-3" strokeWidth={3} />
-                      {lang === "en" ? "Open" : "Abrir"}
+                      {lang === "en" ? "Join" : "Unirme"}
                     </span>
                   )}
                 </div>

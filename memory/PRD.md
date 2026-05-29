@@ -3,6 +3,19 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
+## Latest Update — May 29, 2026 · V4 Social-First Phase A+B (P0+P1)
+- **Backend** (`/app/backend/routes/v4_social.py`):
+  - Portfolio CRUD (`GET/POST/PATCH/DELETE /api/providers/me/portfolio` + public `/providers/by-slug/{slug}/portfolio`), 12-item cap, sort_order auto-increment.
+  - Gremios (per-category community): `GET /api/gremios` (aggregate member counts), `POST/DELETE /api/gremios/{slug}/join|leave`, `GET/POST /api/gremios/{slug}/posts` with author hydration (business_name + slug + getamano_code + provider_verified), `POST /api/gremios/posts/{id}/like` toggle, `POST/GET /api/gremios/posts/{id}/replies` single-layer threads. Auto-join on first post. Indexes seeded on startup.
+- **Trust Score enrichment**: `/api/providers` list + `/api/providers/me` + `/api/providers/by-slug/{slug}` now attach `portfolio_count`, `referrals_converted`, `days_active`, `avg_rating`, `reviews_count` via a batched `_attach_trust_signals` helper (one $group per signal, never N+1).
+- **Community posts**: `_PROVIDER_PROJECTION_FULL/SLIM` + `_build_post_author` now surface `provider_verified` + `getamano_code` so the Barrio feed can render the ✓ badge + Contactar CTA + GM-XXXX chip without an extra hop.
+- **Frontend pages**:
+  - `BarrioPage` (`/comunidad/barrio` + `/community/barrio`): city chip + 5-radius selector (10/25/50/100/160 mi, default 50, persisted in `localStorage.barrio_radius`), StoriesCarousel, "Destacados esta semana" horizontal scroll with Verified badge + GM code + TrustScore tile, post composer, post feed with Contactar/Ver CTAs gated by `author.provider_verified`, inline Trust Score card injected between posts #3 and #4 when the logged-in user is a provider.
+  - `GremiosPage` (`/comunidad/gremios` + `/community/gremios`): grid of 188 categories with "Unirme/Join" or "Miembro" pills, optimistic membership cache in localStorage, detail view with back/Join/Leave/composer, post card with like + reply (single layer), lock banner for non-providers.
+- **SearchResultCard**: now imports `<TrustScore variant="tile">` and renders below the rating row.
+- **Tests**: `/app/backend/tests/test_iter89_v4_social.py` (13 tests) + `/app/backend/tests/test_iter90_v4_social_extras.py` (8 tests) — all 21 V4 tests pass alongside iter83-iter88 (full V3+V4 regression: 36/36).
+- **Testing agent verification**: 100% backend + 100% on frontend flows tested. No critical/minor defects.
+
 ## Architecture
 - **Frontend**: React 19 + React Router + Tailwind + Shadcn UI + Poppins + Sonner
 - **Backend**: FastAPI + Motor (MongoDB async) + PyJWT + bcrypt + httpx + requests + twilio
