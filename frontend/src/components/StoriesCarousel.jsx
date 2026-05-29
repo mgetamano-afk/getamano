@@ -464,7 +464,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
   return createPortal((
     <div
       className="fixed inset-0 z-[120] bg-black flex items-center justify-center"
-      style={{ height: "100vh", maxHeight: "100vh" }}
+      style={{ height: "100dvh", maxHeight: "100dvh" }}
       data-testid="story-viewer"
       data-no-ptr="true"
       onMouseDown={() => setPaused(true)}
@@ -479,8 +479,22 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
         <p className="text-white">—</p>
       ) : (
         <>
-          {/* Progress bars */}
-          <div className="absolute top-3 left-3 right-3 flex gap-1 z-10">
+          {/* Section 86 — Mobile-first story FRAME.
+              - Phone (default): frame fills the whole viewport (w/h 100%).
+              - Tablet/desktop (md+): frame collapses to a 9:16 portrait
+                column centered with black side-bars, max 440px wide.
+              Image fills the frame with `object-cover` so there's no dead
+              space and sticker `%` coords map directly to the visible
+              image bounds. */}
+          <div
+            className="relative w-full h-full md:h-full md:w-auto md:aspect-[9/16] md:max-w-[440px] md:rounded-2xl md:overflow-hidden md:shadow-2xl"
+            data-testid="story-viewer-frame"
+          >
+          {/* Progress bars — respect notch via safe-area-inset-top */}
+          <div
+            className="absolute left-3 right-3 flex gap-1 z-10"
+            style={{ top: "calc(0.75rem + env(safe-area-inset-top, 0px))" }}
+          >
             {stories.map((_, i) => (
               <div key={i} className="flex-1 h-0.5 rounded-full bg-white/30 overflow-hidden">
                 <div
@@ -492,7 +506,10 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
           </div>
 
           {/* Header row */}
-          <div className="absolute top-7 left-3 right-3 flex items-center gap-3 z-10">
+          <div
+            className="absolute left-3 right-3 flex items-center gap-3 z-10"
+            style={{ top: "calc(1.75rem + env(safe-area-inset-top, 0px))" }}
+          >
             <Link
               to={active.provider_slug ? `/p/${active.provider_slug}` : "#"}
               className="flex items-center gap-2 flex-1 min-w-0 group"
@@ -506,17 +523,17 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-white font-semibold text-sm truncate">
+                <p className="text-white font-semibold text-sm truncate drop-shadow-md">
                   {group.business_name}
                   {active.verified && <ShieldCheck className="w-3 h-3 inline-block ml-1 text-emerald-400" />}
                 </p>
-                <p className="text-white/60 text-[11px]">{lang === "en" ? "Tap to view" : "Toca para ver"}</p>
+                <p className="text-white/70 text-[11px] drop-shadow-md">{lang === "en" ? "Tap to view" : "Toca para ver"}</p>
               </div>
             </Link>
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white"
+              className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white flex-shrink-0"
               data-testid="story-viewer-close"
               aria-label="Cerrar"
             >
@@ -526,14 +543,14 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
 
           {/* Vignette gradient — improves readability of caption + action buttons on any image */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none z-[1] bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-          <div className="absolute inset-x-0 top-0 h-32 pointer-events-none z-[1] bg-gradient-to-b from-black/50 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-32 pointer-events-none z-[1] bg-gradient-to-b from-black/60 to-transparent" />
 
-          {/* Story image — tap area also handles double-tap-to-like */}
+          {/* Story image — fills the frame so stickers land in the right
+              spot and there's no dead space on mobile. */}
           <img
             {...lazyImg(buildFileUrl(active.image_url), { priority: true })}
             alt={active.caption || group.business_name}
-            className="object-contain select-none"
-            style={{ maxWidth: "100%", maxHeight: "100vh", width: "auto", height: "auto" }}
+            className="absolute inset-0 w-full h-full object-cover select-none"
             data-testid="story-viewer-image"
             onClick={handleImageTap}
             draggable={false}
@@ -555,8 +572,8 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
 
           {/* Caption */}
           {active.caption && (
-            <div className="absolute bottom-20 left-6 right-6 z-10">
-              <p className="text-white text-base font-medium drop-shadow-lg text-center leading-snug px-4">
+            <div className="absolute left-4 right-4 z-10" style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))" }}>
+              <p className="text-white text-base font-medium drop-shadow-lg text-center leading-snug px-2">
                 {active.caption}
               </p>
             </div>
@@ -578,7 +595,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
               <button
                 type="button"
                 onClick={deleteStory}
-                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 hover:bg-rose-500/80 backdrop-blur text-white text-xs font-semibold transition"
+                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-black/60 hover:bg-rose-500/80 backdrop-blur text-white text-xs font-semibold transition flex-shrink-0"
                 data-testid="story-owner-delete"
                 aria-label={lang === "en" ? "Delete story" : "Eliminar historia"}
               >
@@ -606,16 +623,17 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
           )}
 
           {/* Touch areas for prev/next */}
-          <button type="button" onClick={goLeft} className="absolute left-0 top-0 bottom-0 w-1/3" aria-label="Previous" data-testid="story-viewer-prev" />
-          <button type="button" onClick={goRight} className="absolute right-0 top-0 bottom-0 w-1/3" aria-label="Next" data-testid="story-viewer-next" />
+          <button type="button" onClick={goLeft} className="absolute left-0 top-0 bottom-0 w-1/3 z-[6]" aria-label="Previous" data-testid="story-viewer-prev" />
+          <button type="button" onClick={goRight} className="absolute right-0 top-0 bottom-0 w-1/3 z-[6]" aria-label="Next" data-testid="story-viewer-next" />
+          </div>
 
-          {/* Visible chevrons for desktop */}
+          {/* Visible chevrons for desktop — outside the frame */}
           {(activeIdx > 0 || hasPrev) && (
-            <button type="button" onClick={goLeft} className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 items-center justify-center text-white z-10">
+            <button type="button" onClick={goLeft} className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur items-center justify-center text-white z-10">
               <ChevronLeft className="w-6 h-6" />
             </button>
           )}
-          <button type="button" onClick={goRight} className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 items-center justify-center text-white z-10">
+          <button type="button" onClick={goRight} className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur items-center justify-center text-white z-10">
             <ChevronRight className="w-6 h-6" />
           </button>
         </>
@@ -875,19 +893,38 @@ function StoryCreator({ onClose, onCreated }) {
 
   return createPortal((
     <div
-      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4"
       onClick={(e) => { if (e.target === e.currentTarget && !uploading && !creating) onClose(); }}
       data-testid="story-creator-modal"
     >
-      <div className="bg-white rounded-3xl w-full max-w-md p-5 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+      {/* Section 86 — Mobile-first creator modal.
+          - Phone (default): full-width bottom sheet that fills viewport
+            with safe-area padding; scrolls internally so caption + buttons
+            stay reachable above the keyboard.
+          - Tablet/desktop (md+): centered card, 28rem wide, with breathing
+            room around it. */}
+      <div
+        className="bg-white w-full md:w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        style={{
+          maxHeight: "calc(100dvh - env(safe-area-inset-top, 0px))",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+      >
+        {/* Drag handle (mobile only) */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1">
+          <span className="w-10 h-1.5 rounded-full bg-slate-300" />
+        </div>
+        <div className="flex items-center justify-between px-5 pt-3 md:pt-5 pb-3 flex-shrink-0">
           <h3 className="font-display font-bold text-lg text-slate-900">
             {lang === "en" ? "New 24h story" : "Nueva historia de 24h"}
           </h3>
-          <button type="button" onClick={onClose} disabled={uploading || creating} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 disabled:opacity-50" data-testid="story-creator-close">
+          <button type="button" onClick={onClose} disabled={uploading || creating} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 disabled:opacity-50" data-testid="story-creator-close" aria-label={lang === "en" ? "Close" : "Cerrar"}>
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 pb-4">
 
         {/* Image picker */}
         <div className="mb-4">
@@ -895,7 +932,7 @@ function StoryCreator({ onClose, onCreated }) {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="w-full aspect-[4/5] rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-500 flex flex-col items-center justify-center text-slate-400 hover:text-teal-600 transition"
+              className="w-full aspect-[4/5] rounded-2xl border-2 border-dashed border-slate-300 hover:border-pink-500 active:scale-[0.99] flex flex-col items-center justify-center text-slate-400 hover:text-pink-600 transition"
               data-testid="story-creator-pick"
             >
               <ImageIcon className="w-10 h-10 mb-2" />
@@ -915,7 +952,7 @@ function StoryCreator({ onClose, onCreated }) {
                 <button
                   type="button"
                   onClick={() => { setPreview(""); setImageUrl(""); setStickers([]); }}
-                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-20"
+                  className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-20"
                   data-testid="story-creator-clear"
                   aria-label="Remove"
                 >
@@ -939,7 +976,7 @@ function StoryCreator({ onClose, onCreated }) {
                     onClick={(e) => { e.stopPropagation(); removeSticker(s.id); }}
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
-                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shadow"
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow"
                     aria-label="Eliminar sticker"
                     data-testid={`story-creator-sticker-remove-${s.id}`}
                   >
@@ -967,13 +1004,13 @@ function StoryCreator({ onClose, onCreated }) {
               <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{lang === "en" ? "Add stickers" : "Stickers"} <span className="text-slate-400 normal-case">({stickers.length}/3)</span></p>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => addSticker("phone")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-40 transition" data-testid="story-add-sticker-phone">
+              <button type="button" onClick={() => addSticker("phone")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-10 px-3 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 active:scale-95 disabled:opacity-40 transition" data-testid="story-add-sticker-phone">
                 <Phone className="w-3.5 h-3.5" /> {lang === "en" ? "Call me" : "Llámame"}
               </button>
-              <button type="button" onClick={() => addSticker("promo")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 disabled:opacity-40 transition" data-testid="story-add-sticker-promo">
+              <button type="button" onClick={() => addSticker("promo")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-10 px-3 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 active:scale-95 disabled:opacity-40 transition" data-testid="story-add-sticker-promo">
                 <Flame className="w-3.5 h-3.5" /> {lang === "en" ? "Promo" : "Promo"}
               </button>
-              <button type="button" onClick={() => addSticker("tip")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100 disabled:opacity-40 transition" data-testid="story-add-sticker-tip">
+              <button type="button" onClick={() => addSticker("tip")} disabled={stickers.length >= 3} className="inline-flex items-center gap-1.5 h-10 px-3 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100 active:scale-95 disabled:opacity-40 transition" data-testid="story-add-sticker-tip">
                 <Sparkles className="w-3.5 h-3.5" /> {lang === "en" ? "Pro tip" : "Pro tip"}
               </button>
             </div>
@@ -987,7 +1024,7 @@ function StoryCreator({ onClose, onCreated }) {
                         value={s.phone || ""}
                         onChange={(e) => updateSticker(s.id, { phone: e.target.value })}
                         placeholder="+1 555 123 4567"
-                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                        className="flex-1 h-10 px-3 rounded-lg border border-slate-200 text-sm outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                         data-testid={`story-sticker-input-${s.id}`}
                         inputMode="tel"
                         maxLength={24}
@@ -997,7 +1034,7 @@ function StoryCreator({ onClose, onCreated }) {
                         value={s.text || ""}
                         onChange={(e) => updateSticker(s.id, { text: e.target.value })}
                         placeholder={s.type === "promo" ? (lang === "en" ? "20% OFF Today" : "20% OFF Hoy") : (lang === "en" ? "Insider tip" : "Tip pro")}
-                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                        className="flex-1 h-10 px-3 rounded-lg border border-slate-200 text-sm outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100"
                         data-testid={`story-sticker-input-${s.id}`}
                         maxLength={40}
                       />
@@ -1011,44 +1048,48 @@ function StoryCreator({ onClose, onCreated }) {
         )}
 
         {/* Caption */}
-        <div className="mb-4">
+        <div className="mb-2">
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder={lang === "en" ? "Add a short caption (optional, 140 chars)" : "Agrega un texto corto (opcional, 140 chars)"}
             maxLength={140}
             rows={2}
-            className="w-full p-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 resize-none"
+            className="w-full p-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100 resize-none"
             data-testid="story-creator-caption"
           />
           <div className="text-right text-[11px] text-slate-400 mt-1">{caption.length}/140</div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={uploading || creating}
-            className="flex-1 h-11 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium disabled:opacity-60"
-            data-testid="story-creator-cancel"
-          >
-            {lang === "en" ? "Cancel" : "Cancelar"}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!imageUrl || uploading || creating}
-            className="flex-1 h-11 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="story-creator-submit"
-          >
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {creating ? (lang === "en" ? "Posting..." : "Publicando...") : (lang === "en" ? "Post story" : "Publicar")}
-          </button>
-        </div>
+        </div>{/* /scrollable body */}
 
-        <p className="text-[11px] text-slate-400 text-center mt-3">
-          {lang === "en" ? "⏱️ Your story auto-deletes in 24h" : "⏱️ Tu historia se borra sola en 24h"}
-        </p>
+        {/* Sticky footer with action buttons */}
+        <div className="px-5 pt-3 pb-3 border-t border-slate-100 bg-white flex-shrink-0">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={uploading || creating}
+              className="flex-1 h-12 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-medium disabled:opacity-60 transition"
+              data-testid="story-creator-cancel"
+            >
+              {lang === "en" ? "Cancel" : "Cancelar"}
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!imageUrl || uploading || creating}
+              className="flex-1 h-12 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 active:scale-95 text-white font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              data-testid="story-creator-submit"
+            >
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {creating ? (lang === "en" ? "Posting..." : "Publicando...") : (lang === "en" ? "Post story" : "Publicar")}
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400 text-center mt-2">
+            {lang === "en" ? "⏱️ Your story auto-deletes in 24h" : "⏱️ Tu historia se borra sola en 24h"}
+          </p>
+        </div>
       </div>
     </div>
   ), document.body);

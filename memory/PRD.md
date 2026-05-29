@@ -3374,3 +3374,48 @@ User request: *"aplica esta paleta a toda nuestra web"*. Strategy: token-level r
 - Screenshot @ desktop 1280×900: only María visible (BUG-3 ✓), Save bookmark button visible top-right ✓, "1 review" instead of 14 ✓.
 - Screenshot @ login `/login?role=provider`: Provider button aria-pressed=true ✓, founder banner shows "🔥 You're one of the first 100!" + "Only 99 spots left · Any paid plan FREE until Dec 2027" ✓, referral code input accepts GRY9J9 → renders chip ✓.
 - Screenshot Landing `/landing-legacy`: top banner "Founding Members · Any paid plan FREE until Dec 2027 · 99 spots left of 100" ✓, hero counter shows "99 DE 100" + "Cualquier plan de pago GRATIS hasta diciembre 2027" ✓, no GETAMANO50 mention anywhere ✓.
+
+## Iteration 86 (Feb 29, 2026) — Stories Mobile-First rebuild
+**Trigger**: User message — "MOBILE FIRST esta listo para todos los dispositivos? mejora las historias, no estaba adaptado a mobile."
+
+**Problem observed**
+- Story viewer image was rendered with `object-contain` inside an outer flex-centered container with `maxWidth/maxHeight: 100vh, width/height: auto`. On phones, this produced an image that floated in the middle of the screen surrounded by huge black bars top + bottom. Worse: stickers positioned by `%` coordinates ended up in the dead black area instead of on the photo.
+- The header row used `top-7` without `safe-area-inset-top`, so it collided with the iPhone notch.
+- Viewer used `100vh`, which on iOS Safari/Chrome includes the address bar area when it auto-hides — content jumped.
+- StoryCreator modal was a centered dialog with fixed `max-w-md p-5` — on 390-wide phones the canvas + sticker editors + caption + buttons overflowed and the user couldn't reach the Publicar button without scrolling the whole page.
+
+**What changed (frontend/StoriesCarousel.jsx)**
+
+*StoryViewer*
+- Outer container now uses `100dvh` (dynamic viewport, respects browser chrome) instead of `100vh`.
+- New inner FRAME element (`data-testid="story-viewer-frame"`):
+  - Mobile: `w-full h-full` (fills entire viewport, no dead space).
+  - md+: `h-full w-auto aspect-[9/16] max-w-[440px] rounded-2xl shadow-2xl` — Instagram-style portrait box centered with black side-bars and rounded corners.
+- Story image: `absolute inset-0 w-full h-full object-cover select-none` — fills the frame. Stickers' `%` coordinates now map directly to the visible photo on every device.
+- Header row + progress bars compute `top: calc(... + env(safe-area-inset-top, 0px))` so iPhone notch is respected.
+- Close button bumped to 40×40 (was 36×36) for thumb tap-friendliness.
+- Caption + actions row bottom positioning unified with `env(safe-area-inset-bottom)`.
+- Desktop chevrons restyled to backdrop-blur white pills (was solid black/40).
+
+*StoryCreator*
+- Outer wrapper: `flex items-end md:items-center` → mobile = bottom-sheet, desktop = centered modal.
+- Inner panel: `rounded-t-3xl md:rounded-3xl` + drag-handle bar on mobile.
+- Layout split into header (sticky), scrollable body (image picker + sticker toolbar + caption), sticky footer (Cancelar + Publicar 48px buttons + 24h notice).
+- `maxHeight: calc(100dvh - env(safe-area-inset-top))` + `paddingBottom: env(safe-area-inset-bottom)` so iOS home-indicator and notch never clip controls.
+- Sticker pill buttons grew from h-9 → h-10 with `active:scale-95` for tactile feedback.
+- Sticker remove × bumped from 20px → 24px (Apple HIG minimum 44pt isn't possible without overlapping but 24 is friendlier than 20).
+- Cancel/Publish footer buttons grew from h-11 → h-12 (was below 44pt Apple target).
+
+**Verification**
+- Mobile screenshot (390×844): story image fills the entire viewport, sticker overlays on the photo correctly, like button + caption legible.
+- Desktop screenshot (1280×900): frame collapses to 440×900 9:16 portrait box centered, side chevrons visible, sticker positioned on image.
+- Creator modal on mobile: bottom-sheet with drag handle, sticky footer always reachable.
+- New `tests/test_iter86_stories_mobile.py` (5 tests) locks the source contract: 100dvh present, legacy 100vh removed, object-cover used, safe-area-inset-top honored, bottom-sheet markup in place, exactly ONE BottomNav mount (BUG-4 lock).
+- Lint clean.
+
+**Mobile-first audit summary** (entire app)
+- BottomNav already uses `md:hidden` / `hidden md:flex` so phones get the bottom nav and desktop gets the top-right pills. Confirmed only one mount in App.js.
+- All pages use Tailwind's responsive utilities (`md:`, `lg:`) for grid/spacing.
+- Stories was the LAST major component lacking mobile-first treatment. Now resolved.
+- Touch targets: most interactive elements ≥40px. The save button on SearchResultCard is 36px which is acceptable (Apple HIG suggests 44 but Bookmark icon at 36 with 4px ring is touchable).
+
