@@ -166,39 +166,14 @@ export default function OnboardingLogin({ onFinish }) {
           {t("onb.login.subtitle")}
         </p>
 
-        {/* Role picker (Client / Provider) */}
-        <div className="grid grid-cols-2 gap-2 mb-5" data-testid="onb-login-role">
-          {[
-            { id: "client",   label: t("onb.login.client"),   Icon: User },
-            { id: "provider", label: t("onb.login.provider"), Icon: Briefcase },
-          ].map(({ id, label, Icon }) => {
-            const active = role === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => pickRole(id)}
-                aria-pressed={active}
-                className={`h-14 rounded-2xl border-2 flex items-center justify-center gap-2 transition-colors font-semibold ${
-                  active
-                    ? "border-[#0077B6] bg-white text-[#03045E] shadow-sm"
-                    : "border-transparent bg-white/65 text-[#03045E]/65"
-                }`}
-                data-testid={`onb-login-role-${id}`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        {/* Section 88 v3 — single-user model. No role picker on the
+            sign-in screen. Anyone can become a provider later from
+            /account via "Vende tus servicios". */}
 
-        {/* Section 75 — Optional referral code input (providers only).
+        {/* Section 75 — Optional referral code input (anyone can be referred).
             If the user arrived via /r/CODE → field is pre-filled and shown
-            as a chip with a "Quitar" link. Otherwise a small toggle lets
-            them open the manual input. Hidden for clients since referrals
-            are provider-to-provider only. */}
-        {role === "provider" && (
+            as a chip with a "Quitar" link. */}
+        {true && (
           <div className="mb-5" data-testid="onb-referral-row">
             {refCode ? (
               <div
@@ -254,10 +229,11 @@ export default function OnboardingLogin({ onFinish }) {
         )}
 
         {/* Section 73 — Founder Discount urgency banner.
-            Shown ONLY when the user is in "Proveedor" role and there are
-            still slots available. Designed to nudge providers to register
-            faster (FOMO loop). */}
-        {role === "provider" && founderStatus && founderStatus.slots_remaining > 0 && (
+            v3 update: shown to ANYONE on the login screen as long as
+            there are slots available. Since the single-user model lets
+            anyone become a provider later, the banner doubles as a hook
+            into the activation funnel. */}
+        {founderStatus && founderStatus.slots_remaining > 0 && (
           <div
             className="mb-5 px-4 py-3 rounded-2xl text-white text-sm flex items-start gap-3 shadow-sm"
             style={{

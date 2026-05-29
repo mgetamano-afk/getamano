@@ -88,9 +88,9 @@ def test_founders_status_is_100_and_dated():
 # ───────────────────────── Section 75 — Plan-aware credits ────────────────
 
 def test_referral_summary_is_plan_aware(provider_session):
-    """The provider summary must surface `plan_monthly_cents` and
-    `credit_per_referee_cents` so the wallet widget can show the
-    right reward number per plan."""
+    """Section 88 v3 — plan-aware split was replaced by FLAT $5 per
+    conversion ($2 activation + $3 verified-30d). The legacy contract
+    is updated so the wallet shows uniform numbers across all plans."""
     r = provider_session.get(f"{API}/user-referrals/me", timeout=10)
     assert r.status_code == 200, r.text
     data = r.json()
@@ -101,14 +101,6 @@ def test_referral_summary_is_plan_aware(provider_session):
         "wallet_pending_cents",
     ):
         assert k in data, f"missing key {k!r} in /user-referrals/me"
-    plan_cents = data["plan_monthly_cents"]
-    credit_cents = data["credit_per_referee_cents"]
-    # Spec: credit per referee = plan price / 2
-    assert credit_cents * 2 == plan_cents, (
-        f"plan={plan_cents} but credit_per_referee={credit_cents} "
-        "(expected plan / 2)"
-    )
-    # Plan map must be one of the supported tiers (or 0 for free)
-    assert plan_cents in (0, 1000, 1500, 2500)
-    # legacy field mirrors plan
-    assert data["free_month_value_cents"] in (plan_cents, 900)
+    # Section 88: flat $5 total = 500 cents; per referee = 250 cents.
+    assert data["plan_monthly_cents"] == 500
+    assert data["credit_per_referee_cents"] == 250

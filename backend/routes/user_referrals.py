@@ -37,37 +37,48 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 
-# ─── SECTION 75 — Plan-aware milestone credit values ──────────────────
-# CEO Eloy's spec: credit per referral = referrer's plan price / 2, so
-# every 2 paid referees award the referrer 1 free month of their plan.
+# ─── SECTION 88 v3 — Flat referral economy ────────────────────────────
+# User choice (3a@$5): replace the plan-aware milestone math from
+# Section 75 with a flat-per-conversion reward equal to $5 total per
+# converted referral.
 #
-#   Plan       Price  Credit/referee   2-referee milestone
-#   ───────    ─────  ──────────────   ───────────────────
-#   Básico     $10    $5.00            $10  → 1 free month
-#   Pro        $15    $7.50            $15  → 1 free month
-#   Premium    $25    $12.50           $25  → 1 free month
+#   Step 1 — Activation:    referee turns on "Vende tus servicios"
+#                           (is_provider=true). Referrer earns $2.
+#   Step 2 — 30-day mark:   referee has provider_verified=true for at
+#                           least 30 consecutive days. Referrer earns $3.
+#   Total per converted referral: $5.
 #
-# Providers on the FREE plan don't earn credits (nothing to discount).
-# This is the value that gets WRITTEN to the ledger when a milestone
-# hits — the credit then applies against the referrer's NEXT invoice.
+# Free-plan referrers DO earn these credits — the cents are written to
+# `commission_credits` and they can use them whenever they verify (the
+# credit applies against their first invoice). This is intentionally
+# different from Section 75's gating because the v3 model has only
+# TWO plans (free, verified) and we want every referral to count.
+ACTIVATION_REWARD_CENTS = 200    # $2.00 when referee activates as provider
+VERIFICATION_REWARD_CENTS = 300  # $3.00 when referee has been verified 30 days
+FLAT_CONVERSION_TOTAL_CENTS = ACTIVATION_REWARD_CENTS + VERIFICATION_REWARD_CENTS  # $5.00
+
+# Legacy values kept for reference — no longer used in new credit writes.
 PLAN_MONTHLY_CENTS = {
     "basic": 1000,
     "pro": 1500,
     "premium": 2500,
     "premium_plus": 2500,
+    # v3 model
+    "verified": 1000,
 }
 
 
 def _milestone_credit_cents(referrer_plan: Optional[str]) -> int:
-    """Return the cents value of ONE milestone reward for a referrer on
-    the given plan. Returns 0 for free / unknown plans (no credit).
-    The dollar value matches the referrer's current monthly plan price."""
-    return PLAN_MONTHLY_CENTS.get((referrer_plan or "").lower(), 0)
+    """Legacy helper kept so older callers compile.
+
+    Returns the FLAT $5 conversion total now — the per-plan math is gone
+    in the v3 model. New code should reference `FLAT_CONVERSION_TOTAL_CENTS`,
+    `ACTIVATION_REWARD_CENTS` or `VERIFICATION_REWARD_CENTS` directly.
+    """
+    return FLAT_CONVERSION_TOTAL_CENTS
 
 
-# Legacy alias — kept so older imports keep working. New code should use
-# _milestone_credit_cents(plan) instead.
-FREE_MONTH_CENTS = 900  # $9.00 — used only as a fallback when plan unknown
+FREE_MONTH_CENTS = FLAT_CONVERSION_TOTAL_CENTS  # back-compat alias
 
 # Every N confirmed paying referees award 1 month free.
 REFEREES_PER_MILESTONE = 2
@@ -456,25 +467,23 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             sort=[("created_at", -1)],
         )
 
-        # Section 75 — plan-aware reward math. The credit value matches the
-        # referrer's CURRENT monthly plan price so the widget can show
-        # "$7.50 per referido" or "$12.50 per referido" depending on tier.
+        # Section 88 — v3 flat $5-per-conversion. Earlier sections (75)
+        # had a plan-aware split; the v3 model collapses that to a single
+        # flat reward total so the wallet UI is the same for everyone.
         profile = await db.provider_profiles.find_one(
             {"user_id": me.user_id},
-            {"_id": 0, "plan": 1},
+            {"_id": 0, "provider_plan": 1, "plan": 1, "provider_verified": 1},
         ) or {}
-        my_plan = profile.get("plan") or "free"
-        plan_monthly_cents = _milestone_credit_cents(my_plan)
-        # Credit per referee = milestone value / N referees per milestone.
-        credit_per_referee_cents = plan_monthly_cents // REFEREES_PER_MILESTONE if plan_monthly_cents else 0
-        # Wallet balance (pending credits aren't applied to Stripe yet)
-        wallet_pending_cents = 0
-        if my_plan != "free":
-            agg = await db.commission_credits.aggregate([
-                {"$match": {"user_id": me.user_id, "status": "pending"}},
-                {"$group": {"_id": None, "total": {"$sum": "$amount_cents"}}},
-            ]).to_list(1)
-            wallet_pending_cents = int((agg[0] or {}).get("total", 0)) if agg else 0
+        my_plan = profile.get("provider_plan") or profile.get("plan") or "free"
+        plan_monthly_cents = FLAT_CONVERSION_TOTAL_CENTS  # $5 total per conversion
+        # Credit per referee = flat $5 / N referees per milestone
+        credit_per_referee_cents = plan_monthly_cents // REFEREES_PER_MILESTONE
+        # Wallet balance — ALL providers see pending credits now (v3 flat)
+        agg = await db.commission_credits.aggregate([
+            {"$match": {"user_id": me.user_id, "status": "pending"}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount_cents"}}},
+        ]).to_list(1)
+        wallet_pending_cents = int((agg[0] or {}).get("total", 0)) if agg else 0
 
         # Public share URL — frontend resolves window.location.origin
         return {

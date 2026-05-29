@@ -145,6 +145,7 @@ const dict = {
 
     // Tabs / navigation in provider dashboard
     "tabs.profile": "Perfil",
+    "tabs.preferences": "Preferencias",
     "tabs.dashboard": "Inicio",
     "tabs.rates": "Mis Tarifas",
     "tabs.gallery": "Galería",
@@ -450,6 +451,7 @@ const dict = {
 
     // Tabs / navigation in provider dashboard
     "tabs.profile": "Profile",
+    "tabs.preferences": "Preferences",
     "tabs.dashboard": "Home",
     "tabs.rates": "My Rates",
     "tabs.gallery": "Gallery",

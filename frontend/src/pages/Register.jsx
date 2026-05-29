@@ -4,7 +4,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import {
   User as UserIcon,
-  Briefcase,
   Mail,
   Lock,
   Loader2,
@@ -216,29 +215,14 @@ export default function Register() {
               {lang === "en" ? "Join the getamano community" : "Únete a la comunidad getamano"}
             </p>
 
-            {/* Role picker */}
-            <div className="grid grid-cols-2 gap-2 mt-5" role="radiogroup" aria-label="Tipo de cuenta">
-              <RoleButton
-                active={role === "client"}
-                onClick={() => setRole("client")}
-                Icon={UserIcon}
-                label={lang === "en" ? "Client" : "Cliente"}
-                hint={lang === "en" ? "I'm looking for services" : "Busco servicios"}
-                testid="register-role-client"
-              />
-              <RoleButton
-                active={role === "provider"}
-                onClick={() => setRole("provider")}
-                Icon={Briefcase}
-                label={lang === "en" ? "Provider" : "Proveedor"}
-                hint={lang === "en" ? "I offer services" : "Ofrezco servicios"}
-                testid="register-role-provider"
-              />
-            </div>
+            {/* Section 88 v3 — single-user model. No role picker on signup.
+                Anyone can become a provider later via "Vende tus servicios"
+                on /account. We default `role` to "client" in the form payload
+                so legacy server-side checks keep working until they're
+                ripped out in Phase 2. */}
 
-            {/* Optional referral code (providers only) */}
-            {role === "provider" && (
-              <div className="mt-4" data-testid="register-referral-row">
+            {/* Optional referral code (anyone can be referred) */}
+            <div className="mt-5" data-testid="register-referral-row">
                 {refCode ? (
                   <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl border border-[#90E0EF] bg-[#CAF0F8]/40">
                     <Gift className="w-4 h-4 flex-shrink-0" style={{ color: "#0077B6" }} />
@@ -287,7 +271,6 @@ export default function Register() {
                   </button>
                 )}
               </div>
-            )}
 
             {/* Social buttons */}
             <div className="mt-5 space-y-2">
@@ -430,38 +413,5 @@ export default function Register() {
         </div>
       </main>
     </div>
-  );
-}
-
-/**
- * RoleButton — segmented control item used for Client / Provider picker.
- */
-function RoleButton({ active, onClick, Icon, label, hint, testid }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      role="radio"
-      aria-checked={active}
-      data-testid={testid}
-      className={`group flex flex-col items-center gap-1 px-3 py-3 rounded-2xl border-2 transition-all ${
-        active
-          ? "border-[#0077B6] bg-[#CAF0F8]/60 shadow-md shadow-[#0077B6]/15"
-          : "border-slate-200 bg-white hover:border-[#90E0EF] hover:bg-[#CAF0F8]/30"
-      }`}
-    >
-      <Icon
-        className={`w-5 h-5 ${active ? "text-[#0077B6]" : "text-slate-400 group-hover:text-[#0077B6]"}`}
-        strokeWidth={active ? 2.5 : 2}
-      />
-      <span
-        className={`text-sm font-bold leading-none ${
-          active ? "text-[#03045E]" : "text-slate-600"
-        }`}
-      >
-        {label}
-      </span>
-      <span className="text-[10px] text-slate-500 text-center leading-tight">{hint}</span>
-    </button>
   );
 }

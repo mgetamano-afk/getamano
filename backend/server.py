@@ -822,6 +822,14 @@ async def seed():
     except Exception as e:
         logger.warning(f"E2E review cleanup warn: {e}")
 
+    # Section 88 — v3 social-first migration. Promotes legacy paid plans
+    # to provider_plan='verified' + provider_verified=True + GM-XXXX code,
+    # and backfills the preferences map on every provider doc.
+    try:
+        await _v3_migration(db)
+    except Exception as e:
+        logger.warning(f"v3 migration warn: {e}")
+
     if await db.categories.count_documents({}) == 0:
         docs = []
         for c in DEFAULT_CATEGORIES:
@@ -9618,6 +9626,7 @@ from routes.profile_versions import (  # noqa: E402
 from routes.reviews import build_reviews_router as _make_reviews_router  # noqa: E402
 from routes.search_concierge import build_concierge_router as _make_concierge_router  # noqa: E402
 from routes.founders import build_founders_router as _make_founders_router  # noqa: E402
+from routes.v3_provider import build_router as _make_v3_router, run_v3_migration as _v3_migration  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9776,6 +9785,12 @@ api_router.include_router(_make_concierge_router(db=db))
 # Section 73 — Founder Discount (first 50 providers, 50% off forever)
 api_router.include_router(
     _make_founders_router(db=db, User=User, get_current_user=get_current_user)
+)
+
+# Section 88 — v3 social-first: single-user model + provider activation +
+# verification ($10/mo) + preferences toggles + getamano_code GM-XXXX.
+api_router.include_router(
+    _make_v3_router(db=db, get_current_user=get_current_user)
 )
 
 

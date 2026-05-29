@@ -40,15 +40,14 @@ def test_register_route_renders_real_register_component():
 
 
 def test_register_component_has_create_form():
-    """The Register page must expose a submit button + name/email/password inputs."""
+    """The Register page must expose a submit button + name/email/password inputs.
+    Section 88 v3 — role picker removed (single-user model)."""
     src = _read("frontend/src/pages/Register.jsx")
     for needle in (
         'data-testid="register-submit"',
         'data-testid="register-name-input"',
         'data-testid="register-email-input"',
         'data-testid="register-password-input"',
-        'testid="register-role-client"',
-        'testid="register-role-provider"',
     ):
         assert needle in src, f"Section 87 regression: missing {needle}"
     # And it must NOT use orange/teal/green Tailwind tokens

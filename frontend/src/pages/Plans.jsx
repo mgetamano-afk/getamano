@@ -1,203 +1,248 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
-import { Check, Sparkles } from "lucide-react";
-import PlanRecommender from "../components/PlanRecommender";
-import BillingToggle from "../components/BillingToggle";
+import { useAuth } from "../contexts/AuthContext";
+import { Check, ShieldCheck, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-/** Per-experiment deterministic A/B assignment from session_id.
- *  Matches the same algorithm in PlanRecommender so a session sees consistent
- *  variants across pages. */
-function getOrCreateSessionId() {
-  try {
-    let id = localStorage.getItem("quiz_session_id");
-    if (!id) {
-      id = "qs_" + Math.random().toString(36).slice(2, 14) + Date.now().toString(36);
-      localStorage.setItem("quiz_session_id", id);
-    }
-    return id;
-  } catch (_e) { return "qs_" + Math.random().toString(36).slice(2, 14); }
-}
-function getVariant(sessionId, experimentName) {
-  if (!sessionId) return "A";
-  const key = `${sessionId}:${experimentName}`;
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h + key.charCodeAt(i) * 31) % 100003;
-  return h % 2 === 0 ? "A" : "B";
-}
-const ORDER_EXPERIMENT = "plan_card_order_v1";
-// A = ascending (free → premium, default). B = anchor in value (pro → premium → basic → free).
-const PLAN_ORDER_B = ["pro", "premium", "basic", "free"];
-
+/**
+ * Plans — v3 social-first (Section 88).
+ *
+ * The 4-tier system (free / basic $10 / pro $15 / premium $25) is gone.
+ * The v3 model has exactly TWO options:
+ *
+ *   1. Proveedor Libre  — $0 — basic eCard, listed in search.
+ *   2. Proveedor Verificado — $10/mo — adds:
+ *      · ✓ verified badge
+ *      · unique GM-XXXX code displayed on the public eCard
+ *      · priority in search results
+ *      · unlimited messaging
+ *      · full analytics
+ *      · referral program access
+ *
+ * Stripe wiring is intentionally absent in Phase 1 (user choice 4b).
+ * When keys land, the "Verificarme" button will open a Stripe Checkout
+ * session; for now it just hits POST /api/users/me/verify which sets
+ * the flag and mints the GM code.
+ */
 export default function Plans() {
   const { t, lang } = useI18n();
-  const [plans, setPlans] = useState([]);
-  const [billingCycle, setBillingCycle] = useState(() => {
-    try { return localStorage.getItem("plans_billing_cycle") || "monthly"; }
-    catch (_e) { return "monthly"; }
-  });
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [status, setStatus] = useState(null);
+  const [founder, setFounder] = useState(null);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
-    api.get("/plans").then(r => setPlans(r.data));
-  }, []);
+    if (!user) return;
+    let alive = true;
+    Promise.all([
+      api.get("/users/me/provider-status"),
+      api.get("/founders/status").catch(() => ({ data: null })),
+    ]).then(([s, f]) => {
+      if (!alive) return;
+      setStatus(s.data);
+      setFounder(f.data);
+    });
+    return () => { alive = false; };
+  }, [user]);
 
-  // plan_card_order_v1: A = ascending (free → premium, default).
-  //                    B = anchor on value (pro → premium → basic → free)
-  const sessionId = useMemo(() => getOrCreateSessionId(), []);
-  const orderVariant = useMemo(() => getVariant(sessionId, ORDER_EXPERIMENT), [sessionId]);
-  const orderedPlans = useMemo(() => {
-    if (orderVariant !== "B" || !plans.length) return plans;
-    const map = Object.fromEntries(plans.map(p => [p.id, p]));
-    return PLAN_ORDER_B.map(id => map[id]).filter(Boolean);
-  }, [plans, orderVariant]);
-
-  // Fire "opened" event for plan_card_order_v1 once per page load
-  useEffect(() => {
-    if (!plans.length) return;
-    api.post("/quiz/track", {
-      session_id: sessionId,
-      event: "opened",
-      experiment: ORDER_EXPERIMENT,
-      variant: orderVariant,
-      lang,
-    }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plans.length]);
-
-  const trackPlanClick = (planId) => {
-    api.post("/quiz/track", {
-      session_id: sessionId,
-      event: "cta_clicked",
-      experiment: ORDER_EXPERIMENT,
-      variant: orderVariant,
-      recommended_plan: planId,
-      lang,
-    }).catch(() => {});
+  const verify = async () => {
+    if (verifying) return;
+    if (!user) { navigate("/login?next=/plans"); return; }
+    if (!status?.is_provider) {
+      // Activate first
+      try {
+        await api.post("/users/me/activate-provider");
+      } catch (e) { /* tolerate idempotent re-runs */ }
+    }
+    setVerifying(true);
+    try {
+      const { data } = await api.post("/users/me/verify");
+      toast.success(
+        lang === "en"
+          ? `Verified! Your code: ${data.getamano_code}`
+          : `¡Verificado! Tu código: ${data.getamano_code}`
+      );
+      navigate("/account");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Error");
+    } finally {
+      setVerifying(false);
+    }
   };
 
-  const onChangeCycle = (next) => {
-    setBillingCycle(next);
-    try { localStorage.setItem("plans_billing_cycle", next); } catch (_e) { /* ignore */ }
-    api.post("/quiz/track", {
-      session_id: sessionId, event: "billing_cycle_changed",
-      experiment: "billing_cycle_v1", variant: next === "annual" ? "B" : "A", lang,
-    }).catch(() => {});
-  };
+  const isVerified = status?.provider_verified;
+  const founderSlotsLeft = founder?.slots_remaining ?? 0;
+  const isFounderPromoActive = founderSlotsLeft > 0;
+
+  const freePerks = [
+    { en: "Free public eCard", es: "eCard pública gratis" },
+    { en: "Listed in /buscar search", es: "Aparece en búsquedas /buscar" },
+    { en: "Receive messages (basic)", es: "Recibe mensajes (básico)" },
+    { en: "Public phone & WhatsApp links", es: "Teléfono y WhatsApp públicos" },
+  ];
+
+  const verifiedPerks = [
+    { en: "Everything in Free, plus:", es: "Todo de Libre, más:", highlight: true },
+    { en: "✓ Verified badge on your eCard", es: "Insignia ✓ Verificado en tu eCard" },
+    { en: "Unique GM-XXXX code", es: "Código GM-XXXX único" },
+    { en: "Priority in search results", es: "Prioridad en resultados de búsqueda" },
+    { en: "Unlimited messaging & quotes", es: "Mensajes y cotizaciones ilimitados" },
+    { en: "Full analytics dashboard", es: "Dashboard de analytics completo" },
+    { en: "Referral program ($5 per conversion)", es: "Programa de referidos ($5 por conversión)" },
+  ];
+
+  if (authLoading) return null;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-[#F0F9FF] flex flex-col">
       <Header />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20" data-testid="plans-page">
-        <div className="text-center mb-12">
-          <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-orange-700 font-semibold bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
-            <Sparkles className="w-3.5 h-3.5" /> Planes para proveedores
-          </span>
-          <h1 className="font-display text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mt-4">{t("plans.title")}</h1>
-          <p className="text-slate-500 mt-3 max-w-2xl mx-auto">{t("plans.subtitle")}</p>
-        </div>
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full" data-testid="plans-page">
+        <header className="text-center mb-10">
+          <h1 className="font-display text-3xl sm:text-5xl font-extrabold tracking-tight text-[#03045E]" data-testid="plans-title">
+            {lang === "en" ? "Choose your plan" : "Elige tu plan"}
+          </h1>
+          <p className="mt-3 text-slate-600 max-w-2xl mx-auto text-base sm:text-lg">
+            {lang === "en"
+              ? "Simple, transparent pricing. Get verified to unlock the full power of getamano."
+              : "Precios simples y transparentes. Verifícate para desbloquear todo el poder de getamano."}
+          </p>
+        </header>
 
-        {/* Smart Recommender — quiz "What plan do I need?" */}
-        <PlanRecommender />
-
-        {/* Billing cycle toggle */}
-        <div className="mt-12 flex justify-center" data-testid="plans-billing-toggle-row">
-          <BillingToggle cycle={billingCycle} onChange={onChangeCycle} lang={lang} savingsLabel="17%" />
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10" data-variant={orderVariant}>
-          {orderedPlans.map(p => {
-            const features = lang === "es" ? p.features_es : p.features_en;
-            const name = lang === "es" ? p.name : p.name_en;
-            const priceMonthly = p.price_monthly || 0;
-            const priceAnnual = p.price_annual || priceMonthly * 12;
-            const annualSavings = p.annual_savings || 0;
-            const showAnnual = billingCycle === "annual";
-            // Cost per month when paying annually — shown so users see the daily-cost framing.
-            const annualPerMonth = priceAnnual ? (priceAnnual / 12) : 0;
-            return (
-              <div key={p.id} className={`rounded-2xl border-2 p-6 md:p-7 bg-white relative ${p.highlight ? "border-orange-500 shadow-xl shadow-orange-100" : "border-slate-200"}`} data-testid={`plan-card-${p.id}`}>
-                {p.highlight && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap">{lang === "en" ? "Most popular" : "Más popular"}</span>}
-                <h3 className="font-display text-xl font-bold text-slate-900">{name}</h3>
-
-                {/* Price block — animates by swapping the visible value */}
-                <div className="mt-3 min-h-[78px]" data-testid={`plan-price-${p.id}`}>
-                  {priceMonthly === 0 ? (
-                    <div className="flex items-end gap-1">
-                      <span className="font-display text-4xl font-bold text-slate-900">$0</span>
-                      <span className="text-slate-500 mb-1">{lang === "en" ? "/forever" : "/siempre"}</span>
-                    </div>
-                  ) : showAnnual ? (
-                    <>
-                      <div className="flex items-end gap-1">
-                        <span className="font-display text-4xl font-bold text-slate-900" data-testid={`plan-price-${p.id}-annual`}>${priceAnnual}</span>
-                        <span className="text-slate-500 mb-1">{lang === "en" ? "/year" : "/año"}</span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        ≈ <span className="font-semibold text-slate-700">${annualPerMonth.toFixed(annualPerMonth % 1 === 0 ? 0 : 2)}</span> {lang === "en" ? "per month" : "por mes"}
-                      </p>
-                      {annualSavings > 0 && (
-                        <p className="text-xs font-bold mt-1" style={{ color: "#16A34A" }} data-testid={`plan-price-${p.id}-savings`}>
-                          {lang === "en" ? `You save $${annualSavings}/yr` : `Ahorras $${annualSavings}/año`}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-end gap-1">
-                        <span className="font-display text-4xl font-bold text-slate-900" data-testid={`plan-price-${p.id}-monthly`}>${priceMonthly}</span>
-                        <span className="text-slate-500 mb-1">{t("plans.monthly")}</span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1 invisible">placeholder</p>
-                    </>
-                  )}
-                </div>
-
-                <ul className="mt-3 space-y-2.5 min-h-[220px]">
-                  {features.map((f, i) => (
-                    <li key={`${p.id}-${i}`} className="flex items-start gap-2 text-[13px] text-slate-700">
-                      <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" /> {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link to={`/register?role=provider&plan=${p.id}&cycle=${billingCycle}`} onClick={() => trackPlanClick(p.id)} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
-                  {p.id === "free" ? (lang === "en" ? "Start free" : "Empezar gratis") : t("plans.choose")}
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* FAQ section — pre-launch BUG-01 enhancement */}
-        <section className="mt-16 max-w-3xl mx-auto">
-          <h2 className="font-display text-2xl font-semibold text-slate-900 text-center mb-6">
-            {lang === "en" ? "Frequently asked questions" : "Preguntas frecuentes"}
-          </h2>
-          <div className="space-y-3" data-testid="plans-faq">
-            {(lang === "en" ? [
-              { q: "Can I cancel anytime?", a: "Yes. Subscriptions are month-to-month and you can cancel from your dashboard. No long-term commitments." },
-              { q: "Can I switch plans later?", a: "Absolutely. You can upgrade or downgrade at any time. Pro-rated charges apply on the next billing cycle." },
-              { q: "How does billing work?", a: "Charges happen monthly through Stripe. You'll get an invoice by email. Currently all plans are in Beta mode (free) until our official launch." },
-            ] : [
-              { q: "¿Puedo cancelar cuando quiera?", a: "Sí. Todas las suscripciones son mes a mes y puedes cancelar desde tu panel sin compromisos a largo plazo." },
-              { q: "¿Puedo cambiar de plan después?", a: "Por supuesto. Puedes subir o bajar de plan en cualquier momento. El cobro prorrateado aplica en el siguiente ciclo." },
-              { q: "¿Cómo funciona la facturación?", a: "El cobro es mensual vía Stripe y recibes factura por email. Mientras tanto, todos los planes están en modo Beta gratuito hasta el lanzamiento oficial." },
-            ]).map((f, i) => (
-              <details key={i} className="rounded-xl border border-slate-200 bg-white p-4 group" data-testid={`plans-faq-${i}`}>
-                <summary className="cursor-pointer font-semibold text-slate-900 flex items-center justify-between">
-                  {f.q}
-                  <span className="text-slate-400 group-open:rotate-180 transition">▾</span>
-                </summary>
-                <p className="text-sm text-slate-600 mt-2 leading-relaxed">{f.a}</p>
-              </details>
-            ))}
+        {/* Founder banner — kept (user choice 4b leaves it as-is, automatic, no card) */}
+        {isFounderPromoActive && !isVerified && (
+          <div
+            className="mb-8 rounded-2xl p-5 text-white shadow-xl flex items-start gap-3 sm:items-center"
+            style={{ background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)" }}
+            data-testid="plans-founder-banner"
+          >
+            <span className="text-3xl flex-shrink-0">🔥</span>
+            <div>
+              <p className="font-bold text-base sm:text-lg leading-tight">
+                {lang === "en" ? "Founding Members" : "Founding Members"} ·{" "}
+                {lang === "en" ? `${founderSlotsLeft} spots left` : `${founderSlotsLeft} cupos restantes`}
+              </p>
+              <p className="text-sm text-white/90 mt-0.5">
+                {lang === "en"
+                  ? "First 100 providers: Verified plan FREE until December 2027."
+                  : "Primeros 100 proveedores: plan Verificado GRATIS hasta diciembre 2027."}
+              </p>
+            </div>
           </div>
-        </section>
-        <p className="text-center text-xs text-slate-400 mt-8">{lang === "en" ? "Stripe payments coming soon. All plans operate in Beta-free mode today." : "Pagos vía Stripe próximamente. Hoy todos los planes operan en modo Beta gratuito."}</p>
+        )}
+
+        <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+          {/* Card 1 — Free */}
+          <PlanCard
+            kind="free"
+            title={lang === "en" ? "Free Provider" : "Proveedor Libre"}
+            price="$0"
+            periodLabel={lang === "en" ? "Forever" : "Por siempre"}
+            perks={freePerks}
+            lang={lang}
+            currentPlan={status?.provider_plan === "free" || (!status?.is_provider)}
+            ctaLabel={status?.is_provider
+              ? (lang === "en" ? "Current plan" : "Plan actual")
+              : (lang === "en" ? "Start free" : "Empezar gratis")}
+            ctaTestId="plans-free-cta"
+            onCtaClick={() => {
+              if (!user) { navigate("/login?next=/plans"); return; }
+              if (status?.is_provider) return; // already free
+              api.post("/users/me/activate-provider").then(() => navigate("/provider/onboarding"));
+            }}
+            ctaDisabled={!!status?.is_provider}
+          />
+
+          {/* Card 2 — Verified */}
+          <PlanCard
+            kind="verified"
+            title={lang === "en" ? "Verified Provider" : "Proveedor Verificado"}
+            price="$10"
+            periodLabel={lang === "en" ? "/ month" : "/ mes"}
+            perks={verifiedPerks}
+            lang={lang}
+            highlight
+            currentPlan={isVerified}
+            ctaLabel={isVerified
+              ? (lang === "en" ? "Verified ✓" : "Verificado ✓")
+              : verifying
+                ? (lang === "en" ? "Verifying…" : "Verificando…")
+                : isFounderPromoActive
+                  ? (lang === "en" ? "Claim FREE spot" : "Reclamar cupo GRATIS")
+                  : (lang === "en" ? "Verify · $10/mo" : "Verificarme · $10/mes")}
+            ctaTestId="plans-verified-cta"
+            onCtaClick={verify}
+            ctaDisabled={isVerified || verifying}
+            ctaIcon={verifying ? Loader2 : ShieldCheck}
+            ctaIconSpin={verifying}
+          />
+        </div>
+
+        <p className="mt-8 text-center text-sm text-slate-500">
+          {lang === "en"
+            ? "Need help choosing? "
+            : "¿Necesitas ayuda eligiendo? "}
+          <Link to="/contacto" className="text-[#0077B6] font-semibold hover:underline">
+            {lang === "en" ? "Contact us" : "Contáctanos"}
+          </Link>
+        </p>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function PlanCard({ kind, title, price, periodLabel, perks, lang, highlight, currentPlan, ctaLabel, ctaTestId, onCtaClick, ctaDisabled, ctaIcon: Icon, ctaIconSpin }) {
+  return (
+    <div
+      className={`relative rounded-3xl p-6 sm:p-8 transition-all ${
+        highlight
+          ? "bg-gradient-to-br from-[#03045E] to-[#0077B6] text-white shadow-2xl shadow-[#0077B6]/30 sm:-translate-y-2"
+          : "bg-white border-2 border-slate-200 text-[#03045E] hover:border-[#0077B6]/30"
+      }`}
+      data-testid={`plan-card-${kind}`}
+    >
+      {highlight && (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#00B4D8] text-white text-[11px] font-bold uppercase tracking-wider shadow-lg">
+          {lang === "en" ? "Recommended" : "Recomendado"}
+        </span>
+      )}
+      {currentPlan && (
+        <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${highlight ? "bg-[#00B4D8]/30 text-white" : "bg-[#CAF0F8] text-[#0077B6]"}`}>
+          {lang === "en" ? "Current" : "Actual"}
+        </span>
+      )}
+      <h2 className="font-display font-bold text-2xl mb-2">{title}</h2>
+      <div className="flex items-baseline gap-1 mb-5">
+        <span className="text-4xl sm:text-5xl font-extrabold">{price}</span>
+        <span className={`text-sm font-medium ${highlight ? "text-[#CAF0F8]" : "text-slate-500"}`}>{periodLabel}</span>
+      </div>
+      <ul className="space-y-2.5 mb-6">
+        {perks.map((perk, i) => (
+          <li key={i} className={`flex items-start gap-2.5 text-sm ${perk.highlight ? (highlight ? "text-[#90E0EF] font-bold" : "text-[#03045E] font-bold") : ""}`}>
+            <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${highlight ? "text-[#00B4D8]" : "text-[#0077B6]"}`} strokeWidth={2.5} />
+            <span>{lang === "en" ? perk.en : perk.es}</span>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={onCtaClick}
+        disabled={ctaDisabled}
+        className={`w-full h-12 rounded-full font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+          highlight
+            ? "bg-white text-[#03045E] hover:brightness-105 shadow-lg"
+            : "bg-slate-100 hover:bg-slate-200 text-[#03045E]"
+        }`}
+        data-testid={ctaTestId}
+      >
+        {Icon && <Icon className={`w-4 h-4 ${ctaIconSpin ? "animate-spin" : ""}`} />}
+        {ctaLabel}
+      </button>
     </div>
   );
 }

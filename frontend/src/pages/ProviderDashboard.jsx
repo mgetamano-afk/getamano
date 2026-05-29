@@ -23,6 +23,7 @@ import DashboardGallery from "../components/DashboardGallery";
 import ProfileCompletion from "../components/ProfileCompletion";
 import ReferralsTab from "../components/ReferralsTab";
 import LicenseSection from "../components/LicenseSection";
+import ProviderPreferences from "../components/ProviderPreferences";
 import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
 import SubscriptionManager from "../components/SubscriptionManager";
@@ -54,6 +55,7 @@ const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const TAB_KEYS = [
   { id: "dashboard", labelKey: "tabs.dashboard", Icon: Home },
   { id: "perfil", labelKey: "tabs.profile", Icon: Settings },
+  { id: "preferencias", labelKey: "tabs.preferences", Icon: Settings },
   { id: "tarifas", labelKey: "tabs.rates", Icon: DollarSign },
   { id: "galeria", labelKey: "tabs.gallery", Icon: ImageIcon },
   { id: "banner", labelKey: "tabs.banner", Icon: Sparkles },
@@ -390,6 +392,9 @@ export default function ProviderDashboard() {
           <div className="p-6 md:p-8">
             {tab === "red" && (
               <MiRedPage />
+            )}
+            {tab === "preferencias" && (
+              <ProviderPreferences />
             )}
             {tab === "perfil" && (
               <form onSubmit={onSave} className="space-y-8" data-testid="provider-form">
