@@ -63,16 +63,18 @@ export default function Register() {
   })();
   const [role, setRole] = useState(initialRole);
 
-  // Referral code — same resolution chain as OnboardingLogin
+  // Section 88 v3 — accepts legacy 6-char codes AND new GM-REF-XXXX format.
+  // Normalises to uppercase and caps at 12 chars (max "GM-REF-9999").
   const [refCode, setRefCode] = useState(() => {
-    const fromUrl = (params.get("ref") || "").toUpperCase().slice(0, 6);
+    const norm = (s) => (s || "").toUpperCase().trim().replace(/\s+/g, "").slice(0, 12);
+    const fromUrl = norm(params.get("ref"));
     if (fromUrl) return fromUrl;
     try {
-      return (
+      return norm(
         sessionStorage.getItem("gtm_ref_code")
         || localStorage.getItem("gtm_pending_ref_code")
         || ""
-      ).toUpperCase().slice(0, 6);
+      );
     } catch { return ""; }
   });
   const [refInputOpen, setRefInputOpen] = useState(false);
@@ -247,14 +249,14 @@ export default function Register() {
                       setRefCode(
                         e.target.value
                           .toUpperCase()
-                          .replace(/[^A-Z0-9]/g, "")
-                          .slice(0, 6)
+                          .replace(/[^A-Z0-9-]/g, "")
+                          .slice(0, 12)
                       )
                     }
-                    placeholder="A1B2C3"
-                    maxLength={6}
+                    placeholder="GM-REF-1234"
+                    maxLength={12}
                     autoFocus
-                    className="w-full h-12 px-4 rounded-2xl bg-white border-2 border-[#90E0EF] focus:border-[#0077B6] outline-none text-[#03045E] text-sm font-bold tracking-[0.25em] uppercase placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400"
+                    className="w-full h-12 px-4 rounded-2xl bg-white border-2 border-[#90E0EF] focus:border-[#0077B6] outline-none text-[#03045E] text-sm font-bold tracking-[0.18em] uppercase placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400"
                     data-testid="register-referral-input"
                   />
                 ) : (

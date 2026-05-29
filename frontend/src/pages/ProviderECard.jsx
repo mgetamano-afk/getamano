@@ -8,6 +8,9 @@ import ReviewsTabs from "../components/ReviewsTabs";
 import TranslatableDescription from "../components/TranslatableDescription";
 import { SeoHead } from "../components/seo/SeoHead";
 import SocialLinks from "../components/SocialLinks";
+import GMCodeBadge from "../components/GMCodeBadge";
+import Portfolio from "../components/Portfolio";
+import TrustScore from "../components/TrustScore";
 import { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -58,12 +61,16 @@ export default function ProviderECard() {
   const [recommendsRefreshKey, setRecommendsRefreshKey] = useState(0);
   const [refBy, setRefBy] = useState(null);  // resolved from ?via=token
   const [rates, setRates] = useState([]);
+  // Section 89 v4 — public portfolio fetched in parallel with the profile.
+  const [portfolio, setPortfolio] = useState([]);
 
   useEffect(() => {
     api.get(`/providers/by-slug/${slug}`).then(r => {
       setP(r.data);
       api.get(`/providers/${r.data.provider_id}/rates`).then(rr => setRates(rr.data?.rates || [])).catch(() => {});
     }).finally(() => setLoading(false));
+    // Section 89 — portfolio is its own endpoint so it can change independently
+    api.get(`/providers/by-slug/${slug}/portfolio`).then(r => setPortfolio(r.data || [])).catch(() => {});
   }, [slug]);
 
   // Section 46 — Credit the referrer if visitor arrived via ?ref={slug}.
@@ -240,6 +247,12 @@ export default function ProviderECard() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900" data-testid="ecard-business-name">{p.business_name}</h1>
                   {verified && <span className="badge-verified" data-testid="ecard-verified-badge"><ShieldCheck className="w-3.5 h-3.5" /> {t("provider.verified")}</span>}
+                  {/* Section 88 v3 — display the provider's unique GM-XXXX
+                      code next to their verified badge so visitors can
+                      reference it offline (flyers, trucks, business cards). */}
+                  {p.getamano_code && <GMCodeBadge variant="inline" code={p.getamano_code} />}
+                  {/* Section 89 v4 — Trust Score pill */}
+                  <TrustScore profile={p} variant="inline" />
                   <FollowButton targetUserId={p.user_id} showCount />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
@@ -391,6 +404,17 @@ export default function ProviderECard() {
                   className="w-full rounded-xl bg-black max-h-[480px]"
                   data-testid="ecard-video-player"
                 />
+              </div>
+            )}
+
+            {/* Section 89 v4 — Portfolio (up to 12 photos). Self-hides if empty. */}
+            {portfolio.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6" data-testid="ecard-portfolio">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-display font-semibold text-slate-900">{lang === "en" ? "Portfolio" : "Portafolio"}</h3>
+                  <span className="text-xs text-slate-500">{portfolio.length} {lang === "en" ? "photos" : "fotos"}</span>
+                </div>
+                <Portfolio readOnly items={portfolio} />
               </div>
             )}
 

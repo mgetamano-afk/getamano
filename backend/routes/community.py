@@ -168,14 +168,42 @@ def _paginated(items: list[dict], limit: int, key: str, *, asc: bool = False) ->
 
 
 # ─── Handler bodies ─────────────────────────────────────────────────────
-async def _list_posts(deps, limit: int, before: Optional[str], current_user_id: Optional[str], filter: Optional[str] = None):
+async def _list_posts(
+    deps,
+    limit: int,
+    before: Optional[str],
+    current_user_id: Optional[str],
+    filter: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+):
+    """Section 89 — adds optional `city` + `state` filters so the Barrio
+    tab in the new community page can scope posts to the viewer's
+    neighbourhood. We filter by the AUTHOR's stored city/state on their
+    provider_profile, which we lookup once per page via aggregation.
+    """
     limit = max(1, min(limit, 50))
     q: dict = {"is_hidden": {"$ne": True}}
     if before:
         q["created_at"] = {"$lt": before}
-    # Section 77 — `?filter=hitos` shows only milestone celebration posts.
     if filter == "hitos":
         q["type"] = "milestone"
+
+    # City/state filtering: get the set of user_ids whose provider_profile
+    # matches the requested area, then constrain `q.user_id` to that set.
+    if city or state:
+        prov_q: dict = {}
+        if city:
+            prov_q["city"] = city
+        if state:
+            prov_q["state"] = state
+        prov_ids = [
+            p["user_id"] async for p in deps.db.provider_profiles.find(prov_q, {"_id": 0, "user_id": 1})
+        ]
+        if not prov_ids:
+            return _paginated([], limit, "created_at")
+        q["user_id"] = {"$in": prov_ids}
+
     rows = await deps.db.community_posts.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     rows = await hydrate_posts(deps.db, rows, current_user_id)
     return _paginated(rows, limit, "created_at")
@@ -647,12 +675,25 @@ def make_router(*, db, audit_log, get_current_user, PUBLIC_GUARD) -> APIRouter:
 
     # Posts
     @router.get("/posts")
-    async def list_posts(limit: int = 20, before: Optional[str] = None, filter: Optional[str] = None):
-        return await _list_posts(deps, limit, before, None, filter=filter)
+    async def list_posts(
+        limit: int = 20,
+        before: Optional[str] = None,
+        filter: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+    ):
+        return await _list_posts(deps, limit, before, None, filter=filter, city=city, state=state)
 
     @router.get("/posts/feed")
-    async def list_posts_authenticated(limit: int = 20, before: Optional[str] = None, filter: Optional[str] = None, user=Depends(get_current_user)):
-        return await _list_posts(deps, limit, before, user.user_id, filter=filter)
+    async def list_posts_authenticated(
+        limit: int = 20,
+        before: Optional[str] = None,
+        filter: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        user=Depends(get_current_user),
+    ):
+        return await _list_posts(deps, limit, before, user.user_id, filter=filter, city=city, state=state)
 
     @router.post("/posts")
     async def create_post(payload: NewPostIn, request: Request, user=Depends(get_current_user)):

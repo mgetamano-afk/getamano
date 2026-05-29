@@ -24,6 +24,9 @@ import ProfileCompletion from "../components/ProfileCompletion";
 import ReferralsTab from "../components/ReferralsTab";
 import LicenseSection from "../components/LicenseSection";
 import ProviderPreferences from "../components/ProviderPreferences";
+import GMCodeBadge from "../components/GMCodeBadge";
+import Portfolio from "../components/Portfolio";
+import TrustScore from "../components/TrustScore";
 import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
 import SubscriptionManager from "../components/SubscriptionManager";
@@ -274,6 +277,23 @@ export default function ProviderDashboard() {
                   } catch (_e) { /* ignore — banner already showed success state */ }
                 }}
               />
+            </div>
+
+            {/* Section 88 v3 — Provider's unique GM-XXXX code. Self-hides
+                if the provider is unverified (no GM code yet). */}
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "60ms" }}>
+              <GMCodeBadge variant="full" />
+            </div>
+
+            {/* Section 89 v4 — Trust Score breakdown card. Self-hides when
+                profile signals aren't loaded yet. */}
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "80ms" }}>
+              <TrustScore profile={profile} variant="card" />
+            </div>
+
+            {/* Section 89 v4 — Portfolio editor (max 12 photos). */}
+            <div className="animate-fadeSlideUp" style={{ animationDelay: "100ms" }}>
+              <Portfolio />
             </div>
 
             {/* Racha + Ranking lado a lado */}

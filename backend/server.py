@@ -830,6 +830,12 @@ async def seed():
     except Exception as e:
         logger.warning(f"v3 migration warn: {e}")
 
+    # Section 89 — v4 social indexes (portfolio + gremios).
+    try:
+        await _v4_indexes(db)
+    except Exception as e:
+        logger.warning(f"v4 indexes warn: {e}")
+
     if await db.categories.count_documents({}) == 0:
         docs = []
         for c in DEFAULT_CATEGORIES:
@@ -1632,6 +1638,25 @@ async def get_provider_by_slug(slug: str):
         {"_id": 0, "paid_amount_range": 0},
     ).sort("created_at", -1).limit(20).to_list(20)
     p["reviews"] = reviews
+    # Section 89 — Trust Score signals enrichment. Adds:
+    #   portfolio_count, days_active, referrals_converted, avg_rating, reviews_count
+    # so the frontend can compute calcTrustScore(profile) without 4 extra calls.
+    p["portfolio_count"] = await db.portfolio_items.count_documents({"provider_id": p["provider_id"]})
+    p["referrals_converted"] = await db.referrals.count_documents({
+        "referrer_user_id": p.get("user_id"),
+        "status": "paid",
+    })
+    p["avg_rating"] = float(p.get("rating_avg") or 0.0)
+    p["reviews_count"] = int(p.get("rating_count") or 0)
+    try:
+        created_at = p.get("created_at")
+        if created_at:
+            cd = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            p["days_active"] = max(0, (datetime.now(timezone.utc) - cd).days)
+        else:
+            p["days_active"] = 0
+    except Exception:
+        p["days_active"] = 0
     return p
 
 @api_router.get("/providers/me")
@@ -1641,6 +1666,23 @@ async def get_my_provider(user: User = Depends(get_current_user)):
         return None
     cat = await db.categories.find_one({"category_id": p.get("category_id")}, {"_id": 0})
     p["category"] = cat
+    # Section 89 — same trust signals as by-slug so the dashboard has them
+    p["portfolio_count"] = await db.portfolio_items.count_documents({"provider_id": p["provider_id"]})
+    p["referrals_converted"] = await db.referrals.count_documents({
+        "referrer_user_id": user.user_id,
+        "status": "paid",
+    })
+    p["avg_rating"] = float(p.get("rating_avg") or 0.0)
+    p["reviews_count"] = int(p.get("rating_count") or 0)
+    try:
+        created_at = p.get("created_at")
+        if created_at:
+            cd = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            p["days_active"] = max(0, (datetime.now(timezone.utc) - cd).days)
+        else:
+            p["days_active"] = 0
+    except Exception:
+        p["days_active"] = 0
     return p
 
 @api_router.post("/providers")
@@ -9627,6 +9669,7 @@ from routes.reviews import build_reviews_router as _make_reviews_router  # noqa:
 from routes.search_concierge import build_concierge_router as _make_concierge_router  # noqa: E402
 from routes.founders import build_founders_router as _make_founders_router  # noqa: E402
 from routes.v3_provider import build_router as _make_v3_router, run_v3_migration as _v3_migration  # noqa: E402
+from routes.v4_social import build_router as _make_v4_social_router, ensure_indexes as _v4_indexes  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9791,6 +9834,11 @@ api_router.include_router(
 # verification ($10/mo) + preferences toggles + getamano_code GM-XXXX.
 api_router.include_router(
     _make_v3_router(db=db, get_current_user=get_current_user)
+)
+
+# Section 89 — v4 social features: Portfolio + Gremios.
+api_router.include_router(
+    _make_v4_social_router(db=db, get_current_user=get_current_user)
 )
 
 

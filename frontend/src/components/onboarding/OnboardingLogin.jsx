@@ -51,21 +51,22 @@ export default function OnboardingLogin({ onFinish }) {
   const [loading, setLoading] = useState(false);
   const [founderStatus, setFounderStatus] = useState(null); // Section 73 — {slots_remaining}
 
-  // Section 75 — Referral code state. The code arrives from:
-  //   1. URL `?ref=ABCDEF` (provider link sent via WhatsApp).
-  //   2. sessionStorage `gtm_ref_code` (set by ReferralLanding for /r/CODE).
-  //   3. localStorage `gtm_pending_ref_code` (set if user typed it manually
-  //      but navigated away before finishing signup).
-  // The code is uppercase 6-char alphanumeric, excluding O/0/I/1.
+  // Section 88 v3 — accepts either:
+  //   · Legacy 6-char codes (`A1B2C3`) — still valid for codes in the wild
+  //   · New GM-REF-XXXX codes (4 digits) issued from Section 88 onwards
+  // We normalise to uppercase, strip whitespace and cap at 12 chars
+  // (enough for "GM-REF-9999"). The "-" character is preserved so the
+  // new format survives the regex.
   const [refCode, setRefCode] = useState(() => {
-    const fromUrl = (searchParams.get("ref") || "").toUpperCase().slice(0, 6);
+    const norm = (s) => (s || "").toUpperCase().trim().replace(/\s+/g, "").slice(0, 12);
+    const fromUrl = norm(searchParams.get("ref"));
     if (fromUrl) return fromUrl;
     try {
-      return (
+      return norm(
         sessionStorage.getItem("gtm_ref_code")
         || localStorage.getItem("gtm_pending_ref_code")
         || ""
-      ).toUpperCase().slice(0, 6);
+      );
     } catch { return ""; }
   });
   const [refInputOpen, setRefInputOpen] = useState(false);
@@ -204,14 +205,14 @@ export default function OnboardingLogin({ onFinish }) {
                   setRefCode(
                     e.target.value
                       .toUpperCase()
-                      .replace(/[^A-Z0-9]/g, "")
-                      .slice(0, 6)
+                      .replace(/[^A-Z0-9-]/g, "")
+                      .slice(0, 12)
                   )
                 }
-                placeholder="A1B2C3"
-                maxLength={6}
+                placeholder="GM-REF-1234"
+                maxLength={12}
                 autoFocus
-                className="w-full h-12 px-4 rounded-2xl bg-white border-2 border-[#90E0EF] focus:border-[#0077B6] outline-none text-[#03045E] text-sm font-bold tracking-[0.25em] uppercase placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400"
+                className="w-full h-12 px-4 rounded-2xl bg-white border-2 border-[#90E0EF] focus:border-[#0077B6] outline-none text-[#03045E] text-sm font-bold tracking-[0.18em] uppercase placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400"
                 data-testid="onb-referral-input"
               />
             ) : (

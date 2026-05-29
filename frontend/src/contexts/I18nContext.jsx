@@ -253,8 +253,9 @@ const dict = {
     "areas.not_found": "No encontramos esa ciudad — toca Añadir para guardarla como está.",
 
     // Section 70 — Onboarding nativo (ES)
-    "onb.splash.title": "Bienvenido a getamano",
-    "onb.splash.subtitle": "Conectamos a clientes con proveedores latinos verificados en Estados Unidos.",
+    "onb.splash.title": "Bienvenido a Getamano",
+    "onb.splash.subtitle": "Lo latino, a la mano.",
+    "onb.splash.subtitle_long": "Conectamos a clientes con proveedores latinos verificados en Estados Unidos.",
     "onb.splash.legal": "© 2026 Latin Ventures LLC. Todos los derechos reservados.",
     "onb.splash.cta": "Comenzar",
     "onb.slide.title_1": "Proveedores Verificados",
@@ -558,8 +559,9 @@ const dict = {
     "areas.not_found": "We couldn't find that city — tap Add to save it as-is.",
 
     // Section 70 — Onboarding nativo (EN)
-    "onb.splash.title": "Welcome to getamano",
-    "onb.splash.subtitle": "We connect clients with verified Latino service providers across the US.",
+    "onb.splash.title": "Welcome to Getamano",
+    "onb.splash.subtitle": "Latino, at your fingertips.",
+    "onb.splash.subtitle_long": "We connect clients with verified Latino service providers across the US.",
     "onb.splash.legal": "© 2026 Latin Ventures LLC. All rights reserved.",
     "onb.splash.cta": "Get started",
     "onb.slide.title_1": "Verified Providers",

@@ -404,35 +404,47 @@ async def mark_referral_paid(db, referee_user_id: str) -> Optional[dict]:
 
 
 async def _generate_or_get_ref_code(db, user_id: str) -> str:
-    """Lazy-generate a 6-char uppercase code for the user. Stored on
-    provider_profiles (legacy field name `ref_code` kept for compatibility
-    with /auth/register?ref= flow).
+    """Lazy-generate the referral code for a user.
+
+    Section 88 v3 — format aligned with the provider GM-XXXX code:
+        GM-REF-XXXX (where XXXX = 4 random digits 1000–9999)
+
+    The legacy 6-char `A1B2C3` codes are kept untouched if they already
+    exist on a profile — we only generate the new format for users that
+    don't have a `ref_code` yet. This preserves every existing flyer,
+    QR code and /r/CODE link in the wild.
     """
     prof = await db.provider_profiles.find_one(
         {"user_id": user_id},
-        {"_id": 0, "ref_code": 1},
+        {"_id": 0, "ref_code": 1, "getamano_code": 1},
     )
     if prof and prof.get("ref_code"):
         return prof["ref_code"]
-    # Collision-resistant 6-char base32. Try a few times.
-    import secrets
-    import string
-    alphabet = string.ascii_uppercase + string.digits  # no lowercase to keep
-    # codes legible on flyers
-    alphabet = alphabet.replace("O", "").replace("0", "").replace("I", "").replace("1", "")
-    for _ in range(8):
-        candidate = "".join(secrets.choice(alphabet) for _ in range(6))
-        # check unique
-        exists = await db.provider_profiles.find_one({"ref_code": candidate}, {"_id": 0, "user_id": 1})
-        if not exists:
-            await db.provider_profiles.update_one(
-                {"user_id": user_id},
-                {"$set": {"ref_code": candidate}},
-                upsert=False,
-            )
-            return candidate
-    # Fallback (extremely unlikely): use uuid prefix
-    return uuid.uuid4().hex[:6].upper()
+
+    # Section 88 v3 — prefer GM-REF-{XXXX} so the brand stays consistent.
+    # If the user is already a verified provider with a GM-XXXX code,
+    # we mirror its 4-digit suffix so they only have to remember one
+    # number. Otherwise we mint a fresh 4-digit value uniquely.
+    import random
+    candidate: str | None = None
+    gm = (prof or {}).get("getamano_code")
+    if gm and gm.startswith("GM-") and len(gm) >= 6:
+        candidate = f"GM-REF-{gm[3:7]}"
+        # confirm uniqueness (extremely unlikely clash since GM codes are unique)
+        if await db.provider_profiles.find_one({"ref_code": candidate}, {"_id": 0, "user_id": 1}):
+            candidate = None  # fall through to random
+    if candidate is None:
+        for _ in range(25):
+            candidate = f"GM-REF-{random.randint(1000, 9999)}"
+            if not await db.provider_profiles.find_one({"ref_code": candidate}, {"_id": 0, "user_id": 1}):
+                break
+
+    await db.provider_profiles.update_one(
+        {"user_id": user_id},
+        {"$set": {"ref_code": candidate}},
+        upsert=False,
+    )
+    return candidate
 
 
 def make_router(*, db, User, get_current_user) -> APIRouter:

@@ -90,32 +90,33 @@ export default function BottomNav() {
   };
 
   // Build items per user role. Each item: {path, icon, label, testid, badge?, animate?}
-  // Section 61 Bug B6: EXACTLY 5 items, identical on mobile and desktop.
-  // Secondary destinations (Gallery, Plans, Saved, Inbox) live inside "Mi cuenta".
+  // Section 89 v4 — bottom nav copy updated: "Comunidad" → "Barrio",
+  // "Mi cuenta" → "Perfil" to align with the social-first vocabulary.
+  // Routes remain the same so deep-links don't break.
   let items;
   if (!user) {
     items = [
       { path: "/",          icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
       { path: "/search",    icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
-      { path: "/comunidad", icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
+      { path: "/comunidad", icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",   icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
-      { path: "/login",     icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta", testid: "bottom-nav-account" },
+      { path: "/login",     icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account" },
     ];
   } else if (user.role === "provider") {
     items = [
       { path: "/",                   icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
       { path: "/search",             icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
-      { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
+      { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
-      { path: "/dashboard/provider", icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta", testid: "bottom-nav-account", badge: unread },
+      { path: "/dashboard/provider", icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account", badge: unread },
     ];
   } else {
     items = [
       { path: "/",                   icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
       { path: "/search",             icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
-      { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Community" : "Comunidad", testid: "bottom-nav-community", animate: "heartbeat" },
+      { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
-      { path: "/dashboard",          icon: User,            label: lang === "en" ? "Account"   : "Mi cuenta", testid: "bottom-nav-account", badge: unread },
+      { path: "/dashboard",          icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account", badge: unread },
     ];
   }
 

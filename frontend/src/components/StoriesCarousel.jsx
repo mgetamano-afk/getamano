@@ -62,15 +62,21 @@ export default function StoriesCarousel() {
     );
   }
 
-  // Show nothing if no stories AND user is not a provider
-  if (!groups.length && user?.role !== "provider") return null;
+  // Section 89 v4 — Stories are open to ALL logged-in users in the v3
+  // single-user model (was provider-only). Anyone can post; we still
+  // hide the row when there are no stories AND the user is a guest
+  // (logged-out), because guests can't create one anyway.
+  if (!groups.length && !user) return null;
 
-  // Section 76 — Identify the logged-in provider's OWN tile in the
-  // active list so we can render it first with a "+" overlay (Instagram
-  // pattern), instead of a separate floating "+ Tu historia" tile.
-  const myIdx = user?.role === "provider" ? groups.findIndex(g => g.provider_user_id === user.user_id) : -1;
+  // Section 89 v4 — Order verified providers first. Within each group
+  // (verified / unverified) we keep the chronological order returned by
+  // the API. We also surface the logged-in user's own tile separately
+  // (Instagram pattern).
+  const myIdx = user ? groups.findIndex(g => g.provider_user_id === user.user_id) : -1;
   const myGroup = myIdx >= 0 ? groups[myIdx] : null;
-  const otherGroups = myIdx >= 0 ? groups.filter((_, i) => i !== myIdx) : groups;
+  const otherGroups = (myIdx >= 0 ? groups.filter((_, i) => i !== myIdx) : groups)
+    .slice()
+    .sort((a, b) => Number(!!b.verified) - Number(!!a.verified));
 
   // Stories created in the last 60 minutes get a subtle pulse animation —
   // "there's something new" social-network cue.
@@ -85,11 +91,12 @@ export default function StoriesCarousel() {
     <>
       <div className="mb-4" data-testid="stories-carousel">
         <div className="flex gap-3 overflow-x-auto pb-3 px-1 -mx-1 scrollbar-none">
-          {/* Logged-in provider's tile — shown first.
+          {/* Section 89 v4 — Story tile for the logged-in user, regardless
+              of provider status. Anyone can post (single-user model).
               - WITH active stories: tap opens viewer, "+" badge overlays
                 the avatar so they can add another segment.
               - WITHOUT stories: tap opens creator. */}
-          {user?.role === "provider" && (
+          {user && (
             myGroup ? (
               <div
                 className="flex-shrink-0 flex flex-col items-center gap-1.5 group relative"
@@ -604,21 +611,37 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
               </button>
             </div>
           ) : (
-            <div className="absolute left-4 z-10 pointer-events-auto" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }} data-testid="story-viewer-actions">
-              <LikeButton
-                liked={!!likeStates[active.story_id]}
-                count={active.likes_count || 0}
-                onClick={toggleStoryLike}
-                disabled={!!likePending[active.story_id]}
-                size="lg"
-                variant="floating"
-                testid="story-viewer-like"
-                ariaLabel={lang === "en" ? "Like this story" : "Dar like a esta historia"}
-                celebrationLevel="milestone"
-              />
-              <p className="text-white/70 text-[10px] font-medium mt-1.5 ml-2 drop-shadow-md select-none">
-                {lang === "en" ? "Double-tap to like" : "Doble toque para dar like"}
-              </p>
+            <div className="absolute left-4 right-4 z-10 pointer-events-auto flex items-end justify-between gap-3" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }} data-testid="story-viewer-actions">
+              <div>
+                <LikeButton
+                  liked={!!likeStates[active.story_id]}
+                  count={active.likes_count || 0}
+                  onClick={toggleStoryLike}
+                  disabled={!!likePending[active.story_id]}
+                  size="lg"
+                  variant="floating"
+                  testid="story-viewer-like"
+                  ariaLabel={lang === "en" ? "Like this story" : "Dar like a esta historia"}
+                  celebrationLevel="milestone"
+                />
+                <p className="text-white/70 text-[10px] font-medium mt-1.5 ml-2 drop-shadow-md select-none">
+                  {lang === "en" ? "Double-tap to like" : "Doble toque para dar like"}
+                </p>
+              </div>
+              {/* Section 89 v4 — "Ver perfil →" CTA on provider stories.
+                  Renders only when the story comes from a provider with a
+                  public slug. Drives traffic from passive story viewers
+                  to the full eCard. */}
+              {active.provider_slug && (
+                <Link
+                  to={`/p/${active.provider_slug}`}
+                  className="inline-flex items-center gap-1.5 px-4 h-11 rounded-full bg-white text-[#03045E] font-bold text-sm shadow-2xl shadow-black/40 active:scale-95 transition flex-shrink-0"
+                  data-testid="story-viewer-cta-ecard"
+                  aria-label={lang === "en" ? "View profile" : "Ver perfil"}
+                >
+                  {lang === "en" ? "View profile" : "Ver perfil"} →
+                </Link>
+              )}
             </div>
           )}
 

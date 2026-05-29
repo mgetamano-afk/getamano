@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
-import { Newspaper, Compass, Trophy, Award, IdCard } from "lucide-react";
+import { Newspaper, Compass, Trophy, Award, IdCard, MapPin, Users } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 import useSmartNav from "../hooks/useSmartNav";
 import Header from "./Header";
@@ -10,13 +10,16 @@ import Header from "./Header";
  *
  * Persistent wrapper around all /comunidad sub-routes. Renders the global
  * Header once at the top, a SECONDARY pill bar with the comunidad-specific
- * sub-sections (Feed · Explorar · Ranking · eCards · HoF), and the active
- * sub-route via <Outlet />.
+ * sub-sections (Barrio · Feed · Gremios · Explorar · Ranking · eCards ·
+ * HoF), and the active sub-route via <Outlet />.
  *
- * Section 63 — STICKY tab bar (no auto-hide). Always visible during scroll.
+ * Section 89 v4 — added the Barrio tab (first position, distance-scoped
+ * feed) and Gremios tab (private per-category communities).
  */
 const buildTabs = (lang) => [
+  { id: "barrio",       label: lang === "en" ? "Neighborhood" : "Barrio",  shortLabel: lang === "en" ? "Nbhd" : "Barrio",  Icon: MapPin,    path: "/comunidad/barrio" },
   { id: "feed",         label: lang === "en" ? "Feed"        : "Feed",        shortLabel: "Feed",    Icon: Newspaper, path: "/comunidad" },
+  { id: "gremios",      label: lang === "en" ? "Guilds"      : "Gremios",     shortLabel: lang === "en" ? "Guilds" : "Gremios",  Icon: Users,     path: "/comunidad/gremios" },
   { id: "explorar",     label: lang === "en" ? "Explore"     : "Explorar",    shortLabel: lang === "en" ? "Explore" : "Explorar", Icon: Compass,   path: "/comunidad/explorar" },
   { id: "ranking",      label: lang === "en" ? "Ranking"     : "Ranking",     shortLabel: "Ranking", Icon: Trophy,    path: "/comunidad/ranking" },
   { id: "ecards",       label: lang === "en" ? "eCards"      : "eCards",      shortLabel: "eCards",  Icon: IdCard,    path: "/comunidad/ecards" },
