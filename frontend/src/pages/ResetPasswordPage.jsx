@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#F0F9FF]">
       <Header />
       <main className="max-w-md mx-auto px-4 sm:px-6 py-10 sm:py-16" data-testid="reset-password-page">
         <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">

@@ -62,7 +62,7 @@ export default function ComunidadLayout() {
     COMUNIDAD_TABS.find((tab) => tab.path === location.pathname) ?? COMUNIDAD_TABS[0];
 
   return (
-    <div className="min-h-screen bg-slate-50" data-testid="comunidad-layout">
+    <div className="min-h-screen bg-[#F0F9FF]" data-testid="comunidad-layout">
       <Header />
 
       {/* Section 69 + 74 — Sticky tab bar that follows the header's auto-hide.

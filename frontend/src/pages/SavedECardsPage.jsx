@@ -72,7 +72,7 @@ export default function SavedECardsPage() {
   const totalLikes = items.filter(i => i.save_type === "like" || i.save_type === "both").length;
 
   return (
-    <div className="min-h-screen bg-slate-50" data-testid="saved-ecards-page">
+    <div className="min-h-screen bg-[#F0F9FF]" data-testid="saved-ecards-page">
       <Header />
       <main className="container mx-auto px-4 md:px-6 py-8 pb-24 max-w-5xl">
         <div className="mb-8 animate-fadeSlideUp">

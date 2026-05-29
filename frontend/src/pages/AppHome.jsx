@@ -110,7 +110,7 @@ export default function AppHome() {
   useRefreshable(fetchAuthData);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#F0F9FF]">
       <SeoHead
         title={lang === "en"
           ? "Trusted service pros near you"

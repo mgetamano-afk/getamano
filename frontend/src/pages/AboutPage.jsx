@@ -250,7 +250,7 @@ export default function AboutPage() {
         </section>
 
         {/* ─── Values ───────────────────────────────────────────────── */}
-        <section className="bg-slate-50 py-16 md:py-20" data-testid="about-values">
+        <section className="bg-[#F0F9FF] py-16 md:py-20" data-testid="about-values">
           <div className="max-w-5xl mx-auto px-5 md:px-8">
             <div className="flex items-center gap-2 mb-8">
               <Sparkles className="w-4 h-4" style={{ color: "#F97316" }} />
