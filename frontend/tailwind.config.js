@@ -71,38 +71,14 @@ module.exports = {
                                 'blue-light':   '#90E0EF',
                                 'blue-surface': '#CAF0F8',
                         },
-                        /* Section 73b — `orange-*` legacy utilities re-aliased
-                           to the new Atlantic Blue scale so any component
-                           still using `text-orange-500`, `bg-orange-50`, etc.
-                           automatically picks up the Ocean Blue palette. */
-                        orange: {
-                                50:  '#E6F4FA',
-                                100: '#CCE9F5',
-                                200: '#99D2EB',
-                                300: '#66BCE1',
-                                400: '#33A5D7',
-                                500: '#0077B6',
-                                600: '#00669B',
-                                700: '#005580',
-                                800: '#004466',
-                                900: '#03045E',
-                                950: '#02033A'
-                        },
-                        /* Section 73b — `amber-*` legacy utilities re-aliased
-                           to navy gradient (matches the new dark accents). */
-                        amber: {
-                                50:  '#E6E7F2',
-                                100: '#CDCFE5',
-                                200: '#9B9FCC',
-                                300: '#696FB2',
-                                400: '#373F99',
-                                500: '#03045E',
-                                600: '#02034E',
-                                700: '#02033E',
-                                800: '#01022E',
-                                900: '#01021F',
-                                950: '#000110'
-                        }
+                        /* Section 73c — `orange-*` and `amber-*` overrides
+                           REMOVED. The earlier attempt to alias them to
+                           navy broke visual hierarchy (warm CTAs vanished
+                           against the new navy bgs). Tailwind's default
+                           orange/amber scales are now restored — they
+                           contrast nicely against Ocean Blue brand colors
+                           and remain available as warm accent CTAs
+                           (Founding Members banner, urgency badges, etc.). */
                 },
                 keyframes: {
                         'accordion-down': {

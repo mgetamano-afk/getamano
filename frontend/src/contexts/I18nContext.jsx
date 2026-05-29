@@ -297,6 +297,14 @@ const dict = {
     "founder.banner_title": "🔥 ¡Eres de los primeros 50!",
     "founder.banner_left_prefix": "Quedan",
     "founder.banner_left_suffix": "lugares con 50% de descuento de por vida.",
+
+    // Section 73e — Reviews tabs (eCard)
+    "reviews.tab_recent": "Recientes",
+    "reviews.tab_5star": "5 estrellas",
+    "reviews.tab_negative": "No favorables",
+    "reviews.empty_generic": "Sin reseñas en esta categoría todavía.",
+    "reviews.empty_negative_title": "¡Sin reseñas negativas!",
+    "reviews.empty_negative_desc": "Este proveedor mantiene un historial impecable.",
   },
   en: {
     "nav.explore": "Explore services",
@@ -593,6 +601,14 @@ const dict = {
     "founder.banner_title": "🔥 You're one of the first 50!",
     "founder.banner_left_prefix": "Only",
     "founder.banner_left_suffix": "spots left with 50% lifetime discount.",
+
+    // Section 73e — Reviews tabs (eCard) — EN
+    "reviews.tab_recent": "Recent",
+    "reviews.tab_5star": "5 stars",
+    "reviews.tab_negative": "Critical",
+    "reviews.empty_generic": "No reviews in this category yet.",
+    "reviews.empty_negative_title": "No critical reviews!",
+    "reviews.empty_negative_desc": "This provider keeps an impeccable track record.",
   }
 };
 

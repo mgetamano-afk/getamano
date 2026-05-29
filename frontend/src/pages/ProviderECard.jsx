@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import ShareECard from "../components/ShareECard";
+import ReviewsTabs from "../components/ReviewsTabs";
 import TranslatableDescription from "../components/TranslatableDescription";
 import { SeoHead } from "../components/seo/SeoHead";
 import SocialLinks from "../components/SocialLinks";
@@ -485,29 +486,7 @@ export default function ProviderECard() {
                 </form>
               )}
               {p.reviews?.length > 0 ? (
-                <div className="space-y-4">
-                  {p.reviews.map(r => (
-                    <div key={r.review_id} className="border-b border-slate-100 last:border-0 pb-4 last:pb-0" data-testid={`review-item-${r.review_id}`}>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-slate-900">{r.user_name}</span>
-                        <div className="flex">
-                          {[...Array(r.rating)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-orange-500 text-orange-500" />)}
-                        </div>
-                        {r.verified && (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border"
-                            style={{ backgroundColor: "#ECFDF5", color: "#047857", borderColor: "#A7F3D0" }}
-                            title={t(`review.verified_tooltip.${r.verification_source || "messaging"}`)}
-                            data-testid={`review-verified-${r.review_id}`}
-                          >
-                            <ShieldCheck className="w-3 h-3" /> {t("review.verified")}
-                          </span>
-                        )}
-                      </div>
-                      {r.comment && <p className="text-slate-600 text-sm mt-1">{r.comment}</p>}
-                    </div>
-                  ))}
-                </div>
+                <ReviewsTabs reviews={p.reviews} />
               ) : <p className="text-slate-500 text-sm">Aún no hay reseñas.</p>}
             </div>
           </div>
