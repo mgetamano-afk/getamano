@@ -167,7 +167,7 @@ export default function LiveActivityTicker() {
             <Link
               key={`${row.text}-${i}`}
               to={row.link}
-              className="text-sm text-amber-200/95 flex-shrink-0 hover:text-amber-100 transition-colors inline-flex items-center gap-1.5 drop-shadow-[0_0_8px_rgba(252,211,77,0.25)]"
+              className="text-sm text-[#CAF0F8] flex-shrink-0 hover:text-white transition-colors inline-flex items-center gap-1.5 drop-shadow-[0_0_8px_rgba(0,180,216,0.35)]"
               data-testid={`live-activity-row-${i}`}
             >
               <span aria-hidden>{row.icon}</span>

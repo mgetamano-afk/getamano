@@ -226,8 +226,8 @@ export default function OnboardingTour({ role, onDone }) {
           />
         </mask>
       </defs>
-      <rect x="0" y="0" width="100%" height="100%" fill="rgba(15, 23, 42, 0.72)" mask="url(#spotlight-mask)" />
-      {/* Pulsing ring around target */}
+      <rect x="0" y="0" width="100%" height="100%" fill="rgba(3, 4, 94, 0.55)" mask="url(#spotlight-mask)" />
+      {/* Pulsing ring around target — Ocean Blue cyan */}
       <rect
         x={rect.left - 6}
         y={rect.top - 6}
@@ -235,24 +235,25 @@ export default function OnboardingTour({ role, onDone }) {
         height={rect.height + 12}
         rx="16" ry="16"
         fill="none"
-        stroke="rgba(252, 211, 77, 0.9)"
+        stroke="rgba(0, 180, 216, 0.95)"
         strokeWidth="2.5"
         style={{ animation: "ot-spotlight-pulse 1.8s ease-out infinite" }}
       />
     </svg>
   ) : (
-    <div className="fixed inset-0" style={{ background: "rgba(15, 23, 42, 0.72)" }} aria-hidden="true" />
+    <div className="fixed inset-0" style={{ background: "rgba(3, 4, 94, 0.55)", pointerEvents: "none" }} aria-hidden="true" />
   );
 
   return createPortal(
     <div
+      // Section 88 — outer overlay must NOT block scroll. The provider
+      // landing was unscrollable because every touch event hit this
+      // `fixed inset-0` div and never reached the underlying page.
+      // We make the overlay transparent to pointer events and re-enable
+      // them only on the tooltip card so its buttons still work.
       className="fixed inset-0 z-[120]"
-      style={{ animation: "ot-fade-in 280ms ease-out both" }}
+      style={{ animation: "ot-fade-in 280ms ease-out both", pointerEvents: "none" }}
       data-testid="onboarding-tour"
-      // Allow click on the cutout area only — block elsewhere
-      onClick={(e) => {
-        if (e.target === e.currentTarget) close(true);
-      }}
     >
       <style>{`
         @keyframes ot-fade-in { from { opacity: 0 } to { opacity: 1 } }
@@ -276,6 +277,7 @@ export default function OnboardingTour({ role, onDone }) {
           ...tooltipStyle,
           animation: "ot-card-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both",
           boxShadow: "0 24px 60px -12px rgba(0,0,0,0.35)",
+          pointerEvents: "auto",  // Section 88 — re-enable on the card only
         }}
         onClick={(e) => e.stopPropagation()}
         data-testid="onboarding-tooltip"

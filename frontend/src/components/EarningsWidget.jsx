@@ -95,8 +95,8 @@ export default function EarningsWidget() {
       to="/dashboard/provider?tab=red&subtab=earnings"
       className="group relative block rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
       style={{
-        background: "linear-gradient(135deg, #03045E 0%, #0A4D5E 55%, #03045E 100%)",
-        boxShadow: "0 8px 24px -10px rgba(3, 4, 94, 0.4)",
+        background: "linear-gradient(135deg, #03045E 0%, #0077B6 55%, #03045E 100%)",
+        boxShadow: "0 8px 24px -10px rgba(0, 119, 182, 0.55)",
         touchAction: "pan-y",
       }}
       data-testid="earnings-widget"
@@ -123,7 +123,7 @@ export default function EarningsWidget() {
           <div className="flex items-center gap-2 min-w-0">
             <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-300/30 to-emerald-500/20 ring-1 ring-emerald-300/40 flex items-center justify-center shrink-0">
               <Wallet className="w-3.5 h-3.5 text-emerald-200" />
-              <Sparkles className="absolute -top-1 -right-1 w-2.5 h-2.5 text-yellow-300 animate-pulse" style={{ animationDuration: "2.4s", willChange: "opacity" }} />
+              <Sparkles className="absolute -top-1 -right-1 w-2.5 h-2.5 text-[#90E0EF] animate-pulse" style={{ animationDuration: "2.4s", willChange: "opacity" }} />
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
               <div className="text-[10px] font-semibold text-white/80 uppercase tracking-[0.14em] leading-none mt-1 truncate">
@@ -132,8 +132,8 @@ export default function EarningsWidget() {
               {/* Demo mode badge — inline next to the title to avoid the
                   prior absolute-positioning collision with "See details". */}
               {!summary.stripe_configured && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-yellow-300/20 text-yellow-100 text-[8.5px] font-bold uppercase tracking-wider ring-1 ring-yellow-300/30 shrink-0" data-testid="earnings-demo-badge">
-                  <span className="w-1 h-1 rounded-full bg-yellow-300 animate-pulse" />
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#90E0EF]/20 text-[#CAF0F8] text-[8.5px] font-bold uppercase tracking-wider ring-1 ring-[#90E0EF]/30 shrink-0" data-testid="earnings-demo-badge">
+                  <span className="w-1 h-1 rounded-full bg-[#90E0EF] animate-pulse" />
                   {T.demoMode}
                 </span>
               )}
