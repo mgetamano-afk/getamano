@@ -7,6 +7,7 @@ import { api } from "../../lib/api";
 import { toast } from "sonner";
 import LanguageToggle from "./LanguageToggle";
 import CityscapeBackdrop from "../CityscapeBackdrop";
+import BrandMark from "../BrandMark";
 
 /**
  * OnboardingLogin — Section 70 (screen 3 of 3).
@@ -157,7 +158,7 @@ export default function OnboardingLogin({ onFinish }) {
 
       <div className="relative z-10 flex-1 w-full max-w-md mx-auto px-4 sm:px-6 py-4 flex flex-col">
         <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl shadow-[#0077B6]/15 border border-white/40 p-6 sm:p-8">
-        <img src="/getamano-logo-mark.png" alt="getamano" className="w-16 h-16 mx-auto mb-4 object-contain" draggable={false} />
+        <BrandMark size="xl" className="mx-auto mb-4" draggable={false} />
         <h1 className="text-2xl font-bold text-center" style={{ letterSpacing: "-0.02em", color: "#03045E" }} data-testid="onb-login-title">
           {t("onb.login.title")}
         </h1>

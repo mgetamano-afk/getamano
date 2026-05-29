@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { useState } from "react";
 import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram, Printer } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -149,7 +150,7 @@ export default function ShareLinkCard({ slug, businessName }) {
         className="relative w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/95 hover:bg-white text-left transition group"
         data-testid="share-link-copy-btn">
         <span className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center p-0.5" style={{ backgroundColor: "#EBF8F7" }}>
-          <img src="/getamano-logo-mark.png" alt="" className="w-full h-full object-contain" />
+          <BrandMark size="md" className="w-full h-full" alt="" />
         </span>
         <span className="flex-1 min-w-0 truncate text-sm text-slate-900 font-medium" data-testid="share-link-url">{displayUrl}</span>
         <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition ${copied ? "bg-green-500 text-white" : "bg-slate-900 text-white group-hover:bg-orange-600"}`}>

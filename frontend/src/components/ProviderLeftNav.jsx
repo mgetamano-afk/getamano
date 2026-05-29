@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -56,7 +57,7 @@ export default function ProviderLeftNav({
         {/* Brand */}
         <div className="px-4 pt-5 pb-4 border-b border-slate-100">
           <Link to="/dashboard/provider" className="flex items-center gap-2" data-testid="leftnav-brand">
-            <img src="/getamano-logo-mark.png" alt="getamano" className="w-8 h-8" />
+            <BrandMark size="sm" />
             <span className="font-display font-bold text-slate-900 text-base tracking-tight">getamano</span>
           </Link>
         </div>

@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
@@ -68,7 +69,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-14 md:h-16">
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2 min-w-0" data-testid="header-logo-link" aria-label="getamano home">
-            <img src="/getamano-logo-mark.png" alt="" className="w-9 h-9 md:w-10 md:h-10 object-contain flex-shrink-0" />
+            <BrandMark size="md" className="w-9 h-9 md:w-10 md:h-10" alt="" />
             <span className="font-display font-bold text-lg md:text-xl truncate" style={{ color: "#03045E" }}>
               get<span style={{ color: "#0077B6" }}>amano</span>
             </span>

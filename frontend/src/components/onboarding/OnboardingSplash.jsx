@@ -1,5 +1,6 @@
 import { useI18n } from "../../contexts/I18nContext";
 import LanguageToggle from "./LanguageToggle";
+import BrandMark from "../../components/BrandMark";
 import CityscapeBackdrop from "../CityscapeBackdrop";
 
 /**
@@ -43,12 +44,7 @@ export default function OnboardingSplash({ onContinue }) {
 
       {/* Center: logo + copy */}
       <div className="relative z-10 flex-1 w-full max-w-md mx-auto px-6 flex flex-col items-center justify-center text-center">
-        <img
-          src="/getamano-logo-mark.png"
-          alt="getamano"
-          className="w-24 h-24 mb-8 drop-shadow-[0_4px_24px_rgba(255,255,255,0.45)]"
-          draggable={false}
-        />
+        <BrandMark size="2xl" glow draggable={false} className="mb-8" />
         <h1
           className="text-3xl sm:text-4xl font-bold tracking-tight mb-3 drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
           style={{ letterSpacing: "-0.02em", color: "#FFFFFF" }}

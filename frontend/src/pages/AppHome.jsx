@@ -1,3 +1,4 @@
+import BrandMark from "../components/BrandMark";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -129,7 +130,7 @@ export default function AppHome() {
       >
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-display font-extrabold text-[22px] tracking-tight" style={{ letterSpacing: "-0.5px" }}>
-            <img src="/getamano-logo-mark.png" alt="" className="w-9 h-9 object-contain flex-shrink-0" />
+            <BrandMark size="md" className="w-9 h-9" alt="" />
             <span>
               <span style={{ color: "#03045E" }}>get</span>
               <span style={{ color: "#111827" }}>amano</span>

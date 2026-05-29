@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { Link } from "react-router-dom";
 import { useI18n } from "../contexts/I18nContext";
 import { Mail, MapPin, Instagram, Facebook, Music2 } from "lucide-react";
@@ -17,7 +18,7 @@ export default function Footer() {
         <div className="md:col-span-2">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center p-1.5" style={{ backgroundColor: "#F8FCFD" }}>
-              <img src="/getamano-logo-mark.png" alt="" className="w-full h-full object-contain" />
+              <BrandMark size="md" className="w-full h-full" alt="" />
             </div>
             <span className="font-display font-bold text-2xl text-white">get<span style={{ color: "#0077B6" }}>amano</span></span>
           </div>

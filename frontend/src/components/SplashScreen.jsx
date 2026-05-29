@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "gm_splash_shown_at";
@@ -89,7 +90,7 @@ export default function SplashScreen() {
             animation: "splash-ring 1.6s ease-out infinite",
           }} aria-hidden />
           <span className="relative inline-flex items-center justify-center w-28 h-28 rounded-full bg-white shadow-2xl">
-            <img src="/getamano-logo.png" alt="getamano" className="w-20 h-20 object-contain" />
+            <BrandMark size="2xl" className="w-20 h-20" />
           </span>
         </div>
         <h1

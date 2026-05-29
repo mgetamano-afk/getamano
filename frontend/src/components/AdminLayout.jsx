@@ -1,3 +1,4 @@
+import BrandMark from "./BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown, DollarSign, Flag, TrendingUp, Inbox } from "lucide-react";
@@ -47,7 +48,7 @@ export default function AdminLayout({ children, title }) {
         <div className="p-5 border-b border-slate-800">
           <Link to="/" className="flex items-center gap-2" onClick={() => setOpen(false)} data-testid="admin-logo-link">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center p-1.5" style={{ backgroundColor: "#F8FCFD" }}>
-              <img src="/getamano-logo-mark.png" alt="" className="w-full h-full object-contain" />
+              <BrandMark size="md" className="w-full h-full" alt="" />
             </div>
             <div>
               <div className="font-display font-bold text-white">getamano</div>

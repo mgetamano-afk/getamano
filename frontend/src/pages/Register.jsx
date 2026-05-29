@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { api } from "../lib/api";
 import LanguageToggle from "../components/onboarding/LanguageToggle";
 import CityscapeBackdrop from "../components/CityscapeBackdrop";
+import BrandMark from "../components/BrandMark";
 
 /**
  * Register — Section 87.
@@ -203,11 +204,7 @@ export default function Register() {
 
           {/* Card */}
           <div className="bg-white rounded-3xl shadow-2xl shadow-[#0077B6]/15 border border-white/40 p-6 sm:p-8">
-            <img
-              src="/getamano-logo-mark.png"
-              alt="getamano"
-              className="w-14 h-14 mx-auto object-contain"
-            />
+            <BrandMark size="lg" className="mx-auto" />
             <h1
               className="font-display mt-3 text-2xl sm:text-3xl font-bold text-center tracking-tight"
               style={{ color: "#03045E" }}
