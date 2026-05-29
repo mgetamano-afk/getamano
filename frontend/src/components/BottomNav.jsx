@@ -62,7 +62,7 @@ export default function BottomNav() {
   }, []);
 
   // Toggle body class so global CSS can reserve bottom padding.
-  const HIDDEN_PATHS = ["/login", "/register", "/registro", "/verificar-correo", "/verify-email", "/forgot-password", "/reset-password"];
+  const HIDDEN_PATHS = ["/login", "/register", "/registro", "/verificar-correo", "/verify-email", "/forgot-password", "/reset-password", "/welcome", "/bienvenida"];
   const isHidden = location.pathname.startsWith("/admin")
     || HIDDEN_PATHS.some(p => location.pathname.startsWith(p))
     || keyboardOpen;

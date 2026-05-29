@@ -59,7 +59,13 @@ module.exports = {
                                 alabaster: '#F7F6F2',
                                 heather: '#BCC5CC',
                                 lagoon: '#025F67',
-                                sapphire: '#063154'
+                                sapphire: '#063154',
+                                /* Section 71 — Ocean Blue palette (Latin Ventures LLC, 2026) */
+                                'blue-dark':    '#03045E',
+                                'blue-primary': '#0077B6',
+                                'blue-accent':  '#00B4D8',
+                                'blue-light':   '#90E0EF',
+                                'blue-surface': '#CAF0F8',
                         },
                         /* Override 'orange' so legacy classes map to Scooter teal scale */
                         orange: {
@@ -111,6 +117,10 @@ module.exports = {
                 animation: {
                         'accordion-down': 'accordion-down 0.2s ease-out',
                         'accordion-up': 'accordion-up 0.2s ease-out'
+                },
+                fontFamily: {
+                        /* Section 71 — Poppins is the new official font */
+                        poppins: ['Poppins', 'sans-serif'],
                 }
         }
   },

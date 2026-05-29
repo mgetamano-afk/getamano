@@ -9,6 +9,7 @@ import AnalyticsTracker from "./components/AnalyticsTracker";
 import ScrollToTop from "./components/ScrollToTop";
 import PullToRefresh from "./components/PullToRefresh";
 import AutoRefreshOnReturn from "./components/AutoRefreshOnReturn";
+import OnboardingGate from "./components/onboarding/OnboardingGate";
 import InstallPrompt from "./components/InstallPrompt";
 import InstallAppModal from "./components/InstallAppModal";
 import BottomNav from "./components/BottomNav";
@@ -65,6 +66,7 @@ const AdminOpsPage = lazy(() => import("./pages/AdminOpsPage"));
 const PrintCard = lazy(() => import("./pages/PrintCard"));
 const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
+const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow"));
 
 // Admin Zone 4 — all code-split (rarely on critical path)
 const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
@@ -224,6 +226,10 @@ function AppRouter() {
       <Route path="/about" element={<AboutPage />} />
       <Route path="/nosotros" element={<AboutPage />} />
 
+      {/* Section 70 — Native onboarding flow */}
+      <Route path="/welcome" element={<OnboardingFlow />} />
+      <Route path="/bienvenida" element={<OnboardingFlow />} />
+
       {/* SEO hub routes */}
       <Route path="/servicios" element={<SeoServicesIndex />} />
       <Route path="/servicios/:categorySlug" element={<ServicesRouteResolver />} />
@@ -263,6 +269,7 @@ function App() {
               <ScrollToTop />
               <PullToRefresh />
               <AutoRefreshOnReturn />
+              <OnboardingGate />
               <InstallPrompt />
               <InstallAppModal />
               <RouteErrorBoundary>

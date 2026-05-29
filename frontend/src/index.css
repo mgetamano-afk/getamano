@@ -150,6 +150,18 @@ html {
   overscroll-behavior-y: auto;
 }
 
+/* ─── Section 71 — Getamano Design System tokens (Latin Ventures LLC, 2026) ───
+   These CSS variables are the source of truth for the new ocean-blue palette.
+   Existing teal-scooter components stay unchanged until they migrate per the
+   phased rollout plan in PRD.md. */
+:root {
+  --gtm-blue-dark:    #03045E;
+  --gtm-blue-primary: #0077B6;
+  --gtm-blue-accent:  #00B4D8;
+  --gtm-blue-light:   #90E0EF;
+  --gtm-blue-surface: #CAF0F8;
+}
+
 /* Smooth momentum scrolling on iOS for any inner-scroll containers */
 .scroll-touch {
   -webkit-overflow-scrolling: touch;

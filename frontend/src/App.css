@@ -257,6 +257,12 @@
   animation: gtm-sticker-promo-shimmer 3.2s linear infinite;
 }
 
+/* ─── Section 70 — Onboarding slide transition ─── */
+@keyframes gtm-slide-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* ─── Section 72.5 — Story Center Heart Burst (Instagram-style) ─── */
 @keyframes gtm-center-heart {
   0%   { transform: scale(0.2) rotate(-12deg); opacity: 0; }
