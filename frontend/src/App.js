@@ -64,6 +64,8 @@ const RankingPage = lazy(() => import("./pages/RankingPage"));
 import ComunidadLayout from "./components/ComunidadLayout";
 import ComunidadExplorar from "./pages/ComunidadExplorar";
 import ComunidadECards from "./pages/ComunidadECards";
+const BarrioPage = lazy(() => import("./pages/BarrioPage"));
+const GremiosPage = lazy(() => import("./pages/GremiosPage"));
 import QuickActionsFAB from "./components/QuickActionsFAB";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -173,6 +175,8 @@ function AppRouter() {
           per sub-path so swapping tabs feels app-native. */}
       <Route path="/comunidad" element={<ComunidadLayout />}>
         <Route index element={<ComunidadPage embedded />} />
+        <Route path="barrio" element={<BarrioPage />} />
+        <Route path="gremios" element={<GremiosPage />} />
         <Route path="explorar" element={<ComunidadExplorar />} />
         <Route path="chambas" element={<EmpleosPage embedded />} />
         <Route path="ranking" element={<RankingPage embedded />} />
@@ -181,6 +185,8 @@ function AppRouter() {
       </Route>
       <Route path="/community" element={<ComunidadLayout />}>
         <Route index element={<ComunidadPage embedded />} />
+        <Route path="barrio" element={<BarrioPage />} />
+        <Route path="gremios" element={<GremiosPage />} />
         <Route path="explorar" element={<ComunidadExplorar />} />
         <Route path="chambas" element={<EmpleosPage embedded />} />
         <Route path="ranking" element={<RankingPage embedded />} />

@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 90 — V4 Social-First Phase A+B regression. All 13 iter89 tests pass + 8 new iter90 tests pass + spot-checks on iter83/86/87/88 (12/12) pass. Frontend smoke verified: BarrioPage radius persistence works via localStorage 'barrio_radius', Contactar CTA appears on verified-provider posts, GremiosPage shows 188 cards (data-testid 'gremio-card-*') and provider detail view exposes back+Unirme+composer, Search page renders trust-tile with non-zero data-score for verified providers (demo provider scores 55).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/comunidad/gremios (provider)", "issues": ["Spec asks for a 'Join' button on each gremio card in the list view, but cards currently show only 'Abrir' (open) for both anonymous and authenticated providers. The Join/Unirme action is only reachable from the detail view. Functional but a minor UX deviation from spec — providers may not realize one-click join is supported."]},
+      {"screen": "/buscar (Search)", "issues": ["Non-blocking React hydration warning in console: '<span> cannot be a child of <option>' originates from the language <select> on the Filters sidebar (Search.jsx ~line 616). Emergent's dev-tooling wraps option text in a <span> with display:contents — review needed if it bleeds into production build, but no visible UI defect."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter89_v4_social.py",
+    "/app/backend/tests/test_iter90_v4_social_extras.py",
+    "/app/test_reports/pytest/iter90_combined.xml",
+    "/app/test_reports/pytest/iter90_extras.xml",
+    "/app/test_reports/pytest/iter90_regression.xml"
+  ],
+  "action_items": [
+    "(Optional) Render an inline 'Unirme' CTA on each /comunidad/gremios list card to match the spec wording 'Join button on each'.",
+    "(Optional) Audit Search.jsx language <select> for the <option><span/></option> hydration warning — confirm it's only the Emergent dev wrapper and won't show up in production build."
+  ],
+  "critical_code_review_comments": [
+    "Trust signal enrichment is computed inline in two server.py locations (lines 1641-1659 and 1669-1685 per request) plus search.py _attach_trust_signals — three call sites is fine, but consider extracting into a single util to avoid drift if the formula changes (verified=+25, portfolio_count*1.5 cap 15, reviews_count cap 20, avg_rating*4 cap 20, referrals_converted*2 cap 10, days_active/180*10 cap 10).",
+    "Backend exposes BOTH 'provider_verified' (bool) and 'verification_status' ('approved') on /providers responses — choose one canonical flag and document. Existing iter89 frontend tests look for 'provider_verified'; existing dashboards may still consult 'verification_status'.",
+    "GremiosPage shows 'Abrir' on each card whereas spec says 'Join'. Either update copy or update spec — current implementation hides one-click join behind detail view."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter90_v4_social_extras.py (NEW — 8 additional regression tests)"
+  ],
+  "success_rate": {"backend": "100% (21/21 V4 + 25/25 prior regression spot-check)", "frontend": "100% on flows tested"},
+  "test_credentials": "Used credentials from /app/memory/test_credentials.md — admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123. All authenticated.",
+  "seed_data_creation": "iter90 tests create + cleanup portfolio items (TEST_iter90_*) on demo.provider. Gremio posts created during lifecycle tests are NOT deleted (no DELETE endpoint exercised) — demo.provider's gremio post history will accumulate 1 row per run in category 'limpieza'. Membership is cleaned up via DELETE /api/gremios/limpieza/leave.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "V4 backend (Portfolio + Gremios + TrustScore signals) is locked by /app/backend/tests/test_iter89_v4_social.py (13 tests) and /app/backend/tests/test_iter90_v4_social_extras.py (8 tests). Pytest, session-scoped login fixtures from conftest.py. Auth-rate-limit caveat still applies (60s between bulk runs). Key frontend testids verified: barrio-radius-{10,25,50,100,160}, gremio-card-* (188 in dev DB), trust-tile (data-score attribute). Demo provider 'maria-cleaning-services-sallisaw-ok' has GM-1335, TrustScore≈55. localStorage key for radius is 'barrio_radius'. Gremios list shows 'Abrir' (not 'Join') on cards — flagged as minor spec drift, not bug.",
+  "rca of the issue": "N/A — no functional defects. The two minor design notes (Gremios card copy + Search hydration warning) are tracked above."
+}

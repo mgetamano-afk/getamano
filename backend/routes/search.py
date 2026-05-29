@@ -22,6 +22,7 @@ wired into `server.py`.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from math import asin, cos, radians, sin, sqrt
 from types import SimpleNamespace
 from typing import Any, Literal, Optional
@@ -195,6 +196,55 @@ async def _attach_categories(providers: list[dict], db) -> None:
         p["category"] = cats.get(p.get("category_id"))
 
 
+async def _attach_trust_signals(providers: list[dict], db) -> None:
+    """Section 89 v4 — add the Trust Score signals expected by the
+    `<TrustScore>` component on search result cards. Batched so we never
+    do N+1 queries (one $group per signal).
+
+    Signals attached: `portfolio_count`, `referrals_converted`,
+    `days_active`, `avg_rating`, `reviews_count`.
+    """
+    if not providers:
+        return
+
+    provider_ids = [p["provider_id"] for p in providers if p.get("provider_id")]
+    user_ids = [p["user_id"] for p in providers if p.get("user_id")]
+
+    # portfolio_count — batch aggregation
+    portfolio_counts: dict[str, int] = {}
+    if provider_ids:
+        async for row in db.portfolio_items.aggregate([
+            {"$match": {"provider_id": {"$in": provider_ids}}},
+            {"$group": {"_id": "$provider_id", "n": {"$sum": 1}}},
+        ]):
+            portfolio_counts[row["_id"]] = row["n"]
+
+    # referrals_converted — batch aggregation on the referrer side
+    referrals_converted: dict[str, int] = {}
+    if user_ids:
+        async for row in db.referrals.aggregate([
+            {"$match": {"referrer_user_id": {"$in": user_ids}, "status": "paid"}},
+            {"$group": {"_id": "$referrer_user_id", "n": {"$sum": 1}}},
+        ]):
+            referrals_converted[row["_id"]] = row["n"]
+
+    now = datetime.now(timezone.utc)
+    for p in providers:
+        p["portfolio_count"] = portfolio_counts.get(p.get("provider_id"), 0)
+        p["referrals_converted"] = referrals_converted.get(p.get("user_id"), 0)
+        p["avg_rating"] = float(p.get("rating_avg") or 0.0)
+        p["reviews_count"] = int(p.get("rating_count") or 0)
+        try:
+            created_at = p.get("created_at")
+            if created_at:
+                cd = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+                p["days_active"] = max(0, (now - cd).days)
+            else:
+                p["days_active"] = 0
+        except Exception:
+            p["days_active"] = 0
+
+
 # ─── Main handler bodies ───────────────────────────────────────────────
 async def _do_search_providers(deps, params: _SearchParams) -> list[dict]:
     query = await _build_simple_filters(params, deps.db, deps.PUBLIC_GUARD)
@@ -222,6 +272,7 @@ async def _do_search_providers(deps, params: _SearchParams) -> list[dict]:
 
     providers = providers[: params.limit]
     await _attach_categories(providers, deps.db)
+    await _attach_trust_signals(providers, deps.db)
     return providers
 
 

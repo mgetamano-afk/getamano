@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import CategoryIcon from "./CategoryIcon";
 import OwnerIdentityBadge from "./OwnerIdentityBadge";
+import TrustScore from "./TrustScore";
 import { useI18n } from "../contexts/I18nContext";
 
 /**
@@ -253,6 +254,13 @@ export default function SearchResultCard({ provider, isSaved = false, onToggleSa
               {lang === "en" ? "New" : "Nuevo"}
             </span>
           )}
+        </div>
+
+        {/* Section 89 v4 — Trust Score tile next to the title. The
+            backend already attaches portfolio_count / referrals_converted
+            / days_active so the score is meaningful on the list view. */}
+        <div className="mt-1.5">
+          <TrustScore profile={p} variant="tile" />
         </div>
 
         {/* Category + city row */}

@@ -38,10 +38,12 @@ _PROVIDER_PROJECTION_FULL = {
     "_id": 0, "user_id": 1, "slug": 1, "business_name": 1,
     "logo_url": 1, "photo_url": 1, "city": 1, "state": 1,
     "provider_id": 1, "languages": 1, "category_id": 1,
+    "provider_verified": 1, "getamano_code": 1,
 }
 _PROVIDER_PROJECTION_SLIM = {
     "_id": 0, "user_id": 1, "slug": 1, "business_name": 1,
     "logo_url": 1, "photo_url": 1,
+    "provider_verified": 1, "getamano_code": 1,
 }
 
 
@@ -111,6 +113,10 @@ def _build_post_author(user_id: str, user_doc: dict, prof: Optional[dict]) -> di
         "city": prof.get("city") if prof else None,
         "state": prof.get("state") if prof else None,
         "is_provider": bool(prof),
+        # Section 89 v4 — surface the verification flag + GM code so the
+        # Barrio feed can render the ✓ badge + Contact CTA inline.
+        "provider_verified": bool(prof and prof.get("provider_verified")),
+        "getamano_code": prof.get("getamano_code") if prof else None,
     }
 
 
