@@ -3287,3 +3287,38 @@ User request: *"aplica esta paleta a toda nuestra web"*. Strategy: token-level r
 
 ### Files
 - **MODIFIED**: 107 files across `src/` (`.jsx`, `.js`, `.css`) — see git diff for the full list. Plus `tailwind.config.js`, `index.css` (manual edits).
+
+
+## Iteration 84 (Feb 29, 2026) — Search eCard miniature redesign (Airbnb-style)
+**Trigger**: User message #836 — "Primero quiero mejorar la apariencia de las eCard cuando se muestran en la sección de buscar… reseñas, recommendations, me gusta, y cuánto usualmente cobra". User clarified: "b) diseño expandido tipo Airbnb, NO mostrar precio, costos se ven al entrar a la eCard completa".
+
+**What changed**
+- New component `/app/frontend/src/components/SearchResultCard.jsx` — Airbnb-style large card with:
+  - **Hero photo carousel** (16:10 aspect, gallery[] sorted by sort_order + cover_url fallback) with hover prev/next arrows + dot indicators (up to 5 dots, "+N" if more)
+  - **Overlay badges** absolute: Verified (top-left, white pill), Video (top-right, navy pill), OwnerIdentity (bottom-left)
+  - **Title row**: business_name (line-clamp-2) + rating ⭐ X.X (N) ─ shows "New" / "Nuevo" when rating_count=0
+  - **Category chip** with CategoryIcon + tint from `p.category.color`, city + state, distance pill when present
+  - **Description** (line-clamp-2)
+  - **Services chips**: max 3 + "+N" overflow
+  - **Stats footer** (border-top): ❤ likes · 👁 views · 💬 reviews · ⚡ "Quick reply" when rating_count≥3 AND rating_avg≥4
+  - **No price** (per user request — pricing only on full eCard)
+  - `card-lift` hover, image `scale-[1.03]` on hover, focus ring
+  - Responsive: single column on mobile, 2-col on `md+`
+- `/app/frontend/src/pages/Search.jsx` — replaced the inline 47-line result-card JSX block with `<SearchResultCard provider={p} />`. Split-view (left list) and Map views remain unchanged (compact layout there is intentional).
+
+**Testids preserved/added**
+- `result-card-{slug}` (existing — keeps regression tests green)
+- `card-video-badge-{slug}` (existing)
+- `distance-badge-{slug}` (existing)
+- New: `result-card-photo-{slug}`, `result-card-prev-{slug}`, `result-card-next-{slug}`, `result-card-dots-{slug}`, `result-card-rating-{slug}`, `result-card-services-{slug}`, `result-card-stats-{slug}`, `result-card-fast-{slug}`
+
+**Verification**
+- Lint JS: clean on both files.
+- Desktop screenshot @ 1280×900: 19 result cards detected, carousel + dots + stats all render.
+- Mobile screenshot @ 390×844: cards stack 1-col, all info readable, no horizontal overflow.
+- href integrity: `/provider/{slug}` confirmed.
+- Stats text from DOM: "3 likes · 691 views · 14 reviews · Quick reply" for María; "New" + 1 like + 7 views for Juan (correct branching).
+
+**Not regressed**
+- Backend untouched — search endpoint already exposes `gallery`, `likes_count`, `views`, `rating_count`, etc.
+- Split view + Map view cards left intact (smaller real estate, would not fit Airbnb-sized card).

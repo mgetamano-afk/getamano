@@ -8,6 +8,7 @@ import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as M
 import { toast } from "sonner";
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
+import SearchResultCard from "../components/SearchResultCard";
 import ProvidersMap from "../components/ProvidersMap";
 import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
@@ -602,51 +603,7 @@ export default function Search() {
             ) : (
               <div className="grid md:grid-cols-2 gap-5">
                 {providers.map(p => (
-                  <Link key={p.provider_id} to={`/provider/${p.slug}`} className="card-lift bg-white rounded-2xl border border-slate-200 overflow-hidden block" data-testid={`result-card-${p.slug}`}>
-                    <div className="h-32 bg-slate-100 relative">
-                      {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" />}
-                      {p.verification_status === "approved" && (
-                        <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> {t("provider.verified")}</div>
-                      )}
-                      {p.video_url && (
-                        <div
-                          className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white shadow"
-                          style={{ backgroundColor: "rgba(3, 4, 94, 0.92)" }}
-                          data-testid={`card-video-badge-${p.slug}`}
-                        >
-                          <Video className="w-3 h-3" /> Video
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-display font-semibold text-slate-900">{p.business_name}</h3>
-                          <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                            {p.city}{p.state ? `, ${p.state}` : ""}
-                            {typeof p.distance_miles === "number" && p.distance_miles < 9999 && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#E0F2F1", color: "#03045E" }} data-testid={`distance-badge-${p.slug}`}>
-                                <Navigation className="w-2.5 h-2.5" /> {p.distance_miles.toFixed(1)} {lang === "en" ? "mi" : "mi"}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        {p.rating_count > 0 && (
-                          <div className="flex items-center gap-1 text-sm font-medium">
-                            <Star className="w-4 h-4 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)}
-                          </div>
-                        )}
-                      </div>
-                      {p.category && (
-                        <span className="inline-flex items-center gap-1 mt-2 mr-2 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${p.category.color}15`, color: p.category.color }}>
-                          <CategoryIcon slug={p.category.slug} size={14} color={p.category.color} stroke={2} />
-                          {lang === "es" ? p.category.name_es : p.category.name_en}
-                        </span>
-                      )}
-                      {p.owner_identity && <span className="inline-block mt-2"><OwnerIdentityBadge identity={p.owner_identity} size="sm" /></span>}
-                      {p.description && <p className="text-sm text-slate-600 mt-3 line-clamp-2">{p.description}</p>}
-                    </div>
-                  </Link>
+                  <SearchResultCard key={p.provider_id} provider={p} />
                 ))}
               </div>
             )}
