@@ -3,7 +3,19 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 29, 2026 · V4 Social-First Phase A+B (P0+P1)
+## Latest Update — May 29, 2026 · V4 Phase C — Push Notifications wired
+- **Push triggers** added at 4 critical events (Phase C):
+  1. `POST /api/reviews` → push to provider: "{name} dejó una reseña ⭐⭐⭐⭐⭐"
+  2. `POST /api/service-requests` → push to provider: "Nueva solicitud de cotización"
+  3. `POST /api/messages` (legacy) → push to provider on new client message
+  4. `POST /api/messaging/conversations/{id}/messages` (modern) → push to OTHER side of the conversation
+- **New `/api/push/test`** endpoint (auth-gated) so any user can verify the full delivery path end-to-end via the dashboard (frontend helper: `sendTestPush()` in `/lib/push.js`).
+- **Service worker** (`/app/frontend/public/service-worker.js`) already handles `push`, `notificationclick`, `pushsubscriptionchange` events — confirmed working with the new payload shape (`title/body/icon/url/tag`).
+- **VAPID** keys are baked into `/app/backend/.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY_B64`, `VAPID_SUBJECT`). `pywebpush==2.3.0` is in requirements.
+- **Tests**: `test_iter91_v4_push_phase_c.py` (8 tests) — VAPID key endpoint, auth-gated subscribe, list, test-push, plus source-code locks ensuring the 4 triggers stay wired.
+- Full V3+V4 regression suite: **44/44 pass**.
+
+## Previous Update — May 29, 2026 · V4 Social-First Phase A+B (P0+P1)
 - **Backend** (`/app/backend/routes/v4_social.py`):
   - Portfolio CRUD (`GET/POST/PATCH/DELETE /api/providers/me/portfolio` + public `/providers/by-slug/{slug}/portfolio`), 12-item cap, sort_order auto-increment.
   - Gremios (per-category community): `GET /api/gremios` (aggregate member counts), `POST/DELETE /api/gremios/{slug}/join|leave`, `GET/POST /api/gremios/{slug}/posts` with author hydration (business_name + slug + getamano_code + provider_verified), `POST /api/gremios/posts/{id}/like` toggle, `POST/GET /api/gremios/posts/{id}/replies` single-layer threads. Auto-join on first post. Indexes seeded on startup.

@@ -147,6 +147,26 @@ def build_reviews_router(*, db, User, get_current_user, require_admin) -> APIRou
         }
         await db.reviews.insert_one(review)
         await _recompute_rating(db, payload.provider_id)
+
+        # Section 89 v4 (Phase C) — Web Push notification to the
+        # provider. Fire-and-forget; never block the response.
+        try:
+            prov = await db.provider_profiles.find_one(
+                {"provider_id": payload.provider_id}, {"_id": 0, "user_id": 1, "slug": 1}
+            )
+            if prov:
+                from routes.push import send_push_to_user
+                stars = "⭐" * int(payload.rating)
+                await send_push_to_user(db, prov["user_id"], {
+                    "title": f"{user.name} dejó una reseña {stars}",
+                    "body": (payload.comment or "")[:140] or "Toca para ver tu reseña.",
+                    "icon": "/getamano-logo-mark.png",
+                    "url": f"/p/{prov.get('slug') or ''}#reviews",
+                    "tag": f"review_{review['review_id']}",
+                })
+        except Exception as _e:
+            logger.warning(f"push send_push (review) failed: {_e}")
+
         review.pop("_id", None)
         return review
 

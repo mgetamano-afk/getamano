@@ -2155,6 +2155,19 @@ async def create_service_request(payload: ServiceRequestIn, user: User = Depends
     if prov_user and prov_user.get("phone"):
         send_sms(prov_user["phone"], f"[getamano] Nueva solicitud de cotización de {user.name}: {payload.message[:120]}", event="new_quote_request")
 
+    # Section 89 v4 (Phase C) — Web Push to provider
+    try:
+        from routes.push import send_push_to_user
+        await send_push_to_user(db, provider["user_id"], {
+            "title": "Nueva solicitud de cotización",
+            "body": f"{user.name}: {(payload.message or '')[:120]}",
+            "icon": "/getamano-logo-mark.png",
+            "url": "/dashboard/provider?tab=solicitudes",
+            "tag": f"quote_{req['request_id']}",
+        })
+    except Exception as _e:
+        logger.warning(f"push send_push (service_request) failed: {_e}")
+
     req.pop("_id", None)
     return req
 
@@ -2653,6 +2666,19 @@ async def send_message(payload: MessageIn, user: User = Depends(get_current_user
     prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
     if prov_user and prov_user.get("phone"):
         send_sms(prov_user["phone"], f"[getamano] Nuevo mensaje de {user.name}: {payload.body[:120]}", event="new_message_to_provider")
+
+    # Section 89 v4 (Phase C) — Web Push to provider
+    try:
+        from routes.push import send_push_to_user
+        await send_push_to_user(db, provider["user_id"], {
+            "title": f"Mensaje de {user.name}",
+            "body": payload.body[:140],
+            "icon": "/getamano-logo-mark.png",
+            "url": f"/dashboard/provider?tab=mensajes&conversation={conv['conversation_id']}",
+            "tag": f"msg_{conv['conversation_id']}",
+        })
+    except Exception as _e:
+        logger.warning(f"push send_push (message) failed: {_e}")
 
     msg.pop("_id", None)
     return msg
@@ -7352,6 +7378,23 @@ async def post_message(conversation_id: str, payload: MessageIn,
                                     body=body, trigger_type="new_message")
         try: send_sms(recipient_phone, body, event="new_message")
         except Exception: pass
+
+    # Section 89 v4 (Phase C) — Web Push to the OTHER side of the
+    # conversation. We resolve the recipient user_id from the conv doc.
+    try:
+        recipient_user_id = conv.get("participant_user_id") if is_provider else conv.get("provider_user_id")
+        if recipient_user_id and recipient_user_id != user.user_id:
+            from routes.push import send_push_to_user
+            await send_push_to_user(db, recipient_user_id, {
+                "title": f"Mensaje de {user.name}",
+                "body": payload.body[:140],
+                "icon": "/getamano-logo-mark.png",
+                "url": f"/mensajes?conversation={conversation_id}",
+                "tag": f"msg_{conversation_id}",
+            })
+    except Exception as _e:
+        logger.warning(f"push send_push (messaging) failed: {_e}")
+
     msg.pop("_id", None)
     return msg
 

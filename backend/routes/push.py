@@ -163,4 +163,19 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         ).to_list(20)
         return rows
 
+    @router.post("/push/test")
+    async def send_test_push(me: User = Depends(get_current_user)) -> dict:
+        """Section 89 v4 (Phase C) — fire a test notification to the
+        current user's subscribed devices. Used by the dashboard "send
+        test" button to verify the full delivery path end-to-end.
+        """
+        result = await send_push_to_user(db, me.user_id, {
+            "title": "🔔 Notificación de prueba",
+            "body": "Si ves esto, tus notificaciones están listas.",
+            "icon": "/getamano-logo-mark.png",
+            "url": "/dashboard/provider",
+            "tag": "test_push",
+        })
+        return result
+
     return router

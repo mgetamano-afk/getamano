@@ -99,3 +99,19 @@ export async function removePushSubscription() {
     await sub.unsubscribe();
   } catch { /* ignore */ }
 }
+
+/**
+ * Section 89 v4 (Phase C) — Trigger a test push to the current user.
+ * Resolves to `{ ok, ...serverPayload }`. Used by the
+ * `<NotificationsSettingsCard>` "Send test" button so the user can
+ * verify the full delivery path without waiting for a real event.
+ */
+export async function sendTestPush() {
+  try {
+    const { data } = await api.post("/push/test");
+    return { ok: true, ...data };
+  } catch (e) {
+    const status = e?.response?.status;
+    return { ok: false, reason: status === 503 ? "no_vapid" : "send_failed" };
+  }
+}
