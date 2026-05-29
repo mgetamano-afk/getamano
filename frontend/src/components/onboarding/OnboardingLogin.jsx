@@ -59,6 +59,13 @@ export default function OnboardingLogin({ onFinish }) {
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
+  // Apple & Facebook need their own provider credentials (Apple Developer
+  // account + Facebook App ID) which the user hasn't provisioned yet.
+  // Buttons are shown for design preview; tap → "coming soon" toast.
+  const comingSoon = (provider) => {
+    toast.message(`${provider} ${t("onb.login.soon")}`);
+  };
+
   return (
     <div
       className="min-h-screen w-full flex flex-col items-center font-poppins"
@@ -110,21 +117,50 @@ export default function OnboardingLogin({ onFinish }) {
           })}
         </div>
 
-        {/* Google OAuth */}
-        <button
-          type="button"
-          onClick={googleLogin}
-          className="w-full h-12 rounded-2xl bg-white border border-slate-200 hover:border-[#0077B6] hover:shadow-sm flex items-center justify-center gap-2 font-semibold text-[#03045E] mb-5 transition"
-          data-testid="onb-login-google"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z" />
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-            <path fill="#FBBC05" d="M5.84 14.12c-.22-.66-.35-1.36-.35-2.12s.13-1.46.35-2.12V7.04H2.18A10.997 10.997 0 0 0 1 12c0 1.77.42 3.45 1.18 4.96l3.66-2.84z" />
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.07.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
-          </svg>
-          {t("onb.login.google")}
-        </button>
+        {/* Section 70b — Social auth row: Google (live) + Apple + Facebook
+            (visual preview, awaiting provider credentials). All three follow
+            the same pill spec for visual consistency. */}
+        <div className="space-y-2.5 mb-5" data-testid="onb-social-row">
+          <button
+            type="button"
+            onClick={googleLogin}
+            className="w-full h-12 rounded-2xl bg-white border border-slate-200 hover:border-[#0077B6] hover:shadow-sm flex items-center justify-center gap-2.5 font-semibold text-[#03045E] transition"
+            data-testid="onb-login-google"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.12c-.22-.66-.35-1.36-.35-2.12s.13-1.46.35-2.12V7.04H2.18A10.997 10.997 0 0 0 1 12c0 1.77.42 3.45 1.18 4.96l3.66-2.84z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.07.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
+            </svg>
+            {t("onb.login.google")}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => comingSoon("Apple")}
+            className="w-full h-12 rounded-2xl bg-black hover:bg-neutral-800 active:scale-[0.99] flex items-center justify-center gap-2.5 font-semibold text-white transition"
+            data-testid="onb-login-apple"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+              <path d="M17.05 12.04c-.03-3.04 2.49-4.5 2.6-4.57-1.42-2.08-3.63-2.37-4.42-2.4-1.88-.19-3.67 1.11-4.62 1.11-.97 0-2.43-1.08-4-1.05-2.06.03-3.97 1.2-5.03 3.04-2.14 3.71-.55 9.21 1.53 12.23 1.02 1.48 2.23 3.14 3.82 3.08 1.53-.06 2.11-.99 3.96-.99 1.85 0 2.37.99 4 .96 1.65-.03 2.7-1.5 3.71-2.99 1.17-1.72 1.65-3.39 1.68-3.47-.04-.02-3.22-1.24-3.25-4.95zM14.04 3.04C14.87 2.03 15.43.61 15.27-.79c-1.19.05-2.64.79-3.5 1.79-.77.88-1.45 2.32-1.27 3.69 1.33.1 2.69-.67 3.54-1.65z" />
+            </svg>
+            {t("onb.login.apple")}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => comingSoon("Facebook")}
+            className="w-full h-12 rounded-2xl text-white font-semibold flex items-center justify-center gap-2.5 active:scale-[0.99] transition"
+            style={{ backgroundColor: "#1877F2" }}
+            data-testid="onb-login-facebook"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+            </svg>
+            {t("onb.login.facebook")}
+          </button>
+        </div>
 
         {/* Divider */}
         <div className="flex items-center gap-3 mb-5 text-xs text-[#03045E]/50">
