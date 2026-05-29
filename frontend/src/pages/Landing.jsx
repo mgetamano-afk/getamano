@@ -241,7 +241,7 @@ export default function Landing() {
               </form>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link to="/registro?intent=provider" className="btn-primary" data-testid="hero-cta-open-ecard">Quiero abrir mi eCard</Link>
+                <Link to="/registro?role=provider" className="btn-primary" data-testid="hero-cta-open-ecard">Quiero abrir mi eCard</Link>
                 <Link to="/buscar" className="px-6 py-3 rounded-full text-white/90 border border-white/20 hover:bg-white/10 font-medium" data-testid="hero-cta-explore">Explorar servicios</Link>
                 {isPwaInstalled ? (
                   <span

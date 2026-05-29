@@ -162,7 +162,7 @@ export default function Plans() {
                     </li>
                   ))}
                 </ul>
-                <Link to={`/register?intent=provider&plan=${p.id}&cycle=${billingCycle}`} onClick={() => trackPlanClick(p.id)} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
+                <Link to={`/register?role=provider&plan=${p.id}&cycle=${billingCycle}`} onClick={() => trackPlanClick(p.id)} className={`mt-6 inline-flex justify-center w-full ${p.highlight ? "btn-secondary" : "btn-outline"}`} data-testid={`plan-cta-${p.id}`}>
                   {p.id === "free" ? (lang === "en" ? "Start free" : "Empezar gratis") : t("plans.choose")}
                 </Link>
               </div>

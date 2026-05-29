@@ -371,7 +371,7 @@ export default function PlanRecommender() {
 
           <div className="mt-7 flex flex-col sm:flex-row gap-3 items-center justify-center">
             <Link
-              to={`/register?intent=provider&plan=${recommended}&via=quiz`}
+              to={`/register?role=provider&plan=${recommended}&via=quiz`}
               onClick={() => track(sessionIdRef.current, "cta_clicked", { recommended_plan: recommended, answers, lang, experiment: ACTIVE_EXPERIMENTS.RESULT_CTA, variant })}
               className="inline-flex items-center gap-1 px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:opacity-90 transition"
               style={{ backgroundColor: meta.color }}

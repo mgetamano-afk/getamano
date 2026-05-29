@@ -55,7 +55,7 @@ export default function ComunidadECards() {
             ? "Be the first verified provider in your area."
             : "Sé el primer proveedor verificado en tu zona."}
           ctaLabel={lang === "en" ? "Become a provider" : "Ser proveedor"}
-          ctaTo="/register?intent=provider"
+          ctaTo="/register?role=provider"
         />
       </div>
     );

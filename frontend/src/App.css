@@ -1,5 +1,12 @@
 .App { min-height: 100vh; overflow-x: clip; }
 
+/* Section 77 — utility class for hiding horizontal scrollbars on
+   carousels (categories, featured providers). Mobile-first: WebKit
+   browsers, Firefox and IE11. */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+
 .gradient-text {
     background: linear-gradient(135deg, #03045E 0%, #0077B6 100%);
     -webkit-background-clip: text;

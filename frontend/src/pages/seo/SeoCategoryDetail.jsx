@@ -58,7 +58,7 @@ export default function SeoCategoryDetail() {
           {totalProviders > 0
             ? `${totalProviders} proveedores latinos verificados de ${category.name_es.toLowerCase()} activos en ${total_cities} ciudades de USA.`
             : `Aún no hay proveedores activos en esta categoría. ¿Eres uno? `}
-          {totalProviders === 0 && <Link to="/register?intent=provider" className="underline" style={{ color: "#0077B6" }}>Únete a getamano</Link>}
+          {totalProviders === 0 && <Link to="/register?role=provider" className="underline" style={{ color: "#0077B6" }}>Únete a getamano</Link>}
         </p>
 
         {category.license_flag === "red" && (

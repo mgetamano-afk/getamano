@@ -202,7 +202,7 @@ export default function Header() {
                   <Link to="/login" onClick={() => setOpen(false)} className="block w-full text-center px-4 py-3 rounded-xl border border-slate-300 text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100" data-testid="mobile-nav-login">
                     {t("nav.login")}
                   </Link>
-                  <Link to="/register?intent=provider" onClick={() => setOpen(false)} className="block w-full text-center btn-primary" style={{ minHeight: 48 }} data-testid="mobile-nav-register">
+                  <Link to="/register?role=provider" onClick={() => setOpen(false)} className="block w-full text-center btn-primary" style={{ minHeight: 48 }} data-testid="mobile-nav-register">
                     {t("nav.providers")}
                   </Link>
                 </>

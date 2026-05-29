@@ -429,7 +429,7 @@ export default function AboutPage() {
                 {c.ctaFind}
               </Link>
               <Link
-                to="/register?intent=provider"
+                to="/register?role=provider"
                 className="inline-flex items-center gap-1 px-5 py-3 rounded-full text-sm font-bold text-white transition hover:bg-white/10"
                 style={{ border: "1.5px solid rgba(255,255,255,0.4)" }}
                 data-testid="about-cta-join"

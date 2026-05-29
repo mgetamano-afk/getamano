@@ -70,7 +70,7 @@ export default function ProviderCTASection() {
             </li>
           </ul>
           <Link
-            to="/registro?intent=provider&lang=es"
+            to="/registro?role=provider&lang=es"
             className="mt-5 inline-flex w-full items-center justify-center gap-2 py-3 px-5 rounded-2xl text-white font-bold transition active:scale-[0.98] shadow-sm"
             style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
             data-testid="provider-cta-latino-button"
@@ -110,7 +110,7 @@ export default function ProviderCTASection() {
             </li>
           </ul>
           <Link
-            to="/registro?intent=provider&lang=en"
+            to="/registro?role=provider&lang=en"
             className="mt-5 inline-flex w-full items-center justify-center gap-2 py-3 px-5 rounded-2xl text-white font-bold transition active:scale-[0.98] shadow-sm"
             style={{ background: "linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%)" }}
             data-testid="provider-cta-american-button"

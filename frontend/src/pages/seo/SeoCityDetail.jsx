@@ -54,7 +54,7 @@ export default function SeoCityDetail() {
         {categories.length === 0 ? (
           <div className="bg-white rounded-2xl border p-10 text-center" style={{ borderColor: "#BCC5CC" }}>
             <p className="text-slate-500 mb-3">Aún no hay proveedores activos en esta ciudad.</p>
-            <Link to="/register?intent=provider" className="btn-primary inline-block">¿Eres proveedor? Únete</Link>
+            <Link to="/register?role=provider" className="btn-primary inline-block">¿Eres proveedor? Únete</Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

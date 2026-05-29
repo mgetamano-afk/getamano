@@ -105,7 +105,7 @@ export default function UniversalServicesCard() {
 
           <button
             type="button"
-            onClick={() => navigate("/register?intent=provider")}
+            onClick={() => navigate("/register?role=provider")}
             className="inline-flex items-center gap-1 px-4 py-[10px] rounded-full text-sm font-semibold transition hover:bg-teal-50"
             style={{ border: "1.5px solid #03045E", color: "#03045E", background: "transparent" }}
             data-testid="universal-services-cta-provider"

@@ -58,7 +58,7 @@ export default function Footer() {
             <li><Link to="/ranking" className="hover:text-white transition" data-testid="footer-ranking">{t("footer.ranking_month")}</Link></li>
             <li><Link to="/ciudades" className="hover:text-white transition" data-testid="footer-cities">{t("footer.cities")}</Link></li>
             <li><Link to="/plans" className="hover:text-white transition" data-testid="footer-plans">{t("nav.plans")}</Link></li>
-            <li><Link to="/register?intent=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>
+            <li><Link to="/register?role=provider" className="hover:text-white transition" data-testid="footer-providers">{t("nav.providers")}</Link></li>
             <li><Link to="/instalar" className="hover:text-white transition inline-flex items-center gap-1" data-testid="footer-install"><span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" /> {t("footer.download_app")}</Link></li>
             <li><Link to="/nosotros" className="hover:text-white transition" data-testid="footer-about">{t("footer.about")}</Link></li>
           </ul>

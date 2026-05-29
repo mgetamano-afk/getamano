@@ -376,7 +376,7 @@ export default function CategoryHub() {
                   <Sparkles className="w-4 h-4" /> {lang === "es" ? "Ver todos los proveedores" : "See all providers"}
                 </Link>
                 <Link
-                  to="/registro?intent=provider"
+                  to="/registro?role=provider"
                   className="px-5 py-2.5 rounded-full font-semibold text-sm inline-flex items-center gap-2 border border-white/30 hover:bg-white/10 transition"
                   style={{ color: "white" }}
                   data-testid="category-cta-onboard"
@@ -416,7 +416,7 @@ export default function CategoryHub() {
                 ? "Estamos creciendo. Publica tu eCard gratis y sé de los primeros en esta categoría."
                 : "We're growing. Publish your free eCard and be among the first in this category."}
             </p>
-            <Link to="/registro?intent=provider" className="mt-4 inline-flex px-5 py-2.5 rounded-full font-semibold text-white" style={{ backgroundColor: "#03045E" }} data-testid="category-empty-onboard">
+            <Link to="/registro?role=provider" className="mt-4 inline-flex px-5 py-2.5 rounded-full font-semibold text-white" style={{ backgroundColor: "#03045E" }} data-testid="category-empty-onboard">
               {lang === "es" ? "Soy proveedor" : "I'm a provider"}
             </Link>
           </div>
