@@ -3,6 +3,7 @@ import { Package, Loader2, CheckCircle2, Truck, Download, Printer } from "lucide
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import VerifiedBadge from "./VerifiedBadge";
+import AiCardDesigner from "./AiCardDesigner";
 
 /**
  * PhysicalCardsPanel — V7 Item 3 (provider self-service).
@@ -80,8 +81,9 @@ export default function PhysicalCardsPanel() {
       </header>
 
       {/* V13 — Live preview of the physical card mock-up generated from
-          the current eCard data. Two sides (front + back) so the provider
-          sees exactly what will be printed. */}
+          the current eCard data. V14 — adds the AI background designer
+          and overlays the active design on the front of the preview. */}
+      {profile && <AiCardDesigner profile={profile} onDesignChange={() => refresh()} />}
       {profile && <PhysicalCardPreview profile={profile} />}
 
       {/* ── Order form ── */}
@@ -200,6 +202,25 @@ function PhysicalCardPreview({ profile }) {
   const code = profile?.getamano_code || "";
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [activeDesign, setActiveDesign] = useState(null);
+
+  // V14 — pull the active AI design once (and re-pull every 8s in case the
+  // sibling AiCardDesigner just generated a new one). Cheap because the
+  // endpoint returns a single doc.
+  useEffect(() => {
+    let alive = true;
+    const fetchActive = () => api.get("/physical-cards/ai-design/active")
+      .then(r => { if (alive) setActiveDesign(r.data); })
+      .catch(() => {});
+    fetchActive();
+    const id = setInterval(fetchActive, 8000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const palette = activeDesign?.palette || [];
+  const frontStyle = activeDesign?.preview_data_url
+    ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${activeDesign.preview_data_url})`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: `linear-gradient(135deg, ${palette[0] || "#03045E"} 0%, ${palette[1] || "#0077B6"} 100%)` };
 
   const downloadPreviewPdf = async () => {
     setDownloading(true);
@@ -227,7 +248,9 @@ function PhysicalCardPreview({ profile }) {
     if (!window.confirm("¿Enviar esta tarjeta a imprimir con getamano? El equipo te contactará para el pago + envío.")) return;
     setPrinting(true);
     try {
-      await api.post("/physical-cards/print-orders", { provider_id: profile.provider_id, packs: 1 });
+      const body = { provider_id: profile.provider_id, packs: 1 };
+      if (activeDesign?.design_id) body.design_id = activeDesign.design_id;
+      await api.post("/physical-cards/print-orders", body);
       toast.success("Orden enviada al equipo de getamano 🎉");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "No se pudo enviar la orden");
@@ -244,30 +267,35 @@ function PhysicalCardPreview({ profile }) {
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
         {/* FRONT */}
         <div
-          className="relative w-[280px] h-[170px] rounded-2xl text-white p-4 shadow-xl hover:scale-[1.02] transition-transform duration-300"
-          style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
+          className="relative w-[280px] h-[170px] rounded-2xl text-white p-4 shadow-xl hover:scale-[1.02] transition-transform duration-300 overflow-hidden"
+          style={frontStyle}
           data-testid="physical-card-preview-front"
         >
           <div className="absolute top-3 right-3 flex items-center gap-1">
             {verified && <VerifiedBadge size={20} darkBg />}
           </div>
           {profile?.logo_url ? (
-            <img src={profile.logo_url} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/15 mb-2" />
+            <img src={profile.logo_url} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/15 mb-2 backdrop-blur" />
           ) : (
-            <div className="w-9 h-9 rounded-lg bg-white/15 mb-2 flex items-center justify-center font-display font-bold text-white">
+            <div className="w-9 h-9 rounded-lg bg-white/15 backdrop-blur mb-2 flex items-center justify-center font-display font-bold text-white">
               {(profile?.business_name || "?")[0]?.toUpperCase()}
             </div>
           )}
-          <p className="font-display font-bold text-lg leading-tight" data-testid="physical-card-preview-name">
+          <p className="font-display font-bold text-lg leading-tight drop-shadow" data-testid="physical-card-preview-name">
             {profile?.business_name || "Tu negocio"}
           </p>
-          <p className="text-xs text-white/80 mt-0.5">
+          <p className="text-xs text-white/90 mt-0.5 drop-shadow">
             {[profile?.city, profile?.state].filter(Boolean).join(", ")}
           </p>
-          <p className="absolute bottom-3 left-4 text-[10px] uppercase tracking-widest text-white/60 font-bold">
-            get<span className="text-[#0077B6]">amano</span>
+          <p className="absolute bottom-3 left-4 text-[10px] uppercase tracking-widest text-white/70 font-bold">
+            get<span style={{ color: palette[2] || "#90E0EF" }}>amano</span>
             {code && <span className="ml-2 text-white/70">{code}</span>}
           </p>
+          {activeDesign?.design_id && (
+            <span className="absolute top-2 left-2 text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-violet-600/80 text-white font-bold backdrop-blur" data-testid="physical-card-ai-badge">
+              IA
+            </span>
+          )}
         </div>
 
         {/* BACK */}

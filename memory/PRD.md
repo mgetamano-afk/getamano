@@ -3,7 +3,42 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V13b Print-with-getamano (PDF + admin queue)
+## Latest Update — May 30, 2026 · V14 AI Card Designer (Gemini Nano Banana)
+
+User: "agrega una opción generar con IA, nuestra IA tiene que entender la categoría para poner fondos relacionados a la categoría y extraer la información del eCard, para no complicar al cliente, y él tiene que elegir los colores. Hagamos esto que se vea más pro." Confirmaciones: 1a (fondo completo abstracto) + 2c (3 colores con presets + custom + "Mi marca" auto-extraído del logo) + 3c (regeneración ilimitada mientras edita).
+
+### Backend
+- **`services/ai_card_design.py`** nuevo módulo: usa **Gemini Nano Banana** (`gemini-3.1-flash-image-preview`) vía emergentintegrations + Emergent LLM Key. Mapea categorías a hints visuales (Limpieza → microfibras, Plomería → tuberías estilizadas, etc.) y devuelve PNG en base64. Prompt negativo explícito: "no text, no logos, no people".
+- **`services/card_pdf.py`** ampliado para aceptar `ai_bg_b64` + `palette`. Cuando hay AI background lo composita debajo + agrega overlay 32% alpha para asegurar legibilidad del texto blanco. Cuando no hay AI, fallback al gradient determinístico V13.
+- **3 endpoints nuevos** en `routes/physical_cards.py`:
+  - `POST /api/physical-cards/ai-design` `{provider_id, palette, category_label?, seed_hint?}` → genera background, persiste en `card_designs` collection, devuelve `design_id` + `preview_data_url` (base64 inline). Marca diseños previos del mismo provider como `is_active: false`.
+  - `GET /api/physical-cards/ai-design/active?provider_id=...` → devuelve el último diseño activo del owner.
+  - `POST /api/physical-cards/print-orders` actualizado para aceptar `design_id` opcional + setear `has_ai_background: true` en la orden.
+
+### Frontend
+- **`AiCardDesigner.jsx`** nuevo componente reusable (~220 líneas):
+  - Hero gradient violet/fuchsia/rose con badge "Nuevo".
+  - 6 presets curados (Océano, Atardecer, Bosque, Berry, Mono, Cálido) + "Mi marca" auto-extraída del logo del provider via canvas + quantización k-means light + "Personalizado" con 3 color pickers.
+  - Click chip → highlight con scale + border violeta.
+  - Botón **"Generar con IA"** (o "Regenerar" si ya hay diseño activo). Gradient animado, scale hover, spinner durante el call.
+  - Status footer con `design_id` slice + copy "Regenera las veces que quieras".
+- **`PhysicalCardsPanel.jsx`** integra `<AiCardDesigner>` arriba del preview + `PhysicalCardPreview` actualizado:
+  - Polling `/ai-design/active` cada 8s para reflejar el último diseño.
+  - Front-side ahora aplica `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)) + url(data:image/...)` cuando hay AI activo.
+  - Badge "IA" violeta en la esquina superior izquierda cuando aplica.
+  - Print order body incluye `design_id` automáticamente.
+
+### Tests
+- `test_iter106_v14_ai_card_designer.py` (9 tests: 6 integration con AI real + 3 frontend locks).
+- Cumulative regression iter98→iter106: **100/100 verde**.
+
+### Smoke validation
+Screenshot confirmó:
+- Designer renderizando con 8 paletas (Mi marca extraído del logo de María + 6 curados + Custom).
+- Preview de la tarjeta de María con el AI background activo + badge "IA" + texto blanco con drop-shadow legible.
+- Status "Active design: 6ecedb43 · Regenerate as many times as you want."
+
+## Previous Update — May 30, 2026 · V13b Print-with-getamano (PDF + admin queue)
 
 User: "y una opción que diga imprimir con getamano y que se genere la orden en panel de administración del CEO y que este ahí el PDF para que las mande a imprimir".
 

@@ -51,6 +51,19 @@ class PrintCardsOrderIn(BaseModel):
     provider_id: str = Field(..., max_length=80)
     packs: int = Field(default=1, ge=1, le=10)
     notes: Optional[str] = Field(default=None, max_length=400)
+    # V14 — optional AI design reference; if provided we composite the
+    # AI background into the printed PDF instead of the gradient mock.
+    design_id: Optional[str] = Field(default=None, max_length=80)
+
+
+class AiDesignIn(BaseModel):
+    provider_id: str = Field(..., max_length=80)
+    # Three hex colours. We store all three so the print PDF + the live
+    # web preview pull from the same source of truth.
+    palette: List[str] = Field(..., min_length=3, max_length=3)
+    # Optional category override (defaults to whatever's on the eCard).
+    category_label: Optional[str] = Field(default=None, max_length=80)
+    seed_hint: Optional[str] = Field(default=None, max_length=120)
 
 
 class ShippingAddressIn(BaseModel):
@@ -146,11 +159,14 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
         return docs[0]
 
     @router.get("/physical-cards/preview-pdf")
-    async def preview_pdf(provider_id: Optional[str] = None, user: User = Depends(get_current_user)):
+    async def preview_pdf(provider_id: Optional[str] = None, design_id: Optional[str] = None,
+                          user: User = Depends(get_current_user)):
         """Returns a 2-page PDF (front + back, real-size 85.6×54mm) for
-        the caller's eCard. The provider downloads this as a sample."""
+        the caller's eCard. If `design_id` is supplied (or the provider
+        has a saved AI design), the AI background is composited in."""
         from services.card_pdf import render_card_pdf
         prof = await _resolve_owned_ecard(user.user_id, provider_id)
+        ai_bg_b64, palette = await _load_design(user.user_id, prof["provider_id"], design_id)
         pdf = render_card_pdf(
             business_name=prof.get("business_name", ""),
             city=prof.get("city"),
@@ -158,6 +174,8 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
             slug=prof.get("slug"),
             getamano_code=prof.get("getamano_code"),
             is_verified=prof.get("verification_status") == "approved",
+            ai_bg_b64=ai_bg_b64,
+            palette=palette,
         )
         filename = f"getamano-card-{prof.get('slug', 'preview')}.pdf"
         return Response(
@@ -169,15 +187,115 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
             },
         )
 
+    async def _load_design(user_id: str, provider_id: str, explicit_design_id: Optional[str]):
+        """Resolves which design to use for previews/print.
+
+        Priority:
+          1. Explicit `design_id` (must belong to caller).
+          2. Latest design saved for this provider_id.
+          3. None → fall back to the deterministic gradient.
+        Returns (b64_or_none, palette_or_none).
+        """
+        if explicit_design_id:
+            d = await db.card_designs.find_one(
+                {"design_id": explicit_design_id, "user_id": user_id},
+                {"_id": 0},
+            )
+        else:
+            d = await db.card_designs.find_one(
+                {"user_id": user_id, "provider_id": provider_id, "is_active": True},
+                sort=[("created_at", -1)],
+            )
+        if not d:
+            return None, None
+        return d.get("image_b64"), tuple(d.get("palette") or []) or None
+
+    @router.post("/physical-cards/ai-design")
+    async def ai_design(payload: AiDesignIn, user: User = Depends(get_current_user)) -> dict:
+        """Generates a new AI background for the caller's eCard via Gemini
+        Nano Banana. Unlimited regenerations are allowed — only the LATEST
+        active design is used at print time. Each call costs ~1.5¢ of
+        Emergent LLM credits."""
+        from services.ai_card_design import generate_card_background
+        prof = await _resolve_owned_ecard(user.user_id, payload.provider_id)
+
+        category_label = payload.category_label or prof.get("category_label")
+        if not category_label and prof.get("category_id"):
+            cat = await db.categories.find_one({"category_id": prof["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
+            if cat:
+                category_label = cat.get("name_es") or cat.get("name_en")
+        category_label = category_label or prof.get("business_name", "professional service")
+
+        try:
+            bg_b64 = await generate_card_background(
+                category_label=category_label,
+                palette=(payload.palette[0], payload.palette[1], payload.palette[2]),
+                business_name=prof.get("business_name"),
+                seed_hint=payload.seed_hint,
+            )
+        except Exception as e:
+            logger.exception("AI design generation failed")
+            raise HTTPException(status_code=502, detail=f"La IA no pudo generar el diseño: {e}")
+
+        now = datetime.now(timezone.utc).isoformat()
+        design_id = f"des_{uuid.uuid4().hex[:14]}"
+        # Mark older designs as inactive so only the latest one feeds print.
+        await db.card_designs.update_many(
+            {"user_id": user.user_id, "provider_id": prof["provider_id"]},
+            {"$set": {"is_active": False}},
+        )
+        doc = {
+            "design_id": design_id,
+            "user_id": user.user_id,
+            "provider_id": prof["provider_id"],
+            "palette": payload.palette,
+            "category_label": category_label,
+            "seed_hint": payload.seed_hint,
+            "image_b64": bg_b64,
+            "image_size_bytes": len(bg_b64) * 3 // 4,
+            "is_active": True,
+            "created_at": now,
+        }
+        await db.card_designs.insert_one(doc)
+        doc.pop("_id", None)
+        # Don't echo the full image (it's ~600 KB); return a thumbnail-style
+        # data URL the frontend can render directly + the design_id.
+        return {
+            "design_id": design_id,
+            "palette": payload.palette,
+            "category_label": category_label,
+            "preview_data_url": f"data:image/png;base64,{bg_b64}",
+            "created_at": now,
+        }
+
+    @router.get("/physical-cards/ai-design/active")
+    async def get_active_design(provider_id: Optional[str] = None, user: User = Depends(get_current_user)) -> dict:
+        prof = await _resolve_owned_ecard(user.user_id, provider_id)
+        d = await db.card_designs.find_one(
+            {"user_id": user.user_id, "provider_id": prof["provider_id"], "is_active": True},
+            {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+        if not d:
+            return {"design_id": None, "preview_data_url": None, "palette": None}
+        return {
+            "design_id": d["design_id"],
+            "palette": d.get("palette"),
+            "category_label": d.get("category_label"),
+            "preview_data_url": f"data:image/png;base64,{d['image_b64']}",
+            "created_at": d["created_at"],
+        }
+
     @router.post("/physical-cards/print-orders")
     async def submit_print_order(payload: PrintCardsOrderIn, user: User = Depends(get_current_user)) -> dict:
-        """Creates a print-with-getamano order. The PDF is stored alongside
-        the order so the admin panel can download exactly what the provider
-        previewed. Status starts at "pending_payment" because Stripe is
-        still mocked — admin can flip it to "queued_for_print" manually."""
+        """Creates a print-with-getamano order. The rendered PDF (with the
+        AI background if one is active) is stored alongside the order so
+        the admin panel can download exactly what the provider previewed.
+        Status starts at "pending_payment" because Stripe is still mocked."""
         import base64
         from services.card_pdf import render_card_pdf
         prof = await _resolve_owned_ecard(user.user_id, payload.provider_id)
+        ai_bg_b64, palette = await _load_design(user.user_id, prof["provider_id"], payload.design_id)
         pdf = render_card_pdf(
             business_name=prof.get("business_name", ""),
             city=prof.get("city"),
@@ -185,6 +303,8 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
             slug=prof.get("slug"),
             getamano_code=prof.get("getamano_code"),
             is_verified=prof.get("verification_status") == "approved",
+            ai_bg_b64=ai_bg_b64,
+            palette=palette,
         )
         now = datetime.now(timezone.utc).isoformat()
         order = {
@@ -197,7 +317,9 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
             "qty_cards": payload.packs * CARDS_PER_PACK,
             "total_usd": payload.packs * PRICE_PER_PACK_USD,
             "notes": payload.notes,
-            "status": "pending_payment",  # → admin flips to "queued_for_print"
+            "design_id": payload.design_id,
+            "has_ai_background": bool(ai_bg_b64),
+            "status": "pending_payment",
             "status_history": [{"status": "pending_payment", "at": now}],
             "pdf_b64": base64.b64encode(pdf).decode("ascii"),
             "pdf_size_bytes": len(pdf),
@@ -205,7 +327,7 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
             "updated_at": now,
         }
         await db.print_card_orders.insert_one(order)
-        order.pop("_id", None)  # never expose BSON ObjectId in the response
+        order.pop("_id", None)
         # Best-effort push to admins so they see it instantly.
         try:
             from routes.push import send_push_to_user
@@ -220,7 +342,6 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
                 })
         except Exception as _e:
             logger.warning(f"print-order admin push failed: {_e}")
-        # Don't leak the b64 to the client; it's only for the admin pdf endpoint.
         out = {k: v for k, v in order.items() if k != "pdf_b64"}
         return out
 
