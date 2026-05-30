@@ -45,7 +45,7 @@ export default function ReelCreator({ onClose, onCreated }) {
     try {
       const fd = new FormData();
       fd.append("file", f);
-      const { data } = await api.post("/upload", fd, {
+      const { data } = await api.post("/reels/upload-video", fd, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 180_000,
       });

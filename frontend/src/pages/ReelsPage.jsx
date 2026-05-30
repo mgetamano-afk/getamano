@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Heart, ChevronLeft, Volume2, VolumeX, Loader2,
-  ShieldCheck, MapPin, Eye, Play, Sparkles, Bookmark, Share2,
+  ShieldCheck, MapPin, Eye, Play, Sparkles, Bookmark, Share2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
@@ -68,6 +68,14 @@ export default function ReelsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // V15 — Listen for `reels:open-creator` event so the FAB menu can
+  // request opening the upload modal without prop-drilling.
+  useEffect(() => {
+    const handler = () => setCreatorOpen(true);
+    window.addEventListener("reels:open-creator", handler);
+    return () => window.removeEventListener("reels:open-creator", handler);
+  }, []);
+
   // Observe which slide is active to autoplay only that video.
   useEffect(() => {
     if (!reels.length) return;
@@ -132,16 +140,7 @@ export default function ReelsPage() {
 
       {/* V15 — Contextual reel actions live in ReelActionMenu (FAB).
           The global QuickActionsFAB is hidden on /reels by route filter,
-          so this is the single floating control on this page. We also
-          listen for "reels:open-creator" so the menu can ask us to open
-          the upload modal. */}
-      {user && (() => {
-        if (!window._reelsCreatorListener) {
-          window._reelsCreatorListener = () => setCreatorOpen(true);
-          window.addEventListener("reels:open-creator", window._reelsCreatorListener);
-        }
-        return null;
-      })()}
+          so this is the single floating control on this page. */}
       {user && (
         <ReelActionMenu
           activeReel={reels[activeIdx]}
@@ -164,9 +163,20 @@ export default function ReelsPage() {
           </h2>
           <p className="text-sm text-white/70 max-w-xs">
             {lang === "en"
-              ? "Providers can post 60-second vertical videos. Tap + to be the first."
-              : "Los proveedores pueden subir videos verticales de 60s. Toca + para ser el primero."}
+              ? "Anyone can post a 60-second vertical video. Tap + to be the first."
+              : "Cualquier persona puede subir un video vertical de 60s. Toca + para ser el primero."}
           </p>
+          {user && (
+            <button
+              type="button"
+              onClick={() => setCreatorOpen(true)}
+              className="mt-5 px-5 h-11 rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 text-white text-sm font-bold inline-flex items-center gap-2 active:scale-95 hover:shadow-xl transition-all duration-200"
+              data-testid="reels-empty-cta"
+            >
+              <Plus className="w-4 h-4" />
+              {lang === "en" ? "Post your first reel" : "Sube tu primer reel"}
+            </button>
+          )}
         </div>
       )}
 
@@ -306,10 +316,14 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
               loading="lazy"
             />
           </Link>
-          <div className="flex-1 min-w-0 text-white">
-            <p className="font-bold text-sm inline-flex items-center gap-1">
+          <div className="flex-1 min-w-0 text-white" data-testid={`reel-author-${reel.reel_id}`}>
+            <p className="font-bold text-sm inline-flex items-center gap-1" data-testid={`reel-author-name-${reel.reel_id}`}>
               {reel.business_name}
-              {reel.verified && <VerifiedBadge size={16} darkBg code={reel.getamano_code} />}
+              {reel.verified
+                ? <VerifiedBadge size={16} darkBg code={reel.getamano_code} />
+                : <span className="text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-full bg-white/15 text-white/70" data-testid={`reel-unverified-${reel.reel_id}`}>
+                    {lang === "en" ? "Unverified" : "Sin verificar"}
+                  </span>}
             </p>
             <p className="text-[11px] text-white/70 inline-flex items-center gap-1.5">
               {reel.getamano_code && <span className="font-mono">{reel.getamano_code}</span>}

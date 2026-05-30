@@ -3,7 +3,28 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V15.1 Double-tap to like
+## Latest Update — May 30, 2026 · V15 FIX: Reels video upload (root cause)
+
+User report: "no reels no funciona". **Root cause**: `/api/upload` solo aceptaba imágenes (`Solo imágenes (jpg/png/webp/gif/heic)`), pero `ReelCreator` y el nuevo `ReelCameraRecorder` posteaban videos a ese endpoint → 400 silencioso → reels jamás se subían.
+
+### Backend (`server.py`)
+- **Nuevo endpoint `POST /api/reels/upload-video`**: acepta MP4, MOV, AVI, **WebM** (output de `MediaRecorder`), MKV. Cap 80 MB. Solo requiere usuario logueado (no provider) — alinea con V15 Nota 1.1.2.
+- `MAX_REEL_VIDEO_SIZE = 80 MB` y `ALLOWED_REEL_VIDEO_TYPES` añadidos al header de constants.
+- `POST /api/upload` ahora detecta videos y devuelve mensaje friendly: "Los videos van a /api/reels/upload-video, no a /api/upload." (evita que devs futuros caigan en el mismo bug).
+
+### Frontend
+- `ReelCreator.jsx` y `ReelCameraRecorder.jsx` cambian `/upload` → `/reels/upload-video`.
+- `ReelsPage.jsx` empty-state actualizado:
+  - Copy correcto: "Cualquier persona puede subir un video vertical de 60s. Toca + para ser el primero." (era obsoleto: "Los proveedores pueden subir…").
+  - Nuevo CTA gradient `Sube tu primer reel` para empuje visual.
+- Listener `reels:open-creator` ahora usa `useEffect` con cleanup (antes era un global `window._reelsCreatorListener` que producía memory leaks).
+- Author del reel ahora muestra explícitamente "SIN VERIFICAR" pill cuando no está verified, además del `VerifiedBadge` PNG cuando sí lo está (V15 Nota 1.1).
+
+### Tests
+- `test_iter109_v15_reels_fix.py` (11 tests, 6 backend integration + 5 frontend locks).
+- Cumulative regression iter98→iter109: **118/118 verde**.
+
+## Previous Update — May 30, 2026 · V15.1 Double-tap to like
 
 - `ReelsPage.jsx` ahora detecta **doble-tap sobre el video** (umbral 280 ms): cancela el play/pause pendiente, dispara `POST /reels/{id}/like` y muestra `<LikeBurst/>` (corazón gigante + 6 corazones orbitando). Idempotente — si el reel ya está "me gusta", el burst aparece sin segunda llamada.
 - Single-tap mantiene el comportamiento de play/pause (deferred 280 ms para detectar la segunda tap).

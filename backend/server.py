@@ -2440,8 +2440,11 @@ async def update_user(payload: UserUpdateIn, user: User = Depends(get_current_us
 # ============ UPLOAD ============
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"}
+# V15 — Reels upload also accepts WebM (output of in-browser MediaRecorder)
+ALLOWED_REEL_VIDEO_TYPES = ALLOWED_VIDEO_TYPES | {"video/webm", "video/x-matroska"}
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB images
 MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB videos
+MAX_REEL_VIDEO_SIZE = 80 * 1024 * 1024  # 80 MB reels (≤ 60s)
 GALLERY_COMPRESS_MAX_WIDTH = 1200
 GALLERY_COMPRESS_QUALITY = 85
 
@@ -2495,9 +2498,58 @@ def _compress_image_bytes(data: bytes, content_type: str) -> tuple[bytes, str]:
         logger.warning(f"Image compression failed, keeping original: {e}")
         return data, content_type
 
+@api_router.post("/reels/upload-video")
+async def upload_reel_video(file: UploadFile = File(...), user: User = Depends(get_current_user)):
+    """V15 — Dedicated video upload for reels. Open to ANY logged-in user
+    (Nota 1.1.2: verificados o no, todos pueden subir reels). Accepts the
+    formats produced by `MediaRecorder` (WebM) as well as imported MP4/MOV.
+    The frontend POSTs the resulting `url` into POST /reels."""
+    content_type = (file.content_type or "application/octet-stream").lower().split(";")[0].strip()
+    if content_type not in ALLOWED_REEL_VIDEO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Formato no soportado para Reels. Usa MP4, WebM, MOV o AVI.",
+        )
+    data = await file.read()
+    if len(data) > MAX_REEL_VIDEO_SIZE:
+        raise HTTPException(status_code=400, detail="El video supera 80 MB. Recorta tu reel a ≤ 60s.")
+    ext_map = {
+        "video/mp4": "mp4", "video/quicktime": "mov", "video/x-msvideo": "avi",
+        "video/avi": "avi", "video/webm": "webm", "video/x-matroska": "mkv",
+    }
+    ext = ext_map.get(content_type, "mp4")
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/reels/{user.user_id}/{file_id}.{ext}"
+    try:
+        result = put_object(path, data, content_type)
+    except Exception as e:
+        logger.exception("Reel video upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    await db.files.insert_one({
+        "file_id": file_id, "user_id": user.user_id, "storage_path": result["path"],
+        "original_filename": file.filename or "", "content_type": content_type,
+        "size": result.get("size", len(data)), "is_deleted": False,
+        "kind": "reel-video",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {
+        "file_id": file_id,
+        "path": result["path"],
+        "url": f"/api/files/{result['path']}",
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+    }
+
+
 @api_router.post("/upload")
 async def upload(file: UploadFile = File(...), user: User = Depends(get_current_user)):
     content_type = file.content_type or "application/octet-stream"
+    if content_type.startswith("video/"):
+        # Friendly redirect: callers can route reels to the right endpoint.
+        raise HTTPException(
+            status_code=400,
+            detail="Los videos van a /api/reels/upload-video, no a /api/upload.",
+        )
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Solo imágenes (jpg/png/webp/gif/heic)")
     data = await file.read()

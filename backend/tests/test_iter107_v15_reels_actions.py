@@ -147,8 +147,9 @@ def test_reel_camera_recorder_uses_mediarecorder():
     assert "getUserMedia" in src
     # Hard 30s cap
     assert "MAX_DURATION_S = 30" in src
-    # Upload path matches /upload then POST /reels
-    assert '"/upload"' in src
+    # V15 fix (iter109): video uploads now go through /reels/upload-video
+    # (the legacy /upload endpoint only accepts images).
+    assert '"/reels/upload-video"' in src
     assert '"/reels"' in src
 
 

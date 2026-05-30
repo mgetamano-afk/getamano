@@ -141,7 +141,7 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
       const fd = new FormData();
       const ext = (previewBlob.type.split("/")[1] || "webm").split(";")[0];
       fd.append("file", previewBlob, `reel-recorded.${ext}`);
-      const upload = await api.post("/upload", fd, {
+      const upload = await api.post("/reels/upload-video", fd, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 180_000,
       });
