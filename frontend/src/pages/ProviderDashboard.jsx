@@ -6,7 +6,7 @@ import AddressAutocomplete from "../components/AddressAutocomplete";
 import ImageUpload, { buildFileUrl } from "../components/ImageUpload";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar, Sparkles, ChevronRight } from "lucide-react";
+import { Eye, Phone, Star, ShieldCheck, ExternalLink, Home, Building2, MessageCircle, CreditCard, Image as ImageIcon, Settings, Trash2, Check, Inbox, Trophy, DollarSign, Calendar, Sparkles, ChevronRight, Menu } from "lucide-react";
 import { toast } from "sonner";
 import ProviderGreeting from "../components/ProviderGreeting";
 import ProviderSideNav from "../components/ProviderSideNav";
@@ -54,26 +54,38 @@ import ServiceAreasInput from "../components/ServiceAreasInput";
 import BusinessCardScanner from "../components/BusinessCardScanner";
 import ProfileVersionsPanel from "../components/ProfileVersionsPanel";
 import EcardsManagerPanel from "../components/EcardsManagerPanel";
+import VerificationCenter from "../components/VerificationCenter";
 import { ScanLine, History } from "lucide-react";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { US_STATES, getStateByAbbr } from "../data/usLocations";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-const TAB_KEYS = [
-  { id: "dashboard", labelKey: "tabs.dashboard", Icon: Home },
-  { id: "perfil", labelKey: "tabs.profile", Icon: Settings },
-  { id: "preferencias", labelKey: "tabs.preferences", Icon: Settings },
-  { id: "tarifas", labelKey: "tabs.rates", Icon: DollarSign },
-  { id: "galeria", labelKey: "tabs.gallery", Icon: ImageIcon },
-  { id: "banner", labelKey: "tabs.banner", Icon: Sparkles },
-  { id: "citas", labelKey: "tabs.appointments", Icon: Calendar },
-  { id: "solicitudes", labelKey: "tabs.requests", Icon: Inbox },
-  { id: "mensajes", labelKey: "tabs.messages", Icon: MessageCircle },
-  { id: "referidos", labelKey: "tabs.referrals", Icon: Trophy },
-  { id: "diario", labelKey: "tabs.journal", Icon: Trophy },
-  { id: "versiones", labelKey: "tabs.versions", Icon: History },
-  { id: "suscripcion", labelKey: "tabs.subscription", Icon: CreditCard },
-];
+
+// Section V13 — Mobile top-bar label resolution. The TAB_KEYS list went
+// away with the horizontal strip; we use a flat map so the mobile header
+// can show the active tab name without re-importing the sidebar groups.
+const MOBILE_TAB_LABELS = {
+  dashboard:    { es: "Inicio",        en: "Home" },
+  perfil:       { es: "Mi perfil",     en: "My profile" },
+  ecard:        { es: "Mis eCards",    en: "My eCards" },
+  galeria:      { es: "Portafolio",    en: "Portfolio" },
+  banner:       { es: "Banner Pro",    en: "Banner Pro" },
+  reels:        { es: "Mis Reels",     en: "My Reels" },
+  analytics:    { es: "Analytics",     en: "Analytics" },
+  mensajes:     { es: "Mensajes",      en: "Messages" },
+  solicitudes:  { es: "Solicitudes",   en: "Requests" },
+  citas:        { es: "Citas",         en: "Appointments" },
+  tarifas:      { es: "Mis tarifas",   en: "Pricing" },
+  destacar:     { es: "Destacarme",    en: "Feature me" },
+  red:          { es: "Referidos",     en: "Referrals" },
+  diario:       { es: "Mi diario",     en: "My diary" },
+  tarjetas:     { es: "Tarjetas físicas", en: "Physical cards" },
+  preferencias: { es: "Preferencias",  en: "Preferences" },
+  verificarme:  { es: "Verificarme",   en: "Get verified" },
+  versiones:    { es: "Versiones",     en: "Versions" },
+};
+const CURRENT_TAB_LABEL = (tab, lang) =>
+  (MOBILE_TAB_LABELS[tab] || { es: "Dashboard", en: "Dashboard" })[lang === "en" ? "en" : "es"];
 
 export default function ProviderDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -93,10 +105,16 @@ export default function ProviderDashboard() {
   const [tab, setTab] = useState(() => {
     const initial = searchParams.get("tab") || "dashboard";
     // Aliases — wallet/red both point at the referrals tab (the live UI
-    // already lives at "referidos").
+    // already lives at "referidos"). V13 — sidebar uses "red" as item id
+    // but the panel renders under "referidos" too.
     if (initial === "wallet" || initial === "red") return "referidos";
     return initial;
   });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Sidebar emits "red" for the Referrals item — translate that into the
+  // existing "referidos" panel key so the renderer (and URL) stay stable.
+  const handleTabChange = (next) => setTab(next === "red" ? "referidos" : next);
 
   // Sync tab → URL so deep-link sharing works (and back/forward updates the
   // visible pane). Doesn't push history — uses replace to avoid bloat.
@@ -248,18 +266,36 @@ export default function ProviderDashboard() {
         />
 
         <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)_320px] lg:gap-6 lg:items-start">
-          {/* Section 64 — Vertical sidebar (desktop only) */}
-          <div className="hidden lg:block">
-            <ProviderSideNav
-              tab={tab}
-              onChange={setTab}
-              unreadMessages={unread}
-              pendingRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
-            />
-          </div>
+          {/* Section V13 — Unified vertical sidebar drives the whole
+              dashboard. Desktop renders it as a sticky rail; mobile
+              opens it as a slide-out drawer (mobileOpen controls). */}
+          <ProviderSideNav
+            tab={tab === "referidos" ? "red" : tab}
+            onChange={handleTabChange}
+            unreadMessages={unread}
+            pendingRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
+            mobileOpen={mobileNavOpen}
+            onMobileClose={() => setMobileNavOpen(false)}
+          />
 
           {/* COLUMNA CENTRO — Contenido principal scrolleable */}
           <section className="min-w-0 space-y-6" data-testid="provider-dashboard-center">
+            {/* Mobile-only top bar: hamburger + current tab label */}
+            <div className="lg:hidden flex items-center gap-2 bg-white rounded-2xl border border-slate-200 px-3 py-2 sticky top-16 z-30 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="p-2 -ml-1 rounded-xl hover:bg-slate-100 active:scale-95 transition"
+                aria-label="Open dashboard menu"
+                data-testid="provider-dashboard-mobile-menu-btn"
+              >
+                <Menu className="w-5 h-5 text-slate-700" />
+              </button>
+              <span className="font-display font-semibold text-sm text-slate-800 truncate" data-testid="provider-dashboard-mobile-tab-label">
+                {CURRENT_TAB_LABEL(tab, lang)}
+              </span>
+            </div>
+
             {/* ── HOME (Inicio) overview — visible only when tab === "dashboard" ── */}
             {tab === "dashboard" && (
               <DashboardHomeV7
@@ -271,22 +307,10 @@ export default function ProviderDashboard() {
             )}
             {/* ── END Home (V7 rebuild) ── */}
 
-        {/* Tabs */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="flex overflow-x-auto border-b border-slate-100" data-testid="dashboard-tabs">
-            {TAB_KEYS.map(tt => (
-              <button
-                key={tt.id}
-                onClick={() => setTab(tt.id)}
-                className={`flex items-center gap-2 px-5 py-4 text-sm font-medium border-b-2 transition flex-shrink-0 ${tab === tt.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-900"}`}
-                data-testid={`dashboard-tab-${tt.id}`}
-              >
-                <tt.Icon className="w-4 h-4" /> {t(tt.labelKey)}
-                {tt.id === "mensajes" && unread > 0 && <span className="ml-1 bg-orange-500 text-white text-xs rounded-full px-2 py-0.5">{unread}</span>}
-              </button>
-            ))}
-          </div>
-
+        {/* Section V13 — Center content panel. The horizontal tab strip
+            that used to live here was removed in favor of the single
+            vertical sidebar. */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden animate-fadeSlideUp" data-testid="dashboard-panel">
           <div className="p-6 md:p-8">
             {tab === "red" && (
               <MiRedPage />
@@ -639,39 +663,8 @@ export default function ProviderDashboard() {
               <ProfileVersionsPanel />
             )}
 
-            {tab === "suscripcion" && (
-              <div data-testid="dashboard-subscription" className="space-y-6">
-                {/* Subscription Manager — current plan + cancel/reactivate */}
-                <SubscriptionManager />
-
-                {/* Plan picker grid (legacy beta mode — change plan without payment) */}
-                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-blue-600" />
-                  <div className="flex-1">
-                    <div className="font-medium text-slate-900">Cambios libres durante la beta</div>
-                    <div className="text-xs text-slate-500">El cobro real con Stripe estará disponible próximamente. Mientras tanto, puedes cambiar de plan sin costo.</div>
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {plans.map(p => (
-                    <div key={p.id} className={`rounded-2xl border-2 p-5 ${p.highlight ? "border-orange-500" : "border-slate-200"} ${profile.plan === p.id ? "ring-2 ring-blue-500" : ""}`} data-testid={`sub-plan-${p.id}`}>
-                      <div className="font-display font-bold text-xl text-slate-900">{p.name}</div>
-                      <div className="text-2xl font-display font-bold mt-1">${p.price_monthly}<span className="text-sm text-slate-500 font-normal">/mes</span></div>
-                      <ul className="mt-3 space-y-1 min-h-[120px]">
-                        {p.features_es.slice(0, 4).map((f) => <li key={f} className="text-xs text-slate-600 flex items-start gap-1"><Check className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />{f}</li>)}
-                      </ul>
-                      <button
-                        onClick={() => changePlan(p.id)}
-                        disabled={profile.plan === p.id}
-                        className={`mt-4 w-full ${profile.plan === p.id ? "bg-slate-100 text-slate-400 cursor-default" : p.highlight ? "btn-secondary" : "btn-primary"} text-sm justify-center`}
-                        data-testid={`sub-choose-${p.id}`}
-                      >
-                        {profile.plan === p.id ? "Plan actual" : "Cambiar a este plan"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {tab === "verificarme" && (
+              <VerificationCenter profile={profile} />
             )}
           </div>
         </div>

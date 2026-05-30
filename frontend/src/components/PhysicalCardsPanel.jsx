@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Package, Loader2, CheckCircle2, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
+import VerifiedBadge from "./VerifiedBadge";
 
 /**
  * PhysicalCardsPanel — V7 Item 3 (provider self-service).
@@ -30,6 +31,7 @@ export default function PhysicalCardsPanel() {
   const [loading, setLoading] = useState(true);
   const [packs, setPacks] = useState(1);
   const [creating, setCreating] = useState(false);
+  const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({
     name: "", line1: "", line2: "", city: "", state: "", zip: "", phone: "",
   });
@@ -41,7 +43,12 @@ export default function PhysicalCardsPanel() {
     try { const r = await api.get("/physical-cards/orders/me"); setOrders(r.data || []); }
     finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    // V13 — pull the provider profile so we can render the LIVE physical
+    // card preview at the top of the panel, generated from the eCard data.
+    api.get("/providers/me").then(r => setProfile(r.data)).catch(() => {});
+  }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -71,6 +78,11 @@ export default function PhysicalCardsPanel() {
           Cada tarjeta abre tu eCard al tap. {CARDS_PER_PACK} tarjetas por pack · ${PRICE_PER_PACK}/pack · envío gratis en USA.
         </p>
       </header>
+
+      {/* V13 — Live preview of the physical card mock-up generated from
+          the current eCard data. Two sides (front + back) so the provider
+          sees exactly what will be printed. */}
+      {profile && <PhysicalCardPreview profile={profile} />}
 
       {/* ── Order form ── */}
       <form onSubmit={onSubmit} className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3" data-testid="physical-cards-form">
@@ -169,5 +181,88 @@ function Input({ label, value, onChange, testid, maxLength }) {
         data-testid={testid}
       />
     </label>
+  );
+}
+
+/**
+ * PhysicalCardPreview — V13. Renders a deck of two cards (front + back)
+ * generated from the live provider profile. The front shows the business
+ * name, category, city/state + verified badge; the back has the NFC tap
+ * mark and the eCard URL.
+ *
+ * No AI is invoked — this is a deterministic mock-up so users SEE the
+ * exact data that will go into the printer. When we ship the OpenAI
+ * IMAGE design service we can swap this with a generative variant.
+ */
+function PhysicalCardPreview({ profile }) {
+  const verified = profile?.verification_status === "approved";
+  const code = profile?.getamano_code || "";
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5" data-testid="physical-card-preview">
+      <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-3">
+        Vista previa de tu tarjeta
+      </p>
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+        {/* FRONT */}
+        <div
+          className="relative w-[280px] h-[170px] rounded-2xl text-white p-4 shadow-xl hover:scale-[1.02] transition-transform duration-300"
+          style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
+          data-testid="physical-card-preview-front"
+        >
+          <div className="absolute top-3 right-3 flex items-center gap-1">
+            {verified && <VerifiedBadge size={20} darkBg />}
+          </div>
+          {profile?.logo_url ? (
+            <img src={profile.logo_url} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/15 mb-2" />
+          ) : (
+            <div className="w-9 h-9 rounded-lg bg-white/15 mb-2 flex items-center justify-center font-display font-bold text-white">
+              {(profile?.business_name || "?")[0]?.toUpperCase()}
+            </div>
+          )}
+          <p className="font-display font-bold text-lg leading-tight" data-testid="physical-card-preview-name">
+            {profile?.business_name || "Tu negocio"}
+          </p>
+          <p className="text-xs text-white/80 mt-0.5">
+            {[profile?.city, profile?.state].filter(Boolean).join(", ")}
+          </p>
+          <p className="absolute bottom-3 left-4 text-[10px] uppercase tracking-widest text-white/60 font-bold">
+            get<span className="text-[#0077B6]">amano</span>
+            {code && <span className="ml-2 text-white/70">{code}</span>}
+          </p>
+        </div>
+
+        {/* BACK */}
+        <div
+          className="relative w-[280px] h-[170px] rounded-2xl bg-white border border-slate-200 p-4 shadow-md hover:scale-[1.02] transition-transform duration-300"
+          data-testid="physical-card-preview-back"
+        >
+          <div className="absolute top-3 right-3 w-8 h-8 rounded-full border-2 border-slate-300 flex items-center justify-center">
+            <span className="text-[9px] font-bold text-slate-400">NFC</span>
+          </div>
+          <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400">Tap to open</p>
+          <p className="font-display font-bold text-[#03045E] text-base mt-1 leading-tight truncate">
+            {profile?.business_name}
+          </p>
+          {profile?.slug && (
+            <p className="text-xs text-slate-500 mt-1 font-mono truncate" data-testid="physical-card-preview-slug">
+              getamano.us/p/{profile.slug}
+            </p>
+          )}
+          <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+            <p className="text-[10px] text-slate-400 max-w-[160px] leading-tight">
+              Toca esta tarjeta con un celular para abrir mi eCard pública.
+            </p>
+            <div className="w-10 h-10 rounded bg-slate-100 grid grid-cols-3 gap-px p-1">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <span key={i} className={`rounded-[1px] ${i % 2 ? "bg-slate-300" : "bg-slate-700"}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="text-[11px] text-slate-500 text-center mt-3">
+        Los datos se actualizan en vivo desde tu eCard. Cambia tu nombre, foto o ciudad y la tarjeta se imprime con la última versión.
+      </p>
+    </div>
   );
 }

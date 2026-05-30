@@ -3,7 +3,63 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V12 Multi-eCard + Sandbox payments
+## Latest Update — May 30, 2026 · V13 Dashboard rebuild (vertical-only nav + Verificarme + Wallet)
+
+User feedback: el menú horizontal duplicaba el vertical. Eliminar el horizontal, unificar todo en el vertical, adaptarlo a mobile, restructurar items y agregar Verificarme + nuevo sistema de premios por referido.
+
+### Estructura final del sidebar (V13)
+- **DASHBOARD**: Inicio · Mi perfil · Mis eCards · Portafolio · **Banner Pro** · Mis Reels
+- **NEGOCIO**: Analytics · Mensajes · Solicitudes · Citas · Mis tarifas
+- **CRECER**: Destacarme · Referidos · **Mi diario** · Tarjetas físicas · Preferencias · **Verificarme** (nuevo)
+- **ADMIN**: Versiones
+- **Eliminado**: "Suscripción" (su contenido se trasladó a Verificarme con la nueva math de eCards)
+
+### Cambios técnicos
+- **`ProviderSideNav.jsx`** completamente reescrito:
+  - 4 grupos con dividers + headers uppercase tracking-widest.
+  - **Desktop** ≥ lg: sticky rail 220px (igual que antes).
+  - **Mobile** < lg: slide-out drawer triggered por hamburger (`mobileOpen` prop). Drawer 280px ancho, backdrop con blur, body-scroll lock cuando abierto, animación 300ms.
+  - **Animaciones**: stagger-fade en grupos (`provSidenavFade` 320ms) + stagger-slide en items (`provSidenavSlide` 280ms con `animation-delay` escalonado por idx).
+  - Active state: gradient bg `teal-50 → emerald-50` + bar lateral teal-500 + icon scale 110% + ring sutil.
+  - Hover: `translate-x-0.5` + icon scale 105%.
+  - Badges (mensajes / solicitudes) con `animate-pulse`.
+- **`ProviderDashboard.jsx`**:
+  - Eliminado el `<div data-testid="dashboard-tabs">` con `TAB_KEYS.map` (el tab strip horizontal).
+  - Eliminado el tab `suscripcion` y su block de plan picker grid.
+  - Agregado mobile top-bar con hamburger button + tab label dinámico (`MOBILE_TAB_LABELS` map).
+  - State `mobileNavOpen` + handler que cierra al seleccionar item.
+- **`VerificationCenter.jsx`** nuevo (~230 líneas):
+  - Hero header con icono shield + descripción.
+  - 3 tier cards ($10/$15/$20) con la activa highlighted gradient emerald + ring + scale.
+  - Lista de eCards con toggle Activate/Turn off inline (reusa el endpoint V12).
+  - **Refer & earn widget** con progress bar al próximo reward + reward ladder (6 tiers).
+  - Resumen de pricing de apertura ($5 cada adicional) como recordatorio.
+- **`ReferralsTab.jsx`** reescrito como "Mi cartera / Mi wallet":
+  - Hero gradient deep-blue con stats grid (Invitados · Pagaron · Meses ganados · Acreditados).
+  - Progress bar al próximo reward.
+  - Reward ladder con 6 tiers visuales.
+  - Tabla de historial preservada.
+- **`PhysicalCardsPanel.jsx`** ampliado:
+  - Agregado `<PhysicalCardPreview/>` al tope, generado en vivo desde `/providers/me`.
+  - 2 caras: frontal azul (logo + nombre + ciudad/estado + getamano + GM-XXXX + verified badge) + posterior blanca (TAP TO OPEN + URL + NFC ring + QR mark).
+  - Hover: `scale-[1.02]` en cada cara, transition 300ms.
+
+### Sistema de recompensas (nuevo)
+Reemplaza la copia "1 mes gratis por cada referido". Escalera:
+- 2 paid refs → 1 mes gratis
+- 4 → 2 meses
+- 6 → 3 meses
+- 8 → 4 meses
+- 10 → 6 meses
+- 12 → 12 meses (cap)
+
+El widget vive en 2 lugares (Verificarme + Mi Wallet) consistentes en visual + math.
+
+### Tests
+- `test_iter104_v13_dashboard_rebuild.py` (11 tests source-code locks).
+- Cumulative regression iter98→iter104: **76/76 pass**.
+
+## Previous Update — May 30, 2026 · V12 Multi-eCard + Sandbox payments
 
 User wanted providers to be able to own multiple independent eCards under one account, with:
 - **Apertura**: 1ª gratis, 2ª/3ª/4ª... $5 cada una (one-time)
