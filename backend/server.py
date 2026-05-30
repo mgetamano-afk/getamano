@@ -272,6 +272,10 @@ class ProviderProfileIn(BaseModel):
     # Section 89 v9 Part 4C — provider offers in-person service at the
     # customer's address. Independent from `is_home_based` (which is
     # about WHERE the provider operates).
+    # Section V12 — sandbox-paid token for opening the 2nd+ eCard. Not
+    # required for the very first eCard (free). Generated via POST
+    # /users/me/ecards/sandbox-pay {kind:"opening"}.
+    opening_payment_id: Optional[str] = None
     offers_home_service: bool = False
 
 class ProviderProfile(ProviderProfileIn):
@@ -573,7 +577,14 @@ async def seed():
     # Indexes (idempotent)
     try:
         await db.provider_profiles.create_index("slug", unique=True)
-        await db.provider_profiles.create_index("user_id", unique=True)
+        # Section V12 — `user_id` is NO LONGER unique. A user can own
+        # multiple eCards. The drop_index below handles legacy DBs that
+        # still have the unique constraint.
+        try:
+            await db.provider_profiles.drop_index("user_id_1")
+        except Exception:
+            pass  # index didn't exist or already non-unique
+        await db.provider_profiles.create_index("user_id")
         await db.provider_profiles.create_index([("country", 1), ("category_id", 1), ("city", 1)])
         await db.provider_profiles.create_index([("country", 1), ("state", 1)])
         await db.users.create_index("email", unique=True)
@@ -873,6 +884,12 @@ async def seed():
         await _user_profile_indexes(db)
     except Exception as e:
         logger.warning(f"user profile indexes warn: {e}")
+
+    # Section V12 — Multi-eCard ownership + payments indexes.
+    try:
+        await _ecards_indexes(db)
+    except Exception as e:
+        logger.warning(f"ecards indexes warn: {e}")
 
     if await db.categories.count_documents({}) == 0:
         docs = []
@@ -1800,9 +1817,20 @@ async def create_provider(payload: ProviderProfileIn, user: User = Depends(get_c
     if user.role != "provider":
         # auto-upgrade to provider
         await db.users.update_one({"user_id": user.user_id}, {"$set": {"role": "provider"}})
-    existing = await db.provider_profiles.find_one({"user_id": user.user_id})
-    if existing:
-        raise HTTPException(status_code=400, detail="Provider profile already exists")
+
+    # Section V12 — Multi-eCard ownership. The 1st eCard is free; every
+    # additional eCard requires a sandbox-paid `opening_payment_id` token
+    # generated via POST /users/me/ecards/sandbox-pay {kind:"opening"}.
+    # `payload.opening_payment_id` is consumed here so the same token
+    # cannot be reused for two eCards.
+    owned_count = await db.provider_profiles.count_documents({"user_id": user.user_id})
+    if owned_count >= 1:
+        opening_payment_id = getattr(payload, "opening_payment_id", None)
+        if not opening_payment_id:
+            raise HTTPException(
+                status_code=402,
+                detail="Para abrir otra eCard necesitas pagar la apertura ($5).",
+            )
     base_slug = slugify(f"{payload.business_name}-{payload.city or ''}-{payload.state or ''}")
     slug = base_slug
     i = 2
@@ -1811,6 +1839,9 @@ async def create_provider(payload: ProviderProfileIn, user: User = Depends(get_c
         i += 1
     now = datetime.now(timezone.utc).isoformat()
     payload_data = payload.model_dump()
+    # Section V12 — strip the opening_payment_id before persisting; it
+    # belongs to the ecard_payments collection, not the provider doc.
+    opening_token = payload_data.pop("opening_payment_id", None)
     if payload_data.get("phone"):
         payload_data["phone"] = normalize_phone(payload_data["phone"])
     doc = {
@@ -1826,6 +1857,20 @@ async def create_provider(payload: ProviderProfileIn, user: User = Depends(get_c
     }
     await db.provider_profiles.insert_one(doc)
     doc.pop("_id", None)
+
+    # Section V12 — consume sandbox opening token for 2nd+ eCards. If
+    # invalid, roll back the just-inserted profile so callers don't end
+    # up with a free eCard despite a failed payment.
+    if owned_count >= 1 and opening_token:
+        try:
+            await _ecards_router._consume_opening_payment(
+                user_id=user.user_id,
+                payment_id=opening_token,
+                provider_id=doc["provider_id"],
+            )
+        except HTTPException:
+            await db.provider_profiles.delete_one({"provider_id": doc["provider_id"]})
+            raise
 
     # Section 73 — Auto-claim Founder Discount slot if any remain.
     # Wrapped in try so a counter glitch never blocks profile creation.
@@ -9790,6 +9835,10 @@ from routes.user_profile import (  # noqa: E402
     make_router as _make_user_profile_router,
     ensure_user_profile_indexes as _user_profile_indexes,
 )
+from routes.ecards import (  # noqa: E402
+    make_router as _make_ecards_router,
+    ensure_ecards_indexes as _ecards_indexes,
+)
 
 api_router.include_router(
     _make_community_router(
@@ -9996,6 +10045,13 @@ api_router.include_router(
 api_router.include_router(
     _make_user_profile_router(db=db, User=User, get_current_user=get_current_user)
 )
+
+# Section V12 — Multi-eCard ownership + sandbox payments. The router is
+# kept on a module-level alias so `POST /providers` (defined earlier in
+# this file) can call its `_consume_opening_payment` helper to atomically
+# settle the opening fee when a 2nd+ eCard is created.
+_ecards_router = _make_ecards_router(db=db, User=User, get_current_user=get_current_user)
+api_router.include_router(_ecards_router)
 
 
 # Mount api_router AFTER all route definitions so Sections 13–18 are included.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import Header from "../components/Header";
@@ -26,7 +26,12 @@ const STEPS = [
 export default function ProviderOnboarding() {
   const { user, loading: authLoading, refresh } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(0);
+  // Section V12 — sandbox-paid token for opening a 2nd+ eCard. When this
+  // param is present we BYPASS the "already onboarded" redirect because
+  // the user is explicitly opening a NEW eCard, not editing the first.
+  const openingPaymentId = searchParams.get("opening_payment_id");
   const [showScanner, setShowScanner] = useState(false);
   const [plans, setPlans] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -50,12 +55,15 @@ export default function ProviderOnboarding() {
     if (!user) { navigate("/login"); return; }
     Promise.all([api.get("/plans"), api.get("/categories"), api.get("/providers/me")]).then(([pl, c, p]) => {
       setPlans(pl.data); setCategories(c.data);
-      if (p.data) {
+      // V12 — if the caller is opening an additional eCard via sandbox-pay
+      // token, do NOT redirect even though they already have a provider
+      // profile.
+      if (p.data && !openingPaymentId) {
         // already onboarded
         navigate("/dashboard/provider", { replace: true });
       }
     });
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, openingPaymentId]);
 
   const update = (k, v) => setForm(f => {
     // CAMBIO B — when the main category changes, clear the additional ones
@@ -80,6 +88,8 @@ export default function ProviderOnboarding() {
     try {
       const payload = { ...form };
       delete payload.selected_plan;
+      // V12 — forward sandbox-paid opening token for 2nd+ eCards.
+      if (openingPaymentId) payload.opening_payment_id = openingPaymentId;
       const { data } = await api.post("/providers", payload);
       if (form.selected_plan !== "free") {
         await api.post("/providers/me/plan", { plan: form.selected_plan }).catch(() => {});

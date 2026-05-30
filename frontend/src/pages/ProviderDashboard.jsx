@@ -53,6 +53,7 @@ import ChipInput from "../components/ChipInput";
 import ServiceAreasInput from "../components/ServiceAreasInput";
 import BusinessCardScanner from "../components/BusinessCardScanner";
 import ProfileVersionsPanel from "../components/ProfileVersionsPanel";
+import EcardsManagerPanel from "../components/EcardsManagerPanel";
 import { ScanLine, History } from "lucide-react";
 import { MAIN_CATEGORIES } from "../data/categoryMap";
 import { US_STATES, getStateByAbbr } from "../data/usLocations";
@@ -309,20 +310,7 @@ export default function ProviderDashboard() {
               </div>
             )}
             {tab === "ecard" && (
-              <div data-testid="dashboard-tab-ecard" className="space-y-3">
-                <h3 className="font-display font-bold text-lg text-slate-900">Mi eCard pública</h3>
-                <p className="text-sm text-slate-500">Así te ven tus clientes en getamano.</p>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setEcardPreviewOpen(true)} className="btn-outline text-sm" data-testid="dashboard-ecard-preview">
-                    Vista previa
-                  </button>
-                  {profile.slug && (
-                    <Link to={`/p/${profile.slug}`} target="_blank" className="btn-primary text-sm" data-testid="dashboard-ecard-open">
-                      Abrir pública ↗
-                    </Link>
-                  )}
-                </div>
-              </div>
+              <EcardsManagerPanel />
             )}
             {tab === "analytics" && (
               <div data-testid="dashboard-tab-analytics" className="space-y-4">

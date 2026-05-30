@@ -3,7 +3,42 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V11.1 Inicio = Buscar servicios + /moreinfo
+## Latest Update — May 30, 2026 · V12 Multi-eCard + Sandbox payments
+
+User wanted providers to be able to own multiple independent eCards under one account, with:
+- **Apertura**: 1ª gratis, 2ª/3ª/4ª... $5 cada una (one-time)
+- **Verificación mensual** (suscripción account-wide): 1 verificada = $10/mes · 2 = $15/mes · 3+ = $20/mes flat
+- Cada eCard 100% independiente (nombre, slug, categoría, fotos, reseñas, reels propios).
+- Stripe está MOCKED → sandbox-pago ahora, swap a Stripe Link (one-time) + Stripe Subscriptions (mensual) cuando lleguen las keys.
+
+### Backend (`/app/backend/routes/ecards.py` nuevo módulo)
+- `GET /api/users/me/ecards` — lista de eCards del owner con `verification_active`, `is_verified`, `is_founder`, `public_url`.
+- `GET /api/users/me/ecards/pricing` — owned_count, verified_count, next_opening_fee_cents, verification_monthly_cents, tiers.
+- `POST /api/users/me/ecards/sandbox-pay` `{kind: "opening"|"verification"}` — mintea `payment_id` único, registra en `ecard_payments`.
+- `POST /api/users/me/ecards/{provider_id}/verify` — activa verificación (ajusta tier mensual).
+- `DELETE /api/users/me/ecards/{provider_id}/verify` — cancela.
+- `POST /api/providers` actualizado: 1ª eCard gratis (sin cambios), 2ª+ requiere `opening_payment_id` válido y no consumido (devuelve 402 si falta o es stale). El token se consume atómicamente; si la creación falla, el provider se borra y el token queda libre.
+- **Migración crítica**: dropped el unique index `user_id_1` sobre `provider_profiles` que impedía múltiples eCards. Wrapped en try/except para compatibilidad con DBs frescas.
+
+### Frontend
+- **`/app/frontend/src/components/EcardsManagerPanel.jsx`** (nuevo, ~290 líneas):
+  - Pricing summary (eCards / Verificadas / Próx. apertura / Verificación/mes).
+  - Grid de cards con business_name, badges Founder/Primary, ubicación, slug clickeable, toggle de verificación inline.
+  - Botón "+ Add another eCard" → si owned=0 va directo a /provider/onboarding, si owned≥1 abre `<SandboxPayModal>`.
+  - Modal muestra monto, disclaimer "Sandbox mode · en producción Stripe Link/Stripe Subscriptions", botones Cancelar / Confirm (sandbox).
+- **`/app/frontend/src/pages/ProviderDashboard.jsx`** — `tab === "ecard"` ahora renderiza `<EcardsManagerPanel />` (sustituye el viejo "Mi eCard pública").
+- **`/app/frontend/src/components/ProviderSideNav.jsx`** — label renombrado a "Mis eCards" / "My eCards" (plural).
+- **`/app/frontend/src/pages/ProviderOnboarding.jsx`** — lee `?opening_payment_id=...` del URL, bypasea el redirect "ya onboarded" cuando viene con token, y lo forwardea en el POST /providers body.
+
+### Tests
+- `test_iter103_v12_multi_ecard.py` (15 tests) — incluye toggle de tiers (verified=0→1→2→1), 402 sin token, 402 con token reuse, fixtures con cleanup directo en mongo para no chocar con rate-limit del registro.
+- Cumulative regression iter98→iter103: **67/67 verde**.
+
+### Stripe migration plan documentado en código
+- `routes/ecards.py` doc-comments: "`_sandbox_charge_opening_fee` → replace with Stripe Link checkout. `_sandbox_start_verification` → replace with Stripe Subscription create."
+- `EcardsManagerPanel.jsx` modal: muestra explícitamente "en producción Stripe Link / Stripe Subscriptions".
+
+## Previous Update — May 30, 2026 · V11.1 Inicio = Buscar servicios + /moreinfo
 Founder aclaración post-V11: "inicio" debe llevar a buscar servicios (la página de Search real), no al hero de AppHome. El contenido de AppHome (saludo + hero + featured providers + jobs digest + categories grid) se reubica en una página accesible desde el footer.
 
 - **`/` ahora renderiza `<Search />`** (página real de búsqueda con filtros Category/Language/Verified-only + map/list/grid views + location prompt). El "Inicio" del bottom nav lleva directo a esta búsqueda.

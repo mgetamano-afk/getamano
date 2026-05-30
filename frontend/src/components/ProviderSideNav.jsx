@@ -44,7 +44,7 @@ const GROUPS = [
     items: [
       { id: "dashboard",  Icon: Home,        labelEs: "Inicio",      labelEn: "Home" },
       { id: "perfil",     Icon: Settings,    labelEs: "Mi perfil",   labelEn: "My profile" },
-      { id: "ecard",      Icon: IdCard,      labelEs: "Mi eCard",    labelEn: "My eCard" },
+      { id: "ecard",      Icon: IdCard,      labelEs: "Mis eCards",  labelEn: "My eCards" },
       { id: "galeria",    Icon: ImageIcon,   labelEs: "Portafolio",  labelEn: "Portfolio" },
       { id: "reels",      Icon: Film,        labelEs: "Mis Reels",   labelEn: "My Reels" },
     ],
