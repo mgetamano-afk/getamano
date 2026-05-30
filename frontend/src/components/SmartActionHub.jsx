@@ -92,6 +92,11 @@ export default function SmartActionHub() {
   const { lang } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
+  // V15 — `/reels` is a full-screen immersive surface. Founder feedback:
+  // the suggestions panel competes with the reel content and feels
+  // distracting. We hide the hub entirely on that route.
+  const HIDDEN_ROUTES = ["/reels"];
+  const hiddenForRoute = HIDDEN_ROUTES.some(p => location.pathname === p || location.pathname.startsWith(p + "/"));
   const [open, setOpen] = useState(false);
   const [nudges, setNudges] = useState([]);
   const [dismissed, setDismissed] = useState(loadDismissed);
@@ -226,6 +231,7 @@ export default function SmartActionHub() {
 
   const merged = firstStepsNudge ? [firstStepsNudge, ...mergedNudges] : mergedNudges;
   const visible = merged.filter((n) => !dismissed[n.id]);
+  if (hiddenForRoute) return null;
   if (visible.length === 0 && !stepsOpen) return null;
 
   const dismissOne = (id) => {

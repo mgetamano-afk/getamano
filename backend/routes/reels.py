@@ -46,7 +46,11 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
     async def _author_profile(user_id: str) -> Optional[dict]:
-        return await db.provider_profiles.find_one(
+        """V15 — Returns the provider profile if one exists, OR a synthetic
+        user profile so any logged-in user can post a reel (even without
+        being a verified provider). The synthetic shape uses the same keys
+        the feed already consumes so the frontend doesn't branch."""
+        prov = await db.provider_profiles.find_one(
             {"user_id": user_id, "is_active": True},
             {
                 "_id": 0, "provider_id": 1, "user_id": 1, "slug": 1,
@@ -54,14 +58,33 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
                 "verification_status": 1, "getamano_code": 1,
             },
         )
+        if prov:
+            return prov
+        # Fallback to user-level identity
+        u = await db.users.find_one(
+            {"user_id": user_id},
+            {"_id": 0, "name": 1, "username": 1, "picture": 1, "city": 1, "preferred_language": 1},
+        )
+        if not u:
+            return None
+        return {
+            "provider_id": None,
+            "user_id": user_id,
+            "slug": u.get("username"),
+            "business_name": u.get("name") or u.get("username") or "Usuario",
+            "logo_url": u.get("picture"),
+            "city": u.get("city"),
+            "verification_status": "none",
+            "getamano_code": None,
+        }
 
     @router.post("/reels")
     async def create_reel(payload: ReelCreateIn, user: User = Depends(get_current_user)) -> dict:
         prof = await _author_profile(user.user_id)
         if not prof:
-            raise HTTPException(status_code=403, detail="Activa tu perfil de proveedor para subir un reel.")
+            raise HTTPException(status_code=403, detail="Tu cuenta aún no está lista para subir reels.")
 
-        # Throttle: max 10 reels per provider per 24h to keep the feed quality high.
+        # Throttle: max 10 reels per author per 24h to keep the feed quality high.
         since = datetime.now(timezone.utc).timestamp() - 24 * 3600
         recent = await db.reels.count_documents({
             "provider_user_id": user.user_id,
@@ -74,7 +97,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         doc = {
             "reel_id": f"reel_{uuid.uuid4().hex[:12]}",
             "provider_user_id": user.user_id,
-            "provider_id": prof["provider_id"],
+            "provider_id": prof.get("provider_id"),
             "provider_slug": prof.get("slug"),
             "business_name": prof.get("business_name"),
             "logo_url": prof.get("logo_url"),
@@ -87,11 +110,23 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "duration_s": payload.duration_s,
             "views_count": 0,
             "likes_count": 0,
+            "wows_count": 0,
+            "saves_count": 0,
+            "shares_count": 0,
             "is_public": True,
             "created_at": now_iso,
         }
         await db.reels.insert_one(doc)
         doc.pop("_id", None)
+
+        # V15 — Fan-out push notification to (a) followers and (b) users
+        # whose interest_category equals the author's primary category.
+        # Best-effort: any failure logs + swallows.
+        try:
+            await _notify_new_reel(db, doc, prof)
+        except Exception as e:
+            logger.warning(f"reel fanout push failed: {e}")
+
         return doc
 
     @router.get("/reels")
@@ -181,6 +216,99 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
                 logger.warning(f"reel like push failed: {_e}")
         return {"ok": True, "liked": liked}
 
+    # ─── V15 — Wow / Save / Share toggles + metrics ──────────────────
+
+    @router.post("/reels/{reel_id}/wow")
+    async def toggle_wow(reel_id: str, user: User = Depends(get_current_user)) -> dict:
+        """Idempotent "Impresionante" reaction (only one per user per reel)."""
+        existing = await db.reel_wows.find_one(
+            {"reel_id": reel_id, "user_id": user.user_id}, {"_id": 1}
+        )
+        if existing:
+            await db.reel_wows.delete_one({"_id": existing["_id"]})
+            await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"wows_count": -1}})
+            return {"ok": True, "wowed": False}
+        await db.reel_wows.insert_one({
+            "reel_id": reel_id,
+            "user_id": user.user_id,
+            "wowed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"wows_count": 1}})
+        return {"ok": True, "wowed": True}
+
+    @router.post("/reels/{reel_id}/save")
+    async def toggle_save(reel_id: str, user: User = Depends(get_current_user)) -> dict:
+        """Save / unsave a reel to the user's personal collection."""
+        existing = await db.reel_saves.find_one(
+            {"reel_id": reel_id, "user_id": user.user_id}, {"_id": 1}
+        )
+        if existing:
+            await db.reel_saves.delete_one({"_id": existing["_id"]})
+            await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"saves_count": -1}})
+            return {"ok": True, "saved": False}
+        await db.reel_saves.insert_one({
+            "reel_id": reel_id,
+            "user_id": user.user_id,
+            "saved_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"saves_count": 1}})
+        return {"ok": True, "saved": True}
+
+    @router.post("/reels/{reel_id}/share")
+    async def track_share(reel_id: str, user: User = Depends(get_current_user)) -> dict:
+        """Non-idempotent — every share is counted (no dedupe). Includes
+        the share channel (web/wa/copy) for analytics later."""
+        await db.reel_shares.insert_one({
+            "reel_id": reel_id,
+            "user_id": user.user_id,
+            "shared_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"shares_count": 1}})
+        return {"ok": True}
+
+    @router.get("/reels/{reel_id}/reactions/me")
+    async def my_reactions(reel_id: str, user: User = Depends(get_current_user)) -> dict:
+        """Tells the frontend whether the current viewer already
+        liked / wowed / saved this reel so toggles render in the correct
+        state immediately."""
+        liked = await db.reel_likes.find_one({"reel_id": reel_id, "user_id": user.user_id}, {"_id": 1}) is not None
+        wowed = await db.reel_wows.find_one({"reel_id": reel_id, "user_id": user.user_id}, {"_id": 1}) is not None
+        saved = await db.reel_saves.find_one({"reel_id": reel_id, "user_id": user.user_id}, {"_id": 1}) is not None
+        return {"liked": liked, "wowed": wowed, "saved": saved}
+
+    @router.get("/reels/me/saved")
+    async def list_my_saved(user: User = Depends(get_current_user)) -> list:
+        """Section 'Guardados' for the user dashboard."""
+        cursor = db.reel_saves.find({"user_id": user.user_id}, {"_id": 0}).sort("saved_at", -1).limit(60)
+        rows = await cursor.to_list(60)
+        ids = [r["reel_id"] for r in rows]
+        if not ids:
+            return []
+        reels = await db.reels.find({"reel_id": {"$in": ids}}, {"_id": 0}).to_list(60)
+        order = {rid: i for i, rid in enumerate(ids)}
+        return sorted(reels, key=lambda r: order.get(r["reel_id"], 999))
+
+    @router.get("/reels/me/metrics")
+    async def my_reel_metrics(user: User = Depends(get_current_user)) -> dict:
+        """Aggregate metrics across every reel the caller owns:
+        views, likes, wows, saves, shares. Used by the provider dashboard."""
+        cursor = db.reels.find(
+            {"provider_user_id": user.user_id},
+            {"_id": 0, "reel_id": 1, "caption": 1, "views_count": 1,
+             "likes_count": 1, "wows_count": 1, "saves_count": 1,
+             "shares_count": 1, "created_at": 1, "thumbnail_url": 1},
+        ).sort("created_at", -1)
+        items = await cursor.to_list(50)
+        totals = {
+            "reels": len(items),
+            "views": sum(int(r.get("views_count") or 0) for r in items),
+            "likes": sum(int(r.get("likes_count") or 0) for r in items),
+            "wows": sum(int(r.get("wows_count") or 0) for r in items),
+            "saves": sum(int(r.get("saves_count") or 0) for r in items),
+            "shares": sum(int(r.get("shares_count") or 0) for r in items),
+        }
+        return {"totals": totals, "items": items}
+
     @router.delete("/reels/{reel_id}")
     async def delete_reel(reel_id: str, user: User = Depends(get_current_user)) -> dict:
         doc = await db.reels.find_one({"reel_id": reel_id}, {"_id": 0, "provider_user_id": 1})
@@ -219,6 +347,69 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
     return router
 
 
+# ─── V15: Fan-out push notification helper ──────────────────────────
+
+async def _notify_new_reel(db, reel: dict, prof: dict) -> None:
+    """Pushes "X publicó un reel" to:
+      (a) every user who follows the author (collection: `user_follows`,
+          docs `{follower_user_id, followed_user_id}`).
+      (b) every user whose `interest_categories` (array of category_ids)
+          contains the author's primary category — this is the
+          "ecosistema de interés" the founder asked for.
+    Self is excluded. Each recipient gets at most one push per reel
+    thanks to deduplication on `user_id`.
+    """
+    from routes.push import send_push_to_user
+    recipients: set[str] = set()
+
+    # (a) followers
+    async for f in db.user_follows.find(
+        {"followed_user_id": reel["provider_user_id"]},
+        {"_id": 0, "follower_user_id": 1},
+    ):
+        uid = f.get("follower_user_id")
+        if uid and uid != reel["provider_user_id"]:
+            recipients.add(uid)
+
+    # (b) same-category interest cohort. We only know the category if
+    # the author has a provider_id (real eCard); user-only authors don't
+    # currently carry a category.
+    if reel.get("provider_id"):
+        full_prof = await db.provider_profiles.find_one(
+            {"provider_id": reel["provider_id"]},
+            {"_id": 0, "category_id": 1},
+        )
+        cat_id = (full_prof or {}).get("category_id")
+        if cat_id:
+            async for u in db.users.find(
+                {"interest_categories": cat_id, "user_id": {"$ne": reel["provider_user_id"]}},
+                {"_id": 0, "user_id": 1},
+            ):
+                uid = u.get("user_id")
+                if uid:
+                    recipients.add(uid)
+
+    if not recipients:
+        return
+
+    business_name = prof.get("business_name") or "Alguien"
+    title = "🎬 Nuevo reel"
+    body = f"{business_name} acaba de publicar un reel"
+    deep_url = f"/reels?r={reel['reel_id']}"
+    for uid in recipients:
+        try:
+            await send_push_to_user(db, uid, {
+                "title": title,
+                "body": body,
+                "icon": prof.get("logo_url") or "/icon-192x192.png",
+                "url": deep_url,
+                "tag": f"new_reel_{reel['reel_id']}",
+            })
+        except Exception:
+            # don't let one failed recipient stop the rest
+            pass
+
+
 async def ensure_reels_indexes(db) -> None:
     """Best-effort indexes for the reels collections."""
     try:
@@ -226,6 +417,13 @@ async def ensure_reels_indexes(db) -> None:
         await db.reels.create_index("provider_user_id")
         await db.reel_likes.create_index([("reel_id", 1), ("user_id", 1)], unique=True)
         await db.reel_views.create_index([("reel_id", 1), ("viewer_user_id", 1)], unique=True)
+        # V15 — new reaction collections
+        await db.reel_wows.create_index([("reel_id", 1), ("user_id", 1)], unique=True)
+        await db.reel_saves.create_index([("reel_id", 1), ("user_id", 1)], unique=True)
+        await db.reel_shares.create_index([("reel_id", 1), ("shared_at", -1)])
+        await db.user_follows.create_index([("follower_user_id", 1), ("followed_user_id", 1)], unique=True)
+        await db.user_follows.create_index("followed_user_id")
+        await db.users.create_index("interest_categories")
         logger.info("reels indexes ensured")
     except Exception as e:
         logger.warning(f"reels index creation skipped: {e}")

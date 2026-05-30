@@ -3,7 +3,41 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V14 AI Card Designer (Gemini Nano Banana)
+## Latest Update — May 30, 2026 · V15 Reels actions + metrics + fan-out notifications
+
+User: "El boton flotante de + tiene que cambiar — Subir Reel · Grabar Reel · Compartir · Me gusta · Guardar. La sección 'sugerencias para ti' no debe existir en reels. Todos los usuarios o eCards (verificados o no) pueden subir historias y reels. Métricas + emoji impresionante con efecto espectacular + notificar a seguidores + cohorte de categoría."
+
+### Backend
+- **`routes/reels.py`** ampliado:
+  - `POST /reels` ahora acepta cualquier usuario logueado (verified o no). Si no tiene `provider_profile` se crea un author sintético basado en el `users` doc (name + picture + city). Throttle: 10 reels/24h.
+  - **3 endpoints nuevos**: `POST /reels/{id}/wow` (toggle "Impresionante"), `POST /reels/{id}/save` (toggle bookmark), `POST /reels/{id}/share` (no-dedupe — cada share cuenta).
+  - **3 endpoints de consulta**: `GET /reels/{id}/reactions/me` (devuelve `{liked, wowed, saved}`), `GET /reels/me/saved` (feed de bookmarks), `GET /reels/me/metrics` (agregado views/likes/wows/saves/shares con per-reel breakdown).
+  - **Fan-out push** `_notify_new_reel`: cuando se publica un reel, dispara push a (a) todos los `user_follows.followed_user_id == author`, y (b) todos los `users.interest_categories` que contengan la `category_id` del eCard del autor. Self excluído. Best-effort.
+- Doc del reel ahora incluye `wows_count`, `saves_count`, `shares_count` desde el insert (anteriormente solo `likes_count`).
+- Índices nuevos: `reel_wows`, `reel_saves`, `reel_shares`, `user_follows`, `users.interest_categories`.
+
+### Frontend
+- **`ReelActionMenu.jsx`** nuevo (~270 líneas) — FAB contextual con fan-out vertical de 6 chips (Impresionante / Me gusta / Guardar / Compartir / Grabar Reel / Subir Reel). Cada chip con gradiente y label visible. Click-outside + Esc cierran.
+- **`ReelCameraRecorder.jsx`** nuevo (~210 líneas) — Modal full-screen para grabar video usando `MediaRecorder` + `getUserMedia`. Trasera por default, flip a frontal, timer en vivo, cap 30s, retake, caption inline (≤140), publish → POST /upload + POST /reels.
+- **Efectos visuales**:
+  - **LikeBurst** (corazón gigante con scale spring + 6 corazones pequeños orbitando hacia afuera).
+  - **WowBurst** (sparkle gigante + glow radial + 12 partículas estrella/destello orbitando + filter drop-shadow dorado). Realmente espectacular.
+- **`ReelsPage.jsx`** refactorizado:
+  - Eliminó el viejo botón flotante "+" sencillo y el right-side action rail con `Like/Share/Profile`.
+  - Las ACCIONES viven en el FAB contextual (`ReelActionMenu`).
+  - Right rail ahora son **4 `MetricPill`** (corazón / sparkles / bookmark / share) read-only mostrando los contadores en tiempo real, formateados con sufijo `k` para >999.
+  - Se mantiene el pin "Profile" en el rail para ir a la eCard del autor.
+- **`SmartActionHub.jsx`** + **`QuickActionsFAB.jsx`** — ahora ambos se ocultan en `/reels` (Nota: "sugerencias para ti no debe existir en reels"). Single source of FAB visible en esa ruta = `ReelActionMenu`.
+
+### Tests
+- `test_iter107_v15_reels_actions.py` (13 tests: 8 backend integration + 5 frontend locks).
+- Cumulative regression iter98→iter107 (omitiendo iter106 con AI real, 60s): **104/104 verde**.
+
+### Smoke screenshots
+- `/reels` viewport iPhone 17 Pro: FAB violet/fuchsia gradient en bottom-right.
+- Click → fan-out vertical de los 6 chips con labels en español. Acción Wow → burst de sparkles.
+
+## Previous Update — May 30, 2026 · V14 AI Card Designer (Gemini Nano Banana)
 
 User: "agrega una opción generar con IA, nuestra IA tiene que entender la categoría para poner fondos relacionados a la categoría y extraer la información del eCard, para no complicar al cliente, y él tiene que elegir los colores. Hagamos esto que se vea más pro." Confirmaciones: 1a (fondo completo abstracto) + 2c (3 colores con presets + custom + "Mi marca" auto-extraído del logo) + 3c (regeneración ilimitada mientras edita).
 

@@ -41,6 +41,8 @@ const HIDE_ON_PATHS = [
   /^\/verify-email/,
   /^\/install/,
   /^\/instalar/,
+  // V15 — Reels owns its own contextual FAB (ReelActionMenu).
+  /^\/reels(\/|$|\?)/,
 ];
 
 export default function QuickActionsFAB() {

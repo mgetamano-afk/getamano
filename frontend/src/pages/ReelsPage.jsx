@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Heart, Share2, ChevronLeft, Volume2, VolumeX, Loader2,
-  ShieldCheck, MapPin, Eye, Play, Plus,
+  Heart, ChevronLeft, Volume2, VolumeX, Loader2,
+  ShieldCheck, MapPin, Eye, Play, Sparkles, Bookmark, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
-import { sharePayload } from "../lib/shareUtils";
 import { buildFileUrl } from "../components/ImageUpload";
 import { resolveAvatar } from "../lib/avatar";
 import ReelCreator from "../components/ReelCreator";
 import VerifiedBadge from "../components/VerifiedBadge";
+import ReelActionMenu from "../components/ReelActionMenu";
 
 /**
  * ReelsPage — Section 89 v4 Phase E.
@@ -130,17 +130,24 @@ export default function ReelsPage() {
         {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
       </button>
 
-      {/* Floating "Create reel" — providers only */}
+      {/* V15 — Contextual reel actions live in ReelActionMenu (FAB).
+          The global QuickActionsFAB is hidden on /reels by route filter,
+          so this is the single floating control on this page. We also
+          listen for "reels:open-creator" so the menu can ask us to open
+          the upload modal. */}
+      {user && (() => {
+        if (!window._reelsCreatorListener) {
+          window._reelsCreatorListener = () => setCreatorOpen(true);
+          window.addEventListener("reels:open-creator", window._reelsCreatorListener);
+        }
+        return null;
+      })()}
       {user && (
-        <button
-          type="button"
-          onClick={() => setCreatorOpen(true)}
-          className="fixed bottom-6 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white flex items-center justify-center shadow-2xl active:scale-95"
-          data-testid="reels-create"
-          aria-label={lang === "en" ? "Create reel" : "Crear reel"}
-        >
-          <Plus className="w-6 h-6" strokeWidth={3} />
-        </button>
+        <ReelActionMenu
+          activeReel={reels[activeIdx]}
+          onAfterUpload={() => load()}
+          onAfterRecord={() => load()}
+        />
       )}
 
       {loading && (
@@ -173,11 +180,6 @@ export default function ReelsPage() {
           slideRef={(el) => { slideRefs.current[idx] = el; }}
           videoRef={(el) => { videoRefs.current[idx] = el; }}
           lang={lang}
-          onLikeChange={(liked, delta) => {
-            setReels(prev => prev.map((r, i) => i === idx
-              ? { ...r, likes_count: Math.max(0, (r.likes_count || 0) + delta), _liked: liked }
-              : r));
-          }}
         />
       ))}
 
@@ -192,35 +194,19 @@ export default function ReelsPage() {
 }
 
 // ─── Single slide ─────────────────────────────────────────────────────
-function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang, onLikeChange }) {
-  const { user } = useAuth();
-  const [liked, setLiked] = useState(!!reel._liked);
-  const [likes, setLikes] = useState(reel.likes_count || 0);
-  const [pending, setPending] = useState(false);
+function MetricPill({ Icon, value, testid }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 text-white" data-testid={testid}>
+      <Icon className="w-7 h-7 drop-shadow-lg" />
+      <span className="text-[10px] font-bold drop-shadow tabular-nums">
+        {(value || 0) > 999 ? `${(value / 1000).toFixed(1)}k` : (value || 0)}
+      </span>
+    </div>
+  );
+}
+
+function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
   const localVideoRef = useRef(null);
-
-  const onLike = async () => {
-    if (pending) return;
-    if (!user) { toast.message(lang === "en" ? "Sign in to like" : "Inicia sesión para dar like"); return; }
-    setPending(true);
-    const next = !liked;
-    setLiked(next); setLikes(n => n + (next ? 1 : -1));
-    onLikeChange(next, next ? 1 : -1);
-    try {
-      const r = await api.post(`/reels/${reel.reel_id}/like`);
-      setLiked(!!r.data?.liked);
-    } catch {
-      setLiked(liked); setLikes(reel.likes_count || 0);
-    } finally { setPending(false); }
-  };
-
-  const onShare = async () => {
-    await sharePayload({
-      title: reel.business_name || "getamano",
-      text: reel.caption || "",
-      url: `${window.location.origin}/reels?r=${reel.reel_id}`,
-    });
-  };
 
   const onTapVideo = () => {
     const v = localVideoRef.current;
@@ -283,33 +269,22 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang, onLik
         </div>
       </div>
 
-      {/* Right-side action rail */}
-      <aside className="absolute right-3 bottom-24 flex flex-col items-center gap-4">
-        <button
-          type="button"
-          onClick={onLike}
-          disabled={pending}
-          className={`flex flex-col items-center gap-0.5 transition ${liked ? "text-rose-500" : "text-white"}`}
-          data-testid={`reel-like-${reel.reel_id}`}
-        >
-          <Heart className={`w-9 h-9 drop-shadow-lg ${liked ? "fill-current" : ""}`} />
-          <span className="text-xs font-bold drop-shadow">{likes}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onShare}
-          className="flex flex-col items-center gap-0.5 text-white"
-          data-testid={`reel-share-${reel.reel_id}`}
-        >
-          <Share2 className="w-9 h-9 drop-shadow-lg" />
-        </button>
+      {/* V15 — Right-side metrics rail (READ-ONLY). Actions moved to the
+          ReelActionMenu FAB. We keep counts here so viewers see how the
+          reel is doing. The owner sees the same numbers in their
+          dashboard via /reels/me/metrics. */}
+      <aside className="absolute right-3 bottom-24 flex flex-col items-center gap-3 pointer-events-none">
+        <MetricPill Icon={Heart}     value={reel.likes_count}  testid={`reel-likes-${reel.reel_id}`} />
+        <MetricPill Icon={Sparkles}  value={reel.wows_count}   testid={`reel-wows-${reel.reel_id}`} />
+        <MetricPill Icon={Bookmark}  value={reel.saves_count}  testid={`reel-saves-${reel.reel_id}`} />
+        <MetricPill Icon={Share2}    value={reel.shares_count} testid={`reel-shares-${reel.reel_id}`} />
         {reel.provider_slug && (
           <Link
             to={`/p/${reel.provider_slug}`}
-            className="flex flex-col items-center gap-0.5 text-white"
+            className="pointer-events-auto flex flex-col items-center gap-0.5 text-white"
             data-testid={`reel-profile-${reel.reel_id}`}
           >
-            <Eye className="w-9 h-9 drop-shadow-lg" />
+            <Eye className="w-8 h-8 drop-shadow-lg" />
             <span className="text-[10px] font-bold drop-shadow">
               {lang === "en" ? "Profile" : "Perfil"}
             </span>
