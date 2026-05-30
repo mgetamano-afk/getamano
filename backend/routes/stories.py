@@ -55,13 +55,26 @@ class StickerIn(BaseModel):
 
 
 class StoryCreateIn(BaseModel):
-    image_url: str = Field(..., min_length=4, max_length=600)
+    # V15.4 — Stories ahora aceptan video además de imagen. Al menos
+    # uno de los dos campos debe estar presente.
+    image_url: Optional[str] = Field(default=None, max_length=600)
+    video_url: Optional[str] = Field(default=None, max_length=600)
+    thumbnail_url: Optional[str] = Field(default=None, max_length=600)
+    duration_s: Optional[float] = Field(default=None, ge=0, le=15.5)
     caption: Optional[str] = Field(default=None, max_length=140)
     stickers: Optional[List[StickerIn]] = Field(default=None, max_length=3)
     # Section 89 v4 — clients can post testimonial stories that tag a
     # provider. When set, the story is OWNED by the author but features
     # the tagged provider's snapshot for the "Ver perfil →" CTA.
     tagged_provider_id: Optional[str] = Field(default=None, max_length=64)
+
+    @field_validator("image_url", "video_url")
+    @classmethod
+    def _strip_empty(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        return v if len(v) >= 4 else None
 
 
 # Like-count thresholds that trigger a one-time celebration push.
