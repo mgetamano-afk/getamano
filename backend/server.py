@@ -3047,6 +3047,33 @@ async def set_owner_identity(payload: OwnerIdentityIn, user: User = Depends(get_
         raise HTTPException(status_code=404, detail="No provider profile")
     return {"ok": True, "owner_identity": payload.owner_identity}
 
+
+# ============ V16.3 — eCard cover URL (partial update) ============
+class CoverUrlIn(BaseModel):
+    cover_url: str = Field(..., max_length=2000)
+
+
+@api_router.put("/providers/me/cover")
+async def set_cover_url(payload: CoverUrlIn, user: User = Depends(get_current_user)):
+    """V16.3 — Dedicated partial-update endpoint for the eCard cover image.
+
+    PUT /providers/me requires the full ProviderProfile payload (business_name,
+    category_id, etc.) so BannerGenerator can't use it to set just the cover.
+    This endpoint sets only `cover_url` on the caller's provider_profile.
+
+    Source: BannerGenerator's "Use as eCard cover" button uploads the
+    generated banner via POST /api/upload, then calls this with the
+    returned URL.
+    """
+    result = await db.provider_profiles.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"cover_url": payload.cover_url, "updated_at": datetime.now(timezone.utc)}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="No provider profile")
+    return {"ok": True, "cover_url": payload.cover_url}
+
+
 # ============ ADS ============
 @api_router.get("/ads")
 async def list_active_ads(category: Optional[str] = None, city: Optional[str] = None):

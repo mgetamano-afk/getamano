@@ -3,7 +3,48 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V16.2 Client-side Recommendation Story (viral)
+## Latest Update — May 30, 2026 · V16.3 Banner Pro → eCard Cover
+
+Founder: "tenemos que encontrarle un rol a banner pro, se suponía que sería la portada de una eCard si la persona no tiene fondo de portada, en este momento no cumple ninguna función."
+
+### El problema
+"Banner Pro" generaba un banner 1200×630 con IA (background generado por Gemini Nano Banana) y luego solo permitía:
+- Descargar PNG
+- Publicar a la Banner Gallery (catálogo público)
+
+Pero **NUNCA** actualizaba el `cover_url` del provider_profile. Los proveedores tenían que pasar por "My Profile" → editar manualmente → pegar la URL → guardar. El feature original (banner = portada de eCard) quedó desconectado.
+
+Mientras tanto, cuando un proveedor NO tenía `cover_url`, su eCard pública mostraba un rectángulo **gris vacío** arriba del nombre. Mala primera impresión.
+
+### Solución V16.3 — dos lados conectados
+1. **Backend nuevo**: `PUT /api/providers/me/cover` — endpoint dedicado de partial update que solo acepta `{cover_url}`. Necesario porque el `PUT /providers/me` general exige el payload completo del ProviderProfile (business_name, category_id, etc.) — no sirve para un one-click action desde otra parte del UI.
+2. **Frontend `BannerGenerator.jsx`**: Botón nuevo **"Usar como portada de mi eCard"** (gradient teal/emerald) que aparece junto a "Publish to gallery" después de generar. Flow: convierte canvas a Blob → `POST /api/upload` → `PUT /providers/me/cover` con el URL retornado. Badge teal "Cover updated" reemplaza el botón al éxito. State `savedAsCover` se resetea al regenerar.
+3. **Frontend `ProviderECard.jsx`**: Cascada de fallback para el cover:
+   1. `p.cover_url` (manual del provider, o establecido vía V16.3)
+   2. `p.gallery[0].url` (primera foto real de su trabajo)
+   3. `/api/og-image/{slug}.png` (auto-card 1200×630 con foto hero + nombre + verified badge — el mismo que se sirve a los crawlers sociales en V16)
+   - Nunca más gray-200 vacío. data-testid `ecard-cover-img-{cover|gallery|og}` permite QA visual de qué nivel disparó.
+
+### UX final
+- Proveedor entra a Banner Pro → elige color/estilo/keywords → "Generar banner" → espera ~20s (Gemini Nano Banana) → ve el banner con QR code → **un click en "Usar como portada de mi eCard"** → toast verde "¡Banner activado como portada de tu eCard! 🎉" → su eCard pública ahora muestra el banner como cover header.
+- Si NUNCA pasa por Banner Pro, su eCard cover sigue auto-fallback a gallery[0] o al OG card auto-generado. Lo importante es que **siempre se ve algo on-brand**.
+
+### Endpoints nuevos
+- `PUT /api/providers/me/cover` (auth) — body `{cover_url: str}`, response `{ok: true, cover_url}`. 401 sin token.
+
+### Tests
+- `test_iter114_v16_3_banner_as_cover.py` (6 tests):
+  - 3 integration: endpoint partial update no wipea otros fields, requiere auth, OG endpoint sigue sirviendo.
+  - 3 frontend source locks: cascade fallback, botón + endpoint correcto, reset al regenerar.
+- Suite cumulativa iter102→iter114: **118/118 verde** (3 errors en iter110 son flaky por `ffmpeg` system binary perdido al pod restart — no relacionado a V16.3; reinstalando en background).
+
+### Smoke validation E2E (Playwright)
+1. Login `demo.provider@getamano.com` → Banner Pro tab.
+2. Click "Generar banner" → espera 20s → ve preview "María's Cleaning Services" con QR.
+3. Click "Use as eCard cover" → toast "Banner set as your eCard cover 🎉" → badge teal "Cover updated".
+4. Visitar `/services/maria-cleaning-services-sallisaw-ok` → eCard ahora muestra el banner como portada header (vs. gris antes).
+
+## Previous Update — May 30, 2026 · V16.2 Client-side Recommendation Story (viral)
 
 Founder: "aplica tu sugerencia" (en respuesta a la propuesta c+d+e):
 - **(c)** Híbrido: caja de comentario opcional, label del botón se adapta ("Publicar mi recomendación" vs "Compartir tal cual").

@@ -247,9 +247,29 @@ export default function ProviderECard() {
           </div>
         )}
 
-        {/* Cover */}
-        <div className="relative h-48 md:h-64 rounded-2xl overflow-hidden bg-slate-200">
-          {p.cover_url && <img src={p.cover_url} alt="cover" className="w-full h-full object-cover" />}
+        {/* Cover — V16.3 fallback cascade:
+            1) Explicit cover_url (provider uploaded one, or used "Use as
+               cover" from Banner Pro).
+            2) gallery[0].url — their first real work photo.
+            3) /api/og-image/{slug}.png — auto-generated card (hero =
+               gallery[0]/AI bg/gradient, plus name + verified badge).
+            Never falls back to bare gray. The OG image endpoint always
+            returns something on-brand and on-identity. */}
+        <div className="relative h-48 md:h-64 rounded-2xl overflow-hidden bg-slate-200" data-testid="ecard-cover">
+          {(() => {
+            const galleryFirst = (p.gallery && p.gallery.length > 0) ? p.gallery[0].url : null;
+            const ogCover = p.slug ? `${(process.env.REACT_APP_BACKEND_URL || "")}/api/og-image/${p.slug}.png` : null;
+            const effectiveCover = p.cover_url || galleryFirst || ogCover;
+            const source = p.cover_url ? "cover" : (galleryFirst ? "gallery" : (ogCover ? "og" : "none"));
+            return effectiveCover ? (
+              <img
+                src={effectiveCover}
+                alt={`${p.business_name} portada`}
+                className="w-full h-full object-cover"
+                data-testid={`ecard-cover-img-${source}`}
+              />
+            ) : null;
+          })()}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
         </div>
 

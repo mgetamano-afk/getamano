@@ -58,6 +58,8 @@ export default function BannerGenerator({ profile }) {
   const [qrUrl, setQrUrl] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishedShareId, setPublishedShareId] = useState(""); // tracks current published instance
+  const [savingAsCover, setSavingAsCover] = useState(false); // V16.3 — "Use as eCard cover"
+  const [savedAsCover, setSavedAsCover] = useState(false);
 
   const slug = profile?.slug || "";
   const businessName = profile?.business_name || "Tu Negocio";
@@ -84,6 +86,7 @@ export default function BannerGenerator({ profile }) {
     setGenerating(true);
     setComposedUrl("");
     setPublishedShareId(""); // new generation invalidates prior published instance
+    setSavedAsCover(false); // V16.3 — new banner means cover-save needs re-click
     try {
       const { data } = await api.post("/providers/me/generate-banner", {
         color,
@@ -305,6 +308,46 @@ export default function BannerGenerator({ profile }) {
     }
   };
 
+  // V16.3 — Set the generated banner as the provider's eCard cover. This is
+  // the "real" job of Banner Pro that was missing: the AI banner becomes the
+  // 1200×630 header of the public eCard with one click. Reuses the same
+  // /api/upload endpoint as publishToGallery, then PATCHes the
+  // provider_profile.cover_url field.
+  const useAsCover = async () => {
+    if (!composedUrl) return;
+    setSavingAsCover(true);
+    try {
+      const resp = await fetch(composedUrl);
+      const blob = await resp.blob();
+      const file = new File([blob], `${slug || "cover"}-${Date.now()}.png`, { type: "image/png" });
+      const fd = new FormData();
+      fd.append("file", file);
+      const up = await api.post("/upload", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 60000,
+      });
+      const imageUrl = up.data?.url;
+      if (!imageUrl) throw new Error("upload failed");
+      // V16.3 — dedicated partial-update endpoint (the full PUT /providers/me
+      // requires business_name, category_id, etc.). PUT /providers/me/cover
+      // only takes { cover_url } and updates that single field.
+      await api.put("/providers/me/cover", { cover_url: imageUrl });
+      setSavedAsCover(true);
+      toast.success(
+        lang === "en"
+          ? "Banner set as your eCard cover 🎉"
+          : "¡Banner activado como portada de tu eCard! 🎉",
+      );
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.detail
+          || (lang === "en" ? "Couldn't set as cover. Try again." : "No se pudo activar como portada."),
+      );
+    } finally {
+      setSavingAsCover(false);
+    }
+  };
+
   return (
     <div data-testid="banner-generator">
       <div className="flex items-start gap-3 mb-5 flex-wrap">
@@ -451,6 +494,27 @@ export default function BannerGenerator({ profile }) {
             <Link to={lang === "en" ? "/banner-gallery" : "/galeria-banners"} className="ml-1 underline inline-flex items-center gap-1 hover:text-emerald-800" data-testid="banner-published-view-link">
               <Eye className="w-3 h-3" /> {lang === "en" ? "View" : "Ver"}
             </Link>
+          </div>
+        )}
+        {composedUrl && !savedAsCover && (
+          <button
+            type="button"
+            onClick={useAsCover}
+            disabled={savingAsCover}
+            className="inline-flex items-center gap-2 px-5 h-11 rounded-full bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white text-sm font-semibold shadow-md disabled:opacity-60"
+            data-testid="banner-use-as-cover-btn"
+            title={lang === "en" ? "Set this banner as your eCard cover" : "Activa este banner como portada de tu eCard"}
+          >
+            {savingAsCover ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+            {savingAsCover
+              ? (lang === "en" ? "Saving…" : "Guardando…")
+              : (lang === "en" ? "Use as eCard cover" : "Usar como portada de mi eCard")}
+          </button>
+        )}
+        {savedAsCover && (
+          <div className="inline-flex items-center gap-2 px-4 h-11 rounded-full bg-teal-50 text-teal-700 text-sm border border-teal-200" data-testid="banner-saved-as-cover-badge">
+            <Check className="w-4 h-4" />
+            {lang === "en" ? "Cover updated" : "Portada activa"}
           </div>
         )}
       </div>
