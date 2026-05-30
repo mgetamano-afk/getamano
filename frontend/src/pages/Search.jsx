@@ -15,6 +15,7 @@ import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import CategoryTreePicker from "../components/CategoryTreePicker";
 import LocationPrompt, { readSavedLocation, saveLocation, clearLocation } from "../components/LocationPrompt";
+import VerifiedBadge from "../components/VerifiedBadge";
 import useGeolocation from "../hooks/useGeolocation";
 import useRefreshable from "../hooks/useRefreshable";
 import { trackSearch } from "../lib/analytics";
@@ -581,7 +582,7 @@ export default function Search() {
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {p.verified && (
                               <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#03045E", border: "1px solid #A6E1DA" }}>
-                                <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                                <VerifiedBadge size={10} /> Verificado
                               </span>
                             )}
                             {p.video_url && (

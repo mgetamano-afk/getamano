@@ -112,6 +112,22 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             raise HTTPException(status_code=404, detail="Reel no encontrado.")
         return doc
 
+    # Section 89 v9 Part 2 — public reels by provider slug. Always
+    # returns an array (never 404s) so the eCard page never crashes.
+    @router.get("/providers/by-slug/{slug}/reels")
+    async def list_reels_by_slug(slug: str, limit: int = 12) -> list:
+        prof = await db.provider_profiles.find_one(
+            {"slug": slug, "is_active": True},
+            {"_id": 0, "user_id": 1},
+        )
+        if not prof:
+            return []
+        limit = max(1, min(50, limit))
+        return await db.reels.find(
+            {"provider_user_id": prof["user_id"], "is_public": True},
+            {"_id": 0},
+        ).sort("created_at", -1).limit(limit).to_list(limit)
+
     @router.post("/reels/{reel_id}/view")
     async def track_view(reel_id: str, user: User = Depends(get_current_user)) -> dict:
         """Increment view count once per (reel, viewer) per 24h."""

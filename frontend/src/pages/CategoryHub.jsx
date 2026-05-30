@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { ShieldCheck, Star, MapPin, Award, ArrowRight, ChevronDown, ChevronUp, MessageSquare, Sparkles, ArrowLeft } from "lucide-react";
+import VerifiedBadge from "../components/VerifiedBadge";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../components/seo/SeoHead";
@@ -522,7 +523,7 @@ function ProviderTile({ p, lang }) {
         )}
         {p.verification_status === "approved" && (
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-600 text-white text-[11px] font-semibold">
-            <ShieldCheck className="w-3 h-3" /> {lang === "es" ? "Verificado" : "Verified"}
+            <VerifiedBadge size={12} /> {lang === "es" ? "Verificado" : "Verified"}
           </span>
         )}
       </div>

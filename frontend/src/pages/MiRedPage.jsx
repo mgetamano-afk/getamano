@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, UserPlus, MapPin, Star, ShieldCheck, DollarSign } from "lucide-react";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
 import FollowButton from "../components/FollowButton";
@@ -193,7 +194,7 @@ function NetworkRow({ u, lang, kind }) {
               {isProvider ? prof.business_name : u.name}
             </span>
             {prof?.verification_status === "approved" && (
-              <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#03045E" }} />
+              <VerifiedBadge size={14} />
             )}
           </div>
           <div className="text-[12px] text-slate-500 truncate flex items-center gap-1.5">

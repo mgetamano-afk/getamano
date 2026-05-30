@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2, Heart, Clock, Phone, Flame, Sparkles } from "lucide-react";
+import VerifiedBadge from "./VerifiedBadge";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
@@ -266,7 +267,7 @@ function StoryTile({ group, fresh, onOpen }) {
         </div>
         <span className="text-[11px] font-medium text-slate-700 max-w-[72px] truncate inline-flex items-center gap-0.5">
           <span className="truncate">{g.business_name}</span>
-          {g.verified && <ShieldCheck className="w-2.5 h-2.5 flex-shrink-0 text-emerald-500" />}
+          {g.verified && <VerifiedBadge size={10} />}
         </span>
       </button>
 
@@ -539,7 +540,7 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
               <div className="min-w-0">
                 <p className="text-white font-semibold text-sm truncate drop-shadow-md">
                   {group.business_name}
-                  {active.verified && <ShieldCheck className="w-3 h-3 inline-block ml-1 text-emerald-400" />}
+                  {active.verified && <VerifiedBadge size={12} className="inline-block ml-1 align-middle" />}
                 </p>
                 <p className="text-white/70 text-[11px] drop-shadow-md">{lang === "en" ? "Tap to view" : "Toca para ver"}</p>
               </div>

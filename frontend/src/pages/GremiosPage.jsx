@@ -10,6 +10,7 @@ import { useI18n } from "../contexts/I18nContext";
 import EmptyState from "../components/EmptyState";
 import { buildFileUrl } from "../components/ImageUpload";
 import { resolveAvatar } from "../lib/avatar";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 /**
  * GremiosPage — Section 89 v4.
@@ -463,7 +464,7 @@ function GremioPostCard({ post, lang, canPost }) {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-[#03045E] truncate inline-flex items-center gap-1">
             {author.business_name || author.name || "—"}
-            {author.provider_verified && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
+            {author.provider_verified && <VerifiedBadge size={14} />}
           </p>
           <p className="text-[11px] text-slate-500">
             {relTime(post.created_at)}

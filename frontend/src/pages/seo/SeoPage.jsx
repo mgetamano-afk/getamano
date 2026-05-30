@@ -3,6 +3,7 @@ import { Link, useParams, useLocation } from "react-router-dom";
 import { api } from "../../lib/api";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import VerifiedBadge from "../../components/VerifiedBadge";
 import { SeoHead, Breadcrumbs, buildBreadcrumbsJsonLd } from "../../components/seo/SeoHead";
 import OwnerIdentityBadge from "../../components/OwnerIdentityBadge";
 import { ShieldCheck, Star, MapPin, Phone, MessageCircle, Award } from "lucide-react";
@@ -209,7 +210,7 @@ export default function SeoPage() {
                     {p.cover_url && <img src={p.cover_url} alt={`${p.business_name} - ${category.name_es} en ${city.name}`} loading="lazy" className="w-full h-full object-cover" />}
                     {p.verification_status === "approved" && (
                       <span className="absolute top-2 left-2 badge-verified" style={{ fontSize: "11px" }}>
-                        <ShieldCheck className="w-3 h-3" /> Verificado
+                        <VerifiedBadge size={12} /> Verificado
                       </span>
                     )}
                   </div>

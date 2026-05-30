@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { Heart, Search, ShieldCheck, Star } from "lucide-react";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { toast } from "sonner";
 import ChambasNearby from "../components/ChambasNearby";
 
@@ -62,7 +63,7 @@ export default function ClientDashboard() {
                     <Link to={`/provider/${p.slug}`} className="font-display font-semibold text-slate-900 hover:text-blue-600 block truncate">{p.business_name}</Link>
                     <p className="text-sm text-slate-500 truncate">{p.city}{p.state ? `, ${p.state}` : ""}</p>
                     <div className="flex items-center gap-2 mt-1 text-xs">
-                      {p.verification_status === "approved" && <span className="badge-verified"><ShieldCheck className="w-3 h-3" /> Verificado</span>}
+                      {p.verification_status === "approved" && <span className="badge-verified"><VerifiedBadge size={12} /> Verificado</span>}
                       {p.rating_count > 0 && <span className="flex items-center gap-0.5 text-slate-600"><Star className="w-3 h-3 fill-orange-500 text-orange-500" /> {p.rating_avg.toFixed(1)}</span>}
                     </div>
                   </div>

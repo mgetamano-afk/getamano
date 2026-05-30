@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import TrustScore, { calcTrustScore } from "./TrustScore";
 import { buildFileUrl } from "./ImageUpload";
+import VerifiedBadge from "./VerifiedBadge";
 
 /**
  * BarrioOverlay — Section 89 v4 unified.
@@ -160,8 +161,8 @@ export function FeaturedStrip({ providers, loading, city }) {
                 <img src={buildFileUrl(p.cover_url)} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
               )}
               {p.provider_verified && (
-                <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold">
-                  <ShieldCheck className="w-2.5 h-2.5" />
+                <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 h-5 px-1.5 rounded-full bg-white/95 text-[#03045E] text-[9px] font-bold shadow-sm">
+                  <VerifiedBadge size={10} />
                   {lang === "en" ? "Verified" : "Verificado"}
                 </span>
               )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin, ExternalLink, ShieldCheck } from "lucide-react";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
 import EmptyState from "../components/EmptyState";
@@ -108,7 +109,7 @@ function ECardTile({ provider, lang }) {
             className="absolute top-2 left-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/95 backdrop-blur text-[10px] font-extrabold tracking-wide"
             style={{ color: "#03045E" }}
           >
-            <ShieldCheck className="w-3 h-3" />
+            <VerifiedBadge size={12} />
             {lang === "en" ? "VERIFIED" : "VERIFICADO"}
           </span>
         )}

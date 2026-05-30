@@ -1,0 +1,38 @@
+{
+  "summary": "V9 user profile (Parts 1-4) end-to-end verification complete. Backend: 134/134 tests green (113 prior + 11 new iter99 e2e + others); auth, profile CRUD, avatar/photos upload+delete, username uniqueness/format, public/private profile, /providers/by-slug/{slug}/reels soft-fail, /providers/me with offers_home_service persistence all working. Frontend: /profile renders with header/photos/about tabs/edit/sell-CTA; public /u/:username renders read-only with @username/GM code/3 tabs; eCard /p/maria-... renders cleanly with the new verified badge; provider dashboard ?tab=perfil shows the new 'Ofrezco servicio a domicilio' toggle and no longer shows the 'Identidad del negocio' picker; toggling ON + saving propagates to the search card as the green '🏠 A domicilio' (At-h) chip. No regressions observed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter98_v9_user_profile.py",
+    "/app/backend/tests/test_iter99_v9_e2e.py",
+    "/app/test_reports/pytest/iter98_results.xml",
+    "/app/test_reports/pytest/iter99_results.xml",
+    "/app/test_reports/pytest/regression_iter83_99.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ProviderDashboard.jsx is large (>700 lines) — consider splitting the 'perfil' tab form into a sub-component for maintainability (not blocking).",
+    "Provider-side home-service toggle lives on the perfil tab (?tab=perfil). UI flow is correct; consider adding a 'home service' quick-action shortcut on the dashboard 'Home' tab for discoverability (UX nit, not a bug).",
+    "Frontend public verify badge artwork (verify-badge-{64,128,256}.png) is correctly referenced and rendered on eCard ('Verified by getamano'). No broken images detected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter99_v9_e2e.py (new — 11 e2e integration tests covering avatar/profile/photos/public-private/home-service/eCard reels/search)"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "test_credentials": "admin@getamano.com/admin123, demo.provider@getamano.com/provider123, demo.client@getamano.com/client123 — all working",
+  "seed_data_creation": "No new seed required; existing maría demo provider + Carlos demo client used. All test artifacts (TEST_ usernames, ephemeral photos) cleaned up by the tests themselves.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "V9 Parts 1-4 are fully verified. New iter99 e2e suite (/app/backend/tests/test_iter99_v9_e2e.py) is the authoritative regression for: avatar upload (POST /users/me/avatar), profile PUT bio/username/social_links with @-stripping, 409 on username conflict, photos lifecycle, public/private toggle, anonymous /users/{username}/profile privacy strip, providers/me PUT offers_home_service flag round-trip to /providers/by-slug/{slug}, eCard reels endpoint never 404. The provider-dashboard offers_home_service toggle is on tab=perfil (route /dashboard/provider?tab=perfil) — not on the default 'dashboard' tab. Frontend smoke screenshots saved to /app/.screenshots/. Note: the provider's auto-generated username for demo.provider is 'maragonzlez_3526' (changes if name changes); use GM-1335 as a stable identifier.",
+  "rca of the issue": "n/a — no defects found in this iteration. Initial test script confusion (PUT /provider/profile 404, /search/providers 404, toggle missing on /dashboard/provider default tab) was test-side, not app-side: correct endpoints are PUT /api/providers/me + GET /api/providers; the home-service toggle lives inside the 'perfil' sub-tab of the provider dashboard. All resolved within the test file."
+}

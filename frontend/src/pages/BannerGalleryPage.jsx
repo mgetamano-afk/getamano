@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Header from "../components/Header";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
@@ -268,7 +269,7 @@ export default function BannerGalleryPage() {
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900 truncate group-hover/name:text-teal-700 transition">
                             {b.business_name}
-                            {b.verified && <ShieldCheck className="w-3.5 h-3.5 inline-block ml-1 text-emerald-500" />}
+                            {b.verified && <VerifiedBadge size={14} className="inline-block ml-1 align-middle" />}
                           </p>
                           <p className="text-xs text-slate-500 truncate">
                             {[b.city, b.state].filter(Boolean).join(", ") || "—"}
@@ -339,7 +340,7 @@ export default function BannerGalleryPage() {
                 <div className="min-w-0 flex-1">
                   <h3 className="font-display font-bold text-xl text-slate-900 truncate">
                     {modal.business_name}
-                    {modal.verified && <ShieldCheck className="w-5 h-5 inline-block ml-1 text-emerald-500" />}
+                    {modal.verified && <VerifiedBadge size={20} className="inline-block ml-1 align-middle" />}
                   </h3>
                   <p className="text-sm text-slate-500 mt-0.5">
                     {[modal.city, modal.state].filter(Boolean).join(", ") || "—"} · {STYLE_FILTERS.find((s) => s.id === modal.style)?.[lang === "en" ? "labelEn" : "labelEs"] || modal.style}

@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useI18n } from "../contexts/I18nContext";
 import { api } from "../lib/api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { Search, MapPin, Sparkles, ShieldCheck, Star, ArrowRight, Heart, TrendingUp, ChevronLeft, ChevronRight, CheckCircle2, ChevronDown, Globe2, Award, Video, Play, Smartphone, Check } from "lucide-react";
 import FoundingCounter from "../components/FoundingCounter";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
@@ -20,6 +21,8 @@ import LiveActivityTicker from "../components/LiveActivityTicker";
 import PushOptInBanner from "../components/PushOptInBanner";
 import ExitIntentLeadCapture from "../components/ExitIntentLeadCapture";
 import BannerOfTheWeekCard from "../components/BannerOfTheWeekCard";
+import V8EnrichmentSections from "../components/V8EnrichmentSections";
+import AboutNavBar from "../components/AboutNavBar";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1400";
 
@@ -62,6 +65,8 @@ function Typewriter({ text, speed = 70, className }) {
 export default function Landing() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAboutRoute = location.pathname.startsWith("/about");
   const isPwaInstalled = useIsPwaInstalled();
   const [q, setQ] = useState("");
   const [loc, setLoc] = useState("");
@@ -151,6 +156,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
+      {isAboutRoute && <AboutNavBar />}
       <Header />
 
       {/* FOUNDING MEMBER BANNER — Section 74 (Founder100 redefinition).
@@ -430,7 +436,7 @@ export default function Landing() {
               <Link key={p.provider_id} to={`/proveedor/${p.slug}`} className={`card-lift bg-white rounded-2xl border ${p.plan === "premium" ? "border-[#0077B6]/40 shadow-[#0077B6]/15 shadow-xl" : "border-slate-200"} overflow-hidden block`} data-testid={`featured-provider-${p.slug}`}>
                 <div className="h-40 bg-slate-100 relative">
                   {p.cover_url && <img src={p.cover_url} alt={p.business_name} className="w-full h-full object-cover" loading="lazy" />}
-                  <div className="absolute top-3 left-3 badge-verified"><ShieldCheck className="w-3.5 h-3.5" /> Verificado</div>
+                  <div className="absolute top-3 left-3 badge-verified"><VerifiedBadge size={14} /> Verificado</div>
                   {p.owner_identity && <span className="absolute top-3 right-3"><OwnerIdentityBadge identity={p.owner_identity} size="sm" /></span>}
                 </div>
                 <div className="p-5">
@@ -540,7 +546,7 @@ export default function Landing() {
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         {p.verification_status === "approved" && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: "#EBF8F7", color: "#03045E", border: "1px solid #A6E1DA" }}>
-                            <ShieldCheck className="w-2.5 h-2.5" /> Verificado
+                            <VerifiedBadge size={10} /> Verificado
                           </span>
                         )}
                         <OwnerIdentityBadge identity={p.owner_identity} size="sm" />
@@ -600,6 +606,9 @@ export default function Landing() {
 
       {/* Section 28 — Download badges + QR strip */}
       <DownloadBadgesSection />
+
+      {/* Section 89 v8 — Landing enrichment block (Verifica/Tools/Reach/Table/Who/CTA) */}
+      <V8EnrichmentSections />
 
       <ProviderCTASection />
 

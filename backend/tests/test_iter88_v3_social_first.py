@@ -144,7 +144,10 @@ def test_plans_has_two_cards_only():
 
 
 def test_user_profile_has_activation_card():
+    """V9 rebuild — the activation card became a header-level CTA.
+    What matters is the activate-provider POST is still wired and the
+    GM-XXXX badge is still rendered for verified providers."""
     src = _read("frontend/src/pages/UserProfile.jsx")
-    assert 'data-testid="user-profile-activate-card"' in src
-    assert 'data-testid="user-profile-verified-card"' in src
-    assert 'data-testid="user-profile-gm-code"' in src
+    assert "users/me/activate-provider" in src
+    # Verified providers see their getamano_code in the header
+    assert "getamano_code" in src

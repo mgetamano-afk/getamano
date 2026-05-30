@@ -154,6 +154,9 @@ export default function ProviderDashboard() {
     photos: p.photos || [], gallery: p.gallery || [],
     social: p.social || {}, price_range: p.price_range || "quote",
     owner_identity: p.owner_identity ?? null,
+    // Section 89 v9 Part 4C — surfaces the "Servicio a domicilio" badge
+    // on Search + eCard when on. Independent from is_home_based.
+    offers_home_service: !!p.offers_home_service,
   });
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -440,33 +443,10 @@ export default function ProviderDashboard() {
                   </div>
                 </Section>
 
-                <Section title="Identidad del negocio (opcional)">
-                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {[
-                      { id: "latino", label: "Dueño Latino", emoji: "🤝", bg: "#E1F5EE", color: "#03045E", border: "#A6E1DA" },
-                      { id: "american", label: "Dueño Americano", emoji: "🤝", bg: "#E6F1FB", color: "#185FA5", border: "#BFD9F2" },
-                      { id: null, label: "Prefiero no indicarlo", emoji: "", bg: "#F8FCFD", color: "#475569", border: "#BCC5CC" },
-                    ].map(opt => {
-                      const active = form.owner_identity === opt.id;
-                      return (
-                        <button
-                          key={String(opt.id)}
-                          type="button"
-                          onClick={() => update("owner_identity", opt.id)}
-                          className={`p-3 rounded-2xl border-2 text-left transition ${active ? "shadow-sm" : "hover:border-slate-300"}`}
-                          style={{ borderColor: active ? opt.color : opt.border, backgroundColor: active ? opt.bg : "white" }}
-                          data-testid={`form-owner-identity-${opt.id || "none"}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {opt.emoji && <span className="text-lg">{opt.emoji}</span>}
-                            <span className="font-medium text-sm" style={{ color: active ? opt.color : "#0F172A" }}>{opt.label}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="md:col-span-2 text-xs text-slate-500">getamano sirve a toda la comunidad latina. Esta selección es opcional, sin banderas ni etiquetas por país.</p>
-                </Section>
+                {/* Section 89 v9 Part 3 — "Identidad del negocio" UI
+                    removed per user request. The `owner_identity` field
+                    is preserved in the data model for backward compat
+                    but no longer surfaced for new edits. */}
 
                 <Section title="Tipo de operación y ubicación">
                   <div className="md:col-span-2 grid grid-cols-2 gap-3">
@@ -479,6 +459,26 @@ export default function ProviderDashboard() {
                       <div className="font-medium text-slate-900 text-sm">Desde casa / móvil</div>
                     </button>
                   </div>
+                  {/* Section 89 v9 Part 4C — Home service toggle */}
+                  <label className="md:col-span-2 flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-400 cursor-pointer" data-testid="form-offers-home-service">
+                    <span>
+                      <span className="font-medium text-slate-900 text-sm inline-flex items-center gap-1.5">
+                        🏠 Ofrezco servicio a domicilio
+                      </span>
+                      <span className="block text-xs text-slate-500 mt-0.5">
+                        Mostraremos el badge <strong>"A domicilio"</strong> en tu eCard y en los resultados de búsqueda.
+                      </span>
+                    </span>
+                    <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${form.offers_home_service ? "bg-emerald-500" : "bg-slate-300"}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!form.offers_home_service}
+                        onChange={(e) => update("offers_home_service", e.target.checked)}
+                        className="sr-only"
+                      />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${form.offers_home_service ? "translate-x-6" : "translate-x-1"}`} />
+                    </span>
+                  </label>
                   {!form.is_home_based && (
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Buscar dirección</label>

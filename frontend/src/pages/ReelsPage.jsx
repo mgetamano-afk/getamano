@@ -12,6 +12,7 @@ import { sharePayload } from "../lib/shareUtils";
 import { buildFileUrl } from "../components/ImageUpload";
 import { resolveAvatar } from "../lib/avatar";
 import ReelCreator from "../components/ReelCreator";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 /**
  * ReelsPage — Section 89 v4 Phase E.
@@ -263,7 +264,7 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang, onLik
           <div className="flex-1 min-w-0 text-white">
             <p className="font-bold text-sm inline-flex items-center gap-1">
               {reel.business_name}
-              {reel.verified && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
+              {reel.verified && <VerifiedBadge size={14} />}
             </p>
             <p className="text-[11px] text-white/70 inline-flex items-center gap-1.5">
               {reel.getamano_code && <span className="font-mono">{reel.getamano_code}</span>}

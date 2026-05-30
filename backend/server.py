@@ -269,6 +269,10 @@ class ProviderProfileIn(BaseModel):
     social: dict = {}
     price_range: Optional[str] = "quote"
     owner_identity: Optional[Literal["latino", "american"]] = None
+    # Section 89 v9 Part 4C — provider offers in-person service at the
+    # customer's address. Independent from `is_home_based` (which is
+    # about WHERE the provider operates).
+    offers_home_service: bool = False
 
 class ProviderProfile(ProviderProfileIn):
     provider_id: str
@@ -863,6 +867,12 @@ async def seed():
         await _physical_cards_indexes(db)
     except Exception as e:
         logger.warning(f"physical cards indexes warn: {e}")
+
+    # Section 89 v9 Part 1 — User profile + photos indexes.
+    try:
+        await _user_profile_indexes(db)
+    except Exception as e:
+        logger.warning(f"user profile indexes warn: {e}")
 
     if await db.categories.count_documents({}) == 0:
         docs = []
@@ -9776,6 +9786,10 @@ from routes.physical_cards import (  # noqa: E402
     ensure_physical_cards_indexes as _physical_cards_indexes,
 )
 from routes.admin_overview import make_router as _make_admin_overview_router  # noqa: E402
+from routes.user_profile import (  # noqa: E402
+    make_router as _make_user_profile_router,
+    ensure_user_profile_indexes as _user_profile_indexes,
+)
 
 api_router.include_router(
     _make_community_router(
@@ -9976,6 +9990,11 @@ api_router.include_router(
 # Section 89 v7 Item 3 — Admin overview + founders + payments stub.
 api_router.include_router(
     _make_admin_overview_router(db=db, User=User, require_admin=require_admin)
+)
+
+# Section 89 v9 Part 1 — User profile + photos.
+api_router.include_router(
+    _make_user_profile_router(db=db, User=User, get_current_user=get_current_user)
 )
 
 

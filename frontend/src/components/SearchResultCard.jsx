@@ -16,6 +16,7 @@ import {
 import CategoryIcon from "./CategoryIcon";
 import OwnerIdentityBadge from "./OwnerIdentityBadge";
 import TrustScore from "./TrustScore";
+import VerifiedBadge from "./VerifiedBadge";
 import { useI18n } from "../contexts/I18nContext";
 
 /**
@@ -174,8 +175,18 @@ export default function SearchResultCard({ provider, isSaved = false, onToggleSa
         {/* Top-left overlay: Verified */}
         {p.verification_status === "approved" && (
           <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/95 shadow-sm" style={{ color: "#03045E" }}>
-            <ShieldCheck className="w-3 h-3" />
+            <VerifiedBadge size={12} />
             {t("provider.verified")}
+          </div>
+        )}
+        {/* Section 89 v9 Part 4C — Home service badge */}
+        {p.offers_home_service && (
+          <div
+            className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/95 text-white shadow-sm"
+            data-testid={`result-card-home-service-${p.slug}`}
+            title="Servicio a domicilio"
+          >
+            🏠 {lang === "en" ? "At-home" : "A domicilio"}
           </div>
         )}
 

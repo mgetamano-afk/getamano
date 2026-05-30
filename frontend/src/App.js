@@ -47,6 +47,7 @@ import ComunidadPage from "./pages/ComunidadPage";
 import DashboardRouter from "./pages/DashboardRouter";
 import Messages from "./pages/Messages";
 import UserProfile from "./pages/UserProfile";
+const PublicUserProfile = lazy(() => import("./pages/PublicUserProfile"));
 import ServiceRequests from "./pages/ServiceRequests";
 import Install from "./pages/Install";
 import CategoryHub from "./pages/CategoryHub";
@@ -119,8 +120,14 @@ function AppRouter() {
   return (
     <Suspense fallback={<ChunkFallback />}>
     <Routes>
-      {/* Zone 1: Landing */}
-      <Route path="/" element={<AppHome />} />
+      {/* Zone 1: Landing.
+          Section 89 v8 — root now opens the Reels-feed (full-screen
+          vertical scroll), AppHome moved to /app, the enriched Landing
+          is at /about. */}
+      <Route path="/" element={<ReelsPage />} />
+      <Route path="/app" element={<AppHome />} />
+      <Route path="/about" element={<Landing />} />
+      <Route path="/landing" element={<Landing />} />
       <Route path="/landing-legacy" element={<Landing />} />
 
       {/* PWA install landing — share-friendly URL for QR codes / WhatsApp links */}
@@ -212,6 +219,7 @@ function AppRouter() {
       <Route path="/requests" element={<ServiceRequests />} />
       <Route path="/messages" element={<Messages />} />
       <Route path="/profile" element={<UserProfile />} />
+      <Route path="/u/:username" element={<PublicUserProfile />} />
       <Route path="/plans" element={<Plans />} />
       {/* Section 88 v3 — `/account` is now the single-user profile page
           (UserProfile.jsx) which carries the "Vende tus servicios" CTA.

@@ -3,7 +3,20 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V7 Rebuild (4 pasos en orden)
+## Latest Update — May 30, 2026 · V8 Landing enrichment + Verified Badge
+- **Custom VerifiedBadge**: nueva `/components/VerifiedBadge.jsx` con el artwork del Xolo + escudo + ✓ que subió el usuario. Pre-renderizado en 64/128/256 px. **Reemplazó `<ShieldCheck>` en 12+ lugares user-facing** (ProviderECard, Search, SearchResultCard, Landing, CategoryHub, ClientDashboard, ComunidadECards, GremiosPage, MiRedPage, BannerGalleryPage, BarrioOverlay, ReelsPage, StoriesCarousel, SeoPage). El icono de ShieldCheck queda sólo para usos genéricos (no-verificación).
+- **V8 Landing enrichment**: nuevo `<V8EnrichmentSections>` con 6 sub-secciones:
+  - §3 Verifica tu negocio · $10/mes (banner Founder100 dinámico desde `/founders/status`).
+  - §4 Herramientas para crecer (6 cards: Reels, Portafolio, eCard, Tarjeta Física $20, Destacado $5/wk, Chambas).
+  - §5 Llega más lejos (pitch 160 millas + 3 stats).
+  - §6 Tabla "El ecosistema completo" (14 features Free vs Verificado $10/mes).
+  - §7 Quiénes somos (corazón latino + tagline "Lo latino, a la mano.").
+  - §8 CTA final dual ("Encontrar proveedor" / "Ofrecer tus servicios").
+- **Route reorg V8**: `/` → ReelsPage, `/about` → Landing enrichida, `/app` → AppHome (preservada), `/landing` + `/landing-legacy` → alias Landing.
+- **AboutNavBar**: nuevo sticky nav sólo en `/about` (logo + lang toggle + CTA "Abrir la app").
+- **Tests**: 11 tests nuevos en `test_iter97_v8_landing_enrichment.py`. Cumulative regression: **97/97 pass**.
+
+## Previous Update — May 30, 2026 · V7 Rebuild (4 pasos en orden)
 - **Paso 1 — Reels closeout**: BottomNav swap "Buscar" → "Reels" (Film icon) en las 3 variantes (guest/provider/client). Reels ya estaba sin crashes desde V4 Phase E.
 - **Paso 2 — Provider Dashboard rebuild**: Nuevo `<ProviderSideNav>` con 4 grupos (Dashboard / Negocio / Crecer / Admin) y 17 items. Nuevo `<DashboardHomeV7>` reemplaza el "Inicio" con 7 secciones (greeting + 3 métricas + Completitud + Portafolio 0/12 + Mis Reels + Actividad + Referidos + Destacar). `TrustScore.jsx` renombrado a "Completitud de perfil" y removido el badge BAJO/MEDIO/ALTO. Nuevos tabs: reels, ecard, analytics, destacar, tarjetas (con `<PhysicalCardsPanel>` inline), preferencias.
 - **Paso 3 — Admin Dashboard rebuild**: AdminLayout NAV ganó 3 entradas nuevas (Reels moderación, Founding Members, Tarjetas físicas). Tres nuevas páginas admin (`AdminReelsModeration`, `AdminFounders`, `AdminPhysicalCards`). Backend: `routes/physical_cards.py` (CRUD provider+admin, push notifications), `routes/admin_overview.py` (KPIs + founders + payments stub), `/admin/reels` + `/admin/reels/{id}/visibility` para moderación. Indexes ensured on startup.

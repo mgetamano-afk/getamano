@@ -37,6 +37,7 @@ import RecommendationsSection from "../components/RecommendationsSection";
 import { LicenseBadge } from "../components/LicenseSection";
 import { formatRate } from "../components/ProviderRates";
 import ReviewThankYouModal from "../components/ReviewThankYouModal";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { toast } from "sonner";
 
 export default function ProviderECard() {
@@ -63,14 +64,30 @@ export default function ProviderECard() {
   const [rates, setRates] = useState([]);
   // Section 89 v4 — public portfolio fetched in parallel with the profile.
   const [portfolio, setPortfolio] = useState([]);
+  // Section 89 v9 Part 2 — provider reels (defensive: never crash the
+  // page if the reels endpoint 404s or hiccups).
+  const [reels, setReels] = useState([]);
 
   useEffect(() => {
+    let alive = true;
+    // Core profile fetch — only this one is allowed to flip `loading`.
     api.get(`/providers/by-slug/${slug}`).then(r => {
+      if (!alive) return;
       setP(r.data);
-      api.get(`/providers/${r.data.provider_id}/rates`).then(rr => setRates(rr.data?.rates || [])).catch(() => {});
-    }).finally(() => setLoading(false));
-    // Section 89 — portfolio is its own endpoint so it can change independently
-    api.get(`/providers/by-slug/${slug}/portfolio`).then(r => setPortfolio(r.data || [])).catch(() => {});
+      // Rates · independent, never crashes the page.
+      api.get(`/providers/${r.data.provider_id}/rates`)
+        .then(rr => alive && setRates(rr.data?.rates || []))
+        .catch(() => alive && setRates([]));
+    }).finally(() => alive && setLoading(false));
+    // Portfolio · independent, soft-fail.
+    api.get(`/providers/by-slug/${slug}/portfolio`)
+      .then(r => alive && setPortfolio(r.data || []))
+      .catch(() => alive && setPortfolio([]));
+    // Reels · independent, soft-fail (V9 Part 2 fix).
+    api.get(`/providers/by-slug/${slug}/reels`)
+      .then(r => alive && setReels(Array.isArray(r.data) ? r.data : []))
+      .catch(() => alive && setReels([]));
+    return () => { alive = false; };
   }, [slug]);
 
   // Section 46 — Credit the referrer if visitor arrived via ?ref={slug}.
@@ -246,7 +263,7 @@ export default function ProviderECard() {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900" data-testid="ecard-business-name">{p.business_name}</h1>
-                  {verified && <span className="badge-verified" data-testid="ecard-verified-badge"><ShieldCheck className="w-3.5 h-3.5" /> {t("provider.verified")}</span>}
+                  {verified && <span className="badge-verified" data-testid="ecard-verified-badge"><VerifiedBadge size={14} /> {t("provider.verified")}</span>}
                   {/* Section 88 v3 — display the provider's unique GM-XXXX
                       code next to their verified badge so visitors can
                       reference it offline (flyers, trucks, business cards). */}
