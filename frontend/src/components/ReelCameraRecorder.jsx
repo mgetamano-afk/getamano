@@ -149,8 +149,9 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
       if (!videoUrl) throw new Error("upload returned no url");
       const created = await api.post("/reels", {
         video_url: videoUrl,
+        thumbnail_url: upload.data?.thumbnail_url || null,
         caption: caption.trim() || null,
-        duration_s: elapsed,
+        duration_s: upload.data?.duration_s || elapsed,
       });
       toast.success("¡Reel publicado!");
       onUploaded?.(created.data);

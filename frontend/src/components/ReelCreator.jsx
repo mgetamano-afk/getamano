@@ -18,6 +18,7 @@ export default function ReelCreator({ onClose, onCreated }) {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -50,6 +51,13 @@ export default function ReelCreator({ onClose, onCreated }) {
         timeout: 180_000,
       });
       setVideoUrl(data?.url || "");
+      setThumbnailUrl(data?.thumbnail_url || "");
+      if (data?.duration_s) setDuration(data.duration_s);
+      if (data?.was_trimmed) {
+        toast.message(lang === "en"
+          ? "Trimmed to 60s automatically"
+          : "Recortado a 60s automáticamente");
+      }
     } catch (e) {
       toast.error(e?.response?.data?.detail || (lang === "en" ? "Upload failed" : "Falla en la subida"));
       setPreviewUrl("");
@@ -63,6 +71,7 @@ export default function ReelCreator({ onClose, onCreated }) {
     try {
       await api.post("/reels", {
         video_url: videoUrl,
+        thumbnail_url: thumbnailUrl || null,
         caption: caption.trim() || null,
         duration_s: duration || null,
       });

@@ -14,7 +14,7 @@ import AIDescriptionAssistant from "../components/AIDescriptionAssistant";
 import CategoryTreePicker from "../components/CategoryTreePicker";
 import { getRelatedCategories, normalizeCategoryKey } from "../data/categoryGroups";
 
-const STEPS = [
+const STEPS_BASE = [
   { id: "plan", title: "Elige tu plan" },
   { id: "info", title: "Datos de tu negocio" },
   { id: "location", title: "Ubicación" },
@@ -27,11 +27,17 @@ export default function ProviderOnboarding() {
   const { user, loading: authLoading, refresh } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState(0);
-  // Section V12 — sandbox-paid token for opening a 2nd+ eCard. When this
-  // param is present we BYPASS the "already onboarded" redirect because
-  // the user is explicitly opening a NEW eCard, not editing the first.
+  // V12 — sandbox-paid token for opening a 2nd+ eCard. When present we
+  // BYPASS the "already onboarded" redirect AND skip the plan/tier step
+  // entirely (V13: tiers/subscription panel was removed in favour of
+  // VerificationCenter, so picking a plan during onboarding makes no
+  // sense). User feedback May 30 2026: "después de pagar lo $5 lo
+  // diriges al panel de los tiers, los tiers ya no existen, la ruta
+  // debería ser directo a registrar la eCard."
   const openingPaymentId = searchParams.get("opening_payment_id");
+  const isAdditionalEcard = Boolean(openingPaymentId);
+  const STEPS = isAdditionalEcard ? STEPS_BASE.slice(1) : STEPS_BASE;
+  const [step, setStep] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [plans, setPlans] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -77,9 +83,18 @@ export default function ProviderOnboarding() {
   const updateList = (k, v) => setForm(f => ({ ...f, [k]: v.split(",").map(s => s.trim()).filter(Boolean) }));
   const updateHour = (d, v) => setForm(f => ({ ...f, hours: { ...f.hours, [d]: v } }));
 
+  // V12 — Each `step` block in the JSX refers to its numeric index in
+  // the ORIGINAL `STEPS_BASE` array (0=plan, 1=info, 2=location, …).
+  // When the user is opening an additional eCard we hide step 0, so the
+  // visible step list runs 1-indexed against STEPS_BASE. `currentStepId`
+  // translates the visual `step` back into the original id so the
+  // existing `step === N` JSX branches keep working without rewrites.
+  const currentStepId = STEPS[step]?.id;
+  const stepIndexInBase = STEPS_BASE.findIndex(s => s.id === currentStepId);
+
   const canNext = () => {
-    if (step === 1) return form.business_name && form.category_id;
-    if (step === 2 && !form.is_home_based) return form.city && form.state;
+    if (currentStepId === "info") return form.business_name && form.category_id;
+    if (currentStepId === "location" && !form.is_home_based) return form.city && form.state;
     return true;
   };
 
@@ -91,7 +106,7 @@ export default function ProviderOnboarding() {
       // V12 — forward sandbox-paid opening token for 2nd+ eCards.
       if (openingPaymentId) payload.opening_payment_id = openingPaymentId;
       const { data } = await api.post("/providers", payload);
-      if (form.selected_plan !== "free") {
+      if (form.selected_plan !== "free" && !isAdditionalEcard) {
         await api.post("/providers/me/plan", { plan: form.selected_plan }).catch(() => {});
       }
       await refresh();
@@ -123,7 +138,7 @@ export default function ProviderOnboarding() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
           <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900">{STEPS[step].title}</h1>
 
-          {step === 0 && (
+          {stepIndexInBase === 0 && (
             <div className="mt-6 grid md:grid-cols-3 gap-4" data-testid="onboarding-plans">
               {plans.map(p => (
                 <button
@@ -145,7 +160,7 @@ export default function ProviderOnboarding() {
             </div>
           )}
 
-          {step === 1 && (
+          {stepIndexInBase === 1 && (
             <div className="mt-6 space-y-4">
               {/* Section 18A — Card scanner CTA */}
               <button
@@ -267,7 +282,7 @@ export default function ProviderOnboarding() {
             </div>
           )}
 
-          {step === 2 && (
+          {stepIndexInBase === 2 && (
             <div className="mt-6 space-y-5">
               <div className="grid grid-cols-2 gap-3">
                 <button type="button" onClick={() => update("is_home_based", false)} className={`p-5 rounded-2xl border-2 text-left ${!form.is_home_based ? "border-blue-600 bg-blue-50/50" : "border-slate-200"}`} data-testid="onboarding-location-physical">
@@ -308,7 +323,7 @@ export default function ProviderOnboarding() {
             </div>
           )}
 
-          {step === 3 && (
+          {stepIndexInBase === 3 && (
             <div className="mt-6 space-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Servicios ofrecidos</label>
@@ -386,7 +401,7 @@ export default function ProviderOnboarding() {
             </div>
           )}
 
-          {step === 4 && (
+          {stepIndexInBase === 4 && (
             <div className="mt-6 grid md:grid-cols-2 gap-4">
               <ImageUpload label="Logo" value={form.logo_url} onChange={v => update("logo_url", v)} testid="onboarding-logo-upload" aspect="1/1" />
               <ImageUpload label="Portada" value={form.cover_url} onChange={v => update("cover_url", v)} testid="onboarding-cover-upload" aspect="16/9" />
@@ -394,7 +409,7 @@ export default function ProviderOnboarding() {
             </div>
           )}
 
-          {step === 5 && (
+          {stepIndexInBase === 5 && (
             <div className="mt-6 space-y-3 text-sm">
               <Row label="Plan" value={plans.find(p => p.id === form.selected_plan)?.name} />
               <Row label="Negocio" value={form.business_name} />

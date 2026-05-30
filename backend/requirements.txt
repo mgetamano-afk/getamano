@@ -146,3 +146,4 @@ websockets==16.0
 yarl==1.23.0
 zipp==4.1.0
 reportlab==4.5.1
+ffmpeg-python==0.2.0

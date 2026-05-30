@@ -3,7 +3,40 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V15 FIX: Reels video upload (root cause)
+## Latest Update — May 30, 2026 · V15.2 / V15.3 / V12-fix polish round
+
+3 fixes en una iteración tras feedback del founder:
+
+### 1. V15.2 — FAB chips sin texto (iconos sueltos sobre el reel)
+> "lo que guarda + queden sueltos sobre el reel, sin texto, el texto de que significa no aparezca"
+- Removido el `<span>` con el label pill negro semi-transparente al lado de cada chip del fan-out.
+- Los chips ahora son **solo el círculo de color con icono** flotando sobre el video.
+- Labels migrados a `title` + `aria-label` para mantener accesibilidad (hover tooltip + screen readers).
+
+### 2. V15.3 — Video processor server-side (ffmpeg)
+> "trabaja con [video processor]"
+- Instalado `ffmpeg` (apt) + `ffmpeg-python==0.2.0` (pip → requirements.txt).
+- Nuevo módulo `/app/backend/services/reel_video.py`:
+  - `process_reel(raw, content_type)` corre en thread pool (asyncio.to_thread) para no bloquear el event loop.
+  - **Auto-trim** > 60s a 60s exactos.
+  - **Auto-thumbnail** 480p JPEG @ t=1s.
+  - **Re-encode** a H.264/AAC MP4 con `movflags=+faststart` (streaming web-ready).
+  - Fail-soft: si ffmpeg crashea, el upload original se conserva sin thumb.
+- Endpoint `POST /api/reels/upload-video` ahora devuelve `thumbnail_url`, `duration_s`, `was_trimmed`.
+- Thumbnail registrada en `db.files` (kind=`reel-thumb`) para que `GET /api/files/{path}` la sirva.
+- Frontend (`ReelCreator` + `ReelCameraRecorder`) reenvía `thumbnail_url` + `duration_s` al POST /reels y muestra toast "Recortado a 60s automáticamente" cuando aplica.
+
+### 3. V12-fix — Después de pagar $5 onboarding va directo a registrar
+> "cuando un cliente registra una segunda eCard, despues de pagar los $5 lo diriges al panel de los tiers, los tiers ya no existen, la rurta deberia ser directo a registrar la ecard"
+- `STEPS_BASE` con todos los 6 pasos + `STEPS` derivado: cuando `openingPaymentId` está presente, hace `slice(1)` saltando el "Elige tu plan" step 0.
+- `currentStepId` + `stepIndexInBase` para que los `{step === N &&}` JSX branches sigan funcionando contra el array base.
+- Cuando `isAdditionalEcard === true` el call a `/providers/me/plan` también se omite (es lo que disparaba el rebote al panel de tiers).
+
+### Tests
+- `test_iter110_v15_3_polish.py` (7 tests integration: 4 video processor real con ffmpeg + 3 source locks).
+- Cumulative regression iter98→iter110: **125/125 verde**.
+
+## Previous Update — May 30, 2026 · V15 FIX: Reels video upload (root cause)
 
 User report: "no reels no funciona". **Root cause**: `/api/upload` solo aceptaba imágenes (`Solo imágenes (jpg/png/webp/gif/heic)`), pero `ReelCreator` y el nuevo `ReelCameraRecorder` posteaban videos a ese endpoint → 400 silencioso → reels jamás se subían.
 

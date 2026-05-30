@@ -2503,7 +2503,13 @@ async def upload_reel_video(file: UploadFile = File(...), user: User = Depends(g
     """V15 — Dedicated video upload for reels. Open to ANY logged-in user
     (Nota 1.1.2: verificados o no, todos pueden subir reels). Accepts the
     formats produced by `MediaRecorder` (WebM) as well as imported MP4/MOV.
-    The frontend POSTs the resulting `url` into POST /reels."""
+
+    V15.3 — Server-side post-process via ffmpeg:
+      · trims clips longer than 60s,
+      · re-encodes to H.264/AAC MP4 (universal playback),
+      · auto-generates a 480p JPEG thumbnail.
+    Fail-soft: if ffmpeg crashes, the original upload still goes through.
+    """
     content_type = (file.content_type or "application/octet-stream").lower().split(";")[0].strip()
     if content_type not in ALLOWED_REEL_VIDEO_TYPES:
         raise HTTPException(
@@ -2513,31 +2519,84 @@ async def upload_reel_video(file: UploadFile = File(...), user: User = Depends(g
     data = await file.read()
     if len(data) > MAX_REEL_VIDEO_SIZE:
         raise HTTPException(status_code=400, detail="El video supera 80 MB. Recorta tu reel a ≤ 60s.")
+
+    # V15.3 — server-side trim + thumbnail. Whole step is best-effort so
+    # the upload survives an ffmpeg blip.
+    final_bytes = data
+    final_ct = content_type
+    thumbnail_bytes = None
+    duration_s = None
+    was_trimmed = False
+    try:
+        from services.reel_video import process_reel, is_ffmpeg_available
+        if is_ffmpeg_available():
+            proc = await process_reel(data, content_type)
+            final_bytes = proc.video_bytes
+            final_ct = proc.output_content_type if proc.video_bytes is not data else content_type
+            thumbnail_bytes = proc.thumbnail_bytes
+            duration_s = proc.duration_s
+            was_trimmed = proc.was_trimmed
+    except Exception as e:
+        logger.warning(f"reel post-process skipped: {e}")
+
     ext_map = {
         "video/mp4": "mp4", "video/quicktime": "mov", "video/x-msvideo": "avi",
         "video/avi": "avi", "video/webm": "webm", "video/x-matroska": "mkv",
     }
-    ext = ext_map.get(content_type, "mp4")
+    # If we transcoded the output is always MP4 regardless of input.
+    ext = "mp4" if final_ct == "video/mp4" else ext_map.get(final_ct, "mp4")
     file_id = str(uuid.uuid4())
     path = f"{APP_NAME}/reels/{user.user_id}/{file_id}.{ext}"
     try:
-        result = put_object(path, data, content_type)
+        result = put_object(path, final_bytes, final_ct)
     except Exception as e:
         logger.exception("Reel video upload failed")
         raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+
+    thumb_url = None
+    if thumbnail_bytes:
+        try:
+            thumb_path = f"{APP_NAME}/reels/{user.user_id}/{file_id}-thumb.jpg"
+            thumb_result = put_object(thumb_path, thumbnail_bytes, "image/jpeg")
+            thumb_url = f"/api/files/{thumb_result['path']}"
+            # V15.3 — register the thumbnail in `db.files` so the
+            # /api/files/{path} download endpoint can serve it. Without
+            # this record, GET returns 404 even though the bytes are in
+            # storage.
+            await db.files.insert_one({
+                "file_id": f"{file_id}-thumb",
+                "user_id": user.user_id,
+                "storage_path": thumb_result["path"],
+                "original_filename": f"{file_id}-thumb.jpg",
+                "content_type": "image/jpeg",
+                "size": thumb_result.get("size", len(thumbnail_bytes)),
+                "is_deleted": False,
+                "kind": "reel-thumb",
+                "parent_file_id": file_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"thumbnail upload skipped: {e}")
+
     await db.files.insert_one({
         "file_id": file_id, "user_id": user.user_id, "storage_path": result["path"],
-        "original_filename": file.filename or "", "content_type": content_type,
-        "size": result.get("size", len(data)), "is_deleted": False,
+        "original_filename": file.filename or "", "content_type": final_ct,
+        "size": result.get("size", len(final_bytes)), "is_deleted": False,
         "kind": "reel-video",
+        "thumbnail_url": thumb_url,
+        "duration_s": duration_s,
+        "was_trimmed": was_trimmed,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
     return {
         "file_id": file_id,
         "path": result["path"],
         "url": f"/api/files/{result['path']}",
-        "content_type": content_type,
-        "size": result.get("size", len(data)),
+        "thumbnail_url": thumb_url,
+        "duration_s": duration_s,
+        "was_trimmed": was_trimmed,
+        "content_type": final_ct,
+        "size": result.get("size", len(final_bytes)),
     }
 
 

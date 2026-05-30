@@ -185,9 +185,12 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
         style={{ bottom: "calc(76px + env(safe-area-inset-bottom, 0px))" }}
         data-testid="reel-action-menu"
       >
-        {/* Action chips fan out vertically above the FAB */}
+        {/* Action chips fan out vertically above the FAB. V15.2 — only
+            the colored icon circle is shown (text labels removed per
+            founder feedback: "que queden sueltos sobre el reel"). The
+            label still lives in `aria-label` + native tooltip for a11y. */}
         {open && (
-          <div className="flex flex-col items-end gap-2 mb-1">
+          <div className="flex flex-col items-end gap-2.5 mb-1">
             {ACTIONS.map((a, i) => {
               const Icon = a.Icon;
               return (
@@ -196,14 +199,13 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
                   type="button"
                   onClick={a.onClick}
                   disabled={busy === a.id}
-                  className="reel-action-chip group flex items-center gap-2 active:scale-95 transition will-change-transform"
+                  title={a.label}
+                  aria-label={a.label}
+                  className="reel-action-chip active:scale-95 transition will-change-transform"
                   style={{ animationDelay: `${i * 35}ms` }}
                   data-testid={`reel-action-${a.id}`}
                 >
-                  <span className="text-xs font-semibold text-white bg-slate-900/85 backdrop-blur px-2.5 py-1 rounded-full shadow">
-                    {a.label}
-                  </span>
-                  <span className={`w-12 h-12 rounded-full bg-gradient-to-br ${a.colorClass} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition ${a.active ? "ring-2 ring-white/70" : ""}`}>
+                  <span className={`w-12 h-12 rounded-full bg-gradient-to-br ${a.colorClass} text-white flex items-center justify-center shadow-lg hover:scale-110 transition ${a.active ? "ring-2 ring-white/70" : ""}`}>
                     {busy === a.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" strokeWidth={2.5} />}
                   </span>
                 </button>
