@@ -121,10 +121,13 @@ function AppRouter() {
     <Suspense fallback={<ChunkFallback />}>
     <Routes>
       {/* Zone 1: Landing.
-          Section V11 — `/` now opens AppHome (búsqueda principal). Reels
-          stays at `/reels`. `/app` keeps as alias for backward links. The
-          enriched Landing is at `/about`. */}
-      <Route path="/" element={<AppHome />} />
+          Section V11.1 — `/` is now the live Search page (Inicio =
+          buscar servicios). The AppHome content (greeting + hero +
+          featured providers + jobs digest) moved to `/moreinfo` reachable
+          from the footer. `/app` keeps as backward-compat alias for
+          AppHome. The enriched marketing Landing is at `/about`. */}
+      <Route path="/" element={<Search />} />
+      <Route path="/moreinfo" element={<AppHome />} />
       <Route path="/app" element={<AppHome />} />
       <Route path="/about" element={<Landing />} />
       <Route path="/landing" element={<Landing />} />

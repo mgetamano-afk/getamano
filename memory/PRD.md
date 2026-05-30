@@ -3,7 +3,15 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V11 Mobile UX cleanup (iPhone 17 Pro audit)
+## Latest Update — May 30, 2026 · V11.1 Inicio = Buscar servicios + /moreinfo
+Founder aclaración post-V11: "inicio" debe llevar a buscar servicios (la página de Search real), no al hero de AppHome. El contenido de AppHome (saludo + hero + featured providers + jobs digest + categories grid) se reubica en una página accesible desde el footer.
+
+- **`/` ahora renderiza `<Search />`** (página real de búsqueda con filtros Category/Language/Verified-only + map/list/grid views + location prompt). El "Inicio" del bottom nav lleva directo a esta búsqueda.
+- **`/moreinfo` renderiza `<AppHome />`** (saludo "Hi, Carlos 👋", hero "What service do you need?", banner Founding Members, quick actions Search/Jobs/Community/Be-a-provider, popular categories, live activity strip). `/app` se mantiene como alias backward-compat para links viejos.
+- **Footer agregó link "More info / Más información"** en la columna "Plataforma" justo debajo de "Sobre nosotros". `data-testid="footer-moreinfo"`. i18n claves: `footer.moreinfo` (ES: "Más información" · EN: "More info").
+- **Tests**: `test_iter102_v11_mobile_ux.py` actualizado con 9 tests cubriendo `/`→Search, `/moreinfo`→AppHome, footer link, i18n keys.
+
+## Previous Update — May 30, 2026 · V11 Mobile UX cleanup (iPhone 17 Pro audit)
 Reportado por el founder en iPhone 17 Pro: Inicio era idéntico a Reels (route doble), había dos menús de navegación con "Barrio" duplicado, el "+" para agregar historia se veía mal posicionado, y el badge ♥1 sobre historias se cortaba en la parte superior.
 
 - **Fix 1 — `/` ahora renderea AppHome** (búsqueda principal con saludo + hero + categorías + featured providers), no ReelsPage. Reels queda solo en `/reels`. `/app` se mantiene como alias backward-compat. (`/app/frontend/src/App.js` línea 127)
