@@ -5,7 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useI18n } from "../contexts/I18nContext";
 import { useAuth } from "../contexts/AuthContext";
-import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, X, Sparkles, Loader2 } from "lucide-react";
+import { Search as SearchIcon, MapPin, Star, ShieldCheck, Filter, List, Map as MapIcon, LayoutPanelLeft, Video, Navigation, X, Sparkles, Loader2, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import CategoryIcon from "../components/CategoryIcon";
 import OwnerIdentityBadge from "../components/OwnerIdentityBadge";
@@ -133,6 +133,17 @@ export default function Search() {
     return () => observer.disconnect();
     // Mount-only: sentinelRef.current is set by React before this fires
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Section V11.3 — "Volver arriba" FAB visibility. Since the search bar
+  // no longer sticks, long result lists need a quick way back to the
+  // filters. We show the FAB once the user has scrolled past 400px.
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // Hero "Cerca de mí" handoff — Landing pushes ?nearme=1 here and we fire
@@ -727,6 +738,24 @@ export default function Search() {
           setTimeout(() => doSearch(null, {}), 0);
         }}
       />
+
+      {/* Section V11.3 — Floating "Volver arriba" button. Visible once the
+          user has scrolled >400px; smooth-scrolls back to the filter bar.
+          Stacked above QuickActionsFAB (which sits at bottom 76px) so the
+          two FABs never overlap on mobile. */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed right-4 sm:right-6 z-50 w-11 h-11 rounded-full bg-[#03045E] text-white shadow-lg hover:bg-[#0077B6] active:scale-95 transition flex items-center justify-center"
+          style={{ bottom: "calc(148px + env(safe-area-inset-bottom, 0px))" }}
+          data-testid="search-scroll-top"
+          aria-label={lang === "en" ? "Back to top" : "Volver arriba"}
+          title={lang === "en" ? "Back to top" : "Volver arriba"}
+        >
+          <ArrowUp className="w-5 h-5" strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }
