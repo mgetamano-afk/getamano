@@ -28,6 +28,8 @@ import GMCodeBadge from "../components/GMCodeBadge";
 import Portfolio from "../components/Portfolio";
 import TrustScore from "../components/TrustScore";
 import LeadPipeline from "../components/LeadPipeline";
+import DashboardHomeV7 from "../components/DashboardHomeV7";
+import PhysicalCardsPanel from "../components/PhysicalCardsPanel";
 import InboxView from "../components/InboxView";
 import CalendarTab from "../components/CalendarTab";
 import SubscriptionManager from "../components/SubscriptionManager";
@@ -255,144 +257,15 @@ export default function ProviderDashboard() {
           {/* COLUMNA CENTRO — Contenido principal scrolleable */}
           <section className="min-w-0 space-y-6" data-testid="provider-dashboard-center">
             {/* ── HOME (Inicio) overview — visible only when tab === "dashboard" ── */}
-            {tab === "dashboard" && (<>
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "0ms" }}>
-              <ProviderGreeting
-                user={user}
+            {tab === "dashboard" && (
+              <DashboardHomeV7
                 profile={profile}
-                unreadMessages={unread}
-                newRequests={(requests || []).filter(r => r.status === "pending" || r.status === "new").length}
+                unread={unread}
+                requests={requests}
+                onTabChange={setTab}
               />
-            </div>
-
-            {/* Section 84 — soft nudge to upload a real photo when the
-                provider is still using a default illustrated avatar. Hides
-                itself automatically once a real photo is on file. */}
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "40ms" }}>
-              <UploadPhotoBanner
-                profile={profile}
-                onUploaded={async () => {
-                  try {
-                    const r = await api.get("/providers/me");
-                    setProfile(r.data);
-                  } catch (_e) { /* ignore — banner already showed success state */ }
-                }}
-              />
-            </div>
-
-            {/* Section 88 v3 — Provider's unique GM-XXXX code. Self-hides
-                if the provider is unverified (no GM code yet). */}
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "60ms" }}>
-              <GMCodeBadge variant="full" />
-            </div>
-
-            {/* Section 89 v4 — Trust Score breakdown card. Self-hides when
-                profile signals aren't loaded yet. */}
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "80ms" }}>
-              <TrustScore profile={profile} variant="card" />
-            </div>
-
-            {/* Section 89 v4 — Portfolio editor (max 12 photos). */}
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "100ms" }}>
-              <Portfolio />
-            </div>
-
-            {/* Racha + Ranking lado a lado */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeSlideUp" style={{ animationDelay: "80ms" }} data-testid="provider-dashboard-streak-ranking-row">
-              <StreakWidget />
-              <LeaderboardWidget />
-            </div>
-
-            {/* Pulso semanal (centro) */}
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "160ms" }}>
-              <MarketPulseCard />
-            </div>
-
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "200ms" }}>
-              <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
-              <ShareStatsCard />
-              <ShareRewardsCard />
-            </div>
-
-            {/* Section 30 — Chambas board CTA + nearby teaser */}
-            <div className="rounded-2xl p-5 flex items-start justify-between gap-4 flex-wrap animate-fadeSlideUp"
-                 style={{ background: "linear-gradient(135deg, rgba(2,95,103,0.06) 0%, rgba(47,157,148,0.10) 100%)", border: "1px solid rgba(2,95,103,0.18)", animationDelay: "240ms" }}
-                 data-testid="provider-dashboard-chambas-promo">
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
-                     style={{ background: "rgba(255,107,44,0.15)", color: "#C2410C" }}>
-                  Nuevo · Beta
-                </div>
-                <h3 className="font-display font-bold text-slate-900 text-lg mt-2 leading-tight">
-                  ¿Necesitas ayuda extra esta semana?
-                </h3>
-                <p className="text-sm text-slate-600 mt-1 max-w-xl">
-                  Publica una <strong>chamba temporal</strong> y recibe propuestas de otros proveedores latinos verificados. O aplica tú a chambas abiertas para sumar ingresos extra.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Link to="/empleos" target="_blank" className="px-4 py-2.5 rounded-full text-white text-sm font-bold inline-flex items-center justify-center gap-2 whitespace-nowrap shadow-sm"
-                      style={{ background: "linear-gradient(135deg, #03045E 0%, #0077B6 100%)" }}
-                      data-testid="provider-dashboard-publish-chamba">
-                  Publicar chamba →
-                </Link>
-                <Link to="/empleos" className="px-4 py-2.5 rounded-full text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:border-teal-500 inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                      data-testid="provider-dashboard-browse-chambas">
-                  Ver chambas activas
-                </Link>
-              </div>
-            </div>
-
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "280ms" }}>
-              <ChambasNearby city={profile.city} role="provider" limit={3} />
-            </div>
-
-            <div className="animate-fadeSlideUp" style={{ animationDelay: "320ms" }}>
-              <WeeklyDigestPreview />
-            </div>
-
-            {/* Mobile-only: mirror del sidebar derecho al final */}
-            <div className="lg:hidden space-y-6" data-testid="provider-dashboard-mobile-sidebar-mirror">
-              <WaitingClientsBadge />
-              <EcardHealth />
-              <WeeklyHealthEmailPreview />
-              <CouponsCard />
-              <ReferralPanel />
-            </div>
-
-            <div className="flex flex-wrap items-start justify-between gap-4 pt-2 animate-fadeSlideUp" style={{ animationDelay: "360ms" }}>
-              <div>
-                <h2 className="font-display text-xl font-bold text-slate-900">Tu panel de control</h2>
-            <p className="text-slate-500 text-sm mt-0.5">Gestiona tu negocio, tus clientes y tu eCard.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setEcardPreviewOpen(true)}
-            className="btn-outline flex items-center gap-1 text-sm"
-            data-testid="view-public-ecard"
-          >
-            Ver mi eCard <ExternalLink className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* SECTION 16A — Profile Completion */}
-        <ProfileCompletion onTabChange={setTab} />
-
-        {/* Analytics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCard icon={Eye} label="Vistas" value={profile.views || 0} color="text-blue-600" testid="stat-views" />
-          <StatCard icon={Phone} label="Contactos" value={profile.contact_clicks || 0} color="text-orange-500" testid="stat-clicks" />
-          <StatCard
-            icon={Star}
-            label="Calificación"
-            value={(profile.rating_count || 0) > 0 ? (profile.rating_avg || 0).toFixed(1) : "—"}
-            color="text-yellow-500"
-            testid="stat-rating"
-          />
-          <StatCard icon={ShieldCheck} label="Estado" value={profile.verification_status} color="text-green-600" capitalize testid="stat-status" />
-        </div>
-        </>)}
-        {/* ── END Home overview ── */}
+            )}
+            {/* ── END Home (V7 rebuild) ── */}
 
         {/* Tabs */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -416,6 +289,73 @@ export default function ProviderDashboard() {
             )}
             {tab === "preferencias" && (
               <ProviderPreferences />
+            )}
+            {tab === "reels" && (
+              <div data-testid="dashboard-tab-reels" className="space-y-4">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-slate-900">Mis Reels</h3>
+                  <p className="text-sm text-slate-500">Gestiona tus videos cortos verticales.</p>
+                </div>
+                <Link
+                  to="/reels"
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold active:scale-95"
+                  data-testid="dashboard-reels-open"
+                >
+                  Abrir Reels →
+                </Link>
+              </div>
+            )}
+            {tab === "ecard" && (
+              <div data-testid="dashboard-tab-ecard" className="space-y-3">
+                <h3 className="font-display font-bold text-lg text-slate-900">Mi eCard pública</h3>
+                <p className="text-sm text-slate-500">Así te ven tus clientes en getamano.</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setEcardPreviewOpen(true)} className="btn-outline text-sm" data-testid="dashboard-ecard-preview">
+                    Vista previa
+                  </button>
+                  {profile.slug && (
+                    <Link to={`/p/${profile.slug}`} target="_blank" className="btn-primary text-sm" data-testid="dashboard-ecard-open">
+                      Abrir pública ↗
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+            {tab === "analytics" && (
+              <div data-testid="dashboard-tab-analytics" className="space-y-4">
+                <h3 className="font-display font-bold text-lg text-slate-900">Analytics</h3>
+                <p className="text-sm text-slate-500">Métricas de tu perfil.</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard icon={Eye} label="Vistas totales" value={profile.views || 0} color="text-blue-600" testid="analytics-views" />
+                  <StatCard icon={Phone} label="Contactos" value={profile.contact_clicks || 0} color="text-orange-500" testid="analytics-clicks" />
+                  <StatCard icon={Star} label="Calificación" value={(profile.rating_count || 0) > 0 ? (profile.rating_avg || 0).toFixed(1) : "—"} color="text-yellow-500" testid="analytics-rating" />
+                  <StatCard icon={ShieldCheck} label="Estado" value={profile.verification_status} color="text-green-600" capitalize testid="analytics-status" />
+                </div>
+                <MarketPulseCard />
+              </div>
+            )}
+            {tab === "destacar" && (
+              <div data-testid="dashboard-tab-destacar" className="space-y-3 max-w-2xl">
+                <h3 className="font-display font-bold text-lg text-slate-900">Destacar mi perfil</h3>
+                <p className="text-sm text-slate-500">
+                  Aparece pin-arriba del carrusel de Barrio en tu ciudad durante 7 días.
+                </p>
+                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-rose-50 p-5">
+                  <p className="text-2xl font-display font-bold text-[#03045E]">$9.99 / semana</p>
+                  <p className="text-sm text-slate-600 mt-1">Cancelas cuando quieras. Disponible cuando activemos pagos.</p>
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-3 h-10 px-4 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm font-bold disabled:opacity-60"
+                    data-testid="dashboard-destacar-cta"
+                  >
+                    Próximamente
+                  </button>
+                </div>
+              </div>
+            )}
+            {tab === "tarjetas" && (
+              <PhysicalCardsPanel />
             )}
             {tab === "perfil" && (
               <form onSubmit={onSave} className="space-y-8" data-testid="provider-form">

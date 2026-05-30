@@ -71,6 +71,9 @@ import QuickActionsFAB from "./components/QuickActionsFAB";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 const AdminOpsPage = lazy(() => import("./pages/AdminOpsPage"));
+const AdminPhysicalCards = lazy(() => import("./pages/admin/AdminPhysicalCards"));
+const AdminReelsModeration = lazy(() => import("./pages/admin/AdminReelsModeration"));
+const AdminFounders = lazy(() => import("./pages/admin/AdminFounders"));
 const PrintCard = lazy(() => import("./pages/PrintCard"));
 const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
@@ -238,6 +241,10 @@ function AppRouter() {
       <Route path="/admin/queue" element={<AdminQueue />} />
       <Route path="/admin/providers" element={<AdminProviders />} />
       <Route path="/admin/reviews" element={<AdminReviews />} />
+      {/* Section 89 v7 Item 3 — new admin sections */}
+      <Route path="/admin/reels" element={<AdminReelsModeration />} />
+      <Route path="/admin/founders" element={<AdminFounders />} />
+      <Route path="/admin/physical-cards" element={<AdminPhysicalCards />} />
       <Route path="/admin/reportes" element={<AdminReportsBidirectional />} />
       <Route path="/admin/catalog" element={<AdminCatalog />} />
       <Route path="/admin/audit" element={<AdminAudit />} />

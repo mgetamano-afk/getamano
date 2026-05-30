@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Home,
-  Search,
   HeartHandshake,
   User,
   Briefcase,
+  Film,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
@@ -90,14 +90,13 @@ export default function BottomNav() {
   };
 
   // Build items per user role. Each item: {path, icon, label, testid, badge?, animate?}
-  // Section 89 v4 — bottom nav copy updated: "Comunidad" → "Barrio",
-  // "Mi cuenta" → "Perfil" to align with the social-first vocabulary.
-  // Routes remain the same so deep-links don't break.
+  // Section 89 v7 — Reels now lives in the bottom nav (replaces "Buscar"
+  // on every variant). Search remains accessible via the top-bar icon.
   let items;
   if (!user) {
     items = [
       { path: "/",          icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
-      { path: "/search",    icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
+      { path: "/reels",     icon: Film,            label: lang === "en" ? "Reels"     : "Reels",     testid: "bottom-nav-reels" },
       { path: "/comunidad", icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",   icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
       { path: "/login",     icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account" },
@@ -105,7 +104,7 @@ export default function BottomNav() {
   } else if (user.role === "provider") {
     items = [
       { path: "/",                   icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
-      { path: "/search",             icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
+      { path: "/reels",              icon: Film,            label: lang === "en" ? "Reels"     : "Reels",     testid: "bottom-nav-reels" },
       { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
       { path: "/dashboard/provider", icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account", badge: unread },
@@ -113,7 +112,7 @@ export default function BottomNav() {
   } else {
     items = [
       { path: "/",                   icon: Home,            label: lang === "en" ? "Home"      : "Inicio",    testid: "bottom-nav-home" },
-      { path: "/search",             icon: Search,          label: lang === "en" ? "Search"    : "Buscar",    testid: "bottom-nav-search" },
+      { path: "/reels",              icon: Film,            label: lang === "en" ? "Reels"     : "Reels",     testid: "bottom-nav-reels" },
       { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
       { path: "/dashboard",          icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account", badge: unread },

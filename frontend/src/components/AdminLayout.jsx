@@ -1,7 +1,7 @@
 import BrandMark from "./BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown, DollarSign, Flag, TrendingUp, Inbox } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown, DollarSign, Flag, TrendingUp, Inbox, Film, Package } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const NAV = [
@@ -13,6 +13,10 @@ const NAV = [
   { path: "/admin/queue", label: "Cola de verificación", Icon: ShieldCheck },
   { path: "/admin/providers", label: "Proveedores", Icon: Users },
   { path: "/admin/reviews", label: "Reseñas", Icon: MessageSquare },
+  // Section 89 v7 Item 3 — new admin surfaces.
+  { path: "/admin/reels", label: "Reels", Icon: Film },
+  { path: "/admin/founders", label: "Founding Members", Icon: Crown },
+  { path: "/admin/physical-cards", label: "Tarjetas físicas", Icon: Package },
   { path: "/admin/reportes", label: "Reportes", Icon: Flag },
   { path: "/admin/catalog", label: "Categorías y ciudades", Icon: FolderTree },
   { path: "/admin/audit", label: "Audit log", Icon: ClipboardList },

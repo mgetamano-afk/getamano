@@ -14,6 +14,7 @@ import ProvidersMap from "../components/ProvidersMap";
 import CitySearchInput from "../components/CitySearchInput";
 import SmartSearchEmptyState from "../components/SmartSearchEmptyState";
 import CategoryTreePicker from "../components/CategoryTreePicker";
+import LocationPrompt, { readSavedLocation, saveLocation, clearLocation } from "../components/LocationPrompt";
 import useGeolocation from "../hooks/useGeolocation";
 import useRefreshable from "../hooks/useRefreshable";
 import { trackSearch } from "../lib/analytics";
@@ -25,7 +26,23 @@ export default function Search() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [q, setQ] = useState(params.get("q") || "");
-  const [city, setCity] = useState(params.get("city") || "");
+  const [city, setCity] = useState(() => {
+    // Section 89 v7 Item 4 — Prefer the URL param; otherwise use the
+    // saved city from the LocationPrompt. The prompt itself fires the
+    // first time both are missing.
+    const fromUrl = params.get("city");
+    if (fromUrl) return fromUrl;
+    const saved = readSavedLocation();
+    return saved.city && saved.state ? `${saved.city}, ${saved.state}` : (saved.city || "");
+  });
+  const [locationPromptOpen, setLocationPromptOpen] = useState(() => {
+    // Open exactly when no city is set anywhere and we haven't already
+    // asked this session.
+    if (params.get("city")) return false;
+    const saved = readSavedLocation();
+    if (saved.city) return false;
+    try { return sessionStorage.getItem("search_city_skipped") !== "1"; } catch { return true; }
+  });
   const [category, setCategory] = useState(params.get("category") || "");
   const [verifiedOnly, setVerifiedOnly] = useState(params.get("verified") === "true");
   const [language, setLanguage] = useState(params.get("language") || "");
@@ -275,6 +292,15 @@ export default function Search() {
         lang={lang}
       />
       <Header />
+      {/* Section 89 v7 Item 4 — first-time location prompt */}
+      <LocationPrompt
+        open={locationPromptOpen}
+        onClose={() => setLocationPromptOpen(false)}
+        onConfirm={({ city: c, state: s }) => {
+          const display = c && s ? `${c}, ${s}` : c || "";
+          setCity(display);
+        }}
+      />
       {/* Sentinel to detect when the sticky filter bar becomes stuck */}
       <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
 
@@ -341,7 +367,33 @@ export default function Search() {
             </div>
           </form>
 
-          {/* Section 81 — AI Concierge reasoning banner */}
+          {/* Section 89 v7 Item 4 — persistent location chip. Shows the
+              currently-saved city and lets the user reopen the prompt
+              or clear it entirely. */}
+          {(city || readSavedLocation().city) && (
+            <div className="-mt-1 mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F0F9FF] border border-[#90E0EF] text-xs font-semibold text-[#0077B6]" data-testid="search-location-chip">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>📍 {city || readSavedLocation().city}</span>
+              <button
+                type="button"
+                onClick={() => setLocationPromptOpen(true)}
+                className="text-[10px] uppercase tracking-wider font-bold hover:underline"
+                data-testid="search-location-chip-change"
+              >
+                {lang === "en" ? "Change" : "Cambiar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCity(""); clearLocation(); }}
+                className="text-[10px] uppercase tracking-wider font-bold text-slate-500 hover:underline"
+                data-testid="search-location-chip-clear"
+              >
+                {lang === "en" ? "All US" : "Toda EE.UU."}
+              </button>
+            </div>
+          )}
+
+          {/* Section 81 — AI Concierge result hint */}
           {conciergeHint && (
             <div
               className="-mt-2 mb-4 px-3 py-2 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 flex items-start gap-2"

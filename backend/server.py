@@ -858,6 +858,12 @@ async def seed():
     except Exception as e:
         logger.warning(f"featured indexes warn: {e}")
 
+    # Section 89 v7 Item 3 — Physical cards indexes.
+    try:
+        await _physical_cards_indexes(db)
+    except Exception as e:
+        logger.warning(f"physical cards indexes warn: {e}")
+
     if await db.categories.count_documents({}) == 0:
         docs = []
         for c in DEFAULT_CATEGORIES:
@@ -1535,6 +1541,62 @@ async def providers_map(
             "lng": lng,
         })
     return {"items": items, "geocoded_this_call": geocoded_this_call, "total_with_coords": len(items), "total_matched": len(providers)}
+
+@api_router.get("/geo/reverse")
+async def geo_reverse(lat: float, lng: float) -> dict:
+    """Section 89 v7 Item 4 — Reverse-geocode `(lat, lng)` to
+    `{city, state}` via an open Nominatim instance (no API key, 1 req/s
+    soft limit per their ToS). Returns `{city: null, state: null}` on
+    any failure so the frontend can prompt the user to type it manually.
+    """
+    try:
+        import httpx
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {
+            "format": "jsonv2",
+            "lat": lat,
+            "lon": lng,
+            "addressdetails": 1,
+            "zoom": 10,
+            "accept-language": "es,en",
+        }
+        headers = {"User-Agent": "getamano/1.0 (https://getamano.us)"}
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(url, params=params, headers=headers)
+            r.raise_for_status()
+            data = r.json() or {}
+            addr = data.get("address", {}) or {}
+            city = (
+                addr.get("city")
+                or addr.get("town")
+                or addr.get("village")
+                or addr.get("hamlet")
+                or addr.get("county")
+                or None
+            )
+            state_full = addr.get("state") or None
+            # Best-effort 2-letter state — Nominatim returns full names.
+            US_STATE_ABBR = {
+                "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+                "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+                "Florida": "FL", "Georgia": "GA", "Hawaii": "HI", "Idaho": "ID",
+                "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+                "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+                "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+                "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV",
+                "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+                "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+                "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+                "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT",
+                "Vermont": "VT", "Virginia": "VA", "Washington": "WA", "West Virginia": "WV",
+                "Wisconsin": "WI", "Wyoming": "WY", "District of Columbia": "DC",
+            }
+            state = US_STATE_ABBR.get(state_full or "", state_full)
+            return {"city": city, "state": state}
+    except Exception as e:
+        logger.warning(f"geo reverse failed: {e}")
+        return {"city": None, "state": None}
+
 
 @api_router.get("/providers/featured-legacy")
 async def featured_providers_legacy():
@@ -9709,6 +9771,11 @@ from routes.featured import (  # noqa: E402
     current_week_key as _featured_week_key,
 )
 from routes.leads import make_router as _make_leads_router  # noqa: E402
+from routes.physical_cards import (  # noqa: E402
+    make_router as _make_physical_cards_router,
+    ensure_physical_cards_indexes as _physical_cards_indexes,
+)
+from routes.admin_overview import make_router as _make_admin_overview_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9899,6 +9966,16 @@ api_router.include_router(
         get_current_user=get_current_user,
         send_sms=send_sms,
     )
+)
+
+# Section 89 v7 Item 3 — Physical NFC cards (provider order + admin fulfilment).
+api_router.include_router(
+    _make_physical_cards_router(db=db, User=User, get_current_user=get_current_user, require_admin=require_admin)
+)
+
+# Section 89 v7 Item 3 — Admin overview + founders + payments stub.
+api_router.include_router(
+    _make_admin_overview_router(db=db, User=User, require_admin=require_admin)
 )
 
 

@@ -83,19 +83,15 @@ export default function TrustScore({ profile, variant = "inline" }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] uppercase tracking-widest font-bold text-slate-500">
-              {lang === "en" ? "Trust Score" : "Trust Score"}
+              {lang === "en" ? "Profile completeness" : "Completitud de perfil"}
             </p>
             <p className="font-display font-extrabold text-3xl text-[#03045E] leading-none">
               {score}
               <span className="text-base text-slate-400 ml-1 font-bold">/ 100</span>
             </p>
           </div>
-          <span
-            className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"
-            style={{ background: t.bg, color: t.color }}
-          >
-            {lang === "en" ? t.label_en : t.label_es}
-          </span>
+          {/* Section 89 v7 — removed the BAJO/MEDIO/ALTO tier label per
+              user feedback. The numeric score is enough. */}
         </div>
         {/* breakdown rows */}
         <ul className="space-y-1.5 text-xs text-slate-600">

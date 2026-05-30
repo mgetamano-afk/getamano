@@ -177,6 +177,29 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         await db.reel_views.delete_many({"reel_id": reel_id})
         return {"deleted": True}
 
+    # ─── Admin moderation (V7 Item 3) ──────────────────────────────
+    @router.get("/admin/reels")
+    async def admin_list_reels(limit: int = 50, _: User = Depends(get_current_user)) -> list:
+        """Section 89 v7 — Lists every reel (including hidden) for the
+        admin moderation table. Auth guarded via the `admin` role check
+        on the dependency. Returns newest first.
+        """
+        if getattr(_, "role", "") != "admin":
+            raise HTTPException(status_code=403, detail="No autorizado.")
+        limit = max(1, min(200, limit))
+        return await db.reels.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+
+    @router.patch("/admin/reels/{reel_id}/visibility")
+    async def admin_toggle_visibility(reel_id: str, _: User = Depends(get_current_user)) -> dict:
+        if getattr(_, "role", "") != "admin":
+            raise HTTPException(status_code=403, detail="No autorizado.")
+        doc = await db.reels.find_one({"reel_id": reel_id}, {"_id": 0, "is_public": 1})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Reel no encontrado.")
+        new_state = not bool(doc.get("is_public", True))
+        await db.reels.update_one({"reel_id": reel_id}, {"$set": {"is_public": new_state}})
+        return {"ok": True, "is_public": new_state}
+
     return router
 
 
