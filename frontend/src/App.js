@@ -121,10 +121,10 @@ function AppRouter() {
     <Suspense fallback={<ChunkFallback />}>
     <Routes>
       {/* Zone 1: Landing.
-          Section 89 v8 — root now opens the Reels-feed (full-screen
-          vertical scroll), AppHome moved to /app, the enriched Landing
-          is at /about. */}
-      <Route path="/" element={<ReelsPage />} />
+          Section V11 — `/` now opens AppHome (búsqueda principal). Reels
+          stays at `/reels`. `/app` keeps as alias for backward links. The
+          enriched Landing is at `/about`. */}
+      <Route path="/" element={<AppHome />} />
       <Route path="/app" element={<AppHome />} />
       <Route path="/about" element={<Landing />} />
       <Route path="/landing" element={<Landing />} />

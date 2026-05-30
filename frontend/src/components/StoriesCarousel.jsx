@@ -91,7 +91,10 @@ export default function StoriesCarousel() {
   return (
     <>
       <div className="mb-4" data-testid="stories-carousel">
-        <div className="flex gap-3 overflow-x-auto pb-3 px-1 -mx-1 scrollbar-none">
+        {/* Section V11 — `pt-3` allows the -top-1 like/count badges on
+            StoryTile avatars to be fully visible despite the overflow-x
+            container clipping vertical overflow. */}
+        <div className="flex gap-3 overflow-x-auto pt-3 pb-3 px-1 -mx-1 scrollbar-none">
           {/* Section 89 v4 — Story tile for the logged-in user, regardless
               of provider status. Anyone can post (single-user model).
               - WITH active stories: tap opens viewer, "+" badge overlays
@@ -100,41 +103,43 @@ export default function StoriesCarousel() {
           {user && (
             myGroup ? (
               <div
-                className="flex-shrink-0 flex flex-col items-center gap-1.5 group relative"
+                className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
                 data-testid="story-tile-self"
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    const idx = groups.findIndex(g => g.provider_user_id === user.user_id);
-                    if (idx >= 0) openViewer(idx);
-                  }}
-                  className="relative w-[72px] h-[72px] rounded-full p-[2.5px] group-hover:scale-105 transition will-change-transform"
-                  style={{ background: "linear-gradient(135deg, #ec4899 0%, #f97316 50%, #f43f5e 100%)" }}
-                  aria-label={lang === "en" ? "View your story" : "Ver tu historia"}
-                >
-                  <div className="w-full h-full rounded-full p-[2px] bg-white">
-                    {myGroup.logo_url ? (
-                      <img {...lazyImg(buildFileUrl(myGroup.logo_url))} alt="" className="w-full h-full rounded-full object-cover bg-slate-100" />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
-                        {(myGroup.business_name || user?.name || "?")[0]?.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                </button>
-                {/* "+" badge overlay — tap to add another story */}
-                <button
-                  type="button"
-                  onClick={() => setShowCreator(true)}
-                  className="absolute top-[42px] left-[42px] w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center ring-2 ring-white shadow-md hover:scale-110 transition will-change-transform"
-                  data-testid="story-add-badge"
-                  aria-label={lang === "en" ? "Add story" : "Agregar historia"}
-                >
-                  <Plus className="w-3.5 h-3.5" strokeWidth={3} />
-                </button>
-                {/* Label is a clickable shortcut to the creator — wider
-                    touch target so users don't have to hit the 24px "+" badge. */}
+                <div className="relative w-[72px] h-[72px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idx = groups.findIndex(g => g.provider_user_id === user.user_id);
+                      if (idx >= 0) openViewer(idx);
+                    }}
+                    className="w-[72px] h-[72px] rounded-full p-[2.5px] group-hover:scale-105 transition will-change-transform"
+                    style={{ background: "linear-gradient(135deg, #ec4899 0%, #f97316 50%, #f43f5e 100%)" }}
+                    aria-label={lang === "en" ? "View your story" : "Ver tu historia"}
+                  >
+                    <div className="w-full h-full rounded-full p-[2px] bg-white">
+                      {myGroup.logo_url ? (
+                        <img {...lazyImg(buildFileUrl(myGroup.logo_url))} alt="" className="w-full h-full rounded-full object-cover bg-slate-100" />
+                      ) : user?.picture ? (
+                        <img src={user.picture} alt="" className="w-full h-full rounded-full object-cover bg-slate-100" />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
+                          {(myGroup.business_name || user?.name || "?")[0]?.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                  {/* + badge — Instagram-style overlap at bottom-right */}
+                  <button
+                    type="button"
+                    onClick={() => setShowCreator(true)}
+                    className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full bg-[#0077B6] text-white flex items-center justify-center ring-2 ring-white shadow-sm hover:scale-110 transition will-change-transform"
+                    data-testid="story-add-badge"
+                    aria-label={lang === "en" ? "Add story" : "Agregar historia"}
+                  >
+                    <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowCreator(true)}
@@ -151,13 +156,25 @@ export default function StoriesCarousel() {
                 className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
                 data-testid="story-create-tile"
               >
-                <div className="relative w-[72px] h-[72px] rounded-full p-[2.5px] group-hover:scale-105 transition will-change-transform" style={{ background: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)" }}>
-                  <div className="w-full h-full rounded-full bg-slate-50 border-2 border-dashed border-teal-400 flex items-center justify-center">
-                    <Plus className="w-7 h-7 text-teal-600" strokeWidth={2.5} />
+                <div className="relative w-[72px] h-[72px]">
+                  <div className="w-[72px] h-[72px] rounded-full p-[2px] bg-slate-200 group-hover:bg-slate-300 transition">
+                    <div className="w-full h-full rounded-full bg-white p-[2px]">
+                      {user?.picture ? (
+                        <img src={user.picture} alt="" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
+                          {(user?.name || "?")[0]?.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {/* + badge — Instagram-style overlap at bottom-right */}
+                  <span className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full bg-[#0077B6] text-white flex items-center justify-center ring-2 ring-white shadow-sm group-hover:scale-110 transition will-change-transform" data-testid="story-create-plus">
+                    <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                  </span>
                 </div>
                 <span className="text-[11px] font-medium text-slate-600 max-w-[72px] truncate">
-                  {lang === "en" ? "Add story" : "Tu historia"}
+                  {lang === "en" ? "Your story" : "Tu historia"}
                 </span>
               </button>
             )

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
-import { Newspaper, Compass, Trophy, Award, IdCard, MapPin, Users } from "lucide-react";
+import { Compass, Trophy, Award, IdCard, Users } from "lucide-react";
 import { useI18n } from "../contexts/I18nContext";
 import useSmartNav from "../hooks/useSmartNav";
 import Header from "./Header";
@@ -10,14 +10,14 @@ import Header from "./Header";
  *
  * Persistent wrapper around all /comunidad sub-routes. Renders the global
  * Header once at the top, a SECONDARY pill bar with the comunidad-specific
- * sub-sections (Barrio · Feed · Gremios · Explorar · Ranking · eCards ·
- * HoF), and the active sub-route via <Outlet />.
+ * sub-sections (Gremios · Explorar · Ranking · eCards · HoF), and the
+ * active sub-route via <Outlet />.
  *
- * Section 89 v4 — added the Barrio tab (first position, distance-scoped
- * feed) and Gremios tab (private per-category communities).
+ * Section V11 — removed the redundant "Barrio/Nbhd" top tab. The bottom
+ * nav already routes "Barrio" → `/comunidad`, so having a second pill
+ * inside the page that selects the same content was duplicated nav.
  */
 const buildTabs = (lang) => [
-  { id: "barrio",       label: lang === "en" ? "Neighborhood" : "Barrio",  shortLabel: lang === "en" ? "Nbhd" : "Barrio",  Icon: MapPin,    path: "/comunidad" },
   { id: "gremios",      label: lang === "en" ? "Guilds"      : "Gremios",     shortLabel: lang === "en" ? "Guilds" : "Gremios",  Icon: Users,     path: "/comunidad/gremios" },
   { id: "explorar",     label: lang === "en" ? "Explore"     : "Explorar",    shortLabel: lang === "en" ? "Explore" : "Explorar", Icon: Compass,   path: "/comunidad/explorar" },
   { id: "ranking",      label: lang === "en" ? "Ranking"     : "Ranking",     shortLabel: "Ranking", Icon: Trophy,    path: "/comunidad/ranking" },
@@ -61,7 +61,7 @@ export default function ComunidadLayout() {
   }, [location.pathname]);
 
   const activeTab =
-    COMUNIDAD_TABS.find((tab) => tab.path === location.pathname) ?? COMUNIDAD_TABS[0];
+    COMUNIDAD_TABS.find((tab) => tab.path === location.pathname) ?? null;
 
   return (
     <div className="min-h-screen bg-[#F0F9FF]" data-testid="comunidad-layout">
@@ -84,7 +84,7 @@ export default function ComunidadLayout() {
           aria-label="Comunidad navigation"
         >
           {COMUNIDAD_TABS.map((tab) => {
-            const isActive = activeTab.id === tab.id;
+            const isActive = activeTab?.id === tab.id;
             return (
               <button
                 key={tab.id}
@@ -121,7 +121,7 @@ export default function ComunidadLayout() {
             <aside className="hidden lg:block lg:w-56 lg:flex-shrink-0 lg:pt-6" data-testid="comunidad-leftnav">
               <nav className="sticky top-24 space-y-1">
                 {COMUNIDAD_TABS.map((tab) => {
-                  const isActive = activeTab.id === tab.id;
+                  const isActive = activeTab?.id === tab.id;
                   return (
                     <Link
                       key={tab.id}

@@ -3,7 +3,17 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V10 Verify Badge + V10b Apple/FB OAuth scaffolding
+## Latest Update — May 30, 2026 · V11 Mobile UX cleanup (iPhone 17 Pro audit)
+Reportado por el founder en iPhone 17 Pro: Inicio era idéntico a Reels (route doble), había dos menús de navegación con "Barrio" duplicado, el "+" para agregar historia se veía mal posicionado, y el badge ♥1 sobre historias se cortaba en la parte superior.
+
+- **Fix 1 — `/` ahora renderea AppHome** (búsqueda principal con saludo + hero + categorías + featured providers), no ReelsPage. Reels queda solo en `/reels`. `/app` se mantiene como alias backward-compat. (`/app/frontend/src/App.js` línea 127)
+- **Fix 2 — Tab "Barrio/Nbhd" eliminada del top de `/comunidad`**. La navegación inferior ya envía al barrio cuando se toca "Barrio", así que el sub-tab repetido era redundante. Top tabs quedan: Gremios · Explorar · Ranking · eCards · Hall of Fame. (`ComunidadLayout.jsx` líneas 19-26). El `activeTab` ahora soporta `null` con `?.id` para que `/comunidad` (vista base del barrio) no resalte ningún sub-tab.
+- **Fix 3 — "+" de "Tu historia" estilo Instagram**: pequeño círculo (22×22 px) bg `#0077B6` con ring-2 blanco superpuesto al bottom-right del avatar. Ambos estados (con historia existente + crear historia nueva) usan ahora el mismo anclaje `-bottom-0.5 -right-0.5`. El avatar muestra la foto/inicial del usuario en lugar del cuadrado vacío con + gigante. (`StoriesCarousel.jsx` líneas 100-180)
+- **Fix 4 — Badge ♥1 ya no se corta**: el container del carousel ganó `pt-3` para que el `-top-1` del badge de likes / count se vea completo. El `overflow-x-auto` ya no tapa los badges porque el padding superior los empuja dentro del bounding box del scroll. (`StoriesCarousel.jsx` línea 94)
+- **Tests**: `test_iter102_v11_mobile_ux.py` (6 tests, source-code locks). Cumulative regression iter98→iter102: **50/50 pass**.
+- **Verificación visual**: Smoke screenshots a 402×874 (viewport iPhone 17 Pro) confirmaron `/` → AppHome con saludo "Hi, Carlos 👋 What do you need today?", `/comunidad` con 0 tabs "Barrio" top y badge ♥1 fully visible, "Tu historia" con avatar + small Instagram-style + badge.
+
+## Previous Update — May 30, 2026 · V10 Verify Badge + V10b Apple/FB OAuth scaffolding
 - **V10 — Verify badge artwork swap**: Reemplazado el `verify-badge.png` original (Xolo claro sobre escudo) por el nuevo **verifyv2** (silueta del Xolo en negro + escudo azul + check). Se re-renderizaron las 3 variantes pre-escaladas (64/128/256 px) + el master a 512×512. Como `VerifiedBadge.jsx` es la **única fuente** de la imagen (12+ páginas consumen el componente), un solo swap de PNG propaga el artwork nuevo a todas las eCards, Reels, Search, Stories, Barrio, ComunidadECards, etc.
 - **VerifiedBadge V10 props** (`/components/VerifiedBadge.jsx`):
   - `code` opcional → embebe `GM-XXXX` en el tooltip "Verificado por getamano · GM-1335".
