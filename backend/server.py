@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, Query, UploadFile, File, Form, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -17,14 +17,13 @@ from catalog import (
     SECTOR_LABELS,
     SECTOR_COLORS,
     SECTOR_EMOJIS,
-    SUBCATEGORY_EMOJIS,
     emoji_for,
     CITIES as SEO_CITIES,
 )
 import httpx
 import requests
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
 
@@ -10811,7 +10810,6 @@ def _build_og_image_recommendation_svg(
     e = _html_escape
     business = (provider.get("business_name") or "este profesional").strip()
     business_short = business if len(business) <= 22 else business[:21] + "…"
-    rating = provider.get("rating_avg") or 0
     is_verified = (provider.get("verification_status") == "approved")
     plan = (provider.get("plan") or "free").lower()
 
@@ -10823,7 +10821,6 @@ def _build_og_image_recommendation_svg(
     msg = (message or "").strip() or default_msg
     msg_lines = _wrap_svg_text(msg, max_chars_per_line=26, max_lines=4)
 
-    business_safe = e(business_short)
     name_safe = e(name_short)
     city_safe = e(city)
 

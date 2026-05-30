@@ -201,11 +201,10 @@ class TestSection70Versions:
 
         # auto-snapshot via PUT /providers/me — count should not decrease
         r_list_before = requests.get(f"{API}/providers/me/versions", headers=h, timeout=20)
-        before_count = None
         if r_list_before.status_code == 200:
             body = r_list_before.json()
             arr = body if isinstance(body, list) else body.get("versions") or body.get("data") or []
-            before_count = len(arr)
+            len(arr)
 
         # trigger an update — PUT requires full provider payload, so fetch then re-PUT
         cur = requests.get(f"{API}/providers/me", headers=h, timeout=20)

@@ -35,7 +35,6 @@ This makes the cap a hard limit at the database level.
 """
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo import ReturnDocument

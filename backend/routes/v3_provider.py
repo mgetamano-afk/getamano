@@ -44,7 +44,7 @@ Section 88 — referral economy.
 
 from __future__ import annotations
 
-import random
+import secrets
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -81,13 +81,14 @@ DEFAULT_PREFERENCES = {
 async def generate_unique_gm_code(db, max_attempts: int = 25) -> str:
     """Generate an unused `GM-XXXX` code (XXXX = 4 random digits).
 
-    We use random.randint instead of a counter so the codes don't reveal
-    the size of the platform. Collision risk is ~1% per attempt at 100
-    codes used; we retry up to `max_attempts` and fall back to the next
+    We use cryptographically-strong `secrets.randbelow` so the codes
+    don't reveal the size of the platform AND can't be guessed by
+    timing attacks. Collision risk is ~1% per attempt at 100 codes
+    used; we retry up to `max_attempts` and fall back to the next
     sequential 4-digit number if we somehow blow past that.
     """
     for _ in range(max_attempts):
-        candidate = f"{GM_CODE_PREFIX}{random.randint(1000, 9999)}"
+        candidate = f"{GM_CODE_PREFIX}{secrets.randbelow(9000) + 1000}"
         clash = await db.provider_profiles.find_one(
             {"getamano_code": candidate}, {"_id": 0, "provider_id": 1}
         )

@@ -424,8 +424,11 @@ async def _generate_or_get_ref_code(db, user_id: str) -> str:
     # Section 88 v3 — prefer GM-REF-{XXXX} so the brand stays consistent.
     # If the user is already a verified provider with a GM-XXXX code,
     # we mirror its 4-digit suffix so they only have to remember one
-    # number. Otherwise we mint a fresh 4-digit value uniquely.
-    import random
+    # number. Otherwise we mint a fresh 4-digit value uniquely using
+    # the cryptographically-secure `secrets` module (the legacy
+    # `random.randint` was flagged as security-weak by the audit since
+    # the codes are public identifiers used in URLs).
+    import secrets
     candidate: str | None = None
     gm = (prof or {}).get("getamano_code")
     if gm and gm.startswith("GM-") and len(gm) >= 6:
@@ -435,7 +438,7 @@ async def _generate_or_get_ref_code(db, user_id: str) -> str:
             candidate = None  # fall through to random
     if candidate is None:
         for _ in range(25):
-            candidate = f"GM-REF-{random.randint(1000, 9999)}"
+            candidate = f"GM-REF-{secrets.randbelow(9000) + 1000}"
             if not await db.provider_profiles.find_one({"ref_code": candidate}, {"_id": 0, "user_id": 1}):
                 break
 

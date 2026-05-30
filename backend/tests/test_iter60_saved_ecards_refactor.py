@@ -11,17 +11,11 @@ Endpoints under test:
   GET    /api/saved-ecards/me/state/{provider_id}
   GET    /api/saved-ecards/me  (with ?filter=bookmark|like|all)
 """
-import os
 import pytest
 import requests
+from tests.test_config import BASE_URL, CLIENT_EMAIL, CLIENT_PASSWORD
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-if not BASE_URL:
-    BASE_URL = "https://verified-providers-2.preview.emergentagent.com"
-
-CLIENT_EMAIL = "demo.client@getamano.com"
-CLIENT_PASSWORD = "client123"
-PROVIDER_ID = "prov_10b9f21bf971"  # demo.provider seed
+PROVIDER_ID = "prov_10b9f21bf971"  # demo.provider seed (stable, not secret)
 
 
 @pytest.fixture(scope="module")

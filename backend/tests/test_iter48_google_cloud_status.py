@@ -10,7 +10,6 @@ Acceptance per review request:
   - /api/card-scan with invalid key → source='api_error' + error_kind + Spanish note
   - Real reality probe: actually call Vision with current key and assert error_kind
 """
-import requests
 
 from tests.test_config import API
 

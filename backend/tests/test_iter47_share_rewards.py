@@ -15,23 +15,22 @@ Covers:
 Snapshot/restore pattern preserves demo.provider state for downstream frontend test.
 """
 import os
-import time
 import requests
 import pytest
 from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
+from tests.test_config import (
+    API,
+    PROVIDER_EMAIL,
+    PROVIDER_PASSWORD,
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+)
 
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:3000").rstrip("/")
-API = f"{BASE_URL}/api"
 
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "test_database")
 
-PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
-ADMIN_EMAIL = "admin@getamano.com"
-ADMIN_PASSWORD = "admin123"
 TIER_ID = "embajador_bronze"
 
 

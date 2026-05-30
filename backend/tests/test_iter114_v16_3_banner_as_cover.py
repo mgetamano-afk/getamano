@@ -15,7 +15,6 @@ with partial updates AND /api/og-image/{slug}.png from V16.
 """
 from __future__ import annotations
 
-import os
 import requests
 
 from test_config import API, BASE_URL, DEMO_SLUG, PROVIDER_EMAIL, PROVIDER_PASSWORD

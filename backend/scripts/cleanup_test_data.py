@@ -21,7 +21,7 @@ async def main():
     db = c[os.environ["DB_NAME"]]
 
     # 1) Find all test users
-    test_user_query = {
+    {
         "$or": [
             {"email": {"$regex": "@test\\.|^test_|@pytest\\.", "$options": "i"}},
             {"name": {"$regex": "^TestUser", "$options": "i"}},

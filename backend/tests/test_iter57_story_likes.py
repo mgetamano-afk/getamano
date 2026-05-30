@@ -151,7 +151,7 @@ class TestStoryViewsDedup:
             meta = _story_meta(client_session, sid_target)
             return meta.get("views_count", 0)
 
-        before = _views_for(sid)
+        _views_for(sid)
 
         # First view by client
         v1 = client_session.post(f"{API}/stories/{sid}/view", timeout=10)

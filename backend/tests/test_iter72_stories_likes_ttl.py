@@ -21,8 +21,6 @@ EXISTS so we know the cleanup is wired.
 """
 import os
 import sys
-import time
-import uuid
 
 import pytest
 import requests

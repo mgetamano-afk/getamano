@@ -8,7 +8,6 @@ Tests:
   - /api/upload usable with valid image; rejects non-image and >10MB
   - Seed state: María's post_demo_seed_001 has 1 comment from Carlos Demo
 """
-import io
 import os
 import time
 import pytest

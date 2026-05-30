@@ -2,7 +2,6 @@
 Focus: NEW recommendations endpoints + revisits to plans/quiz/PhaseE/section18/i18n
 to confirm the 5-sprint shipped surface stays green.
 """
-import os
 import requests
 import pytest
 from test_config import API, BASE_URL  # noqa: F401

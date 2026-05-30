@@ -12,8 +12,6 @@ Notes:
 """
 import base64
 import io
-import os
-import time
 
 import pytest
 import requests

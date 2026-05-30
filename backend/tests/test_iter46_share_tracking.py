@@ -13,7 +13,6 @@ We rely on the shared fixtures in conftest.py:
 import time
 
 import pytest
-import requests
 
 from tests.test_config import API, DEMO_SLUG
 

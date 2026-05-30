@@ -17,7 +17,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel, Field
 
-from integrations.messaging import send_whatsapp, send_sms, deliver_notification
+from integrations.messaging import send_whatsapp, send_sms
 from integrations.messaging_templates import list_templates
 
 

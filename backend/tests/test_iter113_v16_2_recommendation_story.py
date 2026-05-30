@@ -10,11 +10,10 @@ from __future__ import annotations
 import io
 import time
 
-import pytest
 import requests
 from PIL import Image
 
-from test_config import API, BASE_URL, DEMO_SLUG, CLIENT_EMAIL, CLIENT_PASSWORD
+from test_config import API, DEMO_SLUG, CLIENT_EMAIL, CLIENT_PASSWORD
 
 _TIMEOUT = 30
 

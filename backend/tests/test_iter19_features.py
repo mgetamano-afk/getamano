@@ -6,7 +6,6 @@ Iteration 19 — Tests for new backend features:
   (4) Regression: /api/providers excludes TEST; /api/public/stats has providers_label
 """
 import os
-import base64
 import pytest
 import requests
 from pymongo import MongoClient

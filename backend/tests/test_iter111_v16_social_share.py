@@ -20,11 +20,10 @@ from __future__ import annotations
 
 import io
 
-import pytest
 import requests
 from PIL import Image
 
-from test_config import API, BASE_URL, DEMO_SLUG
+from test_config import BASE_URL, DEMO_SLUG
 
 _TIMEOUT = 30  # cairosvg cold-start + remote logo fetch budget
 

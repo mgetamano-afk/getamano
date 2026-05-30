@@ -3,7 +3,6 @@ Validates that PWA static assets are served correctly and that all
 previously-working public APIs still return 200 with the expected shape.
 """
 import os
-import re
 import requests
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if "REACT_APP_BACKEND_URL" in os.environ else "https://verified-providers-2.preview.emergentagent.com"

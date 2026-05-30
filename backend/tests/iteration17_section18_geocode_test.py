@@ -12,7 +12,6 @@ Coverage:
 import pytest
 import requests
 from tests.test_config import (
-    BASE_URL,
     API,
     ADMIN_EMAIL,
     ADMIN_PASSWORD,

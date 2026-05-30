@@ -22,9 +22,7 @@ These checks lock the milestone contract without flooding the DB.
 import os
 import sys
 import uuid
-from datetime import datetime, timezone, timedelta
 
-import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 

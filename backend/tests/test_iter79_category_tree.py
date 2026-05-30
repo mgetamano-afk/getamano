@@ -13,7 +13,6 @@ import os
 import sys
 import time
 
-import pytest
 import requests
 
 sys.path.insert(0, os.path.dirname(__file__))

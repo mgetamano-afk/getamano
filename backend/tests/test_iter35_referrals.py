@@ -22,7 +22,7 @@ import uuid
 import pytest
 import requests
 from test_config import (
-    BASE_URL, API,
+    API,
     ADMIN_EMAIL, ADMIN_PASSWORD,
     PROVIDER_EMAIL, PROVIDER_PASSWORD,
 )

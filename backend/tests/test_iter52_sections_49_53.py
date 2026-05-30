@@ -4,20 +4,19 @@
   - POST /api/reviews  verified-detection branches  (Section 50)
   - GET  /api/providers/by-slug/{slug}  exposes verified/verification_source
 """
-import os
 import time
 import requests
 import pytest
+from tests.test_config import (
+    API,
+    PROVIDER_EMAIL,
+    PROVIDER_PASSWORD,
+    CLIENT_EMAIL,
+    CLIENT_PASSWORD,
+)
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
-API = f"{BASE_URL}/api"
-
-PROVIDER_EMAIL = "demo.provider@getamano.com"
-PROVIDER_PASSWORD = "provider123"
 PROVIDER_ID = "prov_10b9f21bf971"
 PROVIDER_SLUG = "maria-cleaning-services-sallisaw-ok"
-CLIENT_EMAIL = "demo.client@getamano.com"
-CLIENT_PASSWORD = "client123"
 
 
 def _login(email, password):

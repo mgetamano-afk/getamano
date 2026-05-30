@@ -1,7 +1,6 @@
 """Tests for GET /api/banners/banner-of-the-week (Section 57)."""
 import os
 import requests
-import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://verified-providers-2.preview.emergentagent.com").rstrip("/")
 ENDPOINT = f"{BASE_URL}/api/banners/banner-of-the-week"

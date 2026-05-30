@@ -132,7 +132,7 @@ def test_reels_reject_unauthenticated_wow(fresh_reel):
 def test_reel_action_menu_component_has_5_plus_1_actions():
     src = _read("frontend/src/components/ReelActionMenu.jsx")
     for tid in ("upload", "record", "share", "like", "save", "wow"):
-        assert f'data-testid={{`reel-action-${{a.id}}`}}' in src or f'reel-action-{tid}' in src
+        assert 'data-testid={`reel-action-${a.id}`}' in src or f'reel-action-{tid}' in src
     # Each action wires the right API path
     for path in ("/reels/${activeReel.reel_id}/wow", "/reels/${activeReel.reel_id}/save",
                  "/reels/${activeReel.reel_id}/share", "/reels/${activeReel.reel_id}/like"):

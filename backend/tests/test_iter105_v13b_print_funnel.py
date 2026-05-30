@@ -14,7 +14,6 @@ import os
 import sys
 
 import pytest
-import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 from tests.test_config import API, DEMO_SLUG  # noqa: E402

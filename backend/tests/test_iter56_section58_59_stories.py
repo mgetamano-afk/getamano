@@ -9,7 +9,6 @@ Backend-testable surface:
   • DELETE /api/stories/{id}     (owner or admin)
   • backend startup clean / indexes were added on `stories` collection
 """
-import os
 import requests
 
 from tests.test_config import API
@@ -177,7 +176,7 @@ class TestStoriesThrottle:
             # Already capped — that itself is the assertion
             return
         assert seed.status_code == 200, seed.text
-        provider_user_id = seed.json()["provider_user_id"]
+        seed.json()["provider_user_id"]
         created_ids = [seed.json()["story_id"]]
 
         try:

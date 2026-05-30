@@ -1,7 +1,6 @@
 """Iteration 15 — Sections 13/14/15/16: license, completion, badges, referrals, messaging,
 contact-prefs, incomplete-registrations. Pytest suite."""
 import os
-import time
 import uuid
 import pytest
 import requests

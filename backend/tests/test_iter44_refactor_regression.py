@@ -16,7 +16,6 @@ Demo seed (from /app/memory/test_credentials.md):
 from __future__ import annotations
 
 import os
-import time
 import uuid
 
 import pytest

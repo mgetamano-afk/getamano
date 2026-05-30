@@ -17,7 +17,6 @@ import os
 import re
 import sys
 
-import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 from tests.test_config import API  # noqa: E402

@@ -13,7 +13,6 @@ Covers:
  - General endpoints still up: /api/providers, /api/categories, /api/follows/me/feed (auth)
 """
 
-import io
 import os
 import re
 import struct

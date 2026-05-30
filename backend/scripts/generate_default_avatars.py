@@ -13,7 +13,6 @@ Usage:
   cd /app/backend && python scripts/generate_default_avatars.py
 """
 import asyncio
-import base64
 import os
 import sys
 from pathlib import Path
