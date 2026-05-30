@@ -3,7 +3,15 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V15 Reels actions + metrics + fan-out notifications
+## Latest Update — May 30, 2026 · V15.1 Double-tap to like
+
+- `ReelsPage.jsx` ahora detecta **doble-tap sobre el video** (umbral 280 ms): cancela el play/pause pendiente, dispara `POST /reels/{id}/like` y muestra `<LikeBurst/>` (corazón gigante + 6 corazones orbitando). Idempotente — si el reel ya está "me gusta", el burst aparece sin segunda llamada.
+- Single-tap mantiene el comportamiento de play/pause (deferred 280 ms para detectar la segunda tap).
+- `MetricPill` del heart se highlightea en rosa con `fill-current` cuando el viewer ya dio like.
+- `LikeBurst` exportado desde `ReelActionMenu` (DRY: misma animación en el FAB + en el double-tap).
+- Tests `iter108`: 3 source-code locks confirmando timing constants, export/import del burst, y highlight prop.
+
+## Previous Update — May 30, 2026 · V15 Reels actions + metrics + fan-out notifications
 
 User: "El boton flotante de + tiene que cambiar — Subir Reel · Grabar Reel · Compartir · Me gusta · Guardar. La sección 'sugerencias para ti' no debe existir en reels. Todos los usuarios o eCards (verificados o no) pueden subir historias y reels. Métricas + emoji impresionante con efecto espectacular + notificar a seguidores + cohorte de categoría."
 

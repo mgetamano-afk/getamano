@@ -12,7 +12,7 @@ import { buildFileUrl } from "../components/ImageUpload";
 import { resolveAvatar } from "../lib/avatar";
 import ReelCreator from "../components/ReelCreator";
 import VerifiedBadge from "../components/VerifiedBadge";
-import ReelActionMenu from "../components/ReelActionMenu";
+import ReelActionMenu, { LikeBurst } from "../components/ReelActionMenu";
 
 /**
  * ReelsPage — Section 89 v4 Phase E.
@@ -194,10 +194,12 @@ export default function ReelsPage() {
 }
 
 // ─── Single slide ─────────────────────────────────────────────────────
-function MetricPill({ Icon, value, testid }) {
+function MetricPill({ Icon, value, testid, highlight }) {
   return (
     <div className="flex flex-col items-center gap-0.5 text-white" data-testid={testid}>
-      <Icon className="w-7 h-7 drop-shadow-lg" />
+      <Icon
+        className={`w-7 h-7 drop-shadow-lg transition-colors ${highlight ? "text-rose-400 fill-current" : ""}`}
+      />
       <span className="text-[10px] font-bold drop-shadow tabular-nums">
         {(value || 0) > 999 ? `${(value / 1000).toFixed(1)}k` : (value || 0)}
       </span>
@@ -206,13 +208,67 @@ function MetricPill({ Icon, value, testid }) {
 }
 
 function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
+  const { user } = useAuth();
   const localVideoRef = useRef(null);
+  const lastTapRef = useRef(0);
+  const [liveLikes, setLiveLikes] = useState(reel.likes_count || 0);
+  const [liked, setLiked] = useState(false);
+  const [showBurst, setShowBurst] = useState(false);
+
+  // Refresh likes-count + my-liked state when the reel changes.
+  useEffect(() => {
+    setLiveLikes(reel.likes_count || 0);
+    if (!user) { setLiked(false); return; }
+    let alive = true;
+    api.get(`/reels/${reel.reel_id}/reactions/me`).then(r => {
+      if (alive) setLiked(!!r.data?.liked);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [reel.reel_id, reel.likes_count, user]);
+
+  // V15.1 — Double-tap to like (Instagram-style). Single tap toggles
+  // play/pause; if a second tap arrives within 280ms we cancel the
+  // play/pause and fire a like + LikeBurst overlay. Idempotent: tapping
+  // twice on an already-liked reel does nothing (no unlike on double-tap
+  // — the explicit toggle lives in the FAB action menu).
+  const DOUBLE_TAP_MS = 280;
+  const pendingTapRef = useRef(null);
+
+  const fireLike = async () => {
+    setShowBurst(true);
+    setTimeout(() => setShowBurst(false), 900);
+    if (!user) return;
+    if (liked) return; // already liked → just play the animation, no API
+    setLiked(true);
+    setLiveLikes(n => n + 1);
+    try {
+      const r = await api.post(`/reels/${reel.reel_id}/like`);
+      const isLiked = !!r.data?.liked;
+      setLiked(isLiked);
+      if (!isLiked) setLiveLikes(n => Math.max(0, n - 1));
+    } catch {
+      // soft-fail: leave optimistic UI in place
+    }
+  };
 
   const onTapVideo = () => {
-    const v = localVideoRef.current;
-    if (!v) return;
-    if (v.paused) v.play().catch(() => {});
-    else v.pause();
+    const now = Date.now();
+    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+      // Double-tap → like + burst, cancel pending single-tap play/pause
+      lastTapRef.current = 0;
+      if (pendingTapRef.current) { clearTimeout(pendingTapRef.current); pendingTapRef.current = null; }
+      fireLike();
+      return;
+    }
+    lastTapRef.current = now;
+    // Defer the play/pause toggle long enough to detect a 2nd tap.
+    pendingTapRef.current = setTimeout(() => {
+      const v = localVideoRef.current;
+      if (!v) return;
+      if (v.paused) v.play().catch(() => {});
+      else v.pause();
+      pendingTapRef.current = null;
+    }, DOUBLE_TAP_MS);
   };
 
   return (
@@ -233,6 +289,9 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
         onClick={onTapVideo}
         data-testid={`reel-video-${reel.reel_id}`}
       />
+      {/* V15.1 — Double-tap LikeBurst overlay (fullscreen but scoped to
+          this slide so it disappears once the next reel snaps in). */}
+      {showBurst && <LikeBurst />}
       {/* Bottom gradient + caption */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pb-6 pointer-events-none">
         <div className="flex items-end gap-3 max-w-md pointer-events-auto">
@@ -274,9 +333,9 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
           reel is doing. The owner sees the same numbers in their
           dashboard via /reels/me/metrics. */}
       <aside className="absolute right-3 bottom-24 flex flex-col items-center gap-3 pointer-events-none">
-        <MetricPill Icon={Heart}     value={reel.likes_count}  testid={`reel-likes-${reel.reel_id}`} />
-        <MetricPill Icon={Sparkles}  value={reel.wows_count}   testid={`reel-wows-${reel.reel_id}`} />
-        <MetricPill Icon={Bookmark}  value={reel.saves_count}  testid={`reel-saves-${reel.reel_id}`} />
+        <MetricPill Icon={Heart}     value={liveLikes}        testid={`reel-likes-${reel.reel_id}`}  highlight={liked} />
+        <MetricPill Icon={Sparkles}  value={reel.wows_count}  testid={`reel-wows-${reel.reel_id}`} />
+        <MetricPill Icon={Bookmark}  value={reel.saves_count} testid={`reel-saves-${reel.reel_id}`} />
         <MetricPill Icon={Share2}    value={reel.shares_count} testid={`reel-shares-${reel.reel_id}`} />
         {reel.provider_slug && (
           <Link
