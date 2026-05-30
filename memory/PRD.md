@@ -3,7 +3,15 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 29, 2026 · V4 Phases D–H (6-step closeout)
+## Latest Update — May 30, 2026 · V7 Rebuild (4 pasos en orden)
+- **Paso 1 — Reels closeout**: BottomNav swap "Buscar" → "Reels" (Film icon) en las 3 variantes (guest/provider/client). Reels ya estaba sin crashes desde V4 Phase E.
+- **Paso 2 — Provider Dashboard rebuild**: Nuevo `<ProviderSideNav>` con 4 grupos (Dashboard / Negocio / Crecer / Admin) y 17 items. Nuevo `<DashboardHomeV7>` reemplaza el "Inicio" con 7 secciones (greeting + 3 métricas + Completitud + Portafolio 0/12 + Mis Reels + Actividad + Referidos + Destacar). `TrustScore.jsx` renombrado a "Completitud de perfil" y removido el badge BAJO/MEDIO/ALTO. Nuevos tabs: reels, ecard, analytics, destacar, tarjetas (con `<PhysicalCardsPanel>` inline), preferencias.
+- **Paso 3 — Admin Dashboard rebuild**: AdminLayout NAV ganó 3 entradas nuevas (Reels moderación, Founding Members, Tarjetas físicas). Tres nuevas páginas admin (`AdminReelsModeration`, `AdminFounders`, `AdminPhysicalCards`). Backend: `routes/physical_cards.py` (CRUD provider+admin, push notifications), `routes/admin_overview.py` (KPIs + founders + payments stub), `/admin/reels` + `/admin/reels/{id}/visibility` para moderación. Indexes ensured on startup.
+- **Paso 4 — LocationPrompt en /buscar**: Nuevo `<LocationPrompt>` modal con geolocation + entrada manual, persiste a `localStorage.search_city/state`. Backend `/api/geo/reverse` usa Nominatim (no API key) con mapa hardcoded de US states 2-letter. Chip persistente con "Cambiar" + "Toda EE.UU.".
+- **Tests**: 17 tests nuevos en `test_iter96_v7_rebuild.py`. Cumulative regression: **86/86 pass**.
+- **Testing agent verification**: 100% backend + 100% en los 5 flows V7 con E2E. Cero defectos.
+
+## Previous Update — May 29, 2026 · V4 Phases D–H (6-step closeout)
 - **Paso 1 — Feed/Barrio unification**: `/comunidad` and `/comunidad/barrio` both render `ComunidadPage` in `barrio` mode (city chip + 5-radius selector persisted in `localStorage`, FeaturedStrip, inline TrustScore card between posts #3 and #4), keeping all rich legacy features (inline comments, pull-to-refresh, auto-poll, filters). `Feed` tab removed from `ComunidadLayout`. Extracted reusable chrome → `/components/BarrioOverlay.jsx` (`useBarrio`, `BarrioHeader`, `FeaturedStrip`, `InlineTrustCard`, `barrioCityFilter`).
 - **Paso 2 — Story tag de proveedor**: Anyone can post a 24h story by tagging a provider (`StoryCreateIn.tagged_provider_id`); providers still post without a tag. Story doc carries `tagged_provider_*` snapshot, `/stories/active` aggregation surfaces them, viewer CTA becomes "Ver {business_name} →", and tagged provider gets a Web Push. `StoryCreator` has a debounced provider autocomplete chip.
 - **Paso 3 — Reels (Phase E)**: New `/routes/reels.py` (CRUD + view dedupe + like toggle). New `ReelsPage` at `/reels` (vertical scroll-snap fullscreen, IntersectionObserver autoplay/pause, mute toggle, back button, floating + CTA). New `ReelCreator` modal uploads via `/api/upload` then posts to `/api/reels`. Throttle 10 reels/24h per provider.
