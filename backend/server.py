@@ -10234,14 +10234,23 @@ async def _fetch_logo_data_uri(logo_url: str, timeout: float = 4.0) -> str:
         return ""
 
 
-def _build_og_image_svg(provider: dict, embedded_logo_uri: str = "") -> str:
-    """Section 56/65 — Render a 1200×630 SVG card with provider info.
+def _build_og_image_svg(
+    provider: dict,
+    embedded_logo_uri: str = "",
+    embedded_hero_uri: str = "",
+    hero_source: str = "none",
+) -> str:
+    """Section 56/65/V16 — Render a 1200×630 SVG card with provider info.
+
+    V16: when `embedded_hero_uri` is provided, render it as a full-bleed
+    background image (gallery photo or AI card design) with a dark
+    gradient overlay to keep the white text legible. Falls back to the
+    deterministic teal gradient when no hero is available.
 
     SVG is intentionally lightweight (no external fonts beyond system stack)
     and includes:
-      - Teal getamano gradient background
-      - Circular avatar (initials fallback if no logo) — accepts pre-fetched
-        data URI for reliable PNG conversion (Section 65)
+      - Hero photo or teal gradient background
+      - Circular avatar (initials fallback if no logo)
       - Verified ribbon
       - Business name (truncated)
       - Category · City, State
@@ -10318,6 +10327,25 @@ def _build_og_image_svg(provider: dict, embedded_logo_uri: str = "") -> str:
             f'<text x="980" y="420" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="80" font-weight="800" fill="white">{initials_safe}</text>'
         )
 
+    # V16 — hero background. Prefer real gallery photo, fall back to AI design,
+    # fall back to deterministic gradient. The hero photo is composited
+    # full-bleed with a dark gradient overlay so white text stays legible
+    # at the 9-10:1 contrast ratio we target.
+    if embedded_hero_uri:
+        hero_safe = e(embedded_hero_uri)
+        hero_block = (
+            f'<image href="{hero_safe}" xlink:href="{hero_safe}" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>'
+            f'<rect width="1200" height="630" fill="url(#heroOverlay)"/>'
+            f'<rect width="780" height="630" fill="url(#heroSideFade)"/>'
+        )
+        # Brand the top strip with where the artwork came from (or a generic
+        # social-friendly label otherwise).
+        top_label = "FOTO REAL DEL PROFESIONAL · GETAMANO" if hero_source == "gallery" else "PROFESIONAL VERIFICADO · GETAMANO"
+    else:
+        hero_block = '<rect width="1200" height="630" fill="url(#bg)"/>'
+        top_label = "PROFESIONAL VERIFICADO · GETAMANO"
+    top_label_safe = e(top_label)
+
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -10325,19 +10353,32 @@ def _build_og_image_svg(provider: dict, embedded_logo_uri: str = "") -> str:
       <stop offset="55%" stop-color="#0A4D5E"/>
       <stop offset="100%" stop-color="#025F67"/>
     </linearGradient>
+    <linearGradient id="heroOverlay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(3,4,94,0.72)"/>
+      <stop offset="45%" stop-color="rgba(6,49,84,0.78)"/>
+      <stop offset="100%" stop-color="rgba(2,95,103,0.85)"/>
+    </linearGradient>
+    <linearGradient id="heroSideFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.55)"/>
+      <stop offset="55%" stop-color="rgba(0,0,0,0.15)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.0)"/>
+    </linearGradient>
     <pattern id="grain" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
       <circle cx="30" cy="30" r="1.2" fill="rgba(255,255,255,0.03)"/>
     </pattern>
+    <clipPath id="cardClip"><rect width="1200" height="630"/></clipPath>
   </defs>
 
-  <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect width="1200" height="630" fill="url(#grain)"/>
+  <g clip-path="url(#cardClip)">
+    {hero_block}
+    <rect width="1200" height="630" fill="url(#grain)"/>
+  </g>
 
   <!-- Left accent stripe -->
   <rect x="0" y="0" width="14" height="630" fill="#2F9D94"/>
 
   <!-- Top label -->
-  <text x="80" y="100" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="#2F9D94">PROFESIONAL VERIFICADO · GETAMANO</text>
+  <text x="80" y="100" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="700" letter-spacing="3" fill="#2F9D94">{top_label_safe}</text>
 
   <!-- Verified badge top-right -->
   {verified_block}
@@ -10364,7 +10405,14 @@ def _build_og_image_svg(provider: dict, embedded_logo_uri: str = "") -> str:
 
 
 async def _load_og_provider(slug: str) -> dict:
-    """Section 65 — Resolve a slug to the provider dict used by OG renderers.
+    """Section 65 / V16 — Resolve a slug to the provider dict used by OG renderers.
+
+    V16 adds hero image precedence so the social preview reflects the
+    provider's real visual identity:
+      1. First gallery photo (their actual work) — preferred once they
+         upload anything.
+      2. AI card_designs.is_active=true background — second-best.
+      3. None → fall back to deterministic teal gradient.
 
     Returns a generic fallback so social previews never 404. Enriches the
     category name in Spanish (legacy stored only category_id).
@@ -10378,11 +10426,40 @@ async def _load_og_provider(slug: str) -> dict:
             "state": "",
             "rating_avg": 0,
             "rating_count": 0,
+            "_hero_image_url": "",
+            "_hero_image_source": "none",
         }
     if provider.get("category_id"):
         cat = await db.categories.find_one({"category_id": provider["category_id"]}, {"_id": 0, "name_es": 1, "name_en": 1})
         if cat:
             provider["category"] = {"name_es": cat.get("name_es") or cat.get("name_en")}
+
+    # V16 hero image lookup
+    hero_url = ""
+    hero_source = "none"
+    gallery = provider.get("gallery") or []
+    for item in gallery:
+        if isinstance(item, dict):
+            u = (item.get("url") or "").strip()
+            if u:
+                hero_url = u
+                hero_source = "gallery"
+                break
+    if not hero_url:
+        ai_design = await db.card_designs.find_one(
+            {
+                "user_id": provider.get("user_id"),
+                "provider_id": provider.get("provider_id"),
+                "is_active": True,
+            },
+            {"_id": 0, "image_b64": 1},
+            sort=[("created_at", -1)],
+        )
+        if ai_design and ai_design.get("image_b64"):
+            hero_url = f"data:image/png;base64,{ai_design['image_b64']}"
+            hero_source = "ai"
+    provider["_hero_image_url"] = hero_url
+    provider["_hero_image_source"] = hero_source
     return provider
 
 
@@ -10395,7 +10472,13 @@ async def og_image(slug: str):
     kept for browsers, Twitter Cards (which accept SVG), and debug tools.
     """
     provider = await _load_og_provider(slug)
-    svg = _build_og_image_svg(provider)
+    # SVG variant ships with raw remote URLs (no need to embed for browser
+    # rendering — they fetch images natively).
+    svg = _build_og_image_svg(
+        provider,
+        embedded_hero_uri=provider.get("_hero_image_url") or "",
+        hero_source=provider.get("_hero_image_source") or "none",
+    )
     return _OGResponse(
         content=svg,
         media_type="image/svg+xml",
@@ -10408,12 +10491,15 @@ async def og_image(slug: str):
 
 @app.get("/api/og-image/{slug}.png")
 async def og_image_png(slug: str):
-    """Section 65 — Dynamic 1200×630 PNG used as og:image for social previews.
+    """Section 65 / V16 — Dynamic 1200×630 PNG used as og:image for social previews.
 
     WhatsApp, iMessage, Facebook and most other crawlers expect PNG/JPEG
-    (NOT SVG). We render the SVG, embed the provider logo as a base64 data
-    URI so the rasteriser doesn't need network fetch, then convert via
-    cairosvg.
+    (NOT SVG). We render the SVG, embed the provider logo + hero photo as
+    base64 data URIs so the rasteriser doesn't need network fetch, then
+    convert via cairosvg.
+
+    V16: hero precedence is gallery photo → AI design → none. When the
+    hero is already a data: URI (AI design) we skip the HTTP fetch.
 
     Heavy HTTP caching (24h max-age + 7d stale-while-revalidate) keeps the
     cost negligible: identical responses are served by the edge, only
@@ -10422,7 +10508,14 @@ async def og_image_png(slug: str):
     import cairosvg as _cairosvg  # local import keeps cold-start lean
     provider = await _load_og_provider(slug)
     logo_uri = await _fetch_logo_data_uri(provider.get("logo_url") or "")
-    svg = _build_og_image_svg(provider, embedded_logo_uri=logo_uri)
+    hero_raw = provider.get("_hero_image_url") or ""
+    hero_uri = hero_raw if hero_raw.startswith("data:") else await _fetch_logo_data_uri(hero_raw)
+    svg = _build_og_image_svg(
+        provider,
+        embedded_logo_uri=logo_uri,
+        embedded_hero_uri=hero_uri,
+        hero_source=provider.get("_hero_image_source") or "none",
+    )
     try:
         png_bytes = _cairosvg.svg2png(
             bytestring=svg.encode("utf-8"),
@@ -10430,10 +10523,10 @@ async def og_image_png(slug: str):
             output_height=630,
         )
     except Exception as exc:  # noqa: BLE001
-        # If conversion fails (corrupt logo, malformed SVG), fall back to
-        # a logo-less render so the social preview still gets the data.
+        # If conversion fails (corrupt logo/hero, malformed SVG), fall back
+        # to a logo+hero-less render so the social preview still gets the data.
         try:
-            fallback_svg = _build_og_image_svg(provider, embedded_logo_uri="")
+            fallback_svg = _build_og_image_svg(provider, embedded_logo_uri="", embedded_hero_uri="")
             png_bytes = _cairosvg.svg2png(
                 bytestring=fallback_svg.encode("utf-8"),
                 output_width=1200,
@@ -10447,6 +10540,193 @@ async def og_image_png(slug: str):
         headers={
             "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
             "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+def _build_og_image_story_svg(
+    provider: dict,
+    embedded_logo_uri: str = "",
+    embedded_hero_uri: str = "",
+    hero_source: str = "none",
+) -> str:
+    """V16 — 1080×1920 vertical SVG for Instagram / TikTok Stories.
+
+    Vertical stack: hero photo top half, content block bottom half, brand
+    footer pill. Same data shape as the horizontal card — different layout.
+    """
+    name = (provider.get("business_name") or "Negocio").strip()
+    name_display = name if len(name) <= 28 else name[:27] + "…"
+    cat = (provider.get("category") or {}).get("name_es") or provider.get("category_label") or ""
+    city = provider.get("city") or ""
+    state = provider.get("state") or ""
+    rating = provider.get("rating_avg") or 0
+    review_count = provider.get("rating_count") or 0
+    is_verified = (provider.get("verification_status") == "approved")
+    plan = (provider.get("plan") or "free").lower()
+    logo_for_svg = embedded_logo_uri or (provider.get("logo_url") or "")
+
+    initials = "".join([w[0] for w in name.split()[:2] if w]).upper() or "G"
+    star_full = "★" * int(round(rating))
+    star_empty = "☆" * (5 - int(round(rating)))
+    star_line = (star_full + star_empty) if rating > 0 else ""
+
+    e = _html_escape
+    name_safe = e(name_display)
+    cat_safe = e(cat)
+    city_safe = e(", ".join(p for p in [city, state] if p))
+    initials_safe = e(initials)
+    logo_safe = e(logo_for_svg)
+
+    # Hero block — full-width top portion (0 → 1100), gradient overlay below
+    if embedded_hero_uri:
+        hero_safe = e(embedded_hero_uri)
+        hero_block = (
+            f'<image href="{hero_safe}" xlink:href="{hero_safe}" x="0" y="0" width="1080" height="1100" preserveAspectRatio="xMidYMid slice"/>'
+            f'<rect x="0" y="0" width="1080" height="1100" fill="rgba(0,0,0,0.18)"/>'
+            f'<rect x="0" y="900" width="1080" height="220" fill="url(#fadeIntoCard)"/>'
+        )
+        hero_label = "FOTO REAL · GETAMANO" if hero_source == "gallery" else "VERIFICADO · GETAMANO"
+    else:
+        hero_block = (
+            '<rect x="0" y="0" width="1080" height="1100" fill="url(#bg)"/>'
+        )
+        hero_label = "VERIFICADO · GETAMANO"
+    hero_label_safe = e(hero_label)
+
+    verified_pill = (
+        '<g transform="translate(80,110)">'
+        '<rect width="240" height="56" rx="28" fill="#10B981"/>'
+        '<path d="M28 28 L40 40 L60 18" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<text x="148" y="36" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" fill="white">Verificado</text>'
+        '</g>'
+    ) if is_verified else ""
+    pro_pill = (
+        '<g transform="translate(80,180)">'
+        '<rect width="140" height="48" rx="24" fill="#F59E0B"/>'
+        '<text x="70" y="32" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="800" letter-spacing="3" fill="white">PRO</text>'
+        '</g>'
+    ) if plan in ("pro", "premium") else ""
+
+    if logo_for_svg:
+        avatar = (
+            f'<defs><clipPath id="avatarClipStory"><circle cx="540" cy="1060" r="100"/></clipPath></defs>'
+            f'<circle cx="540" cy="1060" r="108" fill="white"/>'
+            f'<image href="{logo_safe}" xlink:href="{logo_safe}" x="440" y="960" width="200" height="200" clip-path="url(#avatarClipStory)" preserveAspectRatio="xMidYMid slice"/>'
+        )
+    else:
+        avatar = (
+            f'<circle cx="540" cy="1060" r="108" fill="rgba(255,255,255,0.18)" stroke="white" stroke-width="4"/>'
+            f'<text x="540" y="1090" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="78" font-weight="800" fill="white">{initials_safe}</text>'
+        )
+
+    rating_block = (
+        f'<text x="540" y="1500" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="56" font-weight="700" fill="#FCD34D">{star_line}</text>'
+        f'<text x="540" y="1560" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="32" fill="rgba(255,255,255,0.92)">{rating:.1f} de 5 · {review_count} reseña{"s" if review_count != 1 else ""}</text>'
+    ) if rating > 0 else (
+        '<text x="540" y="1540" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="32" fill="rgba(255,255,255,0.6)">Sin reseñas todavía</text>'
+    )
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#063154"/>
+      <stop offset="55%" stop-color="#0A4D5E"/>
+      <stop offset="100%" stop-color="#025F67"/>
+    </linearGradient>
+    <linearGradient id="cardBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#022E47"/>
+      <stop offset="100%" stop-color="#03045E"/>
+    </linearGradient>
+    <linearGradient id="fadeIntoCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(2,46,71,0)"/>
+      <stop offset="100%" stop-color="rgba(2,46,71,1)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background card -->
+  <rect width="1080" height="1920" fill="url(#cardBg)"/>
+
+  <!-- Hero block (top) -->
+  {hero_block}
+
+  <!-- Top brand strip -->
+  <text x="540" y="60" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" letter-spacing="6" fill="rgba(255,255,255,0.85)">{hero_label_safe}</text>
+
+  <!-- Pills (verified/pro) -->
+  {verified_pill}
+  {pro_pill}
+
+  <!-- Logo overlapping hero/content seam -->
+  {avatar}
+
+  <!-- Business name -->
+  <text x="540" y="1280" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="86" font-weight="800" fill="white">{name_safe}</text>
+
+  <!-- Category -->
+  <text x="540" y="1360" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="40" font-weight="500" fill="rgba(255,255,255,0.85)">{cat_safe}</text>
+  <text x="540" y="1418" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="34" fill="rgba(255,255,255,0.68)">{city_safe}</text>
+
+  <!-- Rating -->
+  {rating_block}
+
+  <!-- CTA pill -->
+  <g transform="translate(290,1670)">
+    <rect width="500" height="100" rx="50" fill="#2F9D94"/>
+    <text x="250" y="64" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="38" font-weight="800" fill="white">Abrir en getamano →</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="540" y="1850" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="600" fill="rgba(255,255,255,0.55)">getamano.us · Lo latino, a la mano.</text>
+</svg>'''
+
+
+@app.get("/api/og-image/story/{slug}.png")
+async def og_image_story_png(slug: str):
+    """V16 — Dynamic 1080×1920 PNG optimised for Instagram / TikTok Stories.
+
+    Providers download this from ShareLinkCard → "Compartir en Story" and
+    upload the PNG into a Story sticker. We bake the same hero precedence
+    (gallery → AI → gradient) so the Story always looks native.
+
+    Route placed under `/story/` (not `{slug}-story.png`) to disambiguate
+    from the horizontal `{slug}.png` route — FastAPI greedy-matches `{slug}`
+    so a hyphen suffix would never reach this handler.
+    """
+    import cairosvg as _cairosvg
+    provider = await _load_og_provider(slug)
+    logo_uri = await _fetch_logo_data_uri(provider.get("logo_url") or "")
+    hero_raw = provider.get("_hero_image_url") or ""
+    hero_uri = hero_raw if hero_raw.startswith("data:") else await _fetch_logo_data_uri(hero_raw)
+    svg = _build_og_image_story_svg(
+        provider,
+        embedded_logo_uri=logo_uri,
+        embedded_hero_uri=hero_uri,
+        hero_source=provider.get("_hero_image_source") or "none",
+    )
+    try:
+        png_bytes = _cairosvg.svg2png(
+            bytestring=svg.encode("utf-8"),
+            output_width=1080,
+            output_height=1920,
+        )
+    except Exception as exc:  # noqa: BLE001
+        try:
+            fallback_svg = _build_og_image_story_svg(provider, embedded_logo_uri="", embedded_hero_uri="")
+            png_bytes = _cairosvg.svg2png(
+                bytestring=fallback_svg.encode("utf-8"),
+                output_width=1080,
+                output_height=1920,
+            )
+        except Exception:
+            raise HTTPException(status_code=500, detail=f"og-image story render failed: {exc}")
+    return _OGResponse(
+        content=png_bytes,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'inline; filename="{slug}-story.png"',
         },
     )
 

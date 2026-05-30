@@ -3,7 +3,46 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V15.2 / V15.3 / V12-fix polish round
+## Latest Update — May 30, 2026 · V16 Rich Social Previews (Open Graph + IG Stories)
+
+Founder: "cuando se compartan las eCards, por redes sociales, en un post de insta, de facebook, de X, el post se vea tan real, como si fuera nativo de esa app... una miniatura de la ecard, con toda la información básica... cuando ya tengamos más data, automáticamente tiene que usar las imágenes que el usuario dueño de las eCards ha puesto."
+
+### Hero precedence (V16 core enhancement)
+La infraestructura de Open Graph (`/api/og-image/{slug}.png`, `/api/og/p/{slug}` SSR HTML, bot middleware) ya existía desde Section 56/65. V16 agrega **precedencia de imagen hero** para que el preview se vea nativo y auténtico:
+1. **Gallery[0]** — primera foto que el proveedor sube de su trabajo real (preferred).
+2. **AI card_designs.is_active=true** — fondo IA si no hay galería.
+3. **Gradient teal** — fallback determinístico.
+
+Cuando hay galería, el badge superior cambia a **"FOTO REAL DEL PROFESIONAL · GETAMANO"** (vs. "PROFESIONAL VERIFICADO · GETAMANO"). El hero se composita full-bleed (1200×630) con overlay gradient oscuro 70-85% alpha + side-fade izquierdo para garantizar legibilidad blanca a 9-10:1 contrast.
+
+### Endpoints nuevos / actualizados
+- `GET /api/og-image/{slug}.png` — 1200×630 PNG horizontal. Ahora embebe gallery[0] como hero data URI via cairosvg.
+- `GET /api/og-image/{slug}.svg` — Mismo render, formato SVG (Twitter Cards + debug).
+- `GET /api/og-image/story/{slug}.png` **(NUEVO)** — 1080×1920 PNG vertical para Instagram/TikTok/FB Stories. Avatar circular overlapping hero/content seam, CTA pill teal "Abrir en getamano →". Disambiguación de ruta: bajo `/story/` para no chocar con greedy `{slug}.png`.
+- `GET /api/og/p/{slug}` — SSR HTML con og:* + twitter:* tags. Sin cambios.
+
+### Frontend — ShareLinkCard.jsx ampliado
+- **Live preview block** (`share-link-social-preview`): renderiza `<img src="/api/og-image/{slug}.png">` para que el proveedor vea EXACTAMENTE cómo se verá su link en FB/IG/X antes de publicarlo. Botón "Actualizar" hace cache-bust con `?t={Date.now()}`. Banner "La imagen usa tu primera foto de galería automáticamente. Cuando agregues más fotos, esta vista previa se actualiza."
+- **Botón "Descargar para Story"** (`share-link-story-download`, gradient pink→fuchsia→purple): fetch del PNG 1080×1920 como blob + `createObjectURL` + download programático (Safari-friendly). Toast "Imagen lista — súbela como sticker en tu historia."
+- **Botón "Validar en Facebook"** (`share-link-validate-fb`): abre `https://developers.facebook.com/tools/debug/?q={shortUrl}` para que el proveedor confirme el scrape correcto.
+- **Botón "Validar en X"** (`share-link-validate-x`): abre `https://cards-dev.twitter.com/validator?url={shortUrl}`.
+- **Wireado al Dashboard Home**: `ShareLinkCard` ahora se renderiza TOP-OF-PAGE en `tab === "dashboard"` de `ProviderDashboard.jsx` (antes era un import huérfano). El proveedor lo ve apenas entra al panel.
+
+### Tests
+- `test_iter111_v16_social_share.py` (12 tests):
+  - 7 integration: PNG dimensions (1200×630 + 1080×1920), route disambiguation, SVG `<image>` injection, HTML meta tags, 404 fallback, bot UA hits FastAPI handler.
+  - 3 frontend source locks: preview block + story button + validators.
+  - 2 backend source locks: `_load_og_provider` gallery-first + story endpoint registered.
+- Suite cumulativa iter102→iter111: **93/93 verde** (sin regresiones).
+
+### Visual validation
+- Smoke screenshot del dashboard del proveedor demo: el live preview muestra a María limpiando una ventana (foto de su galería) con texto blanco legible, badges Verificado + PRO, rating 5.0 (10 reseñas), "Ver eCard completa →", todo sobre un overlay gradient azul. Botones Story/FB/X visible debajo.
+
+### Growth mechanics
+- Cada share desde ShareLinkCard fire-and-forget llama `POST /providers/me/share-event` con `channel: "story" | "facebook" | "x" | ...`. El panel CEO ya tiene `share_events` agregados por canal — Story Downloads aparecen como métrica nueva.
+- La URL de share es `/api/og/p/{slug}?ref={slug}` (no `/p/{slug}` directo) porque el ingress k8s rutea solo `/api/*` al backend. Esto garantiza que TODA URL compartida pase por FastAPI primero y reciba el SSR HTML antes de redirigir al humano al SPA.
+
+## Previous Update — May 30, 2026 · V15.2 / V15.3 / V12-fix polish round
 
 3 fixes en una iteración tras feedback del founder:
 

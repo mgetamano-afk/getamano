@@ -298,12 +298,19 @@ export default function ProviderDashboard() {
 
             {/* ── HOME (Inicio) overview — visible only when tab === "dashboard" ── */}
             {tab === "dashboard" && (
-              <DashboardHomeV7
-                profile={profile}
-                unread={unread}
-                requests={requests}
-                onTabChange={setTab}
-              />
+              <>
+                {/* V16 — Top-of-home: rich social share card with live OG
+                    preview, IG-Story download, and FB/X validators. */}
+                {profile?.slug && (
+                  <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
+                )}
+                <DashboardHomeV7
+                  profile={profile}
+                  unread={unread}
+                  requests={requests}
+                  onTabChange={setTab}
+                />
+              </>
             )}
             {/* ── END Home (V7 rebuild) ── */}
 

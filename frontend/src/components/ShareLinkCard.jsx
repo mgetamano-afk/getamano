@@ -1,6 +1,6 @@
 import BrandMark from "./BrandMark";
 import { useState } from "react";
-import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram, Printer } from "lucide-react";
+import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram, Printer, Image as ImageIcon, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "../lib/api";
@@ -12,10 +12,21 @@ import { api } from "../lib/api";
  * Section 46 — every share appends ?ref={slug} so the public eCard view can
  * credit the referrer. Each click also fires a fire-and-forget
  * POST /providers/me/share-event for the dashboard viral KPI card.
+ *
+ * V16 (Social Preview) — adds:
+ *   - Live preview of how the link looks when pasted in FB/IG/X (uses the
+ *     `/api/og-image/{slug}.png` rendered server-side with the first gallery
+ *     photo → AI bg → gradient fallback).
+ *   - "Descargar para Story" button to download the 1080×1920 vertical PNG
+ *     ready to upload to IG/TikTok/FB Stories.
+ *   - Validators that open the link in Facebook Sharing Debugger /
+ *     Twitter Card Validator so the provider can verify the preview is
+ *     scraped correctly before publishing.
  */
 export default function ShareLinkCard({ slug, businessName }) {
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [previewBust, setPreviewBust] = useState(() => Date.now());
 
   if (!slug) return null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -29,6 +40,9 @@ export default function ShareLinkCard({ slug, businessName }) {
   // Canonical SEO URL (kept clean for the "Ver mi eCard" preview)
   const fullUrl = `${origin}/p/${slug}`;
   const displayUrl = shortUrl.replace(/^https?:\/\//, "").replace(refParam, "").replace("/api/og/p/", "/p/");
+  // V16 image endpoints
+  const previewImg = `${backend}/api/og-image/${slug}.png?t=${previewBust}`;
+  const storyImg = `${backend}/api/og-image/story/${slug}.png?t=${previewBust}`;
 
   // Persuasive Spanish message — first-person, concrete, link last.
   const shareText = `¡Hola! Te dejo mi eCard de ${businessName} en getamano · servicio latino verificado 🌟\n\n${shortUrl}`;
@@ -120,6 +134,47 @@ export default function ShareLinkCard({ slug, businessName }) {
     toast.success("Descargando código QR");
   };
 
+  // V16 — download the 1080×1920 Instagram Story PNG. We fetch as blob so
+  // mobile browsers don't navigate away to a new tab + Safari handles the
+  // download cleanly via the temporary object URL.
+  const downloadStory = async () => {
+    const id = toast.loading("Generando imagen para tu historia…");
+    try {
+      const r = await fetch(storyImg);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u; a.download = `${slug}-story.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 1000);
+      _trackShare("story");
+      toast.success("Imagen lista — súbela como sticker en tu historia.", { id });
+    } catch (e) {
+      console.error("story download failed", e);
+      toast.error("No se pudo descargar la imagen", { id });
+    }
+  };
+
+  const validateFB = () => {
+    // Facebook Sharing Debugger pre-fills the URL so the provider can see
+    // exactly what FB will show when someone pastes the link.
+    const url = `https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(shortUrl)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const validateX = () => {
+    // Twitter (now X) deprecated their validator but the cards.dev mirror still
+    // works for many; we open the URL via their internal redirect as fallback.
+    const url = `https://cards-dev.twitter.com/validator?url=${encodeURIComponent(shortUrl)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const refreshPreview = () => {
+    setPreviewBust(Date.now());
+    toast.success("Previa actualizada");
+  };
+
   return (
     <div className="relative overflow-hidden rounded-3xl p-5 md:p-6 mb-6"
       style={{
@@ -143,6 +198,34 @@ export default function ShareLinkCard({ slug, businessName }) {
         <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="hidden md:inline-flex items-center gap-1 text-xs text-white/70 hover:text-white" data-testid="share-link-preview">
           Ver mi eCard <ExternalLink className="w-3 h-3" />
         </a>
+      </div>
+
+      {/* V16 — Live social preview */}
+      <div className="relative mb-4 rounded-2xl overflow-hidden bg-black/30 border border-white/10" data-testid="share-link-social-preview">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-black/40 border-b border-white/10">
+          <div className="flex items-center gap-1.5 text-[11px] text-white/85 font-semibold tracking-wide">
+            <ImageIcon className="w-3.5 h-3.5 text-orange-300" />
+            Así se verá en Facebook / WhatsApp / X
+          </div>
+          <button
+            type="button"
+            onClick={refreshPreview}
+            className="text-[10px] text-white/60 hover:text-white px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 transition"
+            data-testid="share-link-preview-refresh"
+          >
+            Actualizar
+          </button>
+        </div>
+        <img
+          src={previewImg}
+          alt={`Vista previa para compartir · ${businessName}`}
+          className="block w-full h-auto"
+          loading="lazy"
+          data-testid="share-link-preview-img"
+        />
+        <div className="px-3 py-2 text-[10px] text-white/55 leading-snug">
+          La imagen usa tu primera foto de galería automáticamente. Cuando agregues más fotos, esta vista previa se actualiza.
+        </div>
       </div>
 
       {/* URL display + copy */}
@@ -191,6 +274,34 @@ export default function ShareLinkCard({ slug, businessName }) {
         <button onClick={nativeShare} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white transition" data-testid="share-link-native">
           <Smartphone className="w-4 h-4 text-purple-300" />
           <span className="text-[11px]">Más...</span>
+        </button>
+      </div>
+
+      {/* V16 — Story download + validators */}
+      <div className="relative mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+        <button
+          onClick={downloadStory}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 hover:from-pink-600 hover:via-fuchsia-600 hover:to-purple-600 text-white text-sm font-semibold shadow-lg transition"
+          data-testid="share-link-story-download"
+        >
+          <Instagram className="w-4 h-4" />
+          Descargar para Story
+        </button>
+        <button
+          onClick={validateFB}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white text-sm font-medium transition"
+          data-testid="share-link-validate-fb"
+        >
+          <Search className="w-4 h-4 text-blue-300" />
+          Validar en Facebook
+        </button>
+        <button
+          onClick={validateX}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur text-white text-sm font-medium transition"
+          data-testid="share-link-validate-x"
+        >
+          <Search className="w-4 h-4 text-sky-300" />
+          Validar en X
         </button>
       </div>
 
