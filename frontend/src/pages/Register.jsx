@@ -16,6 +16,7 @@ import { api } from "../lib/api";
 import LanguageToggle from "../components/onboarding/LanguageToggle";
 import CityscapeBackdrop from "../components/CityscapeBackdrop";
 import BrandMark from "../components/BrandMark";
+import { AppleSignInButton, FacebookSignInButton } from "../components/SocialAuthButtons";
 
 /**
  * Register — Section 87.
@@ -142,14 +143,6 @@ export default function Register() {
     sessionStorage.setItem("tx_intent", role);
     if (refCode) sessionStorage.setItem("tx_ref", refCode);
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
-
-  const comingSoon = (label) => {
-    toast.message(
-      lang === "en"
-        ? `${label} coming soon — use Google for now.`
-        : `${label} próximamente — usa Google por ahora.`
-    );
   };
 
   return (
@@ -290,28 +283,8 @@ export default function Register() {
                 </svg>
                 {lang === "en" ? "Continue with Google" : "Continuar con Google"}
               </button>
-              <button
-                type="button"
-                onClick={() => comingSoon("Apple")}
-                className="w-full h-12 rounded-full bg-black hover:bg-slate-800 active:scale-[0.98] transition flex items-center justify-center gap-2 font-semibold text-white"
-                data-testid="register-apple-button"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-                </svg>
-                {lang === "en" ? "Continue with Apple" : "Continuar con Apple"}
-              </button>
-              <button
-                type="button"
-                onClick={() => comingSoon("Facebook")}
-                className="w-full h-12 rounded-full bg-[#1877F2] hover:bg-[#1865d8] active:scale-[0.98] transition flex items-center justify-center gap-2 font-semibold text-white"
-                data-testid="register-facebook-button"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                </svg>
-                {lang === "en" ? "Continue with Facebook" : "Continuar con Facebook"}
-              </button>
+              <AppleSignInButton role={role} onAfterLogin={(u) => navigate(u.role === "provider" ? "/dashboard/provider" : "/dashboard/client")} />
+              <FacebookSignInButton role={role} onAfterLogin={(u) => navigate(u.role === "provider" ? "/dashboard/provider" : "/dashboard/client")} />
             </div>
 
             {/* Divider */}

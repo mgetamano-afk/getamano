@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import LanguageToggle from "./LanguageToggle";
 import CityscapeBackdrop from "../CityscapeBackdrop";
 import BrandMark from "../BrandMark";
+import { AppleSignInButton, FacebookSignInButton } from "../SocialAuthButtons";
 
 /**
  * OnboardingLogin — Section 70 (screen 3 of 3).
@@ -132,12 +133,10 @@ export default function OnboardingLogin({ onFinish }) {
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
-  // Apple & Facebook need their own provider credentials (Apple Developer
-  // account + Facebook App ID) which the user hasn't provisioned yet.
-  // Buttons are shown for design preview; tap → "coming soon" toast.
-  const comingSoon = (provider) => {
-    toast.message(`${provider} ${t("onb.login.soon")}`);
-  };
+  // Section V10b — Apple/Facebook now route through `<AppleSignInButton/>`
+  // and `<FacebookSignInButton/>`, which call /api/auth/oauth-config and
+  // gracefully fall back to "Próximamente" when no provider keys are set
+  // on the backend.
 
   return (
     <div
@@ -273,30 +272,9 @@ export default function OnboardingLogin({ onFinish }) {
             {t("onb.login.google")}
           </button>
 
-          <button
-            type="button"
-            onClick={() => comingSoon("Apple")}
-            className="w-full h-12 rounded-2xl bg-black hover:bg-neutral-800 active:scale-[0.99] flex items-center justify-center gap-2.5 font-semibold text-white transition"
-            data-testid="onb-login-apple"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
-              <path d="M17.05 12.04c-.03-3.04 2.49-4.5 2.6-4.57-1.42-2.08-3.63-2.37-4.42-2.4-1.88-.19-3.67 1.11-4.62 1.11-.97 0-2.43-1.08-4-1.05-2.06.03-3.97 1.2-5.03 3.04-2.14 3.71-.55 9.21 1.53 12.23 1.02 1.48 2.23 3.14 3.82 3.08 1.53-.06 2.11-.99 3.96-.99 1.85 0 2.37.99 4 .96 1.65-.03 2.7-1.5 3.71-2.99 1.17-1.72 1.65-3.39 1.68-3.47-.04-.02-3.22-1.24-3.25-4.95zM14.04 3.04C14.87 2.03 15.43.61 15.27-.79c-1.19.05-2.64.79-3.5 1.79-.77.88-1.45 2.32-1.27 3.69 1.33.1 2.69-.67 3.54-1.65z" />
-            </svg>
-            {t("onb.login.apple")}
-          </button>
+          <AppleSignInButton role={role} onAfterLogin={() => { onFinish?.(); navigate("/"); }} />
 
-          <button
-            type="button"
-            onClick={() => comingSoon("Facebook")}
-            className="w-full h-12 rounded-2xl text-white font-semibold flex items-center justify-center gap-2.5 active:scale-[0.99] transition"
-            style={{ backgroundColor: "#1877F2" }}
-            data-testid="onb-login-facebook"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            {t("onb.login.facebook")}
-          </button>
+          <FacebookSignInButton role={role} onAfterLogin={() => { onFinish?.(); navigate("/"); }} />
         </div>
 
         {/* Divider */}

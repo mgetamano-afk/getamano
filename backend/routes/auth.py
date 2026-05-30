@@ -297,6 +297,170 @@ async def _do_logout(deps, request: Request, response: Response) -> dict:
     return {"ok": True}
 
 
+# ─── Section V10b — Apple Sign In + Facebook OAuth ───────────────────
+# Both endpoints share `_finalize_oauth_login`: it upserts the user keyed
+# on `providers.{name}=external_id`, falls back to email match for account
+# linking, then issues our normal session_token JWT.
+
+APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
+APPLE_ISSUER = "https://appleid.apple.com"
+FACEBOOK_GRAPH_ME = "https://graph.facebook.com/me"
+
+_apple_jwks_client = None  # lazy PyJWKClient cache
+
+
+def _get_apple_jwks_client():
+    global _apple_jwks_client
+    if _apple_jwks_client is None:
+        from jwt import PyJWKClient  # local import keeps cold-start cheap
+        _apple_jwks_client = PyJWKClient(APPLE_JWKS_URL)
+    return _apple_jwks_client
+
+
+async def _finalize_oauth_login(
+    deps,
+    response: Response,
+    *,
+    provider: str,
+    external_id: str,
+    email: Optional[str],
+    name: Optional[str],
+    picture: Optional[str],
+    role: str,
+) -> dict:
+    """Upsert + cookie + token. Returns the standard {user, token} envelope."""
+    now = datetime.now(timezone.utc).isoformat()
+    # 1) by provider link
+    user_doc = await deps.db.users.find_one({f"providers.{provider}": external_id})
+    # 2) by email fallback (account linking)
+    if not user_doc and email:
+        user_doc = await deps.db.users.find_one({"email": email.lower()})
+
+    if user_doc:
+        await deps.db.users.update_one(
+            {"user_id": user_doc["user_id"]},
+            {"$set": {
+                f"providers.{provider}": external_id,
+                "last_login_at": now,
+                **({"picture": picture} if picture and not user_doc.get("picture") else {}),
+                **({"name": name} if name and not user_doc.get("name") else {}),
+            }},
+        )
+        user_id = user_doc["user_id"]
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        await deps.db.users.insert_one({
+            "user_id": user_id,
+            "email": (email or "").lower() or None,
+            "name": name or "",
+            "picture": picture,
+            "role": role if role in ("client", "provider") else "client",
+            "language": "es",
+            "preferred_language": "es",
+            "country": deps.DEFAULT_COUNTRY,
+            "email_verified": True,  # OAuth providers verify email upstream
+            "providers": {provider: external_id},
+            "created_at": now,
+            "last_login_at": now,
+        })
+
+    token = deps.create_jwt(user_id)
+    _set_session_cookie(response, token)
+    user_doc = await deps.db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    return {"user": deps.User(**_hydrate_user_doc(user_doc)).model_dump(mode="json"), "token": token}
+
+
+async def _do_apple_session(deps, payload, response: Response) -> dict:
+    """Verify Apple `id_token` against Apple JWKS, then upsert + cookie."""
+    client_id = os.environ.get("APPLE_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Apple Sign In aún no está configurado. Pide al equipo las credenciales.",
+        )
+    import jwt as _pyjwt
+    try:
+        signing_key = _get_apple_jwks_client().get_signing_key_from_jwt(payload.id_token)
+        claims = _pyjwt.decode(
+            payload.id_token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=client_id,
+            issuer=APPLE_ISSUER,
+        )
+    except _pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Apple token caducado")
+    except _pyjwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail=f"Apple token inválido: {exc}")
+
+    apple_sub = claims.get("sub")
+    if not apple_sub:
+        raise HTTPException(status_code=400, detail="Apple token sin subject")
+
+    email = claims.get("email")
+    # Apple sometimes returns name only on the FIRST sign-in via a separate
+    # `user` field that the JS SDK forwards. We accept it if present.
+    name = payload.name or claims.get("name") or (email.split("@")[0] if email else None)
+
+    return await _finalize_oauth_login(
+        deps,
+        response,
+        provider="apple",
+        external_id=apple_sub,
+        email=email,
+        name=name,
+        picture=None,
+        role=payload.role or "client",
+    )
+
+
+async def _do_facebook_session(deps, payload, response: Response) -> dict:
+    """Validate FB access token via Graph API `/me`, then upsert + cookie."""
+    app_id = os.environ.get("FACEBOOK_APP_ID", "").strip()
+    if not app_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Facebook Login aún no está configurado. Pide al equipo las credenciales.",
+        )
+    params = {"access_token": payload.access_token, "fields": "id,email,name,picture"}
+    async with httpx.AsyncClient(timeout=10.0) as client_http:
+        r = await client_http.get(FACEBOOK_GRAPH_ME, params=params)
+    if r.status_code != 200:
+        msg = "Facebook token inválido"
+        try:
+            msg = r.json().get("error", {}).get("message", msg)
+        except Exception:
+            pass
+        raise HTTPException(status_code=401, detail=msg)
+
+    data = r.json()
+    fb_id = data.get("id")
+    if not fb_id:
+        raise HTTPException(status_code=400, detail="Facebook respondió sin id de usuario")
+
+    return await _finalize_oauth_login(
+        deps,
+        response,
+        provider="facebook",
+        external_id=fb_id,
+        email=data.get("email"),
+        name=data.get("name"),
+        picture=(data.get("picture", {}).get("data", {}) or {}).get("url"),
+        role=payload.role or "client",
+    )
+
+
+class AppleSessionIn(BaseModel):
+    id_token: str
+    name: Optional[str] = None
+    role: Optional[str] = "client"
+
+
+class FacebookSessionIn(BaseModel):
+    access_token: str
+    role: Optional[str] = "client"
+
+
 # ─── OTP helpers ───────────────────────────────────────────────────────
 
 async def _resend_cooldown_remaining(db, email: str) -> Optional[int]:
@@ -545,6 +709,27 @@ def make_router(
     @router.post("/auth/google/session")
     async def google_session(request: Request, response: Response):
         return await _do_google_session(deps, request, response)
+
+    @router.post("/auth/apple/session")
+    async def apple_session(payload: AppleSessionIn, response: Response):
+        return await _do_apple_session(deps, payload, response)
+
+    @router.post("/auth/facebook/session")
+    async def facebook_session(payload: FacebookSessionIn, response: Response):
+        return await _do_facebook_session(deps, payload, response)
+
+    @router.get("/auth/oauth-config")
+    async def oauth_config():
+        """Tells the frontend which OAuth flows are currently configured.
+        Used by Login/Register to gracefully degrade Apple/FB buttons when
+        no keys are set on the backend."""
+        return {
+            "apple": bool(os.environ.get("APPLE_CLIENT_ID", "").strip()),
+            "facebook": bool(os.environ.get("FACEBOOK_APP_ID", "").strip()),
+            "facebook_app_id": os.environ.get("FACEBOOK_APP_ID", "").strip() or None,
+            "apple_client_id": os.environ.get("APPLE_CLIENT_ID", "").strip() or None,
+            "apple_redirect_uri": os.environ.get("APPLE_REDIRECT_URI", "").strip() or None,
+        }
 
     @router.get("/auth/me")
     async def me(user=Depends(get_current_user)):

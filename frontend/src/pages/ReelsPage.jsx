@@ -264,7 +264,7 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang, onLik
           <div className="flex-1 min-w-0 text-white">
             <p className="font-bold text-sm inline-flex items-center gap-1">
               {reel.business_name}
-              {reel.verified && <VerifiedBadge size={14} />}
+              {reel.verified && <VerifiedBadge size={16} darkBg code={reel.getamano_code} />}
             </p>
             <p className="text-[11px] text-white/70 inline-flex items-center gap-1.5">
               {reel.getamano_code && <span className="font-mono">{reel.getamano_code}</span>}
