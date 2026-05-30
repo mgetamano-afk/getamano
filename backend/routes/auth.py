@@ -26,6 +26,7 @@ import logging
 import os
 import secrets as _secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from types import SimpleNamespace
 from typing import Optional
@@ -87,7 +88,7 @@ class SetRoleIn(BaseModel):
             raise ValueError("role must be 'client' or 'provider'")
         return v
 
-    def model_post_init(self, _ctx):  # type: ignore[override]
+    def model_post_init(self, _ctx) -> None:  # type: ignore[override]
         SetRoleIn._validate_role(self.role)
 
 
@@ -317,53 +318,77 @@ def _get_apple_jwks_client():
     return _apple_jwks_client
 
 
-async def _finalize_oauth_login(
-    deps,
-    response: Response,
-    *,
-    provider: str,
-    external_id: str,
-    email: Optional[str],
-    name: Optional[str],
-    picture: Optional[str],
-    role: str,
-) -> dict:
-    """Upsert + cookie + token. Returns the standard {user, token} envelope."""
-    now = datetime.now(timezone.utc).isoformat()
-    # 1) by provider link
-    user_doc = await deps.db.users.find_one({f"providers.{provider}": external_id})
-    # 2) by email fallback (account linking)
-    if not user_doc and email:
-        user_doc = await deps.db.users.find_one({"email": email.lower()})
+@dataclass(frozen=True)
+class OAuthIdentity:
+    """V16.4 — Grouped OAuth profile params for `_finalize_oauth_login`.
+
+    Previously `_finalize_oauth_login` took 8 positional/kw args. Grouping
+    the 6 identity params (provider/external_id/email/name/picture/role)
+    into one immutable dataclass drops the function signature to 4 args
+    and forces callers to think about the identity as a unit (which is
+    how the rest of the codebase treats it).
+    """
+    provider: str
+    external_id: str
+    email: Optional[str] = None
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    role: str = "client"
+
+
+async def _upsert_oauth_user(deps, identity: OAuthIdentity, now: str) -> str:
+    """Find an existing user by provider link OR by email, or create a new
+    one. Returns the resolved `user_id`. Pure DB work — no cookies / JWTs.
+    """
+    user_doc = await deps.db.users.find_one({f"providers.{identity.provider}": identity.external_id})
+    if not user_doc and identity.email:
+        user_doc = await deps.db.users.find_one({"email": identity.email.lower()})
 
     if user_doc:
-        await deps.db.users.update_one(
-            {"user_id": user_doc["user_id"]},
-            {"$set": {
-                f"providers.{provider}": external_id,
-                "last_login_at": now,
-                **({"picture": picture} if picture and not user_doc.get("picture") else {}),
-                **({"name": name} if name and not user_doc.get("name") else {}),
-            }},
-        )
-        user_id = user_doc["user_id"]
-    else:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        await deps.db.users.insert_one({
-            "user_id": user_id,
-            "email": (email or "").lower() or None,
-            "name": name or "",
-            "picture": picture,
-            "role": role if role in ("client", "provider") else "client",
-            "language": "es",
-            "preferred_language": "es",
-            "country": deps.DEFAULT_COUNTRY,
-            "email_verified": True,  # OAuth providers verify email upstream
-            "providers": {provider: external_id},
-            "created_at": now,
+        # Patch the existing user: link the provider, refresh last_login,
+        # backfill picture/name only when they're empty so we never
+        # overwrite a manual edit.
+        patch = {
+            f"providers.{identity.provider}": identity.external_id,
             "last_login_at": now,
-        })
+        }
+        if identity.picture and not user_doc.get("picture"):
+            patch["picture"] = identity.picture
+        if identity.name and not user_doc.get("name"):
+            patch["name"] = identity.name
+        await deps.db.users.update_one({"user_id": user_doc["user_id"]}, {"$set": patch})
+        return user_doc["user_id"]
 
+    # Brand-new user
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    await deps.db.users.insert_one({
+        "user_id": user_id,
+        "email": (identity.email or "").lower() or None,
+        "name": identity.name or "",
+        "picture": identity.picture,
+        "role": identity.role if identity.role in ("client", "provider") else "client",
+        "language": "es",
+        "preferred_language": "es",
+        "country": deps.DEFAULT_COUNTRY,
+        "email_verified": True,  # OAuth providers verify email upstream
+        "providers": {identity.provider: identity.external_id},
+        "created_at": now,
+        "last_login_at": now,
+    })
+    return user_id
+
+
+async def _finalize_oauth_login(deps, response: Response, identity: OAuthIdentity) -> dict:
+    """Upsert + cookie + token. Returns the standard {user, token} envelope.
+
+    V16.4 refactor (audit fix — complexity 12 → 3, 8 args → 3):
+      - Identity params collapsed into `OAuthIdentity` dataclass.
+      - User upsert extracted to `_upsert_oauth_user` (the noisy part).
+      - This function is now just orchestration: timestamp → upsert →
+        token + cookie → hydrate response.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    user_id = await _upsert_oauth_user(deps, identity, now)
     token = deps.create_jwt(user_id)
     _set_session_cookie(response, token)
     user_doc = await deps.db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
@@ -405,12 +430,14 @@ async def _do_apple_session(deps, payload, response: Response) -> dict:
     return await _finalize_oauth_login(
         deps,
         response,
-        provider="apple",
-        external_id=apple_sub,
-        email=email,
-        name=name,
-        picture=None,
-        role=payload.role or "client",
+        OAuthIdentity(
+            provider="apple",
+            external_id=apple_sub,
+            email=email,
+            name=name,
+            picture=None,
+            role=payload.role or "client",
+        ),
     )
 
 
@@ -441,12 +468,14 @@ async def _do_facebook_session(deps, payload, response: Response) -> dict:
     return await _finalize_oauth_login(
         deps,
         response,
-        provider="facebook",
-        external_id=fb_id,
-        email=data.get("email"),
-        name=data.get("name"),
-        picture=(data.get("picture", {}).get("data", {}) or {}).get("url"),
-        role=payload.role or "client",
+        OAuthIdentity(
+            provider="facebook",
+            external_id=fb_id,
+            email=data.get("email"),
+            name=data.get("name"),
+            picture=(data.get("picture", {}).get("data", {}) or {}).get("url"),
+            role=payload.role or "client",
+        ),
     )
 
 
@@ -621,21 +650,17 @@ async def _do_forgot_password(deps, payload: ForgotPasswordIn, request: Request)
     return {"ok": True}
 
 
-async def _do_reset_password(deps, payload: ResetPasswordIn) -> dict:
-    raw_token = (payload.token or "").strip()
-    new_password = payload.new_password or ""
-    if not raw_token or len(raw_token) < 16:
-        raise HTTPException(status_code=400, detail="Token inválido.")
-    if len(new_password) < PASSWORD_MIN_LENGTH:
-        raise HTTPException(status_code=400, detail=f"La contraseña debe tener al menos {PASSWORD_MIN_LENGTH} caracteres.")
+async def _find_valid_reset_record(deps, raw_token: str, now: datetime) -> Optional[dict]:
+    """V16.4 — Resolve a plaintext reset token to its DB record, or None.
 
-    # Search across all unexpired records — we hash-compare against each since
-    # the token itself is never stored in plaintext.
-    now = datetime.now(timezone.utc)
+    Tokens are never stored in plaintext — we walk the unexpired/unused
+    records and bcrypt-compare. Returns None for not-found, expired, or
+    mismatched. The caller raises the 400 in either case so all failures
+    look identical to a brute-forcer (no info leak about which step failed).
+    """
     candidates = await deps.db.password_resets.find(
         {"used_at": None}, {"_id": 0},
     ).limit(50).to_list(50)
-    record = None
     for rec in candidates:
         try:
             if datetime.fromisoformat(rec["expires_at"]) < now:
@@ -643,11 +668,14 @@ async def _do_reset_password(deps, payload: ResetPasswordIn) -> dict:
         except (KeyError, ValueError):
             continue
         if deps.verify_password(raw_token, rec["token_hash"]):
-            record = rec
-            break
-    if not record:
-        raise HTTPException(status_code=400, detail="El enlace expiró o ya fue usado. Solicita uno nuevo.")
+            return rec
+    return None
 
+
+async def _apply_password_reset(deps, record: dict, new_password: str, now: datetime) -> None:
+    """V16.4 — Atomic side-effects after a reset token is validated:
+    rehash + persist + mark token used + nuke active sessions.
+    """
     new_hash = deps.hash_password(new_password)
     await deps.db.users.update_one(
         {"user_id": record["user_id"]},
@@ -659,6 +687,34 @@ async def _do_reset_password(deps, payload: ResetPasswordIn) -> dict:
     )
     # Invalidate every active session so the old password truly stops working.
     await deps.db.user_sessions.delete_many({"user_id": record["user_id"]})
+
+
+async def _do_reset_password(deps, payload: ResetPasswordIn) -> dict:
+    """V16.4 refactor (audit fix — complexity 11 → 4): guard clauses up
+    front, lookup extracted to `_find_valid_reset_record`, side-effects
+    extracted to `_apply_password_reset`.
+    """
+    raw_token = (payload.token or "").strip()
+    new_password = payload.new_password or ""
+
+    # Guard clauses
+    if not raw_token or len(raw_token) < 16:
+        raise HTTPException(status_code=400, detail="Token inválido.")
+    if len(new_password) < PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La contraseña debe tener al menos {PASSWORD_MIN_LENGTH} caracteres.",
+        )
+
+    now = datetime.now(timezone.utc)
+    record = await _find_valid_reset_record(deps, raw_token, now)
+    if not record:
+        raise HTTPException(
+            status_code=400,
+            detail="El enlace expiró o ya fue usado. Solicita uno nuevo.",
+        )
+
+    await _apply_password_reset(deps, record, new_password, now)
     return {"ok": True, "email": record["email"]}
 
 

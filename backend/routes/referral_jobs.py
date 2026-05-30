@@ -54,7 +54,7 @@ class CompleteJobIn(BaseModel):
 def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
-    async def _record_credit(referrer_user_id: str, referral_id: str, commission_amount: float, client_name: str):
+    async def _record_credit(referrer_user_id: str, referral_id: str, commission_amount: float, client_name: str) -> None:
         """Section 71 — Append a row to the commission_credits ledger when a
         referral closes. Imported lazily so this module stays decoupled.
         Idempotent on (source, source_id) — re-runs are safe.
@@ -75,7 +75,7 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             # referral_jobs row is the source of truth and can be replayed.
             pass
 
-    async def _notify(user_id: str, title: str, body: str, cta_url: str, icon: str):
+    async def _notify(user_id: str, title: str, body: str, cta_url: str, icon: str) -> None:
         try:
             await db.notifications.insert_one({
                 "notification_id": f"notif_{uuid.uuid4().hex[:12]}",

@@ -134,14 +134,14 @@ class TestAdminLeadsList:
 
     def test_message_body_spanish_content(self, admin_session):
         r = admin_session.get(f"{API}/admin/leads", timeout=15)
-        es_lead = next((l for l in r.json()["items"] if l["lang"] == "es"), None)
+        es_lead = next((item for item in r.json()["items"] if item["lang"] == "es"), None)
         assert es_lead is not None, "expected at least one Spanish lead"
         assert "¡Hola" in es_lead["message_body"]
         assert "getamano.us" in es_lead["message_body"]
 
     def test_message_body_english_content(self, admin_session):
         r = admin_session.get(f"{API}/admin/leads", timeout=15)
-        en_lead = next((l for l in r.json()["items"] if l["lang"] == "en"), None)
+        en_lead = next((item for item in r.json()["items"] if item["lang"] == "en"), None)
         assert en_lead is not None, "expected at least one English lead"
         assert en_lead["message_body"].startswith("Hi ")
         assert "getamano.us" in en_lead["message_body"]
@@ -175,7 +175,7 @@ class TestAdminLeadsPatch:
         assert data["contacted_at"] is not None
         # verify persistence
         list_r = admin_session.get(f"{API}/admin/leads", params={"status": "contacted"})
-        assert any(l["lead_id"] == lead_id for l in list_r.json()["items"])
+        assert any(item["lead_id"] == lead_id for item in list_r.json()["items"])
 
     def test_patch_set_converted(self, admin_session):
         lead_id = self._create_lead(2002)
@@ -232,7 +232,7 @@ class TestEdgeCases:
         assert r.status_code == 200
         # confirm admin listing returns a properly URL-encoded deep link
         list_r = admin_session.get(f"{API}/admin/leads", timeout=15)
-        match = next((l for l in list_r.json()["items"] if l["phone"].endswith(phone[-7:])), None)
+        match = next((item for item in list_r.json()["items"] if item["phone"].endswith(phone[-7:])), None)
         assert match is not None
         # %C3%B1 = ñ encoded
         assert "%C3" in match["sms_link"] or "%C3" in match["wa_link"]

@@ -76,7 +76,7 @@ class TestSitemapBasics:
 # ─── Bilingual pairing ────────────────────────────────────────────────
 class TestBilingualPairs:
     def test_servicios_has_services_alternate(self, loc_to_alts):
-        es_locs = [l for l in loc_to_alts if "/servicios/" in l or l.endswith("/servicios")]
+        es_locs = [item for item in loc_to_alts if "/servicios/" in item or item.endswith("/servicios")]
         assert len(es_locs) > 0, "No /servicios URLs found"
         for es_loc in es_locs[:20]:  # sample
             en_loc = es_loc.replace("/servicios", "/services", 1)
@@ -87,7 +87,7 @@ class TestBilingualPairs:
             assert {"es", "en", "x-default"}.issubset(hreflangs), f"Missing hreflangs on {es_loc}: {hreflangs}"
 
     def test_services_has_servicios_alternate(self, loc_to_alts):
-        en_locs = [l for l in loc_to_alts if "/services/" in l or l.endswith("/services")]
+        en_locs = [item for item in loc_to_alts if "/services/" in item or item.endswith("/services")]
         assert len(en_locs) > 0
         for en_loc in en_locs[:20]:
             es_loc = en_loc.replace("/services", "/servicios", 1)
@@ -111,7 +111,7 @@ class TestBilingualPairs:
 
     def test_provider_pair_present(self, loc_to_alts, sitemap_text):
         # Look for any /proveedor/ URL and check /provider/ twin
-        prov_es = [l for l in loc_to_alts if "/proveedor/" in l]
+        prov_es = [item for item in loc_to_alts if "/proveedor/" in item]
         if not prov_es:
             pytest.skip("No active providers seeded with slugs")
         # Pick a few

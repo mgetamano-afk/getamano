@@ -241,6 +241,64 @@ async def _do_create_post(deps, payload: NewPostIn, request: Request, user) -> d
     return hydrated[0] if hydrated else doc
 
 
+async def _resolve_reactor_identity(db, reactor_user_id: str) -> dict:
+    """V16.4 — Lookup the reactor's display name + avatar. Reactor may be
+    a plain user (db.users.name) or a provider (provider_profiles.business_name).
+    Returns `{"name": str, "avatar": Optional[str]}`.
+    """
+    reactor = await db.users.find_one(
+        {"user_id": reactor_user_id},
+        {"_id": 0, "name": 1},
+    ) or {}
+    profile = await db.provider_profiles.find_one(
+        {"user_id": reactor_user_id},
+        {"_id": 0, "business_name": 1, "logo_url": 1},
+    ) or {}
+    name = (reactor.get("name") or profile.get("business_name") or "Alguien").split(" ")[0]
+    return {"name": name, "avatar": profile.get("logo_url")}
+
+
+def _format_reaction_body(reactors: list, count: int, kind: str, reactor_name: str, preview: str = "") -> str:
+    """V16.4 — Render the notification body text. Pure function, no I/O."""
+    emoji = "❤️" if kind == "like" else "💬"
+    if kind == "comment" and preview and count <= 1:
+        return f'💬 {reactor_name}: "{preview}"'
+    if count == 1:
+        return f"{emoji} {reactor_name} reaccionó a tu hito"
+    if count == 2:
+        other_name = next(
+            (r["name"] for r in reactors if r.get("user_id") != reactors[0].get("user_id")),
+            "alguien",
+        ) if reactors else "alguien"
+        return f"{emoji} {reactor_name} y {other_name} reaccionaron a tu hito"
+    return f"{emoji} {reactor_name} y {count - 1} más reaccionaron a tu hito"
+
+
+def _merge_reactors(prev_reactors: list, new_reactor: dict, cap: int = 10) -> list:
+    """V16.4 — Dedup + cap the list of recent reactor objects."""
+    if new_reactor.get("user_id") in [r.get("user_id") for r in prev_reactors]:
+        return prev_reactors
+    return ([new_reactor] + prev_reactors)[:cap]
+
+
+async def _push_first_reaction(db, author_user_id: str, post_id: str, body: str, notification_key: str) -> None:
+    """V16.4 — Fire-and-forget push + sent.dm on first reaction in a
+    batch window. Subsequent reactions update the in-app notification
+    silently to avoid push fatigue.
+    """
+    try:
+        from routes.push import send_push_to_user
+        await send_push_to_user(db, author_user_id, {
+            "title": "👏 Reaccionaron a tu hito",
+            "body": body,
+            "url": f"/comunidad/post/{post_id}",
+            "tag": notification_key,  # browser dedupes by tag
+            "icon": "/icon-192x192.png",
+        })
+    except Exception:
+        pass
+
+
 async def _notify_milestone_reaction(
     deps, *, post: dict, reactor_user_id: str, kind: str, preview: str = ""
 ) -> None:
@@ -258,11 +316,12 @@ async def _notify_milestone_reaction(
     min idle, a new notification is created (so the user can get a fresh
     badge if they didn't open the previous one).
 
-    Notification document gains custom fields:
-      - notification_key: stable id used for upsert lookup
-      - reactors: list of latest reactor user_ids (capped at 10)
-      - reactions_count: total reactions in the window
-      - last_reaction_at: ISO timestamp, used to compute "freshness"
+    V16.4 refactor (audit fix — complexity 21 → 6, 17 vars → 8):
+      - Reactor lookup → `_resolve_reactor_identity`
+      - Body formatting → `_format_reaction_body` (pure)
+      - Reactor list dedup → `_merge_reactors` (pure)
+      - Push notification → `_push_first_reaction`
+      - Main fn now: guard → existing? update : insert → push (5 steps).
     """
     author_user_id = post["user_id"]
     if author_user_id == reactor_user_id:
@@ -271,47 +330,24 @@ async def _notify_milestone_reaction(
     db = deps.db
     now = datetime.now(timezone.utc)
     sixty_min_ago = (now - timedelta(minutes=60)).isoformat()
-
-    # Look for an existing batched notif for this post in the last 60 min
     notification_key = f"milestone_reaction::{post['post_id']}::{author_user_id}"
+
     existing = await db.notifications.find_one(
         {"notification_key": notification_key, "created_at": {"$gte": sixty_min_ago}},
         {"_id": 0, "notification_id": 1, "reactions_count": 1, "reactors": 1},
     )
-
-    # Get reactor's display name
-    reactor = await db.users.find_one(
-        {"user_id": reactor_user_id},
-        {"_id": 0, "name": 1},
-    ) or {}
-    profile = await db.provider_profiles.find_one(
-        {"user_id": reactor_user_id},
-        {"_id": 0, "business_name": 1, "logo_url": 1},
-    ) or {}
-    reactor_name = (reactor.get("name") or profile.get("business_name") or "Alguien").split(" ")[0]
-    reactor_avatar = profile.get("logo_url")
+    reactor_meta = await _resolve_reactor_identity(db, reactor_user_id)
+    reactor_name = reactor_meta["name"]
+    new_reactor = {"user_id": reactor_user_id, "name": reactor_name, "avatar": reactor_meta["avatar"]}
 
     if existing:
-        # UPSERT: increment count + add reactor (deduped, capped at 10)
-        prev_reactors = existing.get("reactors") or []
-        new_reactors = prev_reactors
-        if reactor_user_id not in [r.get("user_id") for r in prev_reactors]:
-            new_reactors = ([{"user_id": reactor_user_id, "name": reactor_name, "avatar": reactor_avatar}] + prev_reactors)[:10]
+        new_reactors = _merge_reactors(existing.get("reactors") or [], new_reactor)
         new_count = (existing.get("reactions_count") or 1) + 1
-        # Build the new "X y N más" body
-        emoji = "❤️" if kind == "like" else "💬"
-        if new_count == 1:
-            body = f"{emoji} {reactor_name} reaccionó a tu hito"
-        elif new_count == 2:
-            other_name = next((r["name"] for r in new_reactors if r["user_id"] != reactor_user_id), "alguien")
-            body = f"{emoji} {reactor_name} y {other_name} reaccionaron a tu hito"
-        else:
-            body = f"{emoji} {reactor_name} y {new_count - 1} más reaccionaron a tu hito"
-        title = "👏 Tu comunidad celebra contigo"
+        body = _format_reaction_body(new_reactors, new_count, kind, reactor_name, preview)
         await db.notifications.update_one(
             {"notification_id": existing["notification_id"]},
             {"$set": {
-                "title": title,
+                "title": "👏 Tu comunidad celebra contigo",
                 "body": body,
                 "reactions_count": new_count,
                 "reactors": new_reactors,
@@ -324,10 +360,7 @@ async def _notify_milestone_reaction(
         return
 
     # No recent batch — create a fresh notification
-    emoji = "❤️" if kind == "like" else "💬"
-    body = f"{emoji} {reactor_name} reaccionó a tu hito"
-    if kind == "comment" and preview:
-        body = f"💬 {reactor_name}: \"{preview}\""
+    body = _format_reaction_body([new_reactor], 1, kind, reactor_name, preview)
     await db.notifications.insert_one({
         "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
         "notification_key": notification_key,
@@ -342,7 +375,7 @@ async def _notify_milestone_reaction(
         "is_read": False,
         "dismissed_at": None,
         "reactions_count": 1,
-        "reactors": [{"user_id": reactor_user_id, "name": reactor_name, "avatar": reactor_avatar}],
+        "reactors": [new_reactor],
         "last_reaction_at": now.isoformat(),
         "last_reaction_kind": kind,
         "post_id": post["post_id"],
@@ -351,20 +384,7 @@ async def _notify_milestone_reaction(
         "created_at": now.isoformat(),
     })
 
-    # Push + sent.dm (sandbox-safe) — only fire on FIRST reaction of a fresh
-    # batch to avoid push fatigue. Subsequent reactions update the in-app
-    # notification silently.
-    try:
-        from routes.push import send_push_to_user
-        await send_push_to_user(db, author_user_id, {
-            "title": "👏 Reaccionaron a tu hito",
-            "body": body,
-            "url": f"/comunidad/post/{post['post_id']}",
-            "tag": notification_key,  # browser dedupes by tag
-            "icon": "/icon-192x192.png",
-        })
-    except Exception:
-        pass
+    await _push_first_reaction(db, author_user_id, post["post_id"], body, notification_key)
 
 
 async def _do_toggle_like(deps, post_id: str, user) -> dict:

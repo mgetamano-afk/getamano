@@ -4805,7 +4805,7 @@ async def shutdown_db_client():
     client.close()
 
 
-import asyncio
+import asyncio  # noqa: E402 — module-level import deferred until section that uses it
 # ════════════════════════════════════════════════════════════════════════
 # Periodic jobs that the platform needs to run on its own:
 #   • Monthly leaderboard snapshot (1st of month, after 06:00 UTC)
@@ -5090,7 +5090,7 @@ async def admin_scheduler_run_now(job: str, admin: User = Depends(require_admin)
 # All additions live below to avoid touching the historic core (line numbers stay stable for refs)
 # ════════════════════════════════════════════════════════════════════
 
-import secrets as _secrets
+import secrets as _secrets  # noqa: E402 — section-local alias, kept here for grep affinity
 
 def _gen_ref_code() -> str:
     """Generate a 6-char uppercase alphanumeric referral code."""
@@ -7530,9 +7530,12 @@ async def messaging_start(payload: ConversationStartIn, request: Request, user: 
     await enqueue_notification(recipient_phone=prof.get("phone", ""), channel="sms",
                                 body=body, trigger_type="new_message_to_provider")
     if prof.get("phone"):
-        try: send_sms(prof["phone"], body, event="new_message_to_provider")
-        except Exception: pass
-    conv.pop("_id", None); msg.pop("_id", None)
+        try:
+            send_sms(prof["phone"], body, event="new_message_to_provider")
+        except Exception:
+            pass
+    conv.pop("_id", None)
+    msg.pop("_id", None)
     return {"conversation_id": conv_id, "message": msg}
 
 
@@ -7618,8 +7621,10 @@ async def post_message(conversation_id: str, payload: MessageIn,
         body = f"💬 Nuevo mensaje en getamano de {user.name}: '{payload.body[:80]}'."
         await enqueue_notification(recipient_phone=recipient_phone, channel="sms",
                                     body=body, trigger_type="new_message")
-        try: send_sms(recipient_phone, body, event="new_message")
-        except Exception: pass
+        try:
+            send_sms(recipient_phone, body, event="new_message")
+        except Exception:
+            pass
 
     # Section 89 v4 (Phase C) — Web Push to the OTHER side of the
     # conversation. We resolve the recipient user_id from the conv doc.
@@ -7703,8 +7708,10 @@ async def admin_remind_incomplete(user_id: str, admin: User = Depends(require_ad
     await enqueue_notification(recipient_phone=u.get("phone", ""), channel="sms",
                                 body=body, trigger_type="incomplete_registration")
     if u.get("phone"):
-        try: send_sms(u["phone"], body, event="incomplete_registration")
-        except Exception: pass
+        try:
+            send_sms(u["phone"], body, event="incomplete_registration")
+        except Exception:
+            pass
     return {"ok": True}
 
 
@@ -7850,8 +7857,10 @@ async def book_appointment(payload: AppointmentIn, request: Request,
     await enqueue_notification(recipient_phone=prof.get("phone", ""), channel="sms",
                                 body=body, trigger_type="new_appointment_request")
     if prof.get("phone"):
-        try: send_sms(prof["phone"], body, event="new_appointment_request")
-        except Exception: pass
+        try:
+            send_sms(prof["phone"], body, event="new_appointment_request")
+        except Exception:
+            pass
     apt.pop("_id", None)
     return apt
 
@@ -7893,8 +7902,10 @@ async def update_appointment(appointment_id: str, payload: AppointmentActionIn,
         body = f"📅 Tu cita en getamano fue {verb} para el {apt['date']} a las {apt['time']}."
         await enqueue_notification(recipient_phone=notify_phone, channel="sms",
                                     body=body, trigger_type="appointment_update")
-        try: send_sms(notify_phone, body, event="appointment_update")
-        except Exception: pass
+        try:
+            send_sms(notify_phone, body, event="appointment_update")
+        except Exception:
+            pass
     return {"ok": True, "status": new_status}
 
 
@@ -7930,7 +7941,8 @@ async def activity_feed(limit: int = 12):
     ).sort("created_at", -1).limit(limit).to_list(limit)
     for r in recent_reviews:
         prof = await db.provider_profiles.find_one({"provider_id": r["provider_id"]}, {"_id": 0, "business_name": 1, "slug": 1, "city": 1})
-        if not prof: continue
+        if not prof:
+            continue
         items.append({
             "type": "new_review",
             "icon": "⭐",
@@ -8059,7 +8071,7 @@ async def translate_text(payload: TranslateRequestIn):
 # `_send_email_via_resend` remains here because the weekly-gig-digest
 # helpers below also rely on it.
 
-import asyncio as _asyncio
+import asyncio as _asyncio  # noqa: E402 — section-local alias, kept here for grep affinity
 
 async def _send_email_via_resend(to: str, subject: str, html: str) -> dict:
     """Send a transactional email. Falls back to logger when RESEND_API_KEY missing."""
@@ -8827,16 +8839,20 @@ async def admin_quiz_funnel(_user: User = Depends(require_admin)):
     def accumulate(bucket, sess):
         bucket["sessions"] += 1
         evs = sess["events"]
-        if "opened" in evs: bucket["started"] += 1
+        if "opened" in evs:
+            bucket["started"] += 1
         answered_count = sum(1 for e in evs if e == "answered")
         for q_n in range(1, 5):
-            if answered_count >= q_n: bucket[f"q{q_n}"] += 1
+            if answered_count >= q_n:
+                bucket[f"q{q_n}"] += 1
         if "completed" in evs:
             bucket["completed"] += 1
             if sess.get("recommended_plan") in bucket["plan_dist"]:
                 bucket["plan_dist"][sess["recommended_plan"]] += 1
-        if "cta_clicked" in evs: bucket["cta_clicked"] += 1
-        if "email_captured" in evs: bucket["email_captured"] += 1
+        if "cta_clicked" in evs:
+            bucket["cta_clicked"] += 1
+        if "email_captured" in evs:
+            bucket["email_captured"] += 1
 
     def derive_rates(b):
         abandoned = max(0, b["q1"] - b["completed"])

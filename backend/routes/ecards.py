@@ -103,7 +103,7 @@ class PricingOut(BaseModel):
 
 # ─── Router factory ────────────────────────────────────────────────
 
-def make_router(*, db, User, get_current_user):
+def make_router(*, db, User, get_current_user) -> APIRouter:
     router = APIRouter()
 
     async def _list_my_ecards(user_id: str) -> List[dict]:

@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException
 def make_router(*, db, User, get_current_user, get_optional_user=None) -> APIRouter:
     router = APIRouter()
 
-    async def _ensure_indexes():
+    async def _ensure_indexes() -> None:
         try:
             await db.follows.create_index(
                 [("follower_user_id", 1), ("followed_user_id", 1)],
