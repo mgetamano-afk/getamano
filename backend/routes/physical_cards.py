@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,21 @@ logger = logging.getLogger(__name__)
 PRICE_PER_PACK_USD = 29
 CARDS_PER_PACK = 10
 STATUSES = ["ordered", "printing", "shipped", "delivered", "cancelled"]
+
+
+# Section V13 — Print-with-getamano funnel
+# ----------------------------------------
+# Providers tap "Imprimir con getamano" → a `print_card_orders` row is
+# created with the PDF stored as base64 (small, ~30 KB). The admin panel
+# lists everything pending and downloads the PDF to forward to the
+# printer.
+PRINT_PACK_PRICE_USD = 39  # opening + 1 starter pack of CARDS_PER_PACK
+
+
+class PrintCardsOrderIn(BaseModel):
+    provider_id: str = Field(..., max_length=80)
+    packs: int = Field(default=1, ge=1, le=10)
+    notes: Optional[str] = Field(default=None, max_length=400)
 
 
 class ShippingAddressIn(BaseModel):
@@ -112,6 +128,146 @@ def make_router(*, db: Any, User: type, get_current_user, require_admin) -> APIR
         return await db.physical_card_orders.find(
             {"user_id": user.user_id}, {"_id": 0}
         ).sort("created_at", -1).to_list(50)
+
+    # ─── V13: PDF preview + print order funnel ────────────────────
+
+    async def _resolve_owned_ecard(user_id: str, provider_id: Optional[str]) -> dict:
+        """Looks up an eCard, defaulting to the user's primary one if no
+        `provider_id` is supplied. Raises 404 if it doesn't belong to the
+        caller — providers must own the eCard they're printing."""
+        from services.card_pdf import render_card_pdf  # noqa: F401 — keep lazy
+        query: dict = {"user_id": user_id}
+        if provider_id:
+            query["provider_id"] = provider_id
+        cur = db.provider_profiles.find(query, {"_id": 0}).sort("created_at", 1)
+        docs = await cur.to_list(20)
+        if not docs:
+            raise HTTPException(status_code=404, detail="eCard no encontrada o no es tuya.")
+        return docs[0]
+
+    @router.get("/physical-cards/preview-pdf")
+    async def preview_pdf(provider_id: Optional[str] = None, user: User = Depends(get_current_user)):
+        """Returns a 2-page PDF (front + back, real-size 85.6×54mm) for
+        the caller's eCard. The provider downloads this as a sample."""
+        from services.card_pdf import render_card_pdf
+        prof = await _resolve_owned_ecard(user.user_id, provider_id)
+        pdf = render_card_pdf(
+            business_name=prof.get("business_name", ""),
+            city=prof.get("city"),
+            state=prof.get("state"),
+            slug=prof.get("slug"),
+            getamano_code=prof.get("getamano_code"),
+            is_verified=prof.get("verification_status") == "approved",
+        )
+        filename = f"getamano-card-{prof.get('slug', 'preview')}.pdf"
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-store",
+            },
+        )
+
+    @router.post("/physical-cards/print-orders")
+    async def submit_print_order(payload: PrintCardsOrderIn, user: User = Depends(get_current_user)) -> dict:
+        """Creates a print-with-getamano order. The PDF is stored alongside
+        the order so the admin panel can download exactly what the provider
+        previewed. Status starts at "pending_payment" because Stripe is
+        still mocked — admin can flip it to "queued_for_print" manually."""
+        import base64
+        from services.card_pdf import render_card_pdf
+        prof = await _resolve_owned_ecard(user.user_id, payload.provider_id)
+        pdf = render_card_pdf(
+            business_name=prof.get("business_name", ""),
+            city=prof.get("city"),
+            state=prof.get("state"),
+            slug=prof.get("slug"),
+            getamano_code=prof.get("getamano_code"),
+            is_verified=prof.get("verification_status") == "approved",
+        )
+        now = datetime.now(timezone.utc).isoformat()
+        order = {
+            "order_id": f"pco_{uuid.uuid4().hex[:12]}",
+            "user_id": user.user_id,
+            "provider_id": prof["provider_id"],
+            "slug": prof.get("slug"),
+            "business_name": prof.get("business_name", ""),
+            "packs": payload.packs,
+            "qty_cards": payload.packs * CARDS_PER_PACK,
+            "total_usd": payload.packs * PRICE_PER_PACK_USD,
+            "notes": payload.notes,
+            "status": "pending_payment",  # → admin flips to "queued_for_print"
+            "status_history": [{"status": "pending_payment", "at": now}],
+            "pdf_b64": base64.b64encode(pdf).decode("ascii"),
+            "pdf_size_bytes": len(pdf),
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.print_card_orders.insert_one(order)
+        order.pop("_id", None)  # never expose BSON ObjectId in the response
+        # Best-effort push to admins so they see it instantly.
+        try:
+            from routes.push import send_push_to_user
+            admins = await db.users.find({"role": "admin"}, {"_id": 0, "user_id": 1}).to_list(20)
+            for adm in admins:
+                await send_push_to_user(db, adm["user_id"], {
+                    "title": "Nueva orden de impresión",
+                    "body": f"{prof.get('business_name')} · {payload.packs} pack(s) · ${order['total_usd']}",
+                    "icon": "/getamano-logo-mark.png",
+                    "url": "/dashboard/admin?section=print-orders",
+                    "tag": f"pco_{order['order_id']}",
+                })
+        except Exception as _e:
+            logger.warning(f"print-order admin push failed: {_e}")
+        # Don't leak the b64 to the client; it's only for the admin pdf endpoint.
+        out = {k: v for k, v in order.items() if k != "pdf_b64"}
+        return out
+
+    @router.get("/physical-cards/print-orders/me")
+    async def my_print_orders(user: User = Depends(get_current_user)) -> List[dict]:
+        cur = db.print_card_orders.find(
+            {"user_id": user.user_id}, {"_id": 0, "pdf_b64": 0}
+        ).sort("created_at", -1)
+        return await cur.to_list(50)
+
+    # ─── Admin counterparts ──────────────────────────────────────
+
+    @router.get("/admin/print-orders")
+    async def admin_list_print_orders(status: Optional[str] = None, _: User = Depends(require_admin)) -> List[dict]:
+        q: dict = {}
+        if status:
+            q["status"] = status
+        cur = db.print_card_orders.find(q, {"_id": 0, "pdf_b64": 0}).sort("created_at", -1)
+        return await cur.to_list(500)
+
+    @router.get("/admin/print-orders/{order_id}/pdf")
+    async def admin_download_print_order_pdf(order_id: str, _: User = Depends(require_admin)):
+        import base64
+        order = await db.print_card_orders.find_one({"order_id": order_id}, {"_id": 0})
+        if not order or not order.get("pdf_b64"):
+            raise HTTPException(status_code=404, detail="Orden o PDF no encontrado.")
+        pdf = base64.b64decode(order["pdf_b64"])
+        filename = f"getamano-print-{order['order_id']}.pdf"
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @router.patch("/admin/print-orders/{order_id}")
+    async def admin_update_print_order(order_id: str, status: str, _: User = Depends(require_admin)) -> dict:
+        if status not in ("pending_payment", "queued_for_print", "printing", "shipped", "delivered", "cancelled"):
+            raise HTTPException(status_code=400, detail="Estado inválido.")
+        now = datetime.now(timezone.utc).isoformat()
+        r = await db.print_card_orders.find_one_and_update(
+            {"order_id": order_id},
+            {"$set": {"status": status, "updated_at": now},
+             "$push": {"status_history": {"status": status, "at": now}}},
+        )
+        if not r:
+            raise HTTPException(status_code=404, detail="Orden no encontrada.")
+        return {"ok": True, "status": status}
 
     @router.get("/admin/physical-cards")
     async def admin_list_orders(status: Optional[str] = None, _: User = Depends(require_admin)) -> List[dict]:

@@ -3,7 +3,44 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V13 Dashboard rebuild (vertical-only nav + Verificarme + Wallet)
+## Latest Update — May 30, 2026 · V13b Print-with-getamano (PDF + admin queue)
+
+User: "y una opción que diga imprimir con getamano y que se genere la orden en panel de administración del CEO y que este ahí el PDF para que las mande a imprimir".
+
+### Backend
+- **`services/card_pdf.py`** nuevo módulo, usa **ReportLab** (agregado a `requirements.txt`). Renderiza un PDF 2-page (frente + reverso) a tamaño real 85.6×54mm (CR-80 estándar) tomando datos del eCard. El frente tiene el gradient deep-blue + logo placeholder + business_name + ciudad/estado + verify badge PNG cuando aplica + footer "getamano · GM-XXXX". El reverso es blanco con NFC ring + TAP TO OPEN + URL `getamano.us/p/<slug>` + decorative QR-grid.
+- **3 endpoints nuevos en `routes/physical_cards.py`**:
+  - `GET /api/physical-cards/preview-pdf` — proveedor descarga su PDF de muestra (resuelve el primer eCard del owner por default).
+  - `POST /api/physical-cards/print-orders` `{provider_id, packs, notes}` — crea row en colección `print_card_orders` con PDF embebido en base64 + manda push notification a todos los admins. Owner-gated (404 si el provider_id no pertenece al caller).
+  - `GET /api/physical-cards/print-orders/me` — historial del proveedor (sin pdf_b64).
+- **2 endpoints admin nuevos**:
+  - `GET /api/admin/print-orders[?status=...]` — lista todas las órdenes (sin pdf_b64).
+  - `GET /api/admin/print-orders/{order_id}/pdf` — admin descarga el PDF ready-to-print.
+  - `PATCH /api/admin/print-orders/{order_id}?status=...` — avanza el estado (pending_payment → queued_for_print → printing → shipped → delivered).
+
+### Frontend
+- **`PhysicalCardsPanel.jsx`** — Preview ahora tiene 2 botones:
+  - **"Descargar PDF de muestra"** (outline) → fetch blob + download programático.
+  - **"Imprimir con getamano"** (gradient azul) → confirm dialog + POST /print-orders.
+- **`AdminPrintOrders.jsx`** nueva página completa en `/admin/print-orders`:
+  - Filtros por estado (pills con counts en vivo).
+  - Lista de órdenes con business_name, total $, packs, fecha, link a eCard, nota del proveedor.
+  - Botón **PDF** (azul) para descargar.
+  - 5 botones de estado en pipeline horizontal (pending_payment → queued_for_print → printing → shipped → delivered) con el actual highlighted en emerald.
+- **`AdminLayout.jsx`** — nuevo link "Imprimir con getamano" en sidebar admin con icono Printer.
+- **`App.js`** — ruta `/admin/print-orders` con lazy-load.
+
+### Tests
+- `test_iter105_v13b_print_funnel.py` (15 tests: 10 backend integration + 5 frontend source-locks).
+- Cumulative regression iter98→iter105: **91/91 pass**.
+
+### Stripe migration plan
+El status inicial es `pending_payment` precisamente porque Stripe sigue mocked. Cuando lleguen las keys:
+1. POST /print-orders no marca `pending_payment` sino que dispara Stripe Link checkout y deja la orden en `awaiting_payment_link`.
+2. Webhook `checkout.session.completed` → PATCH a `queued_for_print` automáticamente.
+3. Admin ya no tiene que aceptar pagos manualmente — solo descargar PDFs y mandarlos al printer físico.
+
+## Previous Update — May 30, 2026 · V13 Dashboard rebuild (vertical-only nav + Verificarme + Wallet)
 
 User feedback: el menú horizontal duplicaba el vertical. Eliminar el horizontal, unificar todo en el vertical, adaptarlo a mobile, restructurar items y agregar Verificarme + nuevo sistema de premios por referido.
 

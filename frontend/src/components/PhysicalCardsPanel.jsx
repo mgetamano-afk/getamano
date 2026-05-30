@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Package, Loader2, CheckCircle2, Truck } from "lucide-react";
+import { Package, Loader2, CheckCircle2, Truck, Download, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import VerifiedBadge from "./VerifiedBadge";
@@ -190,13 +190,52 @@ function Input({ label, value, onChange, testid, maxLength }) {
  * name, category, city/state + verified badge; the back has the NFC tap
  * mark and the eCard URL.
  *
- * No AI is invoked — this is a deterministic mock-up so users SEE the
- * exact data that will go into the printer. When we ship the OpenAI
- * IMAGE design service we can swap this with a generative variant.
+ * Adds 2 CTAs:
+ *   · "Descargar PDF de muestra" → GET /physical-cards/preview-pdf
+ *   · "Imprimir con getamano"    → POST /physical-cards/print-orders
+ *                                  (admin sees + downloads pdf to print)
  */
 function PhysicalCardPreview({ profile }) {
   const verified = profile?.verification_status === "approved";
   const code = profile?.getamano_code || "";
+  const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const downloadPreviewPdf = async () => {
+    setDownloading(true);
+    try {
+      const res = await api.get("/physical-cards/preview-pdf", { responseType: "blob" });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `getamano-card-${profile.slug || "preview"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("PDF descargado");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo descargar el PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const submitPrintOrder = async () => {
+    if (!profile?.provider_id) return;
+    if (!window.confirm("¿Enviar esta tarjeta a imprimir con getamano? El equipo te contactará para el pago + envío.")) return;
+    setPrinting(true);
+    try {
+      await api.post("/physical-cards/print-orders", { provider_id: profile.provider_id, packs: 1 });
+      toast.success("Orden enviada al equipo de getamano 🎉");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo enviar la orden");
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5" data-testid="physical-card-preview">
       <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-3">
@@ -260,6 +299,30 @@ function PhysicalCardPreview({ profile }) {
           </div>
         </div>
       </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 mt-4">
+        <button
+          type="button"
+          onClick={downloadPreviewPdf}
+          disabled={downloading}
+          className="flex-1 h-11 rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-[#0077B6] hover:text-[#0077B6] active:scale-95 transition inline-flex items-center justify-center gap-2 disabled:opacity-60"
+          data-testid="physical-card-download-pdf"
+        >
+          {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Descargar PDF de muestra
+        </button>
+        <button
+          type="button"
+          onClick={submitPrintOrder}
+          disabled={printing}
+          className="flex-1 h-11 rounded-full bg-gradient-to-r from-[#0077B6] to-[#03045E] text-white text-sm font-semibold hover:shadow-lg active:scale-95 transition inline-flex items-center justify-center gap-2 disabled:opacity-60"
+          data-testid="physical-card-print-with-getamano"
+        >
+          {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+          Imprimir con getamano
+        </button>
+      </div>
+
       <p className="text-[11px] text-slate-500 text-center mt-3">
         Los datos se actualizan en vivo desde tu eCard. Cambia tu nombre, foto o ciudad y la tarjeta se imprime con la última versión.
       </p>

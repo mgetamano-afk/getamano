@@ -73,6 +73,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 const AdminOpsPage = lazy(() => import("./pages/AdminOpsPage"));
 const AdminPhysicalCards = lazy(() => import("./pages/admin/AdminPhysicalCards"));
+const AdminPrintOrders = lazy(() => import("./pages/admin/AdminPrintOrders"));
 const AdminReelsModeration = lazy(() => import("./pages/admin/AdminReelsModeration"));
 const AdminFounders = lazy(() => import("./pages/admin/AdminFounders"));
 const PrintCard = lazy(() => import("./pages/PrintCard"));
@@ -256,6 +257,7 @@ function AppRouter() {
       <Route path="/admin/reels" element={<AdminReelsModeration />} />
       <Route path="/admin/founders" element={<AdminFounders />} />
       <Route path="/admin/physical-cards" element={<AdminPhysicalCards />} />
+      <Route path="/admin/print-orders" element={<AdminPrintOrders />} />
       <Route path="/admin/reportes" element={<AdminReportsBidirectional />} />
       <Route path="/admin/catalog" element={<AdminCatalog />} />
       <Route path="/admin/audit" element={<AdminAudit />} />

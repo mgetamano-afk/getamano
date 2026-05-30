@@ -1,7 +1,7 @@
 import BrandMark from "./BrandMark";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown, DollarSign, Flag, TrendingUp, Inbox, Film, Package } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, MessageSquare, FolderTree, ClipboardList, BarChart3, LogOut, Home, Menu, X, Crown, DollarSign, Flag, TrendingUp, Inbox, Film, Package, Printer } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const NAV = [
@@ -17,6 +17,7 @@ const NAV = [
   { path: "/admin/reels", label: "Reels", Icon: Film },
   { path: "/admin/founders", label: "Founding Members", Icon: Crown },
   { path: "/admin/physical-cards", label: "Tarjetas físicas", Icon: Package },
+  { path: "/admin/print-orders", label: "Imprimir con getamano", Icon: Printer },
   { path: "/admin/reportes", label: "Reportes", Icon: Flag },
   { path: "/admin/catalog", label: "Categorías y ciudades", Icon: FolderTree },
   { path: "/admin/audit", label: "Audit log", Icon: ClipboardList },
