@@ -10731,6 +10731,278 @@ async def og_image_story_png(slug: str):
     )
 
 
+# ============ V16.2 — Recommendation Story PNG (client → network) ============
+# Each row in db.recommendations gets a unique share_token. When the client
+# wants to publish their endorsement to IG/FB Story we render a 1080×1920 PNG
+# that overlays their hand-written message + their name + a "Cliente Real ✓"
+# badge (if eligible) over the provider's hero photo. This converts every
+# satisfied client into a social-native ad with social proof baked in.
+
+def _wrap_svg_text(text: str, max_chars_per_line: int = 26, max_lines: int = 4) -> list:
+    """Naive word-wrap for SVG <text> blocks.
+
+    SVG doesn't support text reflow natively — we have to split into
+    separate <tspan> rows. This wraps by spaces, never breaking words.
+    Truncates with an ellipsis when we exceed max_lines.
+    """
+    if not text:
+        return []
+    words = text.strip().split()
+    lines = []
+    current = ""
+    for w in words:
+        candidate = (current + " " + w).strip() if current else w
+        if len(candidate) <= max_chars_per_line:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = w
+        if len(lines) >= max_lines:
+            break
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    if len(lines) >= max_lines and len(words) > sum(len(line.split()) for line in lines):
+        last = lines[-1]
+        if len(last) > max_chars_per_line - 1:
+            last = last[: max_chars_per_line - 1]
+        lines[-1] = last + "…"
+    return lines
+
+
+def _build_og_image_recommendation_svg(
+    provider: dict,
+    embedded_logo_uri: str = "",
+    embedded_hero_uri: str = "",
+    hero_source: str = "none",
+    client_name: str = "",
+    client_city: str = "",
+    message: str = "",
+    is_verified_client: bool = False,
+) -> str:
+    """V16.2 — 1080×1920 Story PNG with a client's recommendation overlay."""
+    e = _html_escape
+    business = (provider.get("business_name") or "este profesional").strip()
+    business_short = business if len(business) <= 22 else business[:21] + "…"
+    rating = provider.get("rating_avg") or 0
+    is_verified = (provider.get("verification_status") == "approved")
+    plan = (provider.get("plan") or "free").lower()
+
+    name = (client_name or "Alguien").strip()
+    name_short = name if len(name) <= 24 else name[:23] + "…"
+    city = (client_city or "").strip()
+
+    default_msg = f"Te recomiendo a {business_short}. Trabajo de calidad y trato muy humano."
+    msg = (message or "").strip() or default_msg
+    msg_lines = _wrap_svg_text(msg, max_chars_per_line=26, max_lines=4)
+
+    business_safe = e(business_short)
+    name_safe = e(name_short)
+    city_safe = e(city)
+
+    if embedded_hero_uri:
+        hero_safe = e(embedded_hero_uri)
+        hero_block = (
+            f'<image href="{hero_safe}" xlink:href="{hero_safe}" x="0" y="0" width="1080" height="1100" preserveAspectRatio="xMidYMid slice"/>'
+            f'<rect x="0" y="0" width="1080" height="1100" fill="rgba(0,0,0,0.42)"/>'
+            f'<rect x="0" y="900" width="1080" height="220" fill="url(#fadeIntoCard)"/>'
+        )
+    else:
+        hero_block = '<rect x="0" y="0" width="1080" height="1100" fill="url(#bg)"/>'
+
+    verified_pill = (
+        '<g transform="translate(80,110)">'
+        '<rect width="240" height="56" rx="28" fill="#10B981"/>'
+        '<path d="M28 28 L40 40 L60 18" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<text x="148" y="36" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" fill="white">Verificado</text>'
+        '</g>'
+    ) if is_verified else ""
+    pro_pill = (
+        '<g transform="translate(80,180)">'
+        '<rect width="140" height="48" rx="24" fill="#F59E0B"/>'
+        '<text x="70" y="32" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="800" letter-spacing="3" fill="white">PRO</text>'
+        '</g>'
+    ) if plan in ("pro", "premium") else ""
+
+    client_real_pill = (
+        '<g transform="translate(700,110)">'
+        '<rect width="300" height="56" rx="28" fill="rgba(255,255,255,0.95)"/>'
+        '<circle cx="34" cy="28" r="14" fill="#0EA5E9"/>'
+        '<path d="M28 28 L33 33 L40 22" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<text x="170" y="36" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="#0F172A">Cliente real ✓</text>'
+        '</g>'
+    ) if is_verified_client else ""
+
+    line_height = 76
+    bubble_h = 200 + max(0, len(msg_lines) - 1) * line_height
+    bubble_y = 1140
+    msg_y_start = bubble_y + 90
+    tspans = []
+    for i, line in enumerate(msg_lines):
+        tspans.append(
+            f'<tspan x="540" dy="{0 if i == 0 else line_height}">{e(line)}</tspan>'
+        )
+    message_text = "".join(tspans)
+
+    provider_first_word = business.split()[0] if business else "este pro"
+    if len(provider_first_word) > 16:
+        provider_first_word = provider_first_word[:15] + "…"
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#063154"/>
+      <stop offset="55%" stop-color="#0A4D5E"/>
+      <stop offset="100%" stop-color="#025F67"/>
+    </linearGradient>
+    <linearGradient id="cardBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#022E47"/>
+      <stop offset="100%" stop-color="#03045E"/>
+    </linearGradient>
+    <linearGradient id="fadeIntoCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(2,46,71,0)"/>
+      <stop offset="100%" stop-color="rgba(2,46,71,1)"/>
+    </linearGradient>
+    <filter id="bubbleShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="4"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1920" fill="url(#cardBg)"/>
+  {hero_block}
+
+  <text x="540" y="60" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" letter-spacing="6" fill="rgba(255,255,255,0.92)">TE LO RECOMIENDO · GETAMANO</text>
+
+  {verified_pill}
+  {pro_pill}
+  {client_real_pill}
+
+  <g filter="url(#bubbleShadow)">
+    <rect x="90" y="{bubble_y}" width="900" height="{bubble_h}" rx="32" fill="white"/>
+    <path d="M 540 {bubble_y - 24} L 510 {bubble_y + 12} L 570 {bubble_y + 12} Z" fill="white"/>
+  </g>
+  <text x="540" y="{msg_y_start}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="62" font-weight="500" fill="#0F172A">
+    {message_text}
+  </text>
+
+  <text x="120" y="{bubble_y + 60}" font-family="Georgia,serif" font-size="120" font-weight="800" fill="#FCD34D">“</text>
+  <text x="940" y="{bubble_y + bubble_h - 20}" font-family="Georgia,serif" font-size="120" font-weight="800" fill="#FCD34D">”</text>
+
+  <text x="540" y="{bubble_y + bubble_h + 70}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="white">— {name_safe}</text>
+  <text x="540" y="{bubble_y + bubble_h + 110}" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="26" fill="rgba(255,255,255,0.7)">{city_safe}</text>
+
+  <g transform="translate(190,1730)">
+    <rect width="700" height="110" rx="55" fill="#2F9D94"/>
+    <text x="350" y="70" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="40" font-weight="800" fill="white">Conoce a {e(provider_first_word)} →</text>
+  </g>
+
+  <text x="540" y="1880" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="600" fill="rgba(255,255,255,0.55)">getamano.us · Lo latino, a la mano.</text>
+</svg>'''
+
+
+@app.get("/api/og-image/recommendation/{share_token}.png")
+async def og_image_recommendation_png(share_token: str):
+    """V16.2 — Dynamic 1080×1920 Story PNG that overlays a client's
+    written recommendation on top of the provider's hero photo.
+
+    The share_token resolves to a row in db.recommendations created via
+    POST /api/providers/{provider_id}/recommend. The PNG is served with
+    long Cache-Control because once a recommendation is written it
+    doesn't change.
+    """
+    import cairosvg as _cairosvg
+    rec = await db.recommendations.find_one({"share_token": share_token, "is_public": True}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+    slug = rec.get("provider_slug")
+    if not slug:
+        raise HTTPException(status_code=404, detail="Provider slug missing on recommendation")
+
+    provider = await _load_og_provider(slug)
+    logo_uri = await _fetch_logo_data_uri(provider.get("logo_url") or "")
+    hero_raw = provider.get("_hero_image_url") or ""
+    hero_uri = hero_raw if hero_raw.startswith("data:") else await _fetch_logo_data_uri(hero_raw)
+
+    is_verified_client = False
+    client_user_id = rec.get("client_user_id")
+    provider_id = provider.get("provider_id")
+    if client_user_id and provider_id:
+        has_review = await db.reviews.count_documents({"user_id": client_user_id, "provider_id": provider_id})
+        has_msg = await db.messages.count_documents({"client_id": client_user_id, "provider_id": provider_id})
+        has_req = await db.service_requests.count_documents({"client_id": client_user_id, "provider_id": provider_id})
+        is_verified_client = bool(has_review or has_msg or has_req)
+
+    svg = _build_og_image_recommendation_svg(
+        provider,
+        embedded_logo_uri=logo_uri,
+        embedded_hero_uri=hero_uri,
+        hero_source=provider.get("_hero_image_source") or "none",
+        client_name=rec.get("client_name") or "",
+        client_city=rec.get("client_city") or "",
+        message=rec.get("message") or "",
+        is_verified_client=is_verified_client,
+    )
+    try:
+        png_bytes = _cairosvg.svg2png(
+            bytestring=svg.encode("utf-8"),
+            output_width=1080,
+            output_height=1920,
+        )
+    except Exception as exc:  # noqa: BLE001
+        try:
+            fallback_svg = _build_og_image_recommendation_svg(
+                provider,
+                embedded_logo_uri="",
+                embedded_hero_uri="",
+                client_name=rec.get("client_name") or "",
+                client_city=rec.get("client_city") or "",
+                message=rec.get("message") or "",
+                is_verified_client=is_verified_client,
+            )
+            png_bytes = _cairosvg.svg2png(
+                bytestring=fallback_svg.encode("utf-8"),
+                output_width=1080,
+                output_height=1920,
+            )
+        except Exception:
+            raise HTTPException(status_code=500, detail=f"og-image recommendation render failed: {exc}")
+    return _OGResponse(
+        content=png_bytes,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'inline; filename="recommendation-{share_token}.png"',
+        },
+    )
+
+
+@app.get("/api/providers/{provider_id}/can-verify-client")
+async def can_verify_client(provider_id: str, user: User = Depends(get_current_user)):
+    """V16.2 — Endpoint surfaced by RecommendModal to decide whether to
+    display the "Cliente real ✓" hint to the user BEFORE they submit
+    their recommendation. The same logic is recomputed at PNG-render
+    time so the badge is authoritative even if the user lies in the UI.
+    """
+    has_review = await db.reviews.count_documents({"user_id": user.user_id, "provider_id": provider_id})
+    has_msg = await db.messages.count_documents({"client_id": user.user_id, "provider_id": provider_id})
+    has_req = await db.service_requests.count_documents({"client_id": user.user_id, "provider_id": provider_id})
+    return {
+        "can_verify_client": bool(has_review or has_msg or has_req),
+        "signals": {
+            "review": has_review > 0,
+            "message": has_msg > 0,
+            "request": has_req > 0,
+        },
+    }
+
+
+
+
+
 def _build_og_html(provider: dict, public_url: str, slug: str) -> str:
     """Section 56 — Render bot-friendly HTML with rich OG meta tags."""
     e = _html_escape

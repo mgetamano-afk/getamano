@@ -3,7 +3,71 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V16.1 Celebration + Publish-to-Story
+## Latest Update — May 30, 2026 · V16.2 Client-side Recommendation Story (viral)
+
+Founder: "aplica tu sugerencia" (en respuesta a la propuesta c+d+e):
+- **(c)** Híbrido: caja de comentario opcional, label del botón se adapta ("Publicar mi recomendación" vs "Compartir tal cual").
+- **(d)** Badge "Cliente real ✓" si el usuario logueado ya interactuó con este proveedor (review/mensaje/cotización).
+- **(e)** La recomendación queda persistida como testimonial en `db.recommendations` (ya existía vía `POST /providers/{id}/recommend`).
+
+### Flow desde la perspectiva del cliente
+1. Visita una eCard pública (`/services/{slug}` o `/p/{slug}`).
+2. Hace scroll a la sección "Recomendaciones de la comunidad" → ve botón **"+ Yo lo/la recomiendo"**.
+3. Modal step 1 — formulario: Nombre + Ciudad + Email + caja de mensaje opcional (240 chars). Si está logueado y ya interactuó, ve un hint azul "Ya trabajaste con este pro — tu recomendación llevará insignia 'Cliente real ✓'."
+4. Submit → POST `/api/providers/{id}/recommend` crea row en `db.recommendations` con `share_token` único.
+5. Modal step 2 — **vista previa en vivo** del Story PNG 1080×1920 renderizado server-side, con:
+   - Hero photo del proveedor (gallery → AI bg → gradient).
+   - Speech bubble blanco con la cita italic Georgia del cliente + comillas amarillas.
+   - Byline "— {Nombre} · {Ciudad}".
+   - Badges: Verificado / PRO / Cliente real ✓ (cuando aplica).
+   - CTA pill "Conoce a {ProviderFirstWord} →".
+   - Footer "getamano.us · Lo latino, a la mano."
+6. **3 botones de share**:
+   - **🌸 "Publicar en Story"** (primary, gradient pink/fuchsia/purple) → Web Share API con file payload → opens OS share sheet → user elige Instagram/Facebook/WhatsApp Story → imagen pre-cargada en composer. Fallback a download en desktop.
+   - **💬 "Compartir por WhatsApp"** (texto + link).
+   - **📋 "Copiar enlace"**.
+   - **𝕏 "Compartir en X"**.
+
+### Endpoints nuevos
+- `GET /api/og-image/recommendation/{share_token}.png` — Render dinámico 1080×1920 PNG (cairosvg). 404 si token inválido. Cacheable 24h.
+- `GET /api/providers/{provider_id}/can-verify-client` — Auth-gated. Devuelve `{can_verify_client: bool, signals: {review, message, request: bool}}`. Re-validado server-side al renderizar el PNG (anti-spoofing).
+
+### Helpers de render
+- `_wrap_svg_text(text, max_chars_per_line, max_lines)` — naive word-wrap para SVG `<tspan>` stack (Pillow/cairosvg no soportan text reflow nativo).
+- `_build_og_image_recommendation_svg(provider, hero, message, client_name, client_city, is_verified_client)` — armado del SVG con speech bubble + shadow filter + decorative quote marks + CTA pill.
+
+### Sponsor / social-proof flywheel
+Cada recomendación queda persistida en `db.recommendations` (provider_id + client_name + client_city + message + share_token + client_user_id si está logueado). Esto da:
+1. **Testimonio público** que el proveedor puede surface en su eCard (vía `RecommendationsSection` que ya existe).
+2. **Métrica del proveedor** — `recommendations_count` denormalizada se incrementa por cada nueva. Ya aparece en el badge "X recomendaciones" del eCard hero.
+3. **Tracking de cliente real** — futura métrica del panel CEO: % de recomendaciones que vienen de "Cliente real ✓".
+
+### Frontend changes
+- `RecommendModal.jsx` reescrito (~310 líneas, prev 215):
+  - Polls `/can-verify-client` al abrir si user logueado.
+  - Step 2 ahora muestra `<img src="/api/og-image/recommendation/{token}.png">` como preview.
+  - Función `publishStory()` con Web Share API + file fallback.
+  - Label del submit cambia dinámicamente con `hasMessage = message.trim().length >= 20`.
+- `ProviderECard.jsx` — sin cambios (ya estaba wireado con `<RecommendModal showRecommend>`).
+- `RecommendationsSection.jsx` — sin cambios (ya tenía `onRecommendClick` que dispara el modal).
+
+### Tests
+- `test_iter113_v16_2_recommendation_story.py` (12 tests):
+  - 5 integration: PNG dimensions 1080×1920, 404 para token inválido, fallback sin mensaje, auth gate del can-verify-client, signals shape.
+  - 3 backend source locks: endpoint registrado, SVG con bubble + quote marks + CTA, 3 signal collections.
+  - 4 frontend source locks: can-verify-client call, story preview img, publish-story button, submit label adaptativo.
+- Suite cumulativa iter102→iter113: **112/112 verde**.
+
+### Smoke validation
+- POST /recommend → returns `share_token`.
+- GET /api/og-image/recommendation/{token}.png → 1080×1920 PNG, 634 KB.
+- Visual: hero de María limpiando + bubble blanco con la cita en italic Georgia + "— Carlos Demo · Tulsa, OK" + "Conoce a María's →" + footer.
+- E2E Playwright: form fill → submit → modal step 2 renderiza preview en vivo + botón "Publish to Story" + WhatsApp + Copy.
+
+### ⚠️ Endpoint registration gotcha (resuelto)
+El `@api_router.get(...)` registrado en la sección 56/65 del bottom de server.py NO funciona porque `app.include_router(api_router)` se ejecuta en línea 10169 (antes del bloque OG). Solución: usar `@app.get("/api/...")` directamente para nuevas rutas en esa sección. El primer test fail (`can-verify-client` → 404) lo detectó inmediatamente.
+
+## Previous Update — May 30, 2026 · V16.1 Celebration + Publish-to-Story
 
 Founder feedback al V16: "sí, eso es importante hazlo, y en vez de descargar para historia si es más fácil, desde ahí publicarla."
 
