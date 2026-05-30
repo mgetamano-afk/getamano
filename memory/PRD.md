@@ -3,7 +3,28 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V8 Landing enrichment + Verified Badge
+## Latest Update — May 30, 2026 · V10 Verify Badge + V10b Apple/FB OAuth scaffolding
+- **V10 — Verify badge artwork swap**: Reemplazado el `verify-badge.png` original (Xolo claro sobre escudo) por el nuevo **verifyv2** (silueta del Xolo en negro + escudo azul + check). Se re-renderizaron las 3 variantes pre-escaladas (64/128/256 px) + el master a 512×512. Como `VerifiedBadge.jsx` es la **única fuente** de la imagen (12+ páginas consumen el componente), un solo swap de PNG propaga el artwork nuevo a todas las eCards, Reels, Search, Stories, Barrio, ComunidadECards, etc.
+- **VerifiedBadge V10 props** (`/components/VerifiedBadge.jsx`):
+  - `code` opcional → embebe `GM-XXXX` en el tooltip "Verificado por getamano · GM-1335".
+  - `darkBg={true}` → aplica `filter: brightness(1.3)` (recomendado para overlays oscuros de Reels).
+  - i18n auto-detección via `localStorage.tx_lang` para el alt + title.
+  - El size apropiado de PNG se elige automático: ≤24 → 64, ≤64 → 128, mayor → 256.
+- **V10b — Apple Sign In + Facebook OAuth scaffolding** (`/routes/auth.py` lines ~290-440):
+  - 3 endpoints nuevos: `POST /auth/apple/session` (JWKS via PyJWKClient + verificación RS256 con `audience=APPLE_CLIENT_ID` y `issuer=https://appleid.apple.com`), `POST /auth/facebook/session` (validación vía Graph API `/me`), y `GET /auth/oauth-config` (devuelve `{apple, facebook, apple_client_id, facebook_app_id, apple_redirect_uri}` para que el frontend sepa qué activar).
+  - Helper compartido `_finalize_oauth_login(provider, external_id, email, name, ...)` upsertea por `providers.{name}=external_id`, fallback a match por email para account linking, luego emite el JWT `session_token` (cookie httpOnly secure) — re-usa exactamente las mismas funciones que Google OAuth.
+  - **Graceful degradation**: cuando `APPLE_CLIENT_ID` o `FACEBOOK_APP_ID` no están en `.env`, los endpoints devuelven HTTP 503 con detalle en español ("Apple Sign In aún no está configurado. Pide al equipo las credenciales.").
+- **`<AppleSignInButton/>` + `<FacebookSignInButton/>` reusables** (`/components/SocialAuthButtons.jsx`):
+  - Hacen `fetch /api/auth/oauth-config` (cacheado a nivel módulo) una sola vez por carga.
+  - Si keys presentes → cargan Apple JS SDK / Facebook JS SDK dinámicamente, llaman `AppleID.auth.init` / `FB.init` con `clientId` y abren popup nativo.
+  - Si keys ausentes → label "Apple (próximamente)" / "Facebook (próximamente)", click muestra toast informativo.
+  - Wired en `Login.jsx`, `Register.jsx`, y `OnboardingLogin.jsx` (el componente unificado que renderiza `/login`, `/signin`, `/auth/login`).
+- **V9 closure**: Auditado el composer del Barrio — ya acepta cualquier usuario logueado (no solo providers). V9 Parts 4A/4B funcionando de facto desde el commit original.
+- **Tests**: `test_iter100_v10_verify_badge.py` (9 tests) + `test_iter101_v10b_oauth_scaffolding.py` (8 tests). Cumulative regression iter83→iter101: **151/151 pass**.
+- **Testing agent verification**: 100% backend + 100% frontend (Playwright). Cero defectos. Confirmó el badge nuevo en eCard + Search + i18n switching ES↔EN, el envelope de `/auth/oauth-config`, los 503 de Apple/FB con mensaje en español, y posting Barrio como cliente.
+- **Pendiente para Apple/FB activos**: el usuario necesita crear (a) Apple Services ID + Team ID + Key ID + `.p8` key en developer.apple.com ($99/año), (b) Facebook App ID + App Secret en developers.facebook.com (gratis). Una vez cargadas a `/app/backend/.env`, los botones se activan automáticamente sin redeploy.
+
+## Previous Update — May 30, 2026 · V8 Landing enrichment + Verified Badge
 - **Custom VerifiedBadge**: nueva `/components/VerifiedBadge.jsx` con el artwork del Xolo + escudo + ✓ que subió el usuario. Pre-renderizado en 64/128/256 px. **Reemplazó `<ShieldCheck>` en 12+ lugares user-facing** (ProviderECard, Search, SearchResultCard, Landing, CategoryHub, ClientDashboard, ComunidadECards, GremiosPage, MiRedPage, BannerGalleryPage, BarrioOverlay, ReelsPage, StoriesCarousel, SeoPage). El icono de ShieldCheck queda sólo para usos genéricos (no-verificación).
 - **V8 Landing enrichment**: nuevo `<V8EnrichmentSections>` con 6 sub-secciones:
   - §3 Verifica tu negocio · $10/mes (banner Founder100 dinámico desde `/founders/status`).
