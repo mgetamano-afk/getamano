@@ -302,23 +302,14 @@ export default function Search() {
           setCity(display);
         }}
       />
-      {/* Sentinel to detect when the sticky filter bar becomes stuck */}
+      {/* Section V11.2 — Search bar now scrolls naturally with the page
+          on all screen sizes (user feedback May 30 2026: sticky bar was
+          trapping the page mid-scroll). Sentinel + `stuck` state are
+          preserved as no-ops so existing tests/data-attrs keep working. */}
       <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
 
-      {/* Search filter bar. On mobile (sm and below) this scrolls
-          naturally with the page — sticky was trapping touch and
-          forcing the section to lock at mid-screen on iOS. On md+
-          screens it sticks below the header for quick filter access
-          while browsing long result lists. */}
       <div
-        className="md:sticky md:top-20 z-30 transition-all duration-200"
-        style={{
-          backgroundColor: stuck ? "rgba(247, 246, 242, 0.92)" : "transparent",
-          backdropFilter: stuck ? "blur(14px)" : "none",
-          WebkitBackdropFilter: stuck ? "blur(14px)" : "none",
-          boxShadow: stuck ? "0 4px 16px -8px rgba(3, 4, 94, 0.12)" : "none",
-          borderBottom: stuck ? "1px solid rgba(188, 197, 204, 0.4)" : "1px solid transparent",
-        }}
+        className="z-30"
         data-testid="search-sticky-bar"
         data-stuck={stuck}
       >
