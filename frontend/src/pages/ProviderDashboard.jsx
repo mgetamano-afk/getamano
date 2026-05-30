@@ -127,6 +127,29 @@ export default function ProviderDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  // V16.1 — Celebration: ?celebrate=new_ecard|verified arrives after a
+  // successful eCard creation (2nd+ paid) or verification activation.
+  // We:
+  //   1. Force the dashboard tab so the ShareLinkCard renders.
+  //   2. Capture the kind into state to drive the celebration banner.
+  //   3. Strip the param from the URL so a manual refresh doesn't replay.
+  const [celebrationKind, setCelebrationKind] = useState(null);
+  useEffect(() => {
+    const k = searchParams.get("celebrate");
+    if (k && (k === "new_ecard" || k === "verified")) {
+      setCelebrationKind(k);
+      setTab("dashboard");
+      const next = new URLSearchParams(searchParams);
+      next.delete("celebrate");
+      next.delete("slug");
+      setSearchParams(next, { replace: true });
+      // Auto-clear after 30s so subsequent navigations don't keep showing it.
+      const t = setTimeout(() => setCelebrationKind(null), 30000);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [ecardPreviewOpen, setEcardPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -300,9 +323,15 @@ export default function ProviderDashboard() {
             {tab === "dashboard" && (
               <>
                 {/* V16 — Top-of-home: rich social share card with live OG
-                    preview, IG-Story download, and FB/X validators. */}
+                    preview, IG-Story publish (Web Share API), and FB/X
+                    validators. V16.1 — surfaces a celebration banner when
+                    arrived from a successful payment or verification. */}
                 {profile?.slug && (
-                  <ShareLinkCard slug={profile.slug} businessName={profile.business_name} />
+                  <ShareLinkCard
+                    slug={profile.slug}
+                    businessName={profile.business_name}
+                    celebrationKind={celebrationKind}
+                  />
                 )}
                 <DashboardHomeV7
                   profile={profile}

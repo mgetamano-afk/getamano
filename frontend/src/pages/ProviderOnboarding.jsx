@@ -111,7 +111,14 @@ export default function ProviderOnboarding() {
       }
       await refresh();
       toast.success("¡Tu eCard está lista!");
-      navigate(`/provider/${data.slug}`, { replace: true });
+      // V16.1 — push the provider into the dashboard celebration so they
+      // can share their new eCard immediately. The dashboard reads
+      // ?celebrate=new_ecard, switches to the home tab, scrolls the
+      // ShareLinkCard into view, and shows a celebratory banner.
+      navigate(
+        `/dashboard/provider?celebrate=new_ecard&slug=${encodeURIComponent(data.slug)}`,
+        { replace: true },
+      );
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Error");
     } finally {

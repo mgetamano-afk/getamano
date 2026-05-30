@@ -74,13 +74,21 @@ export default function EcardsManagerPanel() {
       if (ec.verification_active) {
         await api.delete(`/users/me/ecards/${ec.provider_id}/verify`);
         toast.success(lang === "en" ? "Verification turned off" : "Verificación cancelada");
+        await refresh();
       } else {
         // Sandbox-pay the verification subscription, then activate
         await api.post("/users/me/ecards/sandbox-pay", { kind: "verification" });
         await api.post(`/users/me/ecards/${ec.provider_id}/verify`);
         toast.success(lang === "en" ? "Verification activated" : "Verificación activa");
+        // V16.1 — route to the dashboard home celebration so the freshly
+        // verified provider sees the share UI immediately. We assume the
+        // panel lives at /dashboard/provider; the celebrate query param
+        // is consumed there.
+        navigate(
+          `/dashboard/provider?celebrate=verified&slug=${encodeURIComponent(ec.slug || "")}`,
+        );
+        return;
       }
-      await refresh();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Error");
     } finally {

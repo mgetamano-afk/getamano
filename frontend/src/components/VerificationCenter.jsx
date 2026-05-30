@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import VerifiedBadge from "./VerifiedBadge";
 import { ShieldCheck, ShieldOff, Sparkles, Gift, Check, Loader2 } from "lucide-react";
@@ -30,6 +30,7 @@ const REWARD_LADDER = [
 
 export default function VerificationCenter() {
   const { lang } = useI18n();
+  const navigate = useNavigate();
   const [ecards, setEcards] = useState([]);
   const [pricing, setPricing] = useState(null);
   const [referrals, setReferrals] = useState({ paid: 0 });
@@ -61,12 +62,18 @@ export default function VerificationCenter() {
       if (ec.verification_active) {
         await api.delete(`/users/me/ecards/${ec.provider_id}/verify`);
         toast.success(lang === "en" ? "Verification turned off" : "Verificación cancelada");
+        await refresh();
       } else {
         await api.post("/users/me/ecards/sandbox-pay", { kind: "verification" });
         await api.post(`/users/me/ecards/${ec.provider_id}/verify`);
         toast.success(lang === "en" ? "Verification activated" : "Verificación activada");
+        // V16.1 — celebrate by routing to the dashboard home so the
+        // ShareLinkCard surfaces with the "Estás verificado" banner.
+        navigate(
+          `/dashboard/provider?celebrate=verified&slug=${encodeURIComponent(ec.slug || "")}`,
+        );
+        return;
       }
-      await refresh();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Error");
     } finally {

@@ -169,15 +169,22 @@ def test_share_card_renders_live_preview():
     assert "/api/og-image/${slug}.png" in src
 
 
-def test_share_card_has_story_download_button():
-    """V16 — `share-link-story-download` button must fetch the 1080×1920
-    story PNG via /api/og-image/story/{slug}.png and trigger a blob download.
+def test_share_card_has_story_publish_button():
+    """V16 / V16.1 — `share-link-story-publish` button must fetch the
+    1080×1920 story PNG via /api/og-image/story/{slug}.png and trigger
+    a Web Share API call with the file payload (so on mobile the user
+    picks Instagram/Facebook/WhatsApp Story directly). Falls back to
+    blob download on desktop / unsupported browsers.
     """
     src = _share_card_src()
-    assert 'data-testid="share-link-story-download"' in src
+    assert 'data-testid="share-link-story-publish"' in src
     assert "/api/og-image/story/${slug}.png" in src
-    assert "downloadStory" in src
-    # Must use blob+createObjectURL (so Safari/iOS download cleanly)
+    assert "publishStory" in src
+    # Web Share API with file payload
+    assert "navigator.canShare" in src
+    assert "navigator.share" in src
+    assert "files: [file]" in src
+    # Fallback still creates a downloadable blob (Safari/desktop)
     assert "createObjectURL" in src
 
 

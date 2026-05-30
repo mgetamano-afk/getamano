@@ -1,6 +1,6 @@
 import BrandMark from "./BrandMark";
-import { useState } from "react";
-import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram, Printer, Image as ImageIcon, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, MessageCircle, Download, QrCode, ExternalLink, Share2, Check, Smartphone, Mail, X, Facebook, MessageSquare, Twitter, Instagram, Printer, Image as ImageIcon, Search, PartyPopper, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "../lib/api";
@@ -17,16 +17,38 @@ import { api } from "../lib/api";
  *   - Live preview of how the link looks when pasted in FB/IG/X (uses the
  *     `/api/og-image/{slug}.png` rendered server-side with the first gallery
  *     photo → AI bg → gradient fallback).
- *   - "Descargar para Story" button to download the 1080×1920 vertical PNG
- *     ready to upload to IG/TikTok/FB Stories.
+ *   - "Publicar en Story" button: Web Share API with file payload (opens
+ *     the OS share sheet — user picks Instagram Story / Facebook Story /
+ *     WhatsApp Status and the image is loaded directly into that app's
+ *     composer). Falls back to download on desktop.
  *   - Validators that open the link in Facebook Sharing Debugger /
  *     Twitter Card Validator so the provider can verify the preview is
  *     scraped correctly before publishing.
+ *
+ * V16.1 — when invoked with `celebrationKind="new_ecard"` or `"verified"`
+ *   (driven by `?celebrate=...` URL param on the dashboard), the card
+ *   renders a hero celebration banner at the top with confetti emoji
+ *   and a celebratory copy + auto-scrolls itself into view so the
+ *   provider's first instinct after paying / getting verified is to
+ *   share.
  */
-export default function ShareLinkCard({ slug, businessName }) {
+export default function ShareLinkCard({ slug, businessName, celebrationKind }) {
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [previewBust, setPreviewBust] = useState(() => Date.now());
+  const rootRef = useRef(null);
+
+  // V16.1 — auto-scroll when we're rendered as a post-payment / post-verify
+  // celebration so the share UI is in the viewport without the user having
+  // to scroll to find it.
+  useEffect(() => {
+    if (celebrationKind && rootRef.current) {
+      const t = setTimeout(() => {
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [celebrationKind]);
 
   if (!slug) return null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -134,25 +156,60 @@ export default function ShareLinkCard({ slug, businessName }) {
     toast.success("Descargando código QR");
   };
 
-  // V16 — download the 1080×1920 Instagram Story PNG. We fetch as blob so
-  // mobile browsers don't navigate away to a new tab + Safari handles the
-  // download cleanly via the temporary object URL.
-  const downloadStory = async () => {
-    const id = toast.loading("Generando imagen para tu historia…");
+  // V16 / V16.1 — Publish the 1080×1920 story PNG directly into IG/FB/WhatsApp
+  // Stories via the Web Share API with file payload (mobile). On desktop or
+  // browsers that don't support file sharing we fall back to a plain download
+  // with clear copy telling the user to upload from their phone.
+  const publishStory = async () => {
+    const id = toast.loading("Preparando imagen para tu historia…");
     try {
       const r = await fetch(storyImg);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const blob = await r.blob();
+      const file = new File([blob], `${slug}-story.png`, { type: "image/png" });
+
+      // Web Share API with files — opens the native share sheet which
+      // includes Instagram → Story, Facebook → Story, WhatsApp Status, etc.
+      // The image is preloaded into the target app's composer.
+      const canShareFile =
+        typeof navigator !== "undefined" &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [file] });
+
+      if (canShareFile) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: businessName,
+            text: shareText,
+          });
+          _trackShare("story_publish");
+          toast.success("¡Listo! Elige Instagram, Facebook o WhatsApp Story.", { id });
+          return;
+        } catch (e) {
+          if (e?.name === "AbortError") {
+            toast.dismiss(id);
+            return; // user cancelled — leave silently
+          }
+          // Any other error → fall through to download fallback below
+          console.error("native story share failed", e);
+        }
+      }
+
+      // Desktop / unsupported fallback: regular download + helpful copy.
       const u = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = u; a.download = `${slug}-story.png`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 1000);
-      _trackShare("story");
-      toast.success("Imagen lista — súbela como sticker en tu historia.", { id });
+      _trackShare("story_download");
+      toast.success(
+        "Imagen descargada. Súbela como historia desde tu celular para mejor calidad.",
+        { id, duration: 6000 },
+      );
     } catch (e) {
-      console.error("story download failed", e);
-      toast.error("No se pudo descargar la imagen", { id });
+      console.error("publish story failed", e);
+      toast.error("No se pudo preparar la imagen", { id });
     }
   };
 
@@ -176,7 +233,9 @@ export default function ShareLinkCard({ slug, businessName }) {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl p-5 md:p-6 mb-6"
+    <div
+      ref={rootRef}
+      className="relative overflow-hidden rounded-3xl p-5 md:p-6 mb-6"
       style={{
         background: "linear-gradient(135deg, #03045E 0%, #0A4D5E 60%, #03045E 100%)",
         boxShadow: "0 12px 40px -16px rgba(11,15,46,0.6)",
@@ -186,6 +245,35 @@ export default function ShareLinkCard({ slug, businessName }) {
       {/* Decorative gradient blob */}
       <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-orange-500/30 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
+
+      {/* V16.1 — Celebration banner shown after a successful payment or
+          verification activation. Disappears once the URL ?celebrate=...
+          param is consumed by the dashboard. */}
+      {celebrationKind && (
+        <div
+          className="relative mb-4 rounded-2xl border border-amber-300/40 bg-gradient-to-r from-amber-400/20 via-orange-500/15 to-rose-500/20 px-4 py-3 flex items-start gap-3 animate-fadeSlideUp"
+          data-testid="share-link-celebration-banner"
+          data-celebration-kind={celebrationKind}
+        >
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shadow-lg">
+            {celebrationKind === "verified"
+              ? <Sparkles className="w-5 h-5 text-white" />
+              : <PartyPopper className="w-5 h-5 text-white" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-display font-bold text-base leading-tight">
+              {celebrationKind === "verified"
+                ? "¡Estás verificado! 🎉"
+                : "¡Tu nueva eCard está lista! 🎉"}
+            </p>
+            <p className="text-white/80 text-xs mt-0.5 leading-snug">
+              {celebrationKind === "verified"
+                ? "Comparte tu eCard ahora — la insignia verde te abre más confianza con tu próximo cliente."
+                : "Compártela con tu primer cliente. Mientras más rápido la conozca tu red, más rápido llegan los pedidos."}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="relative flex items-center justify-between mb-4 gap-2 flex-wrap">
         <div>
@@ -277,15 +365,15 @@ export default function ShareLinkCard({ slug, businessName }) {
         </button>
       </div>
 
-      {/* V16 — Story download + validators */}
+      {/* V16 — Publish to Story + validators */}
       <div className="relative mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
         <button
-          onClick={downloadStory}
+          onClick={publishStory}
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 hover:from-pink-600 hover:via-fuchsia-600 hover:to-purple-600 text-white text-sm font-semibold shadow-lg transition"
-          data-testid="share-link-story-download"
+          data-testid="share-link-story-publish"
         >
           <Instagram className="w-4 h-4" />
-          Descargar para Story
+          Publicar en Story
         </button>
         <button
           onClick={validateFB}

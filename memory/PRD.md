@@ -3,7 +3,58 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V16 Rich Social Previews (Open Graph + IG Stories)
+## Latest Update — May 30, 2026 · V16.1 Celebration + Publish-to-Story
+
+Founder feedback al V16: "sí, eso es importante hazlo, y en vez de descargar para historia si es más fácil, desde ahí publicarla."
+
+Dos cambios incrementales sobre V16:
+
+### 1. Celebración post-pago / post-verificación
+Cuando un proveedor:
+- termina de pagar la 2da eCard ($5 sandbox) y completa onboarding, o
+- activa verificación en `VerificationCenter` o `EcardsManagerPanel`,
+
+el frontend ahora navega a `/dashboard/provider?celebrate=new_ecard|verified&slug={slug}` en lugar de a la eCard pública. El dashboard:
+1. Detecta `?celebrate=` en el primer mount.
+2. Fuerza `tab="dashboard"` (donde vive ShareLinkCard).
+3. Strip-ea el param de la URL (replace history) para que un reload no replay el banner.
+4. Pasa `celebrationKind` como prop al `<ShareLinkCard>`.
+5. ShareLinkCard renderiza un **banner amarillo/naranja arriba del card** con:
+   - `new_ecard`: "¡Tu nueva eCard está lista! 🎉 Compártela con tu primer cliente..."
+   - `verified`: "¡Estás verificado! 🎉 Comparte tu eCard ahora — la insignia verde te abre más confianza con tu próximo cliente."
+6. `useEffect` con `scrollIntoView({behavior:'smooth', block:'start'})` lleva el card al viewport sin intervención del usuario.
+7. Auto-dismiss del kind a los 30s.
+
+Esto convierte el momento del pago/verify en un momento de **acción inmediata de difusión**, no un dead-end donde el proveedor regresa al perfil público sin saber qué hacer.
+
+### 2. "Publicar en Story" (Web Share API con archivo)
+Reemplazo del botón "Descargar para Story". Nueva implementación:
+- Fetch del PNG 1080×1920 como blob.
+- Crea un `File` object con MIME `image/png`.
+- Detecta `navigator.canShare({files: [file]})` (mobile: Chrome Android, Safari iOS 15+, Edge mobile).
+- Si soportado → `navigator.share({files: [file], title, text})` → abre el OS share sheet nativo → user pulsa **Instagram → Story** / **Facebook → Story** / **WhatsApp → Estado** y la imagen **se carga directamente en el composer** de esa app.
+- Si NO soportado (desktop, navegadores viejos) → fallback al download anterior con copy "Súbela como historia desde tu celular para mejor calidad."
+- Cancelación (AbortError) silenciosa, sin toast de error.
+- Track event con channel `story_publish` (native) o `story_download` (fallback) → métrica para el panel CEO.
+
+Esto es **lo más cercano a "publicar directo desde la app"** que permiten las plataformas — Instagram NO expone API web para postear Stories desde apps third-party (solo Instagram Business Accounts conectados a Facebook Page, y Stories en particular tienen acceso muy restringido). La Web Share API es la ruta oficial soportada por Meta para flujos como este.
+
+### Test IDs renombrados
+- `share-link-story-download` → `share-link-story-publish`
+- Label visible: "Descargar para Story" → **"Publicar en Story"**
+
+### Tests
+- `test_iter111_v16_social_share.py` actualizado (12 tests, ya incluye el rename + Web Share API locks).
+- `test_iter112_v16_1_celebration_publish.py` (7 tests source-locks): celebración prop + auto-scroll + URL consume + onboarding redirect + verify center redirect + ecards panel redirect + button rename.
+- Suite cumulativa iter102→iter112: **100/100 verde**.
+
+### Smoke validation
+Screenshots a 1280×900:
+- `/dashboard/provider?celebrate=new_ecard` → banner "¡Tu nueva eCard está lista! 🎉" arriba del share card, scrolleado al top automáticamente.
+- `/dashboard/provider?celebrate=verified` → banner "¡Estás verificado! 🎉 Comparte tu eCard ahora..." con la misma estructura.
+- Botón "Publicar en Story" visible en gradiente pink→fuchsia→purple en ambos casos.
+
+## Previous Update — May 30, 2026 · V16 Rich Social Previews (Open Graph + IG Stories)
 
 Founder: "cuando se compartan las eCards, por redes sociales, en un post de insta, de facebook, de X, el post se vea tan real, como si fuera nativo de esa app... una miniatura de la ecard, con toda la información básica... cuando ya tengamos más data, automáticamente tiene que usar las imágenes que el usuario dueño de las eCards ha puesto."
 
