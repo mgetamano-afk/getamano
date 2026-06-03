@@ -4,6 +4,7 @@ import { Video, X, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api";
 import { useI18n } from "../contexts/I18nContext";
+import MediaPermissionGate from "./MediaPermissionGate";
 
 /**
  * ReelCreator — Section 89 v4 Phase E.
@@ -23,6 +24,11 @@ export default function ReelCreator({ onClose, onCreated }) {
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [duration, setDuration] = useState(0);
+  // V17.1 — Privacy gate before opening the native gallery picker.
+  // We default to `false` and show the gate when the user taps the
+  // big "elegir video" tile. The gate caches the answer in localStorage
+  // so we don't ask twice in 30 days.
+  const [permGateOpen, setPermGateOpen] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => () => {
@@ -116,13 +122,13 @@ export default function ReelCreator({ onClose, onCreated }) {
           {!previewUrl ? (
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
+              onClick={() => setPermGateOpen(true)}
               className="w-full aspect-[9/16] rounded-2xl border-2 border-dashed border-slate-300 hover:border-pink-500 active:scale-[0.99] flex flex-col items-center justify-center text-slate-400 hover:text-pink-600 transition"
               data-testid="reel-creator-pick"
             >
               <Video className="w-10 h-10 mb-2" />
               <p className="text-sm font-medium">{lang === "en" ? "Tap to choose a video" : "Toca para elegir un video"}</p>
-              <p className="text-xs mt-1">{lang === "en" ? "Vertical 9:16 · ≤60s · ≤80MB" : "Vertical 9:16 · ≤60s · ≤80MB"}</p>
+              <p className="text-xs mt-1">{lang === "en" ? "Vertical 9:16 · 3-60s · ≤80MB" : "Vertical 9:16 · 3-60s · ≤80MB"}</p>
             </button>
           ) : (
             <div className="relative aspect-[9/16] rounded-2xl bg-black overflow-hidden" data-testid="reel-creator-preview-wrap">
@@ -162,6 +168,16 @@ export default function ReelCreator({ onClose, onCreated }) {
             onChange={(e) => handleFile(e.target.files?.[0])}
             data-testid="reel-creator-file"
           />
+          {/* V17.1 — Privacy permission gate. We trigger the hidden file
+              input only after the user grants access. */}
+          {permGateOpen && (
+            <MediaPermissionGate
+              kind="gallery"
+              lang={lang}
+              onGranted={() => { setPermGateOpen(false); inputRef.current?.click(); }}
+              onDenied={() => setPermGateOpen(false)}
+            />
+          )}
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}

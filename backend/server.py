@@ -2527,14 +2527,25 @@ async def upload_reel_video(file: UploadFile = File(...), user: User = Depends(g
     duration_s = None
     was_trimmed = False
     try:
-        from services.reel_video import process_reel, is_ffmpeg_available
+        from services.reel_video import process_reel, is_ffmpeg_available, ReelTooShortError, MIN_REEL_DURATION_S
         if is_ffmpeg_available():
-            proc = await process_reel(data, content_type)
-            final_bytes = proc.video_bytes
-            final_ct = proc.output_content_type if proc.video_bytes is not data else content_type
-            thumbnail_bytes = proc.thumbnail_bytes
-            duration_s = proc.duration_s
-            was_trimmed = proc.was_trimmed
+            try:
+                proc = await process_reel(data, content_type)
+                final_bytes = proc.video_bytes
+                final_ct = proc.output_content_type if proc.video_bytes is not data else content_type
+                thumbnail_bytes = proc.thumbnail_bytes
+                duration_s = proc.duration_s
+                was_trimmed = proc.was_trimmed
+            except ReelTooShortError as e:
+                # V17.1 — Reject under-3s clips with a clear Spanish message.
+                # 422 (unprocessable entity) is the correct semantic for a
+                # well-formed request whose content can't be accepted.
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"El video es muy corto ({e.duration:.1f}s). Mínimo {MIN_REEL_DURATION_S}s.",
+                )
+    except HTTPException:
+        raise  # don't swallow the ReelTooShortError → 422
     except Exception as e:
         logger.warning(f"reel post-process skipped: {e}")
 
@@ -9972,6 +9983,7 @@ from routes.founders import build_founders_router as _make_founders_router  # no
 from routes.v3_provider import build_router as _make_v3_router, run_v3_migration as _v3_migration  # noqa: E402
 from routes.v4_social import build_router as _make_v4_social_router, ensure_indexes as _v4_indexes  # noqa: E402
 from routes.reels import make_router as _make_reels_router, ensure_reels_indexes as _reels_indexes  # noqa: E402
+from routes.social_engagement import make_router as _make_social_engagement_router  # noqa: E402
 from routes.featured import (  # noqa: E402
     make_router as _make_featured_router,
     ensure_featured_indexes as _featured_indexes,
@@ -10115,6 +10127,15 @@ api_router.include_router(
         db=db,
         User=User,
         get_current_user=get_current_user,
+    )
+)
+
+# V17 — Reels / Stories comments + reshare + @mentions
+api_router.include_router(
+    _make_social_engagement_router(
+        db=db,
+        get_current_user=get_current_user,
+        get_current_user_optional=get_optional_user,
     )
 )
 

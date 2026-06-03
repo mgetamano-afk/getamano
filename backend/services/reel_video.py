@@ -27,8 +27,20 @@ import ffmpeg
 
 logger = logging.getLogger(__name__)
 
+MIN_REEL_DURATION_S = 3
 MAX_REEL_DURATION_S = 60
 THUMBNAIL_AT_S = 1.0
+
+
+class ReelTooShortError(ValueError):
+    """Raised when an uploaded reel's video is below MIN_REEL_DURATION_S.
+
+    The handler converts this into a 422 with a Spanish message so the
+    user sees clear feedback in the upload modal.
+    """
+    def __init__(self, duration: float):
+        self.duration = duration
+        super().__init__(f"Reel too short: {duration:.1f}s")
 
 
 @dataclass
@@ -64,6 +76,11 @@ def _process_sync(raw: bytes, content_type: str) -> ProcessedReel:
             f.write(raw)
 
         duration = _probe_duration(src_path) or float(MAX_REEL_DURATION_S)
+        if duration > 0 and duration < MIN_REEL_DURATION_S:
+            # V17.1 — Reject under-3s clips so the feed quality stays high
+            # (Instagram/TikTok use the same floor). The handler converts
+            # this to a 422 with a clear Spanish message.
+            raise ReelTooShortError(duration)
         was_trimmed = duration > MAX_REEL_DURATION_S
         clip_dur = min(duration, float(MAX_REEL_DURATION_S))
 

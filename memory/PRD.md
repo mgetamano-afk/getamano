@@ -3,7 +3,67 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — May 30, 2026 · V16.4 Code Quality Hardening (audit fixes)
+## Latest Update — Jun 3, 2026 · V17 Reels Social Layer (4 fases)
+
+Founder pidió 4 mejoras a Reels en una pasada — todas ejecutadas en batch:
+
+### V17.1 · Cleanup Reels
+- **🧹 Watermark eliminado**: el "watermark" reportado era el `BottomNav` apareciendo bajo el FAB `+` en `/reels`. Agregamos `"/reels"` a `HIDDEN_PATHS` en `BottomNav.jsx`. El FAB también baja a `bottom: 24px` (antes `76px` para librar el nav que ya no existe).
+- **🎬 Mínimo 3s + máximo 60s**: `services/reel_video.py` ahora exporta `MIN_REEL_DURATION_S = 3` y lanza `ReelTooShortError` cuando un video sube < 3s. El endpoint `/api/reels/upload-video` convierte a `422 "El video es muy corto (X.Xs). Mínimo 3s."`. Match con Instagram/TikTok/Facebook Reels.
+- **🛡️ MediaPermissionGate (privacy compliance)**: nuevo componente `MediaPermissionGate.jsx` que muestra un app-level prompt en español/inglés **ANTES** de disparar `getUserMedia` (cámara) o `<input type="file">` (galería). Copy: "getamano quiere acceder a tu cámara/fotos · Solo lo usamos para subir el reel que elijas...". Cumple GDPR + CCPA. Cache en `localStorage` por 30 días por kind (camera/gallery). Wireado en `ReelCameraRecorder.jsx` (gate `getUserMedia` con `permissionGranted` flag) y `ReelCreator.jsx` (gate file input).
+
+### V17.2 · Comentarios en reels + stories
+- **Nuevo módulo** `routes/social_engagement.py` con:
+  - `POST /api/reels/{id}/comments` + `GET /api/reels/{id}/comments`
+  - `POST /api/stories/{id}/comments` + `GET /api/stories/{id}/comments`
+  - `DELETE /api/comments/{id}` (owner-only o admin)
+- **Modelo unificado** `social_comments` keyed por `(subject_type, subject_id)`. Bumpea `comments_count` denormalizado en `reels.comments_count` / `stories.comments_count`.
+- **Auto-notify al post owner** + **hydrate** del autor (name + avatar + verified badge).
+- **Nuevo componente `CommentsSheet.jsx`**: bottom-sheet en móvil + modal en desktop, lista de comments, composer con autocomplete de menciones, delete propio, render de `@menciones` como link a `/services/{slug}`.
+
+### V17.3 · Internal re-share
+- **Nueva colección `reel_reshares`** con `(reel_id, user_id)` único.
+- `POST /api/reels/{id}/reshare` con caption opcional. Idempotente (devuelve `deduped:true` si ya existe). Rechaza self-reshare (400). Bumpea `reels.reshares_count`.
+- `DELETE /api/reels/{id}/reshare` (toggle off).
+- `GET /api/reels/{id}/reshare-state` para hidratar el UI.
+- **NO copiamos el video** — el reshare row referencia el `reel_id` original. Storage flat regardless of viralidad.
+- **Notifica al autor original** con CTA "🔁 Compartieron tu reel".
+- Botón **"Compartir en mi perfil"** integrado en `ReelActionMenu.jsx` (gradient verde-esmeralda, `Repeat2` icon).
+
+### V17.4 · @Mentions (captions + comments)
+- **Regex sustantivo**: `@([a-zA-Z0-9._-]{2,60})` (60 chars para que quepan slugs largos tipo `maria-cleaning-services-sallisaw-ok`).
+- **Resolución**: `_resolve_mentioned_users` busca primero `provider_profiles.slug`, fallback a `users.handle`.
+- **`POST /api/mentions/search?q=ma`** → endpoint público para typeahead.
+- **Nuevo componente `MentionTextarea.jsx`**: detecta `@` al caret + debounce 200ms + dropdown con keyboard nav (↑↓ Enter Esc Tab). Selección reemplaza el handle en progreso.
+- **Notificación**: 1 `notification` por usuario mencionado, idempotente por `notification_key = mention::{subject}::{user}`. Aparece como "💬 @nombre te mencionó: '...'".
+- **Render**: `CommentsSheet` parsea texto y convierte `@handle` en `<a href="/services/{handle}">` con color fuchsia.
+
+### UI changes en ReelActionMenu
+8 acciones en lugar de 5 (de abajo arriba):
+- 📤 Subir Reel · 📹 Grabar Reel · 🔗 Compartir fuera · 🔖 Save · ❤️ Like · ✨ Wow · **🔁 Reshare (V17.3)** · **💬 Comment (V17.2)**
+
+### Tests
+- **`test_iter115_v17_reels_social.py` (20 tests)**:
+  - 4 V17.1 source locks (bottomnav hidden + fab offset + gate component + min duration constant)
+  - 5 V17.2 (auth gate + lifecycle + ACL + listing hydration + testids)
+  - 4 V17.3 (self-reject + idempotent + toggle + state endpoint)
+  - 4 V17.4 (search endpoint + extract_handles dedupe/cap + email-skip + empty)
+  - 3 frontend source locks (MentionTextarea + ReelActionMenu + MediaPermissionGate)
+- Suite V16+V17 (V17.1-V17.4 + V16.0-V16.3 + OAuth): **65+/65+ verde** cuando se ejecuta separado del rate limiter de login.
+- ⚠️ Login rate limit (60s) afecta corridas largas del suite — known limitation, no V17 bug.
+
+### Smoke validation
+Screenshot 412x915 mobile portrait en `/reels`:
+- ✅ Sin BottomNav abajo (fullscreen reel)
+- ✅ FAB `+` con 8 pills apilados (sin labels, solo iconos coloridos)
+- ✅ Nuevo botón 💬 azul (comment) + 🔁 verde (reshare)
+- ✅ Player video ocupa todo el viewport
+Backend E2E: POST comment con `@maria-cleaning-services-sallisaw-ok` → resolve → `mentioned_user_ids: ['user_3e47ee2b3526']` ✓
+
+### Apple/Google Wallet (CONFIRMADO factible)
+Founder pregunta si se puede sin app native. Respuesta: SÍ, 100% funciona desde Safari/Chrome móvil. iOS detecta `.pkpass` MIME y abre Wallet automáticamente. Google Wallet usa URL `pay.google.com/gp/v/save/{signed_JWT}` que funciona universal. **Cuando el founder consiga las credenciales (Apple Developer $99/año + Google Cloud service account) el wallet se activa sin migrar a native.**
+
+## Previous Update — May 30, 2026 · V16.4 Code Quality Hardening (audit fixes)
 
 Founder pasó un code-review automatizado pidiendo aplicar todas las correcciones (b+c+d). Resultado:
 

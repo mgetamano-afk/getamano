@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
 import { X, Camera, Circle, Square, RefreshCcw, Loader2, Send } from "lucide-react";
+import MediaPermissionGate from "./MediaPermissionGate";
 
 const MAX_DURATION_S = 30;
 
@@ -43,9 +44,14 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [caption, setCaption] = useState("");
+  // V17.1 — Privacy gate before triggering getUserMedia. We hold off the
+  // native browser prompt until the user grants in our app-level prompt.
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
-  // Acquire camera on mount + every facing-mode flip.
+  // Acquire camera on mount + every facing-mode flip — BUT only after the
+  // user accepted our app-level permission prompt.
   useEffect(() => {
+    if (!permissionGranted) return undefined;
     let alive = true;
     setPreviewBlob(null); setPreviewUrl(""); setElapsed(0);
     (async () => {
@@ -70,7 +76,7 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
       if (stream) stream.getTracks().forEach(t => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facing]);
+  }, [facing, permissionGranted]);
 
   // Stop everything on unmount.
   useEffect(() => () => {
@@ -164,6 +170,16 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
 
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col" data-testid="reel-camera-recorder">
+      {/* V17.1 — Privacy gate. Until granted, we render ONLY the gate
+          and keep the camera black so getUserMedia never fires. */}
+      {!permissionGranted && (
+        <MediaPermissionGate
+          kind="camera"
+          lang="es"
+          onGranted={() => setPermissionGranted(true)}
+          onDenied={() => onClose?.()}
+        />
+      )}
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between">
         <button

@@ -1,0 +1,48 @@
+# getamano — pre-commit hooks
+#
+# Install once:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Runs automatically on `git commit`. To run manually on the whole repo:
+#   pre-commit run --all-files
+#
+# Hooks (in order):
+#   1. ruff       — bug-detection rules (F, E7XX, F821, F632) auto-fix where possible
+#   2. ruff-format — Python formatter (only on files we touch this commit)
+#   3. eslint     — JS/JSX lint for the frontend
+#   4. pytest-fast — runs only the V16 + critical regression slices (under 30s)
+#
+# Heavy / network-dependent tests live in CI (.github/workflows/ci.yml).
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        # Only the bug-catching rules. Style-only (E1XX, E5XX) skipped — they
+        # don't catch real bugs and slow contributors down.
+        args: [--select=F,E701,E702,E711,E712,E741,E402,F821,F632, --fix]
+        files: ^backend/.*\.py$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^backend/.*\.py$
+      - id: end-of-file-fixer
+        files: ^backend/.*\.py$
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=2000]
+
+  - repo: local
+    hooks:
+      - id: pytest-v16-smoke
+        name: pytest V16 smoke (fast subset)
+        entry: bash -c 'cd backend && python -m pytest tests/test_iter111_v16_social_share.py tests/test_iter112_v16_1_celebration_publish.py tests/test_iter113_v16_2_recommendation_story.py tests/test_iter114_v16_3_banner_as_cover.py -q --tb=line'
+        language: system
+        pass_filenames: false
+        # Only run when backend or v16 tests change — avoids running on docs / frontend-only commits.
+        files: ^(backend/(server\.py|routes/.*|services/.*|tests/test_iter11[1-4].*)|memory/.*\.md)$
+        stages: [pre-commit]

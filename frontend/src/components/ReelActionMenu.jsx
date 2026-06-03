@@ -24,16 +24,19 @@ import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import {
   Plus, X, Upload, Video, Share2, Heart, Bookmark, Sparkles, Loader2,
+  MessageCircle, Repeat2,
 } from "lucide-react";
 import ReelCameraRecorder from "./ReelCameraRecorder";
+import CommentsSheet from "./CommentsSheet";
 
 export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecord }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [busy, setBusy] = useState(null);
-  const [reactions, setReactions] = useState({ liked: false, wowed: false, saved: false });
+  const [reactions, setReactions] = useState({ liked: false, wowed: false, saved: false, reshared: false });
   const [burst, setBurst] = useState(null); // "like" | "wow" | null
   const wrapperRef = useRef(null);
 
@@ -57,10 +60,14 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
 
   // Hydrate "did I already react?" state when the active reel changes.
   useEffect(() => {
-    if (!activeReel?.reel_id || !user) { setReactions({ liked: false, wowed: false, saved: false }); return; }
+    if (!activeReel?.reel_id || !user) { setReactions({ liked: false, wowed: false, saved: false, reshared: false }); return; }
     let alive = true;
     api.get(`/reels/${activeReel.reel_id}/reactions/me`).then(r => {
-      if (alive) setReactions(r.data || {});
+      if (alive) setReactions(prev => ({ ...prev, ...(r.data || {}) }));
+    }).catch(() => {});
+    // V17.3 — also probe reshare state for this reel
+    api.get(`/reels/${activeReel.reel_id}/reshare-state`).then(r => {
+      if (alive) setReactions(prev => ({ ...prev, reshared: !!r.data?.reshared }));
     }).catch(() => {});
     return () => { alive = false; };
   }, [activeReel?.reel_id, user]);
@@ -162,14 +169,50 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
     }
   };
 
+  // V17.2 — open comments sheet for the active reel.
+  const onCommentsClick = () => {
+    if (!requireReel()) return;
+    setOpen(false);
+    setCommentsOpen(true);
+  };
+
+  // V17.3 — toggle internal re-share. Owner-of-reel guard handled
+  // server-side (returns 400 for self-reshare); we just surface the
+  // error.
+  const onReshareClick = async () => {
+    if (!requireReel()) return;
+    if (!user) { toast.error("Inicia sesión"); return; }
+    setOpen(false);
+    setBusy("reshare");
+    try {
+      if (reactions.reshared) {
+        await api.delete(`/reels/${activeReel.reel_id}/reshare`);
+        setReactions(prev => ({ ...prev, reshared: false }));
+        toast.success("Quitaste el re-compartido");
+      } else {
+        await api.post(`/reels/${activeReel.reel_id}/reshare`, {});
+        setReactions(prev => ({ ...prev, reshared: true }));
+        toast.success("Compartido en tu perfil 🔁");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Error");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const ACTIONS = [
+    { id: "comment", Icon: MessageCircle, label: "Comentar", onClick: onCommentsClick,
+      colorClass: "from-sky-500 to-blue-600" },
+    { id: "reshare", Icon: Repeat2, label: "Compartir en mi perfil", onClick: onReshareClick,
+      colorClass: "from-green-500 to-emerald-600", active: reactions.reshared },
     { id: "wow",    Icon: Sparkles, label: "Impresionante", onClick: onWowClick,
       colorClass: "from-amber-400 to-rose-500", active: reactions.wowed },
     { id: "like",   Icon: Heart,    label: "Me gusta",      onClick: onLikeClick,
       colorClass: "from-rose-500 to-pink-500",  active: reactions.liked },
     { id: "save",   Icon: Bookmark, label: "Guardar",       onClick: onSaveClick,
       colorClass: "from-blue-500 to-indigo-500", active: reactions.saved },
-    { id: "share",  Icon: Share2,   label: "Compartir",     onClick: onShareClick,
+    { id: "share",  Icon: Share2,   label: "Compartir fuera", onClick: onShareClick,
       colorClass: "from-emerald-500 to-teal-500" },
     { id: "record", Icon: Video,    label: "Grabar Reel",   onClick: onRecordClick,
       colorClass: "from-violet-500 to-fuchsia-600" },
@@ -182,7 +225,7 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
       <div
         ref={wrapperRef}
         className="fixed right-4 sm:right-6 z-50 flex flex-col items-end gap-3"
-        style={{ bottom: "calc(76px + env(safe-area-inset-bottom, 0px))" }}
+        style={{ bottom: "calc(24px + env(safe-area-inset-bottom, 0px))" }}
         data-testid="reel-action-menu"
       >
         {/* Action chips fan out vertically above the FAB. V15.2 — only
@@ -242,6 +285,16 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
             setRecorderOpen(false);
             onAfterRecord?.(reel);
           }}
+        />
+      )}
+
+      {/* V17.2 — Comments sheet for the active reel */}
+      {commentsOpen && activeReel?.reel_id && (
+        <CommentsSheet
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+          subjectType="reel"
+          subjectId={activeReel.reel_id}
         />
       )}
 
