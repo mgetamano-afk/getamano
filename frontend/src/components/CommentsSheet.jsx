@@ -21,7 +21,7 @@ import MentionTextarea from "./MentionTextarea";
  * The parent controls open/close via the `open` prop. Renders as a
  * full-screen overlay on mobile, modal on desktop.
  */
-export default function CommentsSheet({ open, onClose, subjectType, subjectId, lang = "es" }) {
+export default function CommentsSheet({ open, onClose, subjectType, subjectId, lang = "es", onCommentPosted, onCommentDeleted }) {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
@@ -50,6 +50,7 @@ export default function CommentsSheet({ open, onClose, subjectType, subjectId, l
       const { data } = await api.post(`/${subjectType === "reel" ? "reels" : "stories"}/${subjectId}/comments`, { text: t });
       setItems([...items, data]);
       setText("");
+      onCommentPosted?.(data);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Error");
     } finally {
@@ -62,6 +63,7 @@ export default function CommentsSheet({ open, onClose, subjectType, subjectId, l
     try {
       await api.delete(`/comments/${commentId}`);
       setItems(items.filter(c => c.comment_id !== commentId));
+      onCommentDeleted?.(commentId);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Error");
     }

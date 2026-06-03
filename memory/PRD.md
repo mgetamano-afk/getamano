@@ -3,7 +3,37 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — Jun 3, 2026 · V17 Reels Social Layer (4 fases)
+## Latest Update — Jun 3, 2026 · V17.5 Unified Reels Action Rail
+
+Founder envió 2 screenshots y dijo: "uno de los dos no tiene que estar, prefiero dejar el de color pero estático como el segundo, pero con los colores y las animaciones."
+
+**Problema**: convivían DOS columnas verticales en `/reels`:
+- La columna derecha con `MetricPill` (heart 2, wow 2, save 1, share 0) — counts pero solo lectura.
+- El `ReelActionMenu` (pills coloridos detrás de un `+` FAB) — acciones pero sin counts visibles + escondido por defecto.
+
+**Solución V17.5**:
+1. **Eliminada la columna `MetricPill`** de `ReelsPage.jsx` (la helper `MetricPill` también borrada).
+2. **`ReelActionMenu` ahora siempre visible** — quitado el `+` toggle FAB, quitado el outside-click handler, quitado todo el estado `open/setOpen`.
+3. **Counts integrados en cada pill** — cada acción tiene `countKey` que se mapea a `liveCounts[key]` (hidratado de `activeReel.{likes,wows,saves,shares,comments,reshares}_count`). El número renderiza debajo del icono en `text-[10px] font-bold` con drop-shadow.
+4. **Optimistic updates** — nuevo helper `bumpCount(key, delta)` que actualiza inmediatamente los contadores al reaccionar. `onLikeClick`/`onWowClick`/`onSaveClick`/`onReshareClick` incluyen `bumpCount(key, liked ? 1 : -1)`.
+5. **CommentsSheet** ahora dispara `onCommentPosted` / `onCommentDeleted` para que el rail bumpe `comment` count.
+6. **Animaciones preservadas**: `reel-action-chip` con `animationDelay` staggered + `LikeBurstOverlay` para like/wow.
+
+### Tests
+- `test_iter115_v17_reels_social.py` extendido con 2 nuevos tests (V17.5):
+  - `test_action_menu_is_always_visible_no_toggle_fab` — asserts `reel-action-fab` testid no existe + `liveCounts` + `bumpCount` + countKey + `reel-action-${a.id}-count` patron.
+  - `test_reels_page_no_longer_renders_metric_pill_rail` — `MetricPill` borrado del source.
+- **22/22 verde**.
+
+### Smoke validation
+Screenshot 412x915 mobile portrait en `/reels`:
+- ✅ Una sola columna derecha con 8 pills coloridos
+- ✅ Contadores debajo de cada icono (counts: 0, 0, 2, 2, 1, 0)
+- ✅ Sin `+` toggle ni columna blanca duplicada
+- ✅ Video fullscreen, BottomNav oculto (V17.1 sigue intacto)
+- ✅ Caption "Taxas Pro" + verified badge a la izquierda
+
+## Previous Update — Jun 3, 2026 · V17 Reels Social Layer (4 fases)
 
 Founder pidió 4 mejoras a Reels en una pasada — todas ejecutadas en batch:
 

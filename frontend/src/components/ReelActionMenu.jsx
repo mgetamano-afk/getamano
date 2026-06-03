@@ -32,35 +32,36 @@ import CommentsSheet from "./CommentsSheet";
 export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecord }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [busy, setBusy] = useState(null);
   const [reactions, setReactions] = useState({ liked: false, wowed: false, saved: false, reshared: false });
+  // V17.5 — Live optimistic counts so the rail updates instantly when the
+  // user reacts. Initialised from `activeReel` and refreshed on every
+  // reel change.
+  const [liveCounts, setLiveCounts] = useState({});
   const [burst, setBurst] = useState(null); // "like" | "wow" | null
   const wrapperRef = useRef(null);
 
-  // Close on outside-click / Esc. We wait one tick before attaching the
-  // listener so the click that OPENED the menu doesn't immediately close
-  // it via bubble to window.
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
-    };
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    const t = setTimeout(() => window.addEventListener("click", onClick), 0);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("click", onClick);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  // V17.5 — Outside-click/Esc handling removed because the rail is
+  // now always visible (no open/close state to manage).
 
-  // Hydrate "did I already react?" state when the active reel changes.
+  // Hydrate "did I already react?" state + live counts when the active reel changes.
   useEffect(() => {
-    if (!activeReel?.reel_id || !user) { setReactions({ liked: false, wowed: false, saved: false, reshared: false }); return; }
+    if (!activeReel?.reel_id) {
+      setReactions({ liked: false, wowed: false, saved: false, reshared: false });
+      setLiveCounts({});
+      return;
+    }
+    setLiveCounts({
+      like: activeReel.likes_count || 0,
+      wow: activeReel.wows_count || 0,
+      save: activeReel.saves_count || 0,
+      share: activeReel.shares_count || 0,
+      comment: activeReel.comments_count || 0,
+      reshare: activeReel.reshares_count || 0,
+    });
+    if (!user) { setReactions({ liked: false, wowed: false, saved: false, reshared: false }); return; }
     let alive = true;
     api.get(`/reels/${activeReel.reel_id}/reactions/me`).then(r => {
       if (alive) setReactions(prev => ({ ...prev, ...(r.data || {}) }));
@@ -71,6 +72,12 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
     }).catch(() => {});
     return () => { alive = false; };
   }, [activeReel?.reel_id, user]);
+
+  // V17.5 — Helpers to bump live counts optimistically.
+  const bumpCount = (key, delta) => setLiveCounts(prev => ({
+    ...prev,
+    [key]: Math.max(0, (prev[key] || 0) + delta),
+  }));
 
   if (!user) return null;
 
@@ -83,19 +90,16 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
   };
 
   const onUploadClick = () => {
-    setOpen(false);
     // Trigger the parent's reel-creator modal via a custom event so we
     // don't have to pass refs all the way up.
     window.dispatchEvent(new CustomEvent("reels:open-creator"));
   };
 
   const onRecordClick = () => {
-    setOpen(false);
     setRecorderOpen(true);
   };
 
   const onShareClick = async () => {
-    setOpen(false);
     if (!requireReel()) return;
     setBusy("share");
     const url = `${window.location.origin}/reels?r=${activeReel.reel_id}`;
@@ -117,12 +121,12 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
 
   const onLikeClick = async () => {
     if (!requireReel()) return;
-    setOpen(false);
     setBusy("like");
     try {
       const r = await api.post(`/reels/${activeReel.reel_id}/like`);
       const liked = !!r.data?.liked;
       setReactions(prev => ({ ...prev, liked }));
+      bumpCount("like", liked ? 1 : -1);
       if (liked) {
         setBurst("like");
         setTimeout(() => setBurst(null), 900);
@@ -136,12 +140,12 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
 
   const onWowClick = async () => {
     if (!requireReel()) return;
-    setOpen(false);
     setBusy("wow");
     try {
       const r = await api.post(`/reels/${activeReel.reel_id}/wow`);
       const wowed = !!r.data?.wowed;
       setReactions(prev => ({ ...prev, wowed }));
+      bumpCount("wow", wowed ? 1 : -1);
       if (wowed) {
         setBurst("wow");
         setTimeout(() => setBurst(null), 1100);
@@ -155,12 +159,12 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
 
   const onSaveClick = async () => {
     if (!requireReel()) return;
-    setOpen(false);
     setBusy("save");
     try {
       const r = await api.post(`/reels/${activeReel.reel_id}/save`);
       const saved = !!r.data?.saved;
       setReactions(prev => ({ ...prev, saved }));
+      bumpCount("save", saved ? 1 : -1);
       toast.success(saved ? "Reel guardado" : "Quitado de guardados");
     } catch {
       toast.error("Error");
@@ -172,7 +176,6 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
   // V17.2 — open comments sheet for the active reel.
   const onCommentsClick = () => {
     if (!requireReel()) return;
-    setOpen(false);
     setCommentsOpen(true);
   };
 
@@ -182,16 +185,17 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
   const onReshareClick = async () => {
     if (!requireReel()) return;
     if (!user) { toast.error("Inicia sesión"); return; }
-    setOpen(false);
     setBusy("reshare");
     try {
       if (reactions.reshared) {
         await api.delete(`/reels/${activeReel.reel_id}/reshare`);
         setReactions(prev => ({ ...prev, reshared: false }));
+        bumpCount("reshare", -1);
         toast.success("Quitaste el re-compartido");
       } else {
         await api.post(`/reels/${activeReel.reel_id}/reshare`, {});
         setReactions(prev => ({ ...prev, reshared: true }));
+        bumpCount("reshare", 1);
         toast.success("Compartido en tu perfil 🔁");
       }
     } catch (e) {
@@ -203,17 +207,17 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
 
   const ACTIONS = [
     { id: "comment", Icon: MessageCircle, label: "Comentar", onClick: onCommentsClick,
-      colorClass: "from-sky-500 to-blue-600" },
+      colorClass: "from-sky-500 to-blue-600", countKey: "comment" },
     { id: "reshare", Icon: Repeat2, label: "Compartir en mi perfil", onClick: onReshareClick,
-      colorClass: "from-green-500 to-emerald-600", active: reactions.reshared },
+      colorClass: "from-green-500 to-emerald-600", active: reactions.reshared, countKey: "reshare" },
     { id: "wow",    Icon: Sparkles, label: "Impresionante", onClick: onWowClick,
-      colorClass: "from-amber-400 to-rose-500", active: reactions.wowed },
+      colorClass: "from-amber-400 to-rose-500", active: reactions.wowed, countKey: "wow" },
     { id: "like",   Icon: Heart,    label: "Me gusta",      onClick: onLikeClick,
-      colorClass: "from-rose-500 to-pink-500",  active: reactions.liked },
+      colorClass: "from-rose-500 to-pink-500",  active: reactions.liked, countKey: "like" },
     { id: "save",   Icon: Bookmark, label: "Guardar",       onClick: onSaveClick,
-      colorClass: "from-blue-500 to-indigo-500", active: reactions.saved },
+      colorClass: "from-blue-500 to-indigo-500", active: reactions.saved, countKey: "save" },
     { id: "share",  Icon: Share2,   label: "Compartir fuera", onClick: onShareClick,
-      colorClass: "from-emerald-500 to-teal-500" },
+      colorClass: "from-emerald-500 to-teal-500", countKey: "share" },
     { id: "record", Icon: Video,    label: "Grabar Reel",   onClick: onRecordClick,
       colorClass: "from-violet-500 to-fuchsia-600" },
     { id: "upload", Icon: Upload,   label: "Subir Reel",    onClick: onUploadClick,
@@ -231,11 +235,20 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
         {/* Action chips fan out vertically above the FAB. V15.2 — only
             the colored icon circle is shown (text labels removed per
             founder feedback: "que queden sueltos sobre el reel"). The
-            label still lives in `aria-label` + native tooltip for a11y. */}
-        {open && (
-          <div className="flex flex-col items-end gap-2.5 mb-1">
+            label still lives in `aria-label` + native tooltip for a11y.
+
+            V17.5 — Removed the open/close `+` toggle. All pills are
+            always visible (mimics Instagram/TikTok right-rail). Each
+            pill now also shows its live count as a small bold label
+            below the icon, so the user gets the metric WITHOUT a
+            separate column. */}
+        <div className="flex flex-col items-end gap-3">
             {ACTIONS.map((a, i) => {
               const Icon = a.Icon;
+              const count = a.countKey != null ? (liveCounts[a.countKey] || 0) : null;
+              const countLabel = count != null
+                ? (count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString())
+                : null;
               return (
                 <button
                   key={a.id}
@@ -244,33 +257,25 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
                   disabled={busy === a.id}
                   title={a.label}
                   aria-label={a.label}
-                  className="reel-action-chip active:scale-95 transition will-change-transform"
+                  className="reel-action-chip active:scale-95 transition will-change-transform flex flex-col items-center gap-0.5"
                   style={{ animationDelay: `${i * 35}ms` }}
                   data-testid={`reel-action-${a.id}`}
                 >
-                  <span className={`w-12 h-12 rounded-full bg-gradient-to-br ${a.colorClass} text-white flex items-center justify-center shadow-lg hover:scale-110 transition ${a.active ? "ring-2 ring-white/70" : ""}`}>
+                  <span className={`w-11 h-11 rounded-full bg-gradient-to-br ${a.colorClass} text-white flex items-center justify-center shadow-lg hover:scale-110 transition ${a.active ? "ring-2 ring-white/80" : ""}`}>
                     {busy === a.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" strokeWidth={2.5} />}
                   </span>
+                  {countLabel != null && (
+                    <span
+                      className="text-[10px] font-bold text-white drop-shadow-lg tabular-nums leading-none"
+                      data-testid={`reel-action-${a.id}-count`}
+                    >
+                      {countLabel}
+                    </span>
+                  )}
                 </button>
               );
             })}
-          </div>
-        )}
-
-        {/* Main "+" toggle */}
-        <button
-          type="button"
-          onClick={() => setOpen(v => !v)}
-          className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${
-            open
-              ? "bg-white text-slate-900 rotate-45"
-              : "bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 text-white hover:scale-105"
-          }`}
-          aria-label={open ? "Cerrar menú" : "Abrir menú de acciones"}
-          data-testid="reel-action-fab"
-        >
-          {open ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" strokeWidth={2.5} />}
-        </button>
+        </div>
       </div>
 
       {/* Reaction burst overlays — fullscreen, pointer-events-none */}
@@ -295,6 +300,8 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
           onClose={() => setCommentsOpen(false)}
           subjectType="reel"
           subjectId={activeReel.reel_id}
+          onCommentPosted={() => bumpCount("comment", 1)}
+          onCommentDeleted={() => bumpCount("comment", -1)}
         />
       )}
 

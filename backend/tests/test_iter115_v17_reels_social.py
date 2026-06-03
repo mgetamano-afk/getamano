@@ -312,6 +312,30 @@ def test_action_menu_exposes_new_comment_and_reshare_actions():
     assert "/reshare-state" in src
 
 
+def test_action_menu_is_always_visible_no_toggle_fab():
+    """V17.5 — Founder removed the '+' open/close FAB and the parallel
+    white metrics rail in ReelsPage. The colored pills now render
+    permanently and each one shows its live count below the icon."""
+    src = _read(ACTION_MENU_PATH)
+    # Toggle state should be gone
+    assert "useState(false)" in src  # other state still exists (recorderOpen, commentsOpen)
+    assert "reel-action-fab" not in src, "the toggle FAB testid must be removed"
+    # Live counts plumbed from activeReel
+    assert "liveCounts" in src
+    assert "bumpCount" in src
+    assert "countKey" in src
+    # Per-action count badge testid pattern
+    assert '`reel-action-${a.id}-count`' in src
+
+
+def test_reels_page_no_longer_renders_metric_pill_rail():
+    src = _read("/app/frontend/src/pages/ReelsPage.jsx")
+    assert "MetricPill" not in src, "the duplicate metrics rail must be removed"
+    # The legacy testids are gone
+    assert "reel-likes-${reel.reel_id}" not in src
+    assert "reel-shares-${reel.reel_id}" not in src
+
+
 # -------------------------------------------------------------------
 # V17.4 — handle extraction unit tests (pure functions)
 # -------------------------------------------------------------------

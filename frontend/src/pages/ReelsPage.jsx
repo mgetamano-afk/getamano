@@ -204,19 +204,6 @@ export default function ReelsPage() {
 }
 
 // ─── Single slide ─────────────────────────────────────────────────────
-function MetricPill({ Icon, value, testid, highlight }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 text-white" data-testid={testid}>
-      <Icon
-        className={`w-7 h-7 drop-shadow-lg transition-colors ${highlight ? "text-rose-400 fill-current" : ""}`}
-      />
-      <span className="text-[10px] font-bold drop-shadow tabular-nums">
-        {(value || 0) > 999 ? `${(value / 1000).toFixed(1)}k` : (value || 0)}
-      </span>
-    </div>
-  );
-}
-
 function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
   const { user } = useAuth();
   const localVideoRef = useRef(null);
@@ -342,28 +329,10 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
         </div>
       </div>
 
-      {/* V15 — Right-side metrics rail (READ-ONLY). Actions moved to the
-          ReelActionMenu FAB. We keep counts here so viewers see how the
-          reel is doing. The owner sees the same numbers in their
-          dashboard via /reels/me/metrics. */}
-      <aside className="absolute right-3 bottom-24 flex flex-col items-center gap-3 pointer-events-none">
-        <MetricPill Icon={Heart}     value={liveLikes}        testid={`reel-likes-${reel.reel_id}`}  highlight={liked} />
-        <MetricPill Icon={Sparkles}  value={reel.wows_count}  testid={`reel-wows-${reel.reel_id}`} />
-        <MetricPill Icon={Bookmark}  value={reel.saves_count} testid={`reel-saves-${reel.reel_id}`} />
-        <MetricPill Icon={Share2}    value={reel.shares_count} testid={`reel-shares-${reel.reel_id}`} />
-        {reel.provider_slug && (
-          <Link
-            to={`/p/${reel.provider_slug}`}
-            className="pointer-events-auto flex flex-col items-center gap-0.5 text-white"
-            data-testid={`reel-profile-${reel.reel_id}`}
-          >
-            <Eye className="w-8 h-8 drop-shadow-lg" />
-            <span className="text-[10px] font-bold drop-shadow">
-              {lang === "en" ? "Profile" : "Perfil"}
-            </span>
-          </Link>
-        )}
-      </aside>
+      {/* V17.5 — Metrics rail removed. The colored action pills in
+          ReelActionMenu now show counts inline, eliminating the
+          duplicate column the founder reported. The "Perfil" CTA
+          moved to inline link near the caption instead. */}
 
       {/* Pause indicator (shown when video is paused via tap) */}
       <PausedIndicator videoRef={localVideoRef} />
