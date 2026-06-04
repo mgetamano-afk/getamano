@@ -3,6 +3,67 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
+## Latest Update — Jun 4, 2026 · V19.2 Mega-Polish (4 in 1)
+
+Founder pidió 4 mejoras juntas en español:
+1. CEO admin: dashboard de salud del código
+2. Reels y stories: autoplay
+3. Cámara para grabar reels/stories: permitir zoom
+4. Cliente: consolidar perfil (no duplicado entre bottom-nav y hamburguesa). En perfil: datos personales, username editable, contraseña, correo, publicar chamba, favoritos, banner "completa tu perfil" cuando falten foto + portada
+
+### V19.2.1 · Reels autoplay + camera zoom
+- **`ReelsPage.jsx`** — agregado atributo `autoPlay` al `<video>` (ya tenía `muted` + `playsInline`). Ahora mobile Safari/Chrome respetan la receta de "feed autoplay" (Instagram/TikTok standard). El IntersectionObserver sigue manejando los pause/play en swipe.
+- **`ReelCameraRecorder.jsx`** — nuevo soporte de zoom de cámara:
+  - State `zoomCaps` (probe `track.getCapabilities().zoom` al acquireMedia) + `zoom` value.
+  - `applyConstraints({ advanced: [{ zoom }] })` empuja el valor a la track del video.
+  - Pinch-to-zoom con `Math.hypot` sobre 2 touches activos.
+  - Slider vertical Apple/Android-style en el costado derecho del preview, mostrado SOLO si el dispositivo expone zoom (Chrome Android sí, iOS Safari no — se oculta de forma elegante).
+  - Etiqueta "1.0x..3.5x" con `tabular-nums`.
+- Cero bloqueos a funciones nativas: el MediaPermissionGate sigue en su lugar pero solo gates camera+mic, no zoom/focus/flash futuros.
+
+### V19.2.2 · Consolidated Client Profile (UX overhaul)
+- **`BottomNav.jsx`** — para `user.role === "client"`, la pill "Perfil" ahora linkea a `/profile` (NO `/dashboard`). Antes existía duplicación: bottom-nav iba a `/dashboard` (ClientDashboard delgado) y hamburguesa a `/profile` (UserProfile rico). Ahora ambos van al mismo lugar. `isActive("/profile")` también matchea `/perfil`.
+- **`UserProfile.jsx`** — gran expansión:
+  - **`CoverUploader`** componente nuevo: banner 128-160px con gradient placeholder + foto si existe + botón "Add cover"/"Cambiar portada" + remove button. Multipart upload a `/users/me/cover`.
+  - **`CompleteProfileBanner`** componente nuevo: gradient teal banner con progress bar de 4 pasos (avatar, cover, bio, ciudad). Solo aparece cuando hay pasos pendientes. Botón "Completar" abre el EditProfileModal.
+  - **`FavoritesTab`** componente nuevo: para clientes, reemplaza la pestaña "Reels" en la barra de tabs. Hace `GET /favorites`, renderiza la lista con logo + nombre + categoría + ciudad + rating, links a `/p/{slug}`. Empty state con CTA "Ver proveedores".
+  - **`ChangePasswordPrompt`** componente nuevo: modal sheet que dispara `POST /auth/forgot-password` con el email del usuario y muestra "Revisa tu correo / Ingresar el código" CTA hacia `/reset-password`. Evita escribir nuevo endpoint de cambio de contraseña autenticado — reutiliza el flujo seguro de OTP via email que ya existe.
+  - **`AboutTab` expandido** — nueva sección "Cuenta" en TODOS los perfiles: email (read-only) + "Cambiar contraseña" + "Cerrar sesión" (rojo). Para clientes específicamente: sección amarilla "Publicar chamba" que linkea a `/empleos?post=1`.
+  - **Tabs dinámicos** según rol: Photos · {Favoritos | Reels} · About — Favoritos para clientes, Reels para providers (mutex).
+  - **Default tab para clientes**: salta a "Favoritos" automáticamente al cargar el perfil.
+- **`EmpleosPage.jsx`** — soporte de deep-link `?post=1`: `useSearchParams` detecta el flag, abre el modal de composición automáticamente y limpia la query con `replace: true` para que refrescar no re-abra el modal.
+
+### V19.2.3 · CEO Code Health Dashboard
+- **Backend** — nuevo endpoint `GET /api/admin/code-health` (admin auth):
+  - Subprocess: `python -m ruff check --select=F` (pyflakes solo, fast & high signal) + ruff full ruleset con `--statistics`.
+  - Subprocess: `python -m pytest tests/ --collect-only -q` para contar tests (parse regex `(\d+)\s+tests?\s+collected`).
+  - Glob de `routes/`, `services/`, `integrations/` para encontrar files > 400 LOC + `server.py`.
+  - `git rev-parse --short HEAD` para el commit.
+  - Cache 10 minutos in-memory (key + at) — recomputar pesa ~2-3s y no debe correr en cada page-load del dashboard.
+  - Veredicto green/yellow/red según pyflakes_errors y total_findings.
+  - Usa `sys.executable` para invocar subprocess (evita problemas de PATH bajo supervisord).
+  - `ruff` añadido a `requirements.txt` (no estaba en el venv del backend, solo en `/opt/plugins-venv`).
+- **Frontend** — `AdminCEO.jsx`:
+  - Nuevo `CodeHealthSection` al fondo del dashboard (después de "Actividad en vivo").
+  - Header con commit hash + count de tests + badge verdict + botón "Recalcular" (con cache-bust query param).
+  - 4 KPI cards: Pyflakes · Findings totales · Tests · Archivos de test.
+  - Grid de hotspots con barra de progreso color-coded (verde < 600, amber 600-1000, rojo > 1000 LOC).
+
+### Backend cambios técnicos
+- **`routes/user_profile.py`** — agregados `POST /users/me/cover` + `DELETE /users/me/cover` + `cover_url` expuesto en `_profile_dict`.
+- **`server.py`** — agregado `_compute_code_health()` + `@api_router.get("/admin/code-health")` con cache TTL.
+- **`requirements.txt`** — `ruff==0.15.15` añadido.
+
+### Tests
+- `test_iter120_v19_2_polish.py` — **10 tests verde** (autoplay attrs, camera zoom probes, bottom-nav routing, profile components, /empleos?post=1, cover round-trip, code-health endpoint admin/auth/payload, AdminCEO testids).
+- Cumulativa V18.4+V18.5+V18.6 + V19.1 + V19.2: **39 tests verde** (iter116/117/118/119/120).
+- Testing agent E2E `iteration_75.json`: **100% backend (33/33) + 100% frontend** — todos los 13 user-flows verificados live. Solo un detalle de diseño (tabs cerca del bottom-nav) — arreglado con `pb-28` en el main wrapper de `/profile`.
+
+### Visual confirmation
+- `/profile` (cliente Carlos en mobile 412×915): banner "Finish setting up your profile (3/4 steps done · Add cover image)" + cover gradient + "Add cover" pill + Carlos Demo / @v9e2e_deeb26 / e2e bio / Chicago + Edit pill + "Sell your services" CTA + Tabs Photos·**Favorites**·About con Favorites preseleccionado · lista mostrando "María's Cleaning Services · Sallisaw" ✅.
+- `/admin/ceo` (desktop 1440×900): scroll bottom revela "Salud del código (CEO Insight)" · badge VERDE · botón Recalcular · "1124 tests · 88 archivos · cubren backend, social, e-cards" · commit 74ec89a ✅.
+
+
 ## Latest Update — Jun 4, 2026 · V19 UI Polish (Grupos rename + Avatares + Tu historia)
 
 Founder envió 3 screenshots con polish requests:

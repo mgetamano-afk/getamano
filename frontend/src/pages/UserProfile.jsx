@@ -76,7 +76,7 @@ export default function UserProfile() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6" data-testid="user-profile-page">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-28" data-testid="user-profile-page">
         {/* V19.2 — Completa tu perfil banner. Fires when the user hasn't
             uploaded an avatar OR a cover yet — these are the two visual
             assets that make the profile feel finished and trustworthy. */}
