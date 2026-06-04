@@ -208,6 +208,14 @@ export default function ReelsPage() {
 function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
   const { user } = useAuth();
   const localVideoRef = useRef(null);
+
+  // V18.3 — Replay a "settle-in" zoom when the slide becomes active
+  // so swiping into a new reel feels physical. We bump a key tick so
+  // the CSS class re-mounts.
+  const [activeTick, setActiveTick] = useState(0);
+  useEffect(() => {
+    if (isActive) setActiveTick((n) => n + 1);
+  }, [isActive]);
   const lastTapRef = useRef(0);
   const [liveLikes, setLiveLikes] = useState(reel.likes_count || 0);
   const [liked, setLiked] = useState(false);
@@ -294,10 +302,11 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
       data-testid={`reel-slide-${reel.reel_id}`}
     >
       <video
+        key={`v-${activeTick}`}
         ref={(el) => { localVideoRef.current = el; videoRef(el); }}
         src={buildFileUrl(reel.video_url)}
         poster={reel.thumbnail_url ? buildFileUrl(reel.thumbnail_url) : undefined}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover ${isActive ? "reel-video-active" : ""}`}
         loop
         playsInline
         muted={muted}

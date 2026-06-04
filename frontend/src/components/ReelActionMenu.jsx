@@ -40,6 +40,22 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
   const [burst, setBurst] = useState(null); // "like" | "wow" | null
   const wrapperRef = useRef(null);
 
+  // V18.3 — Track the previously active reel id so we know which slide
+  // direction the user just swiped (down vs up). We use the order in
+  // which reel_ids appear on screen to infer direction — at the rail
+  // level we can't see scrollTop, but we can compare the new active id
+  // against the cached one. We keep a small "tick" counter that bumps
+  // every time the active reel changes so a CSS @keyframes can replay.
+  const [railAnimTick, setRailAnimTick] = useState(0);
+  const prevReelIdRef = useRef(null);
+  useEffect(() => {
+    if (!activeReel?.reel_id) return;
+    if (prevReelIdRef.current && prevReelIdRef.current !== activeReel.reel_id) {
+      setRailAnimTick((n) => n + 1);
+    }
+    prevReelIdRef.current = activeReel.reel_id;
+  }, [activeReel?.reel_id]);
+
   // V17.5 — Outside-click/Esc handling removed because the rail is
   // now always visible (no open/close state to manage).
 
@@ -248,7 +264,10 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
             it light up with its own gradient. Click triggers a
             `pill-bounce` keyframe + `navigator.vibrate(30)` haptic
             on supporting browsers (Chrome Android, Edge Mobile). */}
-        <div className="flex flex-col items-end gap-2.5">
+        <div
+          key={railAnimTick}
+          className="flex flex-col items-end gap-2.5 reel-rail-slide"
+        >
             {ACTIONS.map((a, i) => {
               const Icon = a.Icon;
               const count = a.countKey != null ? (liveCounts[a.countKey] || 0) : null;
@@ -344,6 +363,18 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
           35%  { transform: scale(0.78); }
           75%  { transform: scale(1.18); }
           100% { transform: scale(1); }
+        }
+        /* V18.3 — when the active reel changes, the whole rail slides up
+           together with the incoming reel. The chips inside still run
+           their stagger (chipIn) so the rail feels like it's being
+           assembled on the new card. */
+        .reel-rail-slide {
+          animation: reelRailSlide 460ms cubic-bezier(0.22, 0.85, 0.34, 1) both;
+        }
+        @keyframes reelRailSlide {
+          0%   { opacity: 0; transform: translate3d(0, 28px, 0) scale(0.94); filter: blur(2px); }
+          60%  { opacity: 1; filter: blur(0); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
         }
       `}</style>
     </>

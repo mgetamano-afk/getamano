@@ -3,7 +3,53 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — Jun 4, 2026 · V18 Engagement Milestones + Owner Stats Pill
+## Latest Update — Jun 4, 2026 · V18.3 Scroll-In Animation (Reels + Stories)
+
+Founder: "agrega una animación de cuando scroleamos, un efecto que deslize tanto el reel como los botones de acción, aplica para las historias también."
+
+### Reels
+**`ReelActionMenu.jsx`** — rail completo se desliza cuando cambia el `activeReel.reel_id`:
+- Nuevo `railAnimTick` que se incrementa cuando cambia el id. El inner `<div className="reel-rail-slide">` recibe `key={railAnimTick}` para forzar remount → keyframe re-fires.
+- Animación `@keyframes reelRailSlide`: opacity 0→1 + `translate3d(0, 28px, 0) scale(0.94)` → settled + blur 2px→0 (filter ramp). 460ms con cubic-bezier(0.22, 0.85, 0.34, 1).
+- Los chips internos siguen su stagger (`chipIn`) así que se sienten **ensamblándose en el nuevo reel**.
+
+**`ReelsPage.ReelSlide`** — el `<video>` también re-mounts cuando `isActive` cambia:
+- `activeTick` state se incrementa en `useEffect([isActive])`.
+- Video recibe `key={v-${activeTick}}` + className `reel-video-active` cuando es el activo.
+- Animación `@keyframes reelVideoSettle` (App.css): `scale(1.07) → scale(1)` + `brightness(0.85) → brightness(1)` + opacity 0.45→1. 520ms.
+- **Sensación final**: cuando swipeas a un nuevo reel, el video "aterriza" enfocándose desde un ligero zoom + el rail emerge desde abajo. Las dos animaciones se sincronizan y se sienten como una sola composición.
+
+### Stories
+**`StoriesCarousel.jsx`** — story image se desliza direccional:
+- `slideDir` state que computa `next` (idx aumentó) vs `prev` (idx disminuyó) comparando contra `prevIdxRef`.
+- `<img key={story-img-${active.story_id}-${slideDir}}>` fuerza remount.
+- ClassName condicional: `story-card-slide-in` (slide-in desde la derecha) o `story-card-slide-in-reverse` (desde la izquierda).
+- Keyframes en App.css: `translate3d(28px|-28px, 0, 0) scale(0.96)` → settled. 380ms.
+- Sticker overlays comparten el container, así que se mueven con la foto.
+
+### CSS
+Todo en `/app/frontend/src/App.css` lines 302+:
+- `@keyframes reelVideoSettle`
+- `@keyframes storyCardSlideIn`
+- `@keyframes storyCardSlideInReverse`
+
+Keyframes locales del rail viven en `<style>` block dentro de `ReelActionMenu.jsx` para que viajen con el componente.
+
+### Tests
+`test_iter117_v18_3_scroll_animation.py` (**4/4 verde**):
+- Reel rail slide animation: `railAnimTick` + `reel-rail-slide` class + `@keyframes reelRailSlide` + transform values.
+- Reel video settle: `activeTick` + `reel-video-active` + `@keyframes reelVideoSettle` + scale 1.07.
+- Story directional swipe: `slideDir` state + both CSS classes + direction logic + both keyframes registered.
+- Story image key includes direction for re-mount.
+
+### Smoke validation con Playwright
+- Logged in como demo provider en `/reels`.
+- `document.querySelector(".reel-rail-slide")` → confirmado presente al idle.
+- Programmatic `scrollBy(window.innerHeight)` → 2 frames capturados:
+  - Mid-animation (180ms post-scroll): rail con animation reasonable, video clearly active.
+  - Settled (1100ms): composición estable.
+
+## Previous Update — Jun 4, 2026 · V18 Engagement Milestones + Owner Stats Pill
 
 Founder: "ok dale con eso [streak milestones], igual para las vistas de las historias, agrega un contador únicamente para el que subió el reel, cuántas vistas y reproducciones tiene ese reel o historia."
 

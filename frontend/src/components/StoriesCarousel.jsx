@@ -324,6 +324,18 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
   const navigate = useNavigate();
   const [stories, setStories] = useState([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  // V18.3 — Track swipe direction so the incoming story card can pick
+  // the correct slide-in animation (left-to-right for "next", right-to-
+  // left for "prev"). The animation runs on the card root via the
+  // `slideKey` re-mount trick.
+  const [slideDir, setSlideDir] = useState("next");
+  const prevIdxRef = useRef(0);
+  useEffect(() => {
+    if (activeIdx !== prevIdxRef.current) {
+      setSlideDir(activeIdx > prevIdxRef.current ? "next" : "prev");
+      prevIdxRef.current = activeIdx;
+    }
+  }, [activeIdx]);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
@@ -586,11 +598,16 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
           <div className="absolute inset-x-0 top-0 h-32 pointer-events-none z-[1] bg-gradient-to-b from-black/60 to-transparent" />
 
           {/* Story image — fills the frame so stickers land in the right
-              spot and there's no dead space on mobile. */}
+              spot and there's no dead space on mobile.
+              V18.3 — On every activeIdx change, the image + sticker
+              layer get re-keyed so the slide-in animation re-fires.
+              The direction key alternates next/prev so swipes feel
+              physical (left-to-right for next, right-to-left for prev). */}
           <img
+            key={`story-img-${active.story_id}-${slideDir}`}
             {...lazyImg(buildFileUrl(active.image_url), { priority: true })}
             alt={active.caption || group.business_name}
-            className="absolute inset-0 w-full h-full object-cover select-none"
+            className={`absolute inset-0 w-full h-full object-cover select-none ${slideDir === "next" ? "story-card-slide-in" : "story-card-slide-in-reverse"}`}
             data-testid="story-viewer-image"
             onClick={handleImageTap}
             draggable={false}

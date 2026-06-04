@@ -299,3 +299,35 @@
   animation: gtm-center-heart 1.2s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
   filter: drop-shadow(0 0 24px rgba(244, 63, 94, 0.6));
 }
+
+/* ─── V18.3 — Reels / Stories scroll-in animation ───
+   When a reel video becomes active (isActive=true), it plays a subtle
+   zoom-fade so the new card feels like it lands into focus. Combined
+   with the action rail's translate-up animation in ReelActionMenu's
+   inline <style>, the whole composition slides as one unit. */
+.reel-video-active {
+  animation: reelVideoSettle 520ms cubic-bezier(0.22, 0.85, 0.34, 1) both;
+}
+@keyframes reelVideoSettle {
+  0%   { opacity: 0.45; transform: scale(1.07); filter: brightness(0.85); }
+  60%  { opacity: 1; filter: brightness(1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Stories — directional swipe-in (next/prev). Applied via JS by
+   StoriesCarousel that tracks the direction of the activeIdx change. */
+.story-card-slide-in {
+  animation: storyCardSlideIn 380ms cubic-bezier(0.22, 0.85, 0.34, 1) both;
+}
+@keyframes storyCardSlideIn {
+  0%   { opacity: 0; transform: translate3d(28px, 0, 0) scale(0.96); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.story-card-slide-in-reverse {
+  animation: storyCardSlideInReverse 380ms cubic-bezier(0.22, 0.85, 0.34, 1) both;
+}
+@keyframes storyCardSlideInReverse {
+  0%   { opacity: 0; transform: translate3d(-28px, 0, 0) scale(0.96); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
