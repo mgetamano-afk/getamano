@@ -111,6 +111,48 @@ def _compute_code_health() -> dict:
     rc_git, out_git = _safe_run(["git", "rev-parse", "--short", "HEAD"], timeout=5)
     commit = out_git.strip().splitlines()[-1] if out_git.strip() else "unknown"
 
+    # V19.5 — server.py LOC timeline. Trace the file's size across the
+    # last N commits via `git log --pretty=%H|%cI` + `git show <hash>:server.py | wc -l`.
+    # This gives the founder a visual "the refactor curve is going down"
+    # signal — and stops the worry that the dashboard verdict could
+    # whip-saw between green/yellow on a single warning. Bounded to 40
+    # commits + 12s total to keep the request snappy.
+    loc_history: list[dict] = []
+    try:
+        # `git log -- <path>` resolves <path> relative to the CURRENT
+        # WORKING DIRECTORY (so `server.py` works because subprocess
+        # cwd is /app/backend). But `git show <hash>:<path>` resolves
+        # <path> relative to the REPO ROOT (so we need
+        # `backend/server.py`). Both forms required.
+        rc_top, out_top = _safe_run(["git", "rev-parse", "--show-toplevel"], timeout=3)
+        repo_root = out_top.strip().splitlines()[-1] if out_top.strip() else str(backend_root)
+        try:
+            rel_from_root = str((backend_root / "server.py").resolve().relative_to(repo_root))
+        except Exception:  # noqa: BLE001
+            rel_from_root = "server.py"
+
+        rc_log, out_log = _safe_run([
+            "git", "log", "--pretty=format:%H|%cI", "-n", "40", "--", "server.py",
+        ], timeout=5)
+        seen_hashes: set = set()
+        for ln in out_log.splitlines():
+            ln = ln.strip()
+            if not ln or "|" not in ln:
+                continue
+            full_hash, iso = ln.split("|", 1)
+            short = full_hash[:7]
+            if short in seen_hashes:
+                continue
+            seen_hashes.add(short)
+            rc_ls, out_ls = _safe_run(["git", "show", f"{full_hash}:{rel_from_root}"], timeout=3)
+            if rc_ls != 0 or out_ls.startswith("<error"):
+                continue
+            line_count = out_ls.count("\n")
+            loc_history.append({"commit": short, "at": iso, "loc": line_count})
+        loc_history.reverse()
+    except Exception:  # noqa: BLE001
+        loc_history = []
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "commit": commit,
@@ -124,6 +166,7 @@ def _compute_code_health() -> dict:
             "total_tests_collected": test_count,
         },
         "hotspots": hotspots,
+        "loc_history": loc_history,
         "verdict": "green" if (rc_f == 0 and total_findings < 50) else ("yellow" if total_findings < 200 else "red"),
     }
 

@@ -373,6 +373,11 @@ function CodeHealthSection() {
             </ul>
           )}
         </div>
+
+        {/* V19.5 — Refactor timeline. Plots server.py LOC across the
+            last 40 commits so the founder can SEE the descending curve
+            and feel the refactor is working. */}
+        <LocTimeline history={data.loc_history || []} />
       </Section>
     </div>
   );
@@ -386,6 +391,105 @@ function CodeHealthKPI({ Icon, label, value, color, ok, testid }) {
         <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">{label}</span>
       </div>
       <div className={`font-display text-xl font-bold ${color} tabular-nums leading-none`}>{typeof value === "number" ? value.toLocaleString() : value}</div>
+    </div>
+  );
+}
+
+// ─── V19.5 · server.py LOC timeline (refactor curve) ────────────────
+function LocTimeline({ history }) {
+  if (!history || history.length < 2) {
+    return (
+      <div className="rounded-xl bg-slate-950/50 border border-slate-800 p-3 mt-3" data-testid="code-health-timeline-empty">
+        <h4 className="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-1">Timeline server.py LOC</h4>
+        <p className="text-xs text-slate-500">Aún no hay suficientes commits para graficar.</p>
+      </div>
+    );
+  }
+
+  const W = 540;
+  const H = 96;
+  const PAD_X = 8;
+  const PAD_Y = 14;
+  const innerW = W - PAD_X * 2;
+  const innerH = H - PAD_Y * 2;
+
+  const locs = history.map(p => p.loc);
+  const minLoc = Math.min(...locs);
+  const maxLoc = Math.max(...locs);
+  const range = Math.max(1, maxLoc - minLoc);
+
+  const points = history.map((p, i) => {
+    const x = PAD_X + (i / Math.max(1, history.length - 1)) * innerW;
+    const y = PAD_Y + (1 - (p.loc - minLoc) / range) * innerH;
+    return { x, y, ...p };
+  });
+  const polyline = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  // Area path: line + close to bottom corners
+  const areaPath = `M ${points[0].x},${(H - PAD_Y).toFixed(1)} L ${polyline.split(" ").join(" L ")} L ${points[points.length - 1].x},${(H - PAD_Y).toFixed(1)} Z`;
+
+  const first = history[0];
+  const last = history[history.length - 1];
+  const delta = last.loc - first.loc;
+  const deltaPct = ((delta / first.loc) * 100).toFixed(1);
+  const direction = delta < 0 ? "down" : delta > 0 ? "up" : "flat";
+  const directionColor = direction === "down" ? "text-emerald-300" : direction === "up" ? "text-rose-300" : "text-slate-400";
+  const directionLabel = direction === "down" ? "↓" : direction === "up" ? "↑" : "→";
+
+  return (
+    <div className="rounded-xl bg-slate-950/50 border border-slate-800 p-3 mt-3" data-testid="code-health-timeline">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <h4 className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Timeline server.py LOC</h4>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            {history.length} commits · {first.loc.toLocaleString()} → {last.loc.toLocaleString()}
+          </p>
+        </div>
+        <div className="text-right">
+          <div className={`font-display text-sm font-bold tabular-nums ${directionColor} leading-none`}>
+            {directionLabel} {Math.abs(delta).toLocaleString()} LOC
+          </div>
+          <div className={`text-[10px] tabular-nums mt-0.5 ${directionColor}`}>
+            {delta > 0 ? "+" : ""}{deltaPct}%
+          </div>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="none" data-testid="code-health-timeline-svg">
+        <defs>
+          <linearGradient id="loc-area" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={direction === "down" ? "#10b981" : "#f43f5e"} stopOpacity="0.35" />
+            <stop offset="100%" stopColor={direction === "down" ? "#10b981" : "#f43f5e"} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* Y-axis gridlines (4) */}
+        {[0, 0.25, 0.5, 0.75, 1].map(t => (
+          <line key={t} x1={PAD_X} x2={W - PAD_X} y1={PAD_Y + t * innerH} y2={PAD_Y + t * innerH} stroke="#1e293b" strokeWidth="1" strokeDasharray={t === 1 ? "" : "2 3"} />
+        ))}
+        <path d={areaPath} fill="url(#loc-area)" />
+        <polyline
+          points={polyline}
+          fill="none"
+          stroke={direction === "down" ? "#10b981" : "#f43f5e"}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {points.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={i === points.length - 1 ? 3 : 1.5}
+            fill={i === points.length - 1 ? "#10b981" : "#475569"}
+          />
+        ))}
+        {/* Min / Max labels */}
+        <text x={PAD_X + 2} y={PAD_Y + 8} fill="#64748b" fontSize="9" fontFamily="ui-monospace, monospace">
+          {maxLoc.toLocaleString()}
+        </text>
+        <text x={PAD_X + 2} y={H - PAD_Y + 1} fill="#64748b" fontSize="9" fontFamily="ui-monospace, monospace">
+          {minLoc.toLocaleString()}
+        </text>
+      </svg>
     </div>
   );
 }

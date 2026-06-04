@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -2342,345 +2342,17 @@ def _compress_image_bytes(data: bytes, content_type: str) -> tuple[bytes, str]:
         logger.warning(f"Image compression failed, keeping original: {e}")
         return data, content_type
 
-@api_router.post("/reels/upload-video")
-async def upload_reel_video(file: UploadFile = File(...), user: User = Depends(get_current_user)):
-    """V15 — Dedicated video upload for reels. Open to ANY logged-in user
-    (Nota 1.1.2: verificados o no, todos pueden subir reels). Accepts the
-    formats produced by `MediaRecorder` (WebM) as well as imported MP4/MOV.
-
-    V15.3 — Server-side post-process via ffmpeg:
-      · trims clips longer than 60s,
-      · re-encodes to H.264/AAC MP4 (universal playback),
-      · auto-generates a 480p JPEG thumbnail.
-    Fail-soft: if ffmpeg crashes, the original upload still goes through.
-    """
-    content_type = (file.content_type or "application/octet-stream").lower().split(";")[0].strip()
-    if content_type not in ALLOWED_REEL_VIDEO_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail="Formato no soportado para Reels. Usa MP4, WebM, MOV o AVI.",
-        )
-    data = await file.read()
-    if len(data) > MAX_REEL_VIDEO_SIZE:
-        raise HTTPException(status_code=400, detail="El video supera 80 MB. Recorta tu reel a ≤ 60s.")
-
-    # V15.3 — server-side trim + thumbnail. Whole step is best-effort so
-    # the upload survives an ffmpeg blip.
-    final_bytes = data
-    final_ct = content_type
-    thumbnail_bytes = None
-    duration_s = None
-    was_trimmed = False
-    try:
-        from services.reel_video import process_reel, is_ffmpeg_available, ReelTooShortError, MIN_REEL_DURATION_S
-        if is_ffmpeg_available():
-            try:
-                proc = await process_reel(data, content_type)
-                final_bytes = proc.video_bytes
-                final_ct = proc.output_content_type if proc.video_bytes is not data else content_type
-                thumbnail_bytes = proc.thumbnail_bytes
-                duration_s = proc.duration_s
-                was_trimmed = proc.was_trimmed
-            except ReelTooShortError as e:
-                # V17.1 — Reject under-3s clips with a clear Spanish message.
-                # 422 (unprocessable entity) is the correct semantic for a
-                # well-formed request whose content can't be accepted.
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"El video es muy corto ({e.duration:.1f}s). Mínimo {MIN_REEL_DURATION_S}s.",
-                )
-    except HTTPException:
-        raise  # don't swallow the ReelTooShortError → 422
-    except Exception as e:
-        logger.warning(f"reel post-process skipped: {e}")
-
-    ext_map = {
-        "video/mp4": "mp4", "video/quicktime": "mov", "video/x-msvideo": "avi",
-        "video/avi": "avi", "video/webm": "webm", "video/x-matroska": "mkv",
-    }
-    # If we transcoded the output is always MP4 regardless of input.
-    ext = "mp4" if final_ct == "video/mp4" else ext_map.get(final_ct, "mp4")
-    file_id = str(uuid.uuid4())
-    path = f"{APP_NAME}/reels/{user.user_id}/{file_id}.{ext}"
-    try:
-        result = put_object(path, final_bytes, final_ct)
-    except Exception as e:
-        logger.exception("Reel video upload failed")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
-
-    thumb_url = None
-    if thumbnail_bytes:
-        try:
-            thumb_path = f"{APP_NAME}/reels/{user.user_id}/{file_id}-thumb.jpg"
-            thumb_result = put_object(thumb_path, thumbnail_bytes, "image/jpeg")
-            thumb_url = f"/api/files/{thumb_result['path']}"
-            # V15.3 — register the thumbnail in `db.files` so the
-            # /api/files/{path} download endpoint can serve it. Without
-            # this record, GET returns 404 even though the bytes are in
-            # storage.
-            await db.files.insert_one({
-                "file_id": f"{file_id}-thumb",
-                "user_id": user.user_id,
-                "storage_path": thumb_result["path"],
-                "original_filename": f"{file_id}-thumb.jpg",
-                "content_type": "image/jpeg",
-                "size": thumb_result.get("size", len(thumbnail_bytes)),
-                "is_deleted": False,
-                "kind": "reel-thumb",
-                "parent_file_id": file_id,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            })
-        except Exception as e:
-            logger.warning(f"thumbnail upload skipped: {e}")
-
-    await db.files.insert_one({
-        "file_id": file_id, "user_id": user.user_id, "storage_path": result["path"],
-        "original_filename": file.filename or "", "content_type": final_ct,
-        "size": result.get("size", len(final_bytes)), "is_deleted": False,
-        "kind": "reel-video",
-        "thumbnail_url": thumb_url,
-        "duration_s": duration_s,
-        "was_trimmed": was_trimmed,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {
-        "file_id": file_id,
-        "path": result["path"],
-        "url": f"/api/files/{result['path']}",
-        "thumbnail_url": thumb_url,
-        "duration_s": duration_s,
-        "was_trimmed": was_trimmed,
-        "content_type": final_ct,
-        "size": result.get("size", len(final_bytes)),
-    }
-
-
-@api_router.post("/upload")
-async def upload(file: UploadFile = File(...), user: User = Depends(get_current_user)):
-    content_type = file.content_type or "application/octet-stream"
-    if content_type.startswith("video/"):
-        # Friendly redirect: callers can route reels to the right endpoint.
-        raise HTTPException(
-            status_code=400,
-            detail="Los videos van a /api/reels/upload-video, no a /api/upload.",
-        )
-    if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Solo imágenes (jpg/png/webp/gif/heic)")
-    data = await file.read()
-    if len(data) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=400, detail="El archivo supera 10 MB")
-    # Auto-compress images to reduce storage + speed up page load
-    data, content_type = _compress_image_bytes(data, content_type)
-    # File extension follows the (possibly transcoded) content type
-    ext = content_type.split("/")[-1]
-    if ext == "jpeg":
-        ext = "jpg"
-    file_id = str(uuid.uuid4())
-    path = f"{APP_NAME}/uploads/{user.user_id}/{file_id}.{ext}"
-    try:
-        result = put_object(path, data, content_type)
-    except Exception as e:
-        logger.exception("Upload failed")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
-    await db.files.insert_one({
-        "file_id": file_id,
-        "user_id": user.user_id,
-        "storage_path": result["path"],
-        "original_filename": file.filename or "",
-        "content_type": content_type,
-        "size": result.get("size", len(data)),
-        "is_deleted": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {"file_id": file_id, "path": result["path"], "url": f"/api/files/{result['path']}"}
-
-@api_router.get("/files/{path:path}")
-async def download(path: str):
-    record = await db.files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
-    if not record:
-        raise HTTPException(status_code=404, detail="File not found")
-    try:
-        data, ct = get_object(path)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Storage error: {e}")
-    return Response(content=data, media_type=record.get("content_type") or ct)
+# V19.5 — /upload, /reels/upload-video, /files/{path} moved to routes/uploads.py
 
 # ============ GALLERY ============
-@api_router.get("/providers/me/gallery/limit")
-async def my_gallery_limit(user: User = Depends(get_current_user)):
-    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "gallery": 1, "plan": 1})
-    if not prof:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    plan = prof.get("plan") or "free"
-    max_photos = PLAN_PHOTO_LIMITS.get(plan, PLAN_PHOTO_LIMITS["free"])
-    used = len(prof.get("gallery") or [])
-    return {
-        "plan": plan,
-        "used": used,
-        "max": max_photos,  # None = unlimited
-        "can_upload": (max_photos is None) or (used < max_photos),
-        "remaining": (None if max_photos is None else max(0, max_photos - used)),
-    }
-
-@api_router.post("/providers/me/gallery")
-async def add_gallery_item(payload: GalleryItemIn, user: User = Depends(get_current_user)):
-    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0})
-    if not prof:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    plan = prof.get("plan") or "free"
-    max_photos = PLAN_PHOTO_LIMITS.get(plan, PLAN_PHOTO_LIMITS["free"])
-    current = prof.get("gallery") or []
-    if max_photos is not None and len(current) >= max_photos:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Has llegado al límite de {max_photos} fotos del plan {plan.capitalize()}. Actualiza tu plan para subir fotos ilimitadas.",
-        )
-    next_sort = (max((g.get("sort_order", 0) for g in current), default=-1)) + 1
-    item = {
-        "id": f"g_{uuid.uuid4().hex[:10]}",
-        "url": payload.url,
-        "caption": payload.caption or "",
-        "category": payload.category,
-        "sort_order": next_sort,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.provider_profiles.update_one({"user_id": user.user_id}, {"$push": {"gallery": item}})
-    return item
-
-@api_router.put("/providers/me/gallery/reorder")
-async def reorder_gallery(payload: GalleryReorderIn, user: User = Depends(get_current_user)):
-    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "gallery": 1})
-    if not prof:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    current = prof.get("gallery") or []
-    by_id = {g["id"]: g for g in current}
-    # Reorder: items in payload.order first (deduped, only valid ids), then any leftovers preserving original order
-    seen = set()
-    ordered = []
-    for idx, gid in enumerate(payload.order):
-        if gid in by_id and gid not in seen:
-            g = dict(by_id[gid])
-            g["sort_order"] = idx
-            ordered.append(g)
-            seen.add(gid)
-    for g in current:
-        if g["id"] not in seen:
-            g2 = dict(g)
-            g2["sort_order"] = len(ordered)
-            ordered.append(g2)
-    await db.provider_profiles.update_one(
-        {"user_id": user.user_id},
-        {"$set": {"gallery": ordered}},
-    )
-    return {"ok": True, "count": len(ordered)}
-
-@api_router.put("/providers/me/gallery/{item_id}/category")
-async def set_gallery_category(item_id: str, payload: GalleryCategoryIn, user: User = Depends(get_current_user)):
-    res = await db.provider_profiles.update_one(
-        {"user_id": user.user_id, "gallery.id": item_id},
-        {"$set": {"gallery.$.category": payload.category}},
-    )
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Foto no encontrada")
-    return {"ok": True, "category": payload.category}
-
-@api_router.delete("/providers/me/gallery/{item_id}")
-async def remove_gallery_item(item_id: str, user: User = Depends(get_current_user)):
-    await db.provider_profiles.update_one(
-        {"user_id": user.user_id}, {"$pull": {"gallery": {"id": item_id}}}
-    )
-    return {"ok": True}
-
-@api_router.get("/gallery/photo-categories")
-async def list_photo_categories():
-    """Public list of photo categories used to tag/filter gallery photos."""
-    return [{"key": k, "label": v} for k, v in PHOTO_CATEGORY_LABELS.items()]
-
-# ============ PROVIDER VIDEO (Pro / Premium only) ============
-@api_router.post("/providers/me/video")
-async def upload_provider_video(file: UploadFile = File(...), user: User = Depends(get_current_user)):
-    prof = await db.provider_profiles.find_one({"user_id": user.user_id}, {"_id": 0, "plan": 1, "video_url": 1})
-    if not prof:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    plan = (prof.get("plan") or "free").lower()
-    if plan not in VIDEO_ALLOWED_PLANS:
-        raise HTTPException(status_code=403, detail="El video de presentación está disponible en los planes Pro y Premium.")
-    content_type = file.content_type or "application/octet-stream"
-    if content_type not in ALLOWED_VIDEO_TYPES:
-        raise HTTPException(status_code=400, detail="Formato no soportado. Usa MP4, MOV o AVI.")
-    data = await file.read()
-    if len(data) > MAX_VIDEO_SIZE:
-        raise HTTPException(status_code=400, detail="El video supera 200 MB.")
-    ext_map = {"video/mp4": "mp4", "video/quicktime": "mov", "video/x-msvideo": "avi", "video/avi": "avi"}
-    ext = ext_map.get(content_type, "mp4")
-    file_id = str(uuid.uuid4())
-    path = f"{APP_NAME}/videos/{user.user_id}/{file_id}.{ext}"
-    try:
-        result = put_object(path, data, content_type)
-    except Exception as e:
-        logger.exception("Video upload failed")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
-    await db.files.insert_one({
-        "file_id": file_id, "user_id": user.user_id, "storage_path": result["path"],
-        "original_filename": file.filename or "", "content_type": content_type,
-        "size": result.get("size", len(data)), "is_deleted": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    video_url = f"/api/files/{result['path']}"
-    await db.provider_profiles.update_one(
-        {"user_id": user.user_id},
-        {"$set": {
-            "video_url": video_url,
-            "video_content_type": content_type,
-            "video_uploaded_at": datetime.now(timezone.utc).isoformat(),
-        }},
-    )
-    return {"ok": True, "video_url": video_url, "content_type": content_type, "size": len(data)}
-
-@api_router.delete("/providers/me/video")
-async def delete_provider_video(user: User = Depends(get_current_user)):
-    res = await db.provider_profiles.update_one(
-        {"user_id": user.user_id},
-        {"$unset": {"video_url": "", "video_content_type": "", "video_uploaded_at": ""}},
-    )
-    if res.matched_count == 0:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    return {"ok": True}
-
-# ============ PLAN CHANGE (mock - no Stripe) ============
-@api_router.post("/providers/me/plan")
-async def change_plan(payload: PlanChangeIn, user: User = Depends(get_current_user)):
-    result = await db.provider_profiles.update_one(
-        {"user_id": user.user_id},
-        {"$set": {"plan": payload.plan, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="No provider profile")
-    return {"ok": True, "plan": payload.plan}
+# V19.5 — /providers/me/gallery/*, /providers/me/video, /providers/me/plan, /gallery/photo-categories moved to routes/galleries.py
 
 # ============ MESSAGING ============
 # V19.4 — /messages, /messages/{id}/reply, /conversations*, moved to routes/messages.py
 
 # ============ INCLUDE ROUTER ============
 # ============ LIKES ============
-@api_router.post("/providers/{provider_id}/like")
-async def toggle_like(provider_id: str, user: User = Depends(get_current_user)):
-    existing = await db.likes.find_one({"user_id": user.user_id, "provider_id": provider_id})
-    if existing:
-        await db.likes.delete_one({"user_id": user.user_id, "provider_id": provider_id})
-        await db.provider_profiles.update_one({"provider_id": provider_id}, {"$inc": {"likes_count": -1}})
-        return {"liked": False}
-    await db.likes.insert_one({
-        "user_id": user.user_id, "provider_id": provider_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    await db.provider_profiles.update_one({"provider_id": provider_id}, {"$inc": {"likes_count": 1}})
-    return {"liked": True}
-
-@api_router.get("/providers/{provider_id}/like-status")
-async def like_status(provider_id: str, user: User = Depends(get_current_user)):
-    liked = bool(await db.likes.find_one({"user_id": user.user_id, "provider_id": provider_id}))
-    return {"liked": liked}
+# V19.5 — /providers/{id}/like, /providers/{id}/like-status moved to routes/likes.py
 
 # ============ FOUNDING MEMBERS / PROMO CODES ============
 @api_router.post("/promo-codes/apply")
@@ -3012,134 +2684,7 @@ async def my_journal(user: User = Depends(get_current_user)):
     }
 
 # V19.3 — /admin/ceo-metrics, /admin/code-health, /admin/daily-brief moved to routes/admin_insights.py
-@api_router.get("/community/leaderboard")
-async def leaderboard(period: str = "month", limit: int = 5):
-    """Top providers by milestones unlocked in a period (month/all)."""
-    limit = max(1, min(limit, 20))
-    now = datetime.now(timezone.utc)
-    match: dict = {}
-    period_label = "all"
-    if period == "month":
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
-        match["unlocked_at"] = {"$gte": start}
-        period_label = "month"
-    elif period == "week":
-        start = (now - timedelta(days=7)).isoformat()
-        match["unlocked_at"] = {"$gte": start}
-        period_label = "week"
-    pipeline = [
-        {"$match": match} if match else {"$match": {}},
-        {"$group": {"_id": "$user_id", "count": {"$sum": 1}, "last_at": {"$max": "$unlocked_at"}}},
-        {"$sort": {"count": -1, "last_at": -1}},
-        {"$limit": limit * 4},  # over-fetch for filter out TEST/inactive
-    ]
-    rows = await db.provider_milestones.aggregate(pipeline).to_list(limit * 4)
-    items = []
-    rank = 0
-    for row in rows:
-        uid = row["_id"]
-        user = await db.users.find_one({"user_id": uid}, {"_id": 0, "name": 1}) or {}
-        prof = await db.provider_profiles.find_one({"user_id": uid}, {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "state": 1, "logo_url": 1, "latino_owned": 1, "is_active": 1, "verification_status": 1}) or {}
-        biz = prof.get("business_name") or ""
-        if biz.startswith("TEST_") or not prof.get("is_active", True):
-            continue
-        name = (user.get("name") or "").strip()
-        first = name.split(" ")[0] if name else (biz.split(" ")[0] if biz else "Negocio")
-        rank += 1
-        items.append({
-            "rank": rank,
-            "first_name": first,
-            "business_name": biz or None,
-            "city": prof.get("city"),
-            "state": prof.get("state"),
-            "slug": prof.get("slug"),
-            "logo_url": prof.get("logo_url"),
-            "latino_owned": prof.get("latino_owned") == "yes",
-            "milestones_count": row["count"],
-            "last_at": row.get("last_at"),
-        })
-        if rank >= limit:
-            break
-    return {"period": period_label, "items": items}
-
-@api_router.get("/community/wall-of-fame")
-async def wall_of_fame(limit: int = 50):
-    """Public anonymized feed of recent milestone unlocks across providers."""
-    limit = max(1, min(limit, 100))
-    defs_by_id = {d["id"]: d for d in MILESTONE_DEFS}
-    cursor = db.provider_milestones.find({}, {"_id": 0}).sort("unlocked_at", -1).limit(limit)
-    items = []
-    user_cache = {}
-    prof_cache = {}
-    async for rec in cursor:
-        mid = rec.get("milestone_id")
-        d = defs_by_id.get(mid)
-        if not d:
-            continue
-        uid = rec.get("user_id")
-        if uid not in user_cache:
-            user_cache[uid] = await db.users.find_one({"user_id": uid}, {"_id": 0, "name": 1}) or {}
-        if uid not in prof_cache:
-            prof_cache[uid] = await db.provider_profiles.find_one({"user_id": uid}, {"_id": 0, "slug": 1, "business_name": 1, "city": 1, "state": 1, "logo_url": 1, "latino_owned": 1}) or {}
-        u = user_cache[uid]
-        prof = prof_cache[uid]
-        biz = prof.get("business_name") or ""
-        name = (u.get("name") or "").strip()
-        first = name.split(" ")[0] if name else (biz.split(" ")[0] if biz else "Alguien")
-        # Skip seeded test profiles from public feed
-        if biz.startswith("TEST_"):
-            continue
-        items.append({
-            "first_name": first,
-            "city": prof.get("city"),
-            "state": prof.get("state"),
-            "business_name": biz or None,
-            "slug": prof.get("slug"),
-            "logo_url": prof.get("logo_url"),
-            "latino_owned": prof.get("latino_owned") == "yes",
-            "milestone_id": mid,
-            "title": d["title"],
-            "emoji": d["emoji"],
-            "tier": d["tier"],
-            "unlocked_at": rec.get("unlocked_at"),
-        })
-    # Aggregate stats for hero
-    total_unlocked = await db.provider_milestones.count_documents({})
-    total_providers = await db.provider_profiles.count_documents({"is_active": True})
-    by_tier = {"silver": 0, "gold": 0, "platinum": 0}
-    for it in items:
-        if it["tier"] in by_tier:
-            by_tier[it["tier"]] += 1
-    return {"items": items, "stats": {"total_unlocked": total_unlocked, "total_providers": total_providers, "by_tier": by_tier}}
-
-
-# ════════════════════════════════════════════════════════════════════════
-# ════════════════════════════════════════════════════════════════════════
-# SECTION 35+36+42 — Community module (REFACTORED into routes/community.py)
-# ════════════════════════════════════════════════════════════════════════
-# Mounted below, after audit_log is defined.
-
-
-@api_router.get("/public/stats")
-async def public_stats():
-    # BUG-05: real stats with TEST data excluded
-    base_q = {"verification_status": "approved", "is_active": True, **PUBLIC_GUARD}
-    total = await db.provider_profiles.count_documents(base_q)
-    registered_total = await db.provider_profiles.count_documents({"is_active": True, **PUBLIC_GUARD})
-    states = await db.provider_profiles.distinct("state", {"is_active": True, **PUBLIC_GUARD})
-    avg_doc = await db.provider_profiles.aggregate([
-        {"$match": {"rating_count": {"$gt": 0}, "is_test": {"$ne": True}}},
-        {"$group": {"_id": None, "avg": {"$avg": "$rating_avg"}}}
-    ]).to_list(1)
-    avg = round(avg_doc[0]["avg"], 1) if avg_doc else 4.9
-    # Until 'approved' count reaches critical mass, show 'registered'.
-    label_key = "verified" if total >= 25 else "registered"
-    return {
-        "providers": total if total >= 25 else registered_total,
-        "providers_label": label_key,
-        "states": len([s for s in states if s]),
-        "rating": avg,
-    }
+# V19.5 — /community/leaderboard, /community/wall-of-fame, /public/stats moved to routes/community_engagement.py
 
 # ============ NOTIFICATIONS (inteligentes para proveedores y clientes) ============
 # Notification templates. Each generator returns a list of dicts (key, title, body, cta_label, cta_url, icon, priority).
@@ -9267,6 +8812,10 @@ from routes.admin_catalog import make_router as _make_admin_catalog_router  # no
 from routes.admin_providers import make_router as _make_admin_providers_router  # noqa: E402
 from routes.messages import make_router as _make_messages_router  # noqa: E402
 from routes.ads import make_router as _make_ads_router  # noqa: E402
+from routes.likes import make_router as _make_likes_router  # noqa: E402
+from routes.community_engagement import make_router as _make_community_engagement_router  # noqa: E402
+from routes.galleries import make_router as _make_galleries_router  # noqa: E402
+from routes.uploads import make_router as _make_uploads_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9547,6 +9096,40 @@ api_router.include_router(
         User=User,
         require_admin=require_admin,
         AdIn=AdIn,
+    )
+)
+
+# V19.5 — Round 3 extractions: likes, community public endpoints,
+# galleries (incl. provider video + plan change) and generic uploads.
+api_router.include_router(
+    _make_likes_router(
+        db=db, User=User, get_current_user=get_current_user,
+    )
+)
+api_router.include_router(
+    _make_community_engagement_router(
+        db=db, milestone_defs=MILESTONE_DEFS, public_guard=PUBLIC_GUARD,
+    )
+)
+api_router.include_router(
+    _make_galleries_router(
+        db=db, User=User, get_current_user=get_current_user,
+        GalleryItemIn=GalleryItemIn, GalleryReorderIn=GalleryReorderIn,
+        GalleryCategoryIn=GalleryCategoryIn, PlanChangeIn=PlanChangeIn,
+        plan_photo_limits=PLAN_PHOTO_LIMITS, video_allowed_plans=VIDEO_ALLOWED_PLANS,
+        allowed_video_types=ALLOWED_VIDEO_TYPES, max_video_size=MAX_VIDEO_SIZE,
+        photo_category_labels=PHOTO_CATEGORY_LABELS, app_name=APP_NAME,
+        put_object=put_object, logger=logger,
+    )
+)
+api_router.include_router(
+    _make_uploads_router(
+        db=db, User=User, get_current_user=get_current_user,
+        allowed_image_types=ALLOWED_IMAGE_TYPES,
+        allowed_reel_video_types=ALLOWED_REEL_VIDEO_TYPES,
+        max_upload_size=MAX_UPLOAD_SIZE, max_reel_video_size=MAX_REEL_VIDEO_SIZE,
+        app_name=APP_NAME, put_object=put_object, get_object=get_object,
+        compress_image_bytes=_compress_image_bytes, logger=logger,
     )
 )
 

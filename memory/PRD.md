@@ -3,6 +3,57 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
+## Latest Update — Jun 4, 2026 · V19.5 Server.py Refactor Round 3 + LOC Timeline
+
+Founder: "V19.5 — Round 3 del split (uploads + galleries + likes + community_engagement). ¿Lo lanzo? sí, y haz la línea del tiempo, después revisamos todo lo que tenemos."
+
+### Round 3 — 17 endpoints más extraídos
+- **`routes/likes.py`** (53 LOC): toggle + status (idempotente).
+- **`routes/community_engagement.py`** (132 LOC): /community/leaderboard, /community/wall-of-fame, /public/stats.
+- **`routes/galleries.py`** (208 LOC): photo limit, CRUD + reorder + category, provider video upload/delete, plan change, photo-categories listing.
+- **`routes/uploads.py`** (211 LOC): /upload (imágenes con compresión), /reels/upload-video (ffmpeg + thumbnail), /files/{path}.
+
+### Resultado acumulado V19.3 + V19.4 + V19.5
+| Round | Endpoints extraídos | server.py LOC | Δ      |
+|-------|---------------------|---------------|--------|
+| Pre   | —                   | 11,413        | base   |
+| V19.3 | 11 (insights+catalog)| 10,852       | -561   |
+| V19.4 | 14 (msg+ap+ads)     | 10,615        | -237   |
+| V19.5 | 17 (round 3)        | **10,198**    | -417   |
+| Total | **42 endpoints**    |               | **-1,215 LOC (-10.6%)** |
+
+### LOC Timeline (nueva feature visual)
+- **Backend**: `/api/admin/code-health` ahora incluye `loc_history[]` — los últimos 40 commits que tocaron `server.py`. Para cada commit: `commit` (short hash), `at` (ISO timestamp), `loc` (line count). Implementado con `git log --pretty=%H|%cI -n 40 -- server.py` + `git show <hash>:backend/server.py | count('\\n')`.
+- **Gotcha resuelto**: `git log -- <path>` resuelve la ruta relativa a CWD, pero `git show <hash>:<path>` la resuelve relativa al REPO ROOT. Necesité ambas formas en el mismo subprocess loop.
+- **Frontend**: nuevo componente `LocTimeline` en `AdminCEO.jsx`. SVG sparkline 540×96 con:
+  - Polyline con stroke verde (si baja) o rosa (si sube).
+  - Área rellenada con gradient vertical (opacity 0.35 → 0.02).
+  - Gridlines horizontales punteadas (5 niveles).
+  - Dots en cada commit (último un poco más grande, color emerald).
+  - Header con conteo de commits + delta absoluto y porcentual + dirección flecha (↓/↑/→).
+  - Y-axis labels min/max esquinas.
+- **Lo bonito visualmente**: el chart muestra la curva de crecimiento (commits 1-30 hasta el peak 11,413) y luego el acantilado descendente desde el peak hasta el commit más reciente. El último punto verde grande representa el LOC del working tree actual (10,198) — invitante a seguir bajando.
+
+### Tests
+- `test_iter123_v19_5_split_round3.py` — **11 tests verde**:
+  - Wiring de los 4 módulos.
+  - Lock de los 17 decoradores migrados.
+  - Round-trip de likes (toggle idempotente).
+  - Community endpoints (leaderboard/wall-of-fame/public stats).
+  - Gallery photo-categories.
+  - `/providers/me/gallery/limit` para client (404 esperado).
+  - `/files/{path}` sirve archivos del storage.
+  - `loc_history` presente en la respuesta + estructura correcta (>= 5 commits, todos con commit/at/loc, ordenados oldest→newest).
+  - Componente `LocTimeline` renderizado en AdminCEO.
+  - Dashboard observa LOC < 10,300 (auto-verificación del refactor).
+- Suite cumulativa V18.4 → V19.5: **66 tests verde, cero regresiones funcionales**. (2 fallas observadas solo en bulk-run por rate-limit del `/auth/login`; standalone pasan).
+
+### Tech-debt encontrada y resuelta en este round
+- Ruff F811 (round 2) catched duplicate `MessageIn` shadowing → renamed to `ConversationBodyIn`.
+- Ruff F401 (round 3) catched unused `fastapi.Response` import en server.py → removed (la usaba el /files endpoint que se fue a uploads).
+- Ahora el codebase es ruff F-clean a nivel global (`ruff check --select=F .` → All checks passed).
+
+
 ## Latest Update — Jun 4, 2026 · V19.4 Server.py Refactor Round 2 + Hidden Bug Caught
 
 Founder: "V19.4 — Round 2 del split (admin_providers + messages). ¿Quieres que arranque? sí, dejamos las KEY para el final"
