@@ -232,17 +232,34 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
   const pendingTapRef = useRef(null);
 
   const fireLike = async () => {
+    // V17.7 — Magic moment: haptic pulse (stronger than the rail's 30ms
+    // because double-tap is a deliberate gesture) + giant heart burst.
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      try { navigator.vibrate([15, 40, 25]); } catch { /* desktop */ }
+    }
     setShowBurst(true);
     setTimeout(() => setShowBurst(false), 900);
     if (!user) return;
-    if (liked) return; // already liked → just play the animation, no API
+    if (liked) {
+      // Already liked → replay burst (delight) but no API call.
+      // Still emit the event so the rail's heart pill stays in sync
+      // for late-mounted listeners.
+      window.dispatchEvent(new CustomEvent("reel:liked", { detail: { reel_id: reel.reel_id, liked: true } }));
+      return;
+    }
     setLiked(true);
     setLiveLikes(n => n + 1);
+    // Tell the ReelActionMenu rail to flip the heart pill into the active
+    // rose-pink gradient + bump the count without waiting for re-mount.
+    window.dispatchEvent(new CustomEvent("reel:liked", { detail: { reel_id: reel.reel_id, liked: true } }));
     try {
       const r = await api.post(`/reels/${reel.reel_id}/like`);
       const isLiked = !!r.data?.liked;
       setLiked(isLiked);
-      if (!isLiked) setLiveLikes(n => Math.max(0, n - 1));
+      if (!isLiked) {
+        setLiveLikes(n => Math.max(0, n - 1));
+        window.dispatchEvent(new CustomEvent("reel:liked", { detail: { reel_id: reel.reel_id, liked: false } }));
+      }
     } catch {
       // soft-fail: leave optimistic UI in place
     }

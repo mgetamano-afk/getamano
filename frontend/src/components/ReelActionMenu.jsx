@@ -70,6 +70,31 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
     return () => { alive = false; };
   }, [activeReel?.reel_id, user]);
 
+  // V17.7 — Sync the rail's heart pill when the user double-taps the
+  // reel video. ReelsPage dispatches `reel:liked` whenever fireLike
+  // runs; we filter by reel_id and update both the active flag and the
+  // count optimistically. This makes the brand-teal heart flip to the
+  // rose-pink active gradient at the exact moment the giant heart
+  // bursts on the video — the two animations feel like one gesture.
+  useEffect(() => {
+    const onReelLiked = (e) => {
+      const detail = e?.detail || {};
+      if (!activeReel?.reel_id || detail.reel_id !== activeReel.reel_id) return;
+      setReactions(prev => {
+        const wasLiked = !!prev.liked;
+        if (wasLiked === !!detail.liked) return prev; // no-op
+        // Reflect optimistic count change to match the click flip.
+        setLiveCounts(c => ({
+          ...c,
+          like: Math.max(0, (c.like || 0) + (detail.liked ? 1 : -1)),
+        }));
+        return { ...prev, liked: !!detail.liked };
+      });
+    };
+    window.addEventListener("reel:liked", onReelLiked);
+    return () => window.removeEventListener("reel:liked", onReelLiked);
+  }, [activeReel?.reel_id]);
+
   // V17.5 — Helpers to bump live counts optimistically.
   const bumpCount = (key, delta) => setLiveCounts(prev => ({
     ...prev,

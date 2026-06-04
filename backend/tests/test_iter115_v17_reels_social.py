@@ -350,6 +350,28 @@ def test_story_creator_caption_and_tag_have_optional_pill():
     assert "Opcional" in src
 
 
+def test_v17_7_double_tap_haptic_and_rail_sync():
+    """V17.7 — Double-tap-to-like must trigger haptic vibration in BOTH
+    reels and stories, AND in reels it must dispatch a `reel:liked`
+    event so the ReelActionMenu rail's heart pill flips to the active
+    rose-pink gradient in sync with the giant burst overlay.
+    """
+    reels = _read("/app/frontend/src/pages/ReelsPage.jsx")
+    stories = _read("/app/frontend/src/components/StoriesCarousel.jsx")
+    menu = _read(ACTION_MENU_PATH)
+
+    # Both surfaces vibrate the same pattern on double-tap
+    haptic_pattern = "navigator.vibrate([15, 40, 25])"
+    assert haptic_pattern in reels, "reel double-tap missing haptic"
+    assert haptic_pattern in stories, "story double-tap missing haptic"
+
+    # Reels dispatch the custom event so the rail can update
+    assert 'CustomEvent("reel:liked"' in reels
+    # And the rail listens for it
+    assert 'addEventListener("reel:liked"' in menu
+    assert "onReelLiked" in menu
+
+
 def test_reels_page_no_longer_renders_metric_pill_rail():
     src = _read("/app/frontend/src/pages/ReelsPage.jsx")
     assert "MetricPill" not in src, "the duplicate metrics rail must be removed"

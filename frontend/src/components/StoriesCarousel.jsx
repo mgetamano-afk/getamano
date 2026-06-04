@@ -415,12 +415,19 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
 
   // Double-tap on the story image → trigger like (Instagram pattern).
   // Only fires the API call when the user goes from unliked → liked.
+  //
+  // V17.7 — Add haptic pulse so the magic moment feels physical on
+  // mobile. The pattern [15, 40, 25] is a quick double-pulse that the
+  // user reads as "tap heard, heart firing" without being annoying.
   const handleImageTap = () => {
     const now = Date.now();
     if (now - lastTapRef.current < 320) {
       lastTapRef.current = 0;
       const s = stories[activeIdx];
       if (!s || isOwner || !user) return;
+      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+        try { navigator.vibrate([15, 40, 25]); } catch { /* desktop */ }
+      }
       if (likeStates[s.story_id]) {
         // Already liked — still flash the heart for delight
         setCenterHeart((n) => n + 1);

@@ -3,7 +3,48 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — Jun 3, 2026 · V17.6 Reels Brand Rail + Story Optional Pills
+## Latest Update — Jun 4, 2026 · V17.7 Double-Tap Heart Magic + Rail Sync
+
+Founder: "si doble tap, para ambos, reels y historias, y que suceda la magia del corazón."
+
+### Lo que cambió
+Both reels (`/reels`) y stories (`/stories/{id}` via `StoryViewer`) **ya** tenían double-tap-to-like cableado desde V15.1. Pero faltaban 2 cosas para que la "magia" fuera completa:
+
+1. **Haptic vibration `[15, 40, 25]`** — doble pulso secuencial que se siente físico en el celular. Más fuerte que el `vibrate(30)` del rail (V17.6) porque el doble-tap es un gesto deliberado de afecto.
+2. **Rail sync** — en reels, el heart pill del `ReelActionMenu` tenía su propio estado `reactions.liked` que solo se hidrataba al cambiar de reel. Resultado: al hacer double-tap veías el corazón gigante explotar pero el pill se quedaba en teal-brand. **Discordancia visual**.
+
+### Solución
+- **`ReelsPage.fireLike`**: dispara `window.dispatchEvent(new CustomEvent("reel:liked", { detail: { reel_id, liked: true }}))` + haptic pattern.
+- **`ReelActionMenu`**: nuevo `useEffect` que listens a `reel:liked`, filtra por `activeReel.reel_id`, y aplica:
+  - `setReactions(prev => ({...prev, liked: true}))` → pill flipea de teal-brand a rose-pink gradient en 300ms.
+  - `setLiveCounts(c => ({...c, like: c.like + 1}))` → count optimista.
+- **`StoriesCarousel.handleImageTap`**: haptic vibration antes del `setCenterHeart` (que ya disparaba el burst rojo centered con animation `gtm-center-heart`).
+
+### Resultado E2E
+Al hacer doble-tap en cualquier zona del reel:
+- 💗 **Heart gigante rosa con gloss + drop-shadow rojo** explota en el centro (900ms).
+- ❤️ **Heart pill del rail flipea instantáneo** a rose-pink active + count +1.
+- 📳 **Vibración táctil** en el celular ([15ms, gap 40ms, 25ms]).
+- Las 3 cosas se sienten como **un solo gesto**.
+
+Mismo patrón en stories: doble-tap → CenterHeartBurst (heart + drop-shadow rosa) → haptic.
+
+### Tests
+- `test_iter115_v17_reels_social.py` ahora con `test_v17_7_double_tap_haptic_and_rail_sync`:
+  - Lock del haptic `[15, 40, 25]` en BOTH ReelsPage + StoriesCarousel.
+  - Lock del `CustomEvent("reel:liked"` en ReelsPage.
+  - Lock del listener `addEventListener("reel:liked"` en ReelActionMenu.
+- **24/24 verde**.
+
+### Visual confirmation
+Playwright doble-click en el centro del video → screenshot:
+- ✅ Heart gigante (40% de viewport) ocupa el centro
+- ✅ Heart pill encendido en rose-pink + count 2
+- ✅ Sparkle pill ya estaba en orange-rose + count 2
+- ✅ Brand-uniform en comment + reshare
+- ✅ Bottom: Carlos Demo + UNVERIFIED + Chicago badge
+
+## Previous Update — Jun 3, 2026 · V17.6 Reels Brand Rail + Story Optional Pills
 
 Founder feedback: "deja solo grabar reel, comentar, compartir interno, me gusta, me sorprende. Quita compartir fuera y la flecha hacia arriba. Buttons más chicos. Animación al click. Mantén color de getamano por default, solo cuando le des click que mantenga los colores actuales. En historias quitar que sea requerido comentar y etiquetar, que sea opcional."
 
