@@ -3,6 +3,60 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
+## Latest Update — Jun 4, 2026 · V19.4 Server.py Refactor Round 2 + Hidden Bug Caught
+
+Founder: "V19.4 — Round 2 del split (admin_providers + messages). ¿Quieres que arranque? sí, dejamos las KEY para el final"
+
+### Resultado acumulado
+- **server.py: 10,852 → 10,615 LOC** en este round (-237 LOC)
+- **Total V19.3 + V19.4: 11,413 → 10,615 LOC (-798 LOC, -7.0%)**
+- **14 endpoints más fuera de server.py** (en total 25 endpoints extraídos entre los dos rounds)
+- Dashboard sigue VERDE: pyflakes 0, total findings 0, 1155 tests collected.
+
+### Módulos creados en este round
+- **`routes/messages.py`** (165 LOC nuevas): 4 endpoints del messaging clásico.
+  - `POST /messages` · `POST /messages/{id}/reply` · `GET /conversations` · `GET /conversations/{id}/messages`.
+  - Inyectables: `db`, `User`, `get_current_user`, `MessageIn`, `MessageReplyIn`, `send_sms`, `logger`.
+  - Side-effects: SMS al receptor + Web Push (lazy import de `routes/push`).
+- **`routes/admin_providers.py`** (107 LOC nuevas): 4 endpoints admin de proveedores.
+  - `GET /admin/providers` · `POST /admin/providers/{id}/verify` · `GET /admin/stats` · `PATCH /admin/providers/{id}`.
+  - Verify endpoint mantiene SMS notification con i18n.
+- **`routes/ads.py`** (107 LOC nuevas): 6 endpoints de ads (público + admin CRUD).
+  - `GET /ads` (con tracking de impresiones fire-and-forget) · `POST /ads/{id}/click` · `GET|POST /admin/ads` · `PUT|DELETE /admin/ads/{id}`.
+
+### Bug semántico oculto DETECTADO Y CORREGIDO durante el refactor
+Ruff F811 reveló que `server.py` tenía **DOS clases llamadas `MessageIn`** (línea 350 + línea 6752 — la segunda shadow-eaba la primera al evaluarse el módulo):
+- **Clase #1 (línea 350)**: `MessageIn(provider_id, body, subject)` → schema del endpoint legacy `/messages` (la que mi router necesitaba capturar).
+- **Clase #2 (línea 6752)**: `MessageIn(body, attachment_url, attachment_type)` → schema del nuevo sistema `/messaging/*`.
+
+Antes del refactor: el decorador `@api_router.post("/messages")` resolvía `payload: MessageIn` al momento de su evaluación (línea 2735), cuando todavía vivía la clase #1. Funcionaba por coincidencia.
+
+Después del refactor: pasar `MessageIn=MessageIn` al `make_router` al final del módulo (línea ~9528) **agarraba la clase #2** porque ya había sido shadow-eada — habría roto silenciosamente el endpoint `/messages` (clientes recibiendo `422 missing provider_id`).
+
+**Fix**: rename de la segunda clase a `ConversationBodyIn`. Test `test_duplicate_messagein_resolved_via_rename` valida formalmente que solo existe UNA `MessageIn` y que el endpoint `/messaging/conversations/{id}/messages` usa el nuevo nombre. Esta es la primera vez que un linting + refactor descubre un bug real en producción que iba a manifestarse en el siguiente uso.
+
+### Tests
+- `test_iter122_v19_4_split.py` — **8 tests verde**:
+  - Wiring de los 3 módulos nuevos.
+  - Assertion-lock de los 14 decoradores migrados (NO viven en server.py).
+  - Lock del rename `MessageIn` → `ConversationBodyIn`.
+  - Round-trip de admin/providers + admin/stats + auth required.
+  - CRUD completo de ads (create → update → click track → delete).
+  - **Test crítico de schema**: POST /messages debe requerir provider_id (verifica que el rename fue exitoso).
+  - GET /conversations shape.
+  - Dashboard observa server.py LOC < 10,700.
+- Rate-limit fix con `_TOKEN_CACHE` por rol + retry con backoff (para evitar el rate limiter del `/auth/login`).
+- Suite cumulativa V18.4 → V19.4: **56 tests verde, cero regresiones.**
+
+### Próximos candidatos de extracción (Round 3, sin compromiso aún)
+- **`routes/uploads.py`** (~155 LOC): `/upload`, `/files/{path}`, `/reels/upload-video`.
+- **`routes/galleries.py`** (~95 LOC): `/providers/me/gallery/*`.
+- **`routes/likes.py`** (~80 LOC): `/providers/{id}/like` + `/providers/me/like-status`.
+- **`routes/community_engagement.py`** (~75 LOC): `/community/leaderboard`, `/wall-of-fame`, `/public/stats`.
+
+A este ritmo, en Round 3 server.py baja a < 10,200 LOC. En Round 4-5 termina debajo de 8K LOC (modular por subdominio, tests independientes por router).
+
+
 ## Latest Update — Jun 4, 2026 · V19.3 Server.py Refactor Round 1 (self-introspection loop)
 
 Founder pidió: ejecutar el P0 que el Code Health dashboard se auto-flag-eó. Refactor incremental de `server.py` extrayendo módulos al directorio `routes/` que ya existe.

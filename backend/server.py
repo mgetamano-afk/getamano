@@ -1943,65 +1943,7 @@ async def track_contact_click(provider_id: str):
 
 
 # ============ ADMIN ============
-@api_router.get("/admin/providers")
-async def admin_list_providers(status: Optional[str] = None, _: User = Depends(require_admin)):
-    query = {}
-    if status:
-        query["verification_status"] = status
-    providers = await db.provider_profiles.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return providers
-
-@api_router.post("/admin/providers/{provider_id}/verify")
-async def admin_verify(provider_id: str, payload: VerificationActionIn, admin: User = Depends(require_admin)):
-    result = await db.provider_profiles.update_one(
-        {"provider_id": provider_id},
-        {"$set": {"verification_status": payload.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Provider not found")
-    await db.audit_logs.insert_one({
-        "log_id": f"log_{uuid.uuid4().hex[:10]}",
-        "admin_id": admin.user_id, "action": f"verify:{payload.status}",
-        "target": provider_id, "note": payload.note,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
-    # SMS notify provider on status change
-    provider = await db.provider_profiles.find_one({"provider_id": provider_id}, {"_id": 0})
-    if provider:
-        prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
-        if prov_user and prov_user.get("phone"):
-            label = {"approved": "¡Felicidades! Tu perfil fue verificado por getamano.",
-                     "rejected": "Tu solicitud de verificación fue rechazada. Revisa los requisitos.",
-                     "needs_info": "Necesitamos más información para verificar tu perfil.",
-                     "suspended": "Tu perfil fue suspendido. Contacta soporte.",
-                     "in_review": "Tu perfil está siendo revisado por nuestro equipo.",
-                     "pending": "Tu perfil está pendiente de revisión."}.get(payload.status, f"Estado actualizado: {payload.status}")
-            send_sms(prov_user["phone"], f"[getamano] {label}", event=f"verify_{payload.status}")
-
-        # SECTION 72 — Verification no longer auto-grants a referral reward.
-        # The new model (2 paid referees = 1 free month) requires the referee
-        # to confirm a PAID subscription, not just verification. This is
-        # handled by `mark_referral_paid()` invoked from the Stripe webhook
-        # `invoice.payment_succeeded` (or the dev simulate endpoint).
-        # Legacy `_grant_referral_reward` is kept for backwards compatibility
-        # but no longer triggered here.
-
-    return {"ok": True}
-
-@api_router.get("/admin/stats")
-async def admin_stats(_: User = Depends(require_admin)):
-    total_providers = await db.provider_profiles.count_documents({})
-    pending = await db.provider_profiles.count_documents({"verification_status": "pending"})
-    approved = await db.provider_profiles.count_documents({"verification_status": "approved"})
-    total_users = await db.users.count_documents({})
-    total_clients = await db.users.count_documents({"role": "client"})
-    total_reviews = await db.reviews.count_documents({})
-    return {
-        "total_providers": total_providers, "pending_providers": pending,
-        "approved_providers": approved, "total_users": total_users,
-        "total_clients": total_clients, "total_reviews": total_reviews,
-    }
+# V19.4 — GET /admin/providers, POST /admin/providers/{id}/verify, GET /admin/stats moved to routes/admin_providers.py
 
 # ============ PLANS (UI only) ============
 @api_router.get("/plans")
@@ -2325,22 +2267,7 @@ async def admin_send_weekly_digest(request: Request, admin: User = Depends(requi
     await audit_log(admin.user_id, "digest.weekly_sent", {"sent": sent, "skipped": skipped, "total": len(results)}, request)
     return {"ok": True, "sent": sent, "skipped": skipped, "total": len(results), "results": results[:50]}
 
-# ============ ADMIN: PROVIDER EDIT (override) ============
-@api_router.patch("/admin/providers/{provider_id}")
-async def admin_edit_provider(provider_id: str, payload: AdminProviderEditIn, admin: User = Depends(require_admin)):
-    update = {k: v for k, v in payload.model_dump().items() if v is not None}
-    if not update:
-        return {"ok": True}
-    update["updated_at"] = datetime.now(timezone.utc).isoformat()
-    result = await db.provider_profiles.update_one({"provider_id": provider_id}, {"$set": update})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Not found")
-    await db.audit_logs.insert_one({
-        "log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id,
-        "action": "provider:edit", "target": provider_id, "note": ",".join(update.keys()),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {"ok": True}
+# V19.4 — PATCH /admin/providers/{id} moved to routes/admin_providers.py
 
 # ============ USER UPDATE ============
 @api_router.put("/users/me")
@@ -2732,150 +2659,7 @@ async def change_plan(payload: PlanChangeIn, user: User = Depends(get_current_us
     return {"ok": True, "plan": payload.plan}
 
 # ============ MESSAGING ============
-@api_router.post("/messages")
-async def send_message(payload: MessageIn, user: User = Depends(get_current_user)):
-    provider = await db.provider_profiles.find_one({"provider_id": payload.provider_id}, {"_id": 0})
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
-    if provider["user_id"] == user.user_id:
-        raise HTTPException(status_code=400, detail="Cannot message yourself")
-    # find or create conversation (client_id, provider_id)
-    conv_key = {"client_id": user.user_id, "provider_id": payload.provider_id}
-    conv = await db.conversations.find_one(conv_key, {"_id": 0})
-    now = datetime.now(timezone.utc).isoformat()
-    if not conv:
-        conv = {
-            **conv_key,
-            "conversation_id": f"conv_{uuid.uuid4().hex[:12]}",
-            "provider_user_id": provider["user_id"],
-            "client_name": user.name,
-            "business_name": provider["business_name"],
-            "logo_url": provider.get("logo_url", ""),
-            "slug": provider["slug"],
-            "subject": payload.subject or "Solicitud",
-            "last_message": payload.body[:140],
-            "last_at": now,
-            "unread_for_provider": True,
-            "unread_for_client": False,
-            "created_at": now,
-        }
-        await db.conversations.insert_one(conv)
-    else:
-        await db.conversations.update_one(
-            {"conversation_id": conv["conversation_id"]},
-            {"$set": {"last_message": payload.body[:140], "last_at": now, "unread_for_provider": True},
-             "$unset": {"client_nudge_sent_at": "", "client_nudge_delivery": "",
-                        "client_nudge_skipped_reason": "", "client_nudge_alternatives_count": ""}}
-        )
-    msg = {
-        "message_id": f"msg_{uuid.uuid4().hex[:10]}",
-        "conversation_id": conv["conversation_id"],
-        "sender_id": user.user_id,
-        "sender_role": "client",
-        "body": payload.body,
-        "created_at": now,
-    }
-    await db.messages.insert_one(msg)
-
-    # SMS notify provider
-    prov_user = await db.users.find_one({"user_id": provider["user_id"]}, {"_id": 0})
-    if prov_user and prov_user.get("phone"):
-        send_sms(prov_user["phone"], f"[getamano] Nuevo mensaje de {user.name}: {payload.body[:120]}", event="new_message_to_provider")
-
-    # Section 89 v4 (Phase C) — Web Push to provider
-    try:
-        from routes.push import send_push_to_user
-        await send_push_to_user(db, provider["user_id"], {
-            "title": f"Mensaje de {user.name}",
-            "body": payload.body[:140],
-            "icon": "/getamano-logo-mark.png",
-            "url": f"/dashboard/provider?tab=mensajes&conversation={conv['conversation_id']}",
-            "tag": f"msg_{conv['conversation_id']}",
-        })
-    except Exception as _e:
-        logger.warning(f"push send_push (message) failed: {_e}")
-
-    msg.pop("_id", None)
-    return msg
-
-@api_router.post("/messages/{conversation_id}/reply")
-async def reply_message(conversation_id: str, payload: MessageReplyIn, user: User = Depends(get_current_user)):
-    conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    is_provider = conv["provider_user_id"] == user.user_id
-    is_client = conv["client_id"] == user.user_id
-    if not (is_provider or is_client):
-        raise HTTPException(status_code=403, detail="Not your conversation")
-    now = datetime.now(timezone.utc).isoformat()
-    msg = {
-        "message_id": f"msg_{uuid.uuid4().hex[:10]}",
-        "conversation_id": conversation_id,
-        "sender_id": user.user_id,
-        "sender_role": "provider" if is_provider else "client",
-        "body": payload.body,
-        "created_at": now,
-    }
-    await db.messages.insert_one(msg)
-    update = {"last_message": payload.body[:140], "last_at": now}
-    if is_provider:
-        update["unread_for_client"] = True
-        update["unread_for_provider"] = False
-    else:
-        update["unread_for_provider"] = True
-        update["unread_for_client"] = False
-    await db.conversations.update_one({"conversation_id": conversation_id}, {"$set": update})
-
-    # SMS notify the other party
-    other_user_id = conv["client_id"] if is_provider else conv["provider_user_id"]
-    other_user = await db.users.find_one({"user_id": other_user_id}, {"_id": 0})
-    if other_user and other_user.get("phone"):
-        sender_label = conv["business_name"] if is_provider else user.name
-        send_sms(other_user["phone"], f"[getamano] {sender_label}: {payload.body[:140]}", event="message_reply")
-
-    msg.pop("_id", None)
-    return msg
-
-@api_router.get("/conversations")
-async def list_conversations(user: User = Depends(get_current_user)):
-    # Match both legacy `client_id` and new `participant_user_id` schemas.
-    query = {"$or": [
-        {"client_id": user.user_id},
-        {"participant_user_id": user.user_id},
-        {"provider_user_id": user.user_id},
-    ]}
-    convs = await db.conversations.find(query, {"_id": 0}).sort("last_at", -1).to_list(200)
-    # mark which side I am
-    for c in convs:
-        c["my_role"] = "provider" if c.get("provider_user_id") == user.user_id else "client"
-        if c["my_role"] == "provider":
-            c["unread"] = c.get("unread_for_provider", 0) or c.get("unread_count_provider", 0) or 0
-        else:
-            c["unread"] = c.get("unread_for_client", 0) or c.get("unread_count_participant", 0) or 0
-    return convs
-
-@api_router.get("/conversations/{conversation_id}/messages")
-async def list_messages(conversation_id: str, user: User = Depends(get_current_user)):
-    conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
-    if not conv:
-        raise HTTPException(status_code=404, detail="Not found")
-    # Conversations have two possible schemas:
-    #   · Old schema: {client_id, provider_user_id, unread_for_provider, unread_for_client}
-    #   · New schema: {participant_user_id, provider_user_id, unread_count_provider, unread_count_participant}
-    # We accept both to keep all historical threads readable.
-    is_provider = conv.get("provider_user_id") == user.user_id
-    is_client = (conv.get("client_id") == user.user_id) or (conv.get("participant_user_id") == user.user_id)
-    if not (is_provider or is_client):
-        raise HTTPException(status_code=403, detail="Not your conversation")
-    # Mark read for the side viewing — write BOTH legacy fields so list_conversations
-    # picks it up regardless of schema. Harmless if the field doesn't exist.
-    if is_provider:
-        update = {"unread_for_provider": False, "unread_count_provider": 0}
-    else:
-        update = {"unread_for_client": False, "unread_count_participant": 0}
-    await db.conversations.update_one({"conversation_id": conversation_id}, {"$set": update})
-    msgs = await db.messages.find({"conversation_id": conversation_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
-    return {"conversation": conv, "messages": msgs}
+# V19.4 — /messages, /messages/{id}/reply, /conversations*, moved to routes/messages.py
 
 # ============ INCLUDE ROUTER ============
 # ============ LIKES ============
@@ -3003,65 +2787,7 @@ async def set_cover_url(payload: CoverUrlIn, user: User = Depends(get_current_us
 
 
 # ============ ADS ============
-@api_router.get("/ads")
-async def list_active_ads(category: Optional[str] = None, city: Optional[str] = None):
-    q = {"is_active": True}
-    items = await db.ads.find(q, {"_id": 0}).to_list(50)
-    out = []
-    for a in items:
-        ct = a.get("category_target") or ""
-        ci = a.get("city_target") or ""
-        if ct and category and ct != category:
-            continue
-        if ci and city and ci.lower() != city.lower():
-            continue
-        out.append(a)
-        # track impressions
-        asyncio_loop_safe_update("ads", a["ad_id"], "impressions_count")
-    return out
-
-def asyncio_loop_safe_update(coll: str, key_id: str, field: str):
-    try:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(db[coll].update_one({"ad_id": key_id}, {"$inc": {field: 1}}))
-    except Exception:
-        pass
-
-@api_router.post("/ads/{ad_id}/click")
-async def track_ad_click(ad_id: str):
-    await db.ads.update_one({"ad_id": ad_id}, {"$inc": {"clicks_count": 1}})
-    return {"ok": True}
-
-@api_router.get("/admin/ads")
-async def admin_list_ads(_: User = Depends(require_admin)):
-    return await db.ads.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
-
-@api_router.post("/admin/ads")
-async def admin_create_ad(payload: AdIn, admin: User = Depends(require_admin)):
-    doc = {
-        "ad_id": f"ad_{uuid.uuid4().hex[:10]}",
-        **payload.model_dump(),
-        "impressions_count": 0, "clicks_count": 0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.ads.insert_one(doc)
-    await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:create", "target": doc["ad_id"], "note": payload.headline, "created_at": datetime.now(timezone.utc).isoformat()})
-    doc.pop("_id", None)
-    return doc
-
-@api_router.put("/admin/ads/{ad_id}")
-async def admin_update_ad(ad_id: str, payload: AdIn, admin: User = Depends(require_admin)):
-    await db.ads.update_one({"ad_id": ad_id}, {"$set": payload.model_dump()})
-    await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:update", "target": ad_id, "note": "", "created_at": datetime.now(timezone.utc).isoformat()})
-    return {"ok": True}
-
-@api_router.delete("/admin/ads/{ad_id}")
-async def admin_delete_ad(ad_id: str, admin: User = Depends(require_admin)):
-    await db.ads.delete_one({"ad_id": ad_id})
-    await db.audit_logs.insert_one({"log_id": f"log_{uuid.uuid4().hex[:10]}", "admin_id": admin.user_id, "action": "ad:delete", "target": ad_id, "note": "", "created_at": datetime.now(timezone.utc).isoformat()})
-    return {"ok": True}
+# V19.4 — /ads, /ads/{id}/click, /admin/ads (CRUD) moved to routes/ads.py
 
 # ============ MILESTONES (hitos celebratorios) ============
 # Catalog of milestones. Each entry: id, title (ES), message (ES, can use {name}), emoji, icon, threshold checker
@@ -7023,7 +6749,7 @@ class ConversationStartIn(BaseModel):
     conversation_type: Literal["direct", "quote", "job", "appointment"] = "direct"
     reference_id: Optional[str] = None
 
-class MessageIn(BaseModel):
+class ConversationBodyIn(BaseModel):
     body: str = Field(min_length=1, max_length=1000)
     attachment_url: Optional[str] = None
     attachment_type: Optional[Literal["image", "pdf"]] = None
@@ -7126,7 +6852,7 @@ async def get_conv_messages(conversation_id: str, user: User = Depends(get_curre
 
 
 @api_router.post("/messaging/conversations/{conversation_id}/messages")
-async def post_message(conversation_id: str, payload: MessageIn,
+async def post_message(conversation_id: str, payload: ConversationBodyIn,
                        user: User = Depends(get_current_user)):
     conv = await db.conversations.find_one({"conversation_id": conversation_id}, {"_id": 0})
     if not conv:
@@ -9538,6 +9264,9 @@ from routes.ecards import (  # noqa: E402
 )
 from routes.admin_insights import make_router as _make_admin_insights_router  # noqa: E402
 from routes.admin_catalog import make_router as _make_admin_catalog_router  # noqa: E402
+from routes.admin_providers import make_router as _make_admin_providers_router  # noqa: E402
+from routes.messages import make_router as _make_messages_router  # noqa: E402
+from routes.ads import make_router as _make_ads_router  # noqa: E402
 
 api_router.include_router(
     _make_community_router(
@@ -9784,6 +9513,40 @@ api_router.include_router(
         require_admin=require_admin,
         CategoryIn=CategoryIn,
         CityIn=CityIn,
+    )
+)
+
+# V19.4 — Round 2 extractions:
+#  • messages.py — 1-to-1 messaging + conversations
+#  • admin_providers.py — admin verify / list / stats / patch
+#  • ads.py — sponsored ads public + admin CRUD
+api_router.include_router(
+    _make_messages_router(
+        db=db,
+        User=User,
+        get_current_user=get_current_user,
+        MessageIn=MessageIn,
+        MessageReplyIn=MessageReplyIn,
+        send_sms=send_sms,
+        logger=logger,
+    )
+)
+api_router.include_router(
+    _make_admin_providers_router(
+        db=db,
+        User=User,
+        require_admin=require_admin,
+        VerificationActionIn=VerificationActionIn,
+        AdminProviderEditIn=AdminProviderEditIn,
+        send_sms=send_sms,
+    )
+)
+api_router.include_router(
+    _make_ads_router(
+        db=db,
+        User=User,
+        require_admin=require_admin,
+        AdIn=AdIn,
     )
 )
 
