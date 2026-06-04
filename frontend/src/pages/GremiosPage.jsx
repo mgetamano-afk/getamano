@@ -91,8 +91,8 @@ export default function GremiosPage() {
     if (!user) { toast.message(lang === "en" ? "Sign in" : "Inicia sesión"); return; }
     if (!myProvider?.provider_id) {
       toast.message(lang === "en"
-        ? "Activate your provider profile to join a guild"
-        : "Activa tu perfil de proveedor para unirte a un gremio");
+        ? "Activate your provider profile to join a group"
+        : "Activa tu perfil de proveedor para unirte a un grupo");
       return;
     }
     try {
@@ -152,26 +152,26 @@ export default function GremiosPage() {
       <header className="mb-4">
         <h1 className="font-display font-extrabold text-2xl text-[#03045E] inline-flex items-center gap-2">
           <Users className="w-6 h-6 text-[#0077B6]" />
-          {lang === "en" ? "Guilds" : "Gremios"}
+          {lang === "en" ? "Groups" : "Grupos"}
         </h1>
         <p className="text-sm text-slate-600 mt-1 leading-snug">
           {lang === "en"
             ? "Private communities by trade. Compare prices, ask for help, post warnings — all between providers of the same craft."
-            : "Comunidades privadas por oficio. Comparte precios, pide consejos, advierte de problemas — entre proveedores del mismo gremio."}
+            : "Comunidades privadas por oficio. Comparte precios, pide consejos, advierte de problemas — entre proveedores del mismo grupo."}
         </p>
       </header>
 
       {!user && (
         <div className="rounded-2xl bg-[#F0F9FF] border border-[#90E0EF] p-3.5 mb-4 text-sm text-[#03045E]" data-testid="gremios-anon">
           <Link to="/login" className="font-bold underline">{lang === "en" ? "Sign in" : "Inicia sesión"}</Link>{" "}
-          {lang === "en" ? "to see and join your guilds." : "para ver y unirte a tus gremios."}
+          {lang === "en" ? "to see and join your groups." : "para ver y unirte a tus grupos."}
         </div>
       )}
 
       {!ordered.length ? (
         <EmptyState
           icon={<Users className="w-9 h-9" />}
-          title={lang === "en" ? "No guilds yet" : "Aún no hay gremios"}
+          title={lang === "en" ? "No groups yet" : "Aún no hay grupos"}
           subtitle={lang === "en" ? "Be the first to spark conversation in your trade." : "Sé la primera persona en encender la conversación de tu oficio."}
           testid="gremios-empty"
         />
@@ -344,7 +344,7 @@ function GremioComposer({ slug, onPosted, lang, open, setOpen }) {
         className="w-full mb-3 rounded-2xl bg-white border border-slate-200 hover:border-[#0077B6] hover:bg-[#F0F9FF] transition p-3.5 text-sm text-slate-500 text-left"
         data-testid="gremio-composer-trigger"
       >
-        {lang === "en" ? "Share something with the guild…" : "Comparte algo con tu gremio…"}
+        {lang === "en" ? "Share something with the group…" : "Comparte algo con tu grupo…"}
       </button>
     );
   }
@@ -355,7 +355,7 @@ function GremioComposer({ slug, onPosted, lang, open, setOpen }) {
     try {
       await api.post(`/gremios/${slug}/posts`, { content: txt });
       setContent(""); setOpen(false); onPosted();
-      toast.success(lang === "en" ? "Posted in the guild" : "Publicado en el gremio");
+      toast.success(lang === "en" ? "Posted in the group" : "Publicado en el grupo");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Error");
     } finally { setPosting(false); }

@@ -215,9 +215,13 @@ select {
 }
 
 /* ----- Touch targets ----- */
+/* WCAG / Apple HIG recommend 44pt min for tappable surfaces. We enforce it
+   on mobile (<768px) but exempt small inline pills/badges that explicitly
+   opt-out via `.no-min-touch` — otherwise CSS would warp an avatar `+`
+   badge or a "Member" pill into an oval. */
 @media (max-width: 767px) {
-  button,
-  [role="button"],
+  button:not(.no-min-touch),
+  [role="button"]:not(.no-min-touch),
   a.btn,
   a.btn-primary,
   a.btn-secondary,

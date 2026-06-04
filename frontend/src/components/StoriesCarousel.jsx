@@ -10,6 +10,7 @@ import OwnerStatsPill from "./OwnerStatsPill";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
+import { getDefaultAvatar } from "../lib/avatar";
 import LikeButton from "./LikeButton";
 import useRefreshable from "../hooks/useRefreshable";
 
@@ -119,22 +120,38 @@ export default function StoriesCarousel() {
                     aria-label={lang === "en" ? "View your story" : "Ver tu historia"}
                   >
                     <div className="w-full h-full rounded-full p-[2px] bg-white">
-                      {myGroup.logo_url ? (
-                        <img {...lazyImg(buildFileUrl(myGroup.logo_url))} alt="" className="w-full h-full rounded-full object-cover bg-slate-100" />
-                      ) : user?.picture ? (
-                        <img src={user.picture} alt="" className="w-full h-full rounded-full object-cover bg-slate-100" />
-                      ) : (
-                        <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
-                          {(myGroup.business_name || user?.name || "?")[0]?.toUpperCase()}
-                        </div>
-                      )}
+                      {/* Section V18.7 — Prefer the LATEST story media as the
+                          tile thumbnail (Instagram pattern). Fall back to
+                          provider logo, OAuth picture, then deterministic
+                          illustrated avatar. Each <img> registers an
+                          onError that swaps to the next layer so a stale
+                          URL never renders as a broken-image "?" icon. */}
+                      {(() => {
+                        const fallbackAvatar = getDefaultAvatar({ user_id: user?.user_id, name: user?.name, gender: user?.gender });
+                        const primary = myGroup.image_url ? buildFileUrl(myGroup.image_url) : (myGroup.logo_url ? buildFileUrl(myGroup.logo_url) : (user?.picture || fallbackAvatar));
+                        return (
+                          <img
+                            src={primary}
+                            alt=""
+                            className="w-full h-full rounded-full object-cover bg-slate-100"
+                            onError={(e) => {
+                              if (e.currentTarget.dataset.fellback) return;
+                              e.currentTarget.dataset.fellback = "1";
+                              e.currentTarget.src = fallbackAvatar;
+                            }}
+                          />
+                        );
+                      })()}
                     </div>
                   </button>
-                  {/* + badge — Instagram-style overlap at bottom-right */}
+                  {/* + badge — Instagram-style overlap at bottom-right.
+                      `no-min-touch` opts the 22×22 button out of the
+                      global 44px touch-target rule, which otherwise
+                      stretches it into a pill/oval. */}
                   <button
                     type="button"
                     onClick={() => setShowCreator(true)}
-                    className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full bg-[#0077B6] text-white flex items-center justify-center ring-2 ring-white shadow-sm hover:scale-110 transition will-change-transform"
+                    className="no-min-touch absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full bg-[#0077B6] text-white flex items-center justify-center ring-2 ring-white shadow-sm hover:scale-110 transition will-change-transform"
                     data-testid="story-add-badge"
                     aria-label={lang === "en" ? "Add story" : "Agregar historia"}
                   >
@@ -160,16 +177,27 @@ export default function StoriesCarousel() {
                 <div className="relative w-[72px] h-[72px]">
                   <div className="w-[72px] h-[72px] rounded-full p-[2px] bg-slate-200 group-hover:bg-slate-300 transition">
                     <div className="w-full h-full rounded-full bg-white p-[2px]">
-                      {user?.picture ? (
-                        <img src={user.picture} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-base font-bold text-teal-700">
-                          {(user?.name || "?")[0]?.toUpperCase()}
-                        </div>
-                      )}
+                      {(() => {
+                        const fallbackAvatar = getDefaultAvatar({ user_id: user?.user_id, name: user?.name, gender: user?.gender });
+                        const primary = user?.picture || fallbackAvatar;
+                        return (
+                          <img
+                            src={primary}
+                            alt=""
+                            className="w-full h-full rounded-full object-cover bg-slate-100"
+                            onError={(e) => {
+                              if (e.currentTarget.dataset.fellback) return;
+                              e.currentTarget.dataset.fellback = "1";
+                              e.currentTarget.src = fallbackAvatar;
+                            }}
+                          />
+                        );
+                      })()}
                     </div>
                   </div>
-                  {/* + badge — Instagram-style overlap at bottom-right */}
+                  {/* + badge — Instagram-style overlap at bottom-right.
+                      Using <span> avoids the global mobile button
+                      min-height: 44px rule that would warp it oval. */}
                   <span className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full bg-[#0077B6] text-white flex items-center justify-center ring-2 ring-white shadow-sm group-hover:scale-110 transition will-change-transform" data-testid="story-create-plus">
                     <Plus className="w-3.5 h-3.5" strokeWidth={3} />
                   </span>

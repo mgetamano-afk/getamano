@@ -272,7 +272,7 @@ function EcosystemSection({ lang }) {
     { f: t ? "Featured placement"       : "Destacado",                    free: "❌", v: "+$5/" + (t ? "week" : "semana") },
     { f: t ? "Sponsored Chambas"        : "Chambas patrocinadas",         free: "❌", v: "✅" },
     { f: t ? "Physical business card"   : "Tarjeta física de negocio",    free: "❌", v: "+$20 " + (t ? "one-time" : "una vez") },
-    { f: t ? "Gremio posting (trade network)" : "Publicación en Gremios", free: t ? "View only" : "Solo ver", v: t ? "✅ Full access" : "✅ Acceso total" },
+    { f: t ? "Group posting (trade network)" : "Publicación en Grupos", free: t ? "View only" : "Solo ver", v: t ? "✅ Full access" : "✅ Acceso total" },
     { f: t ? "Referral earnings"        : "Comisiones por referidos",     free: "❌", v: t ? "✅ $7/referral" : "✅ $7/referido" },
   ];
   return (

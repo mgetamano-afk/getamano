@@ -3,6 +3,80 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
+## Latest Update — Jun 4, 2026 · V19 UI Polish (Grupos rename + Avatares + Tu historia)
+
+Founder envió 3 screenshots con polish requests:
+1. "Cambia del nombre de Gremios a Grupos"
+2. "Carga una foto, emoji, avatar, para que la foto no quede con el signo de ?"
+3. "Carga la miniatura de la historia en la foto de historia, y haz que el + sea circular en vez de ovalado"
+
+### V19.1 · "Gremios" → "Grupos" (Spanish copy)
+- **`ComunidadLayout.jsx`** — tab del sub-nav `lang === "en" ? "Guilds" : "Gremios"` → `"Groups" : "Grupos"` (label + shortLabel).
+- **`GremiosPage.jsx`** — header, empty state, composer prompt, toast de "Publicado en el grupo", lock copy "Activa tu perfil para unirte a un grupo".
+- **`V8EnrichmentSections.jsx`** — fila del feature table: "Publicación en Grupos" / "Group posting (trade network)".
+- **Slugs internos (`/gremios`, `gremio-card-*` testids, variables, filenames)** — intencionalmente intactos para no romper API contract ni regression suite. Solo cambio user-facing copy.
+
+### V19.2 · Avatares con onError fallback (BarrioComposer + inline comments)
+- **`ComunidadPage.jsx`** — los `<img src={resolveAvatar(...)}>` de los dos composers (BarrioComposer + InlineCommentsBox) ahora registran `onError` que, ante un Google OAuth picture caducado / 4xx, hace fallback al avatar ilustrado determinístico de `/avatars/*.png`.
+- Pattern guard: `e.currentTarget.dataset.fellback = "1"` para evitar bucle infinito si el fallback también falla.
+- Import añadido: `getDefaultAvatar` (ya existía la utility en `/lib/avatar.js`).
+
+### V19.3 · "Tu historia" tile fixes
+- **Bug 1 — Thumbnail con `?` icono**: El image se renderizaba con `src={user.picture}` sin onError. Cuando la URL de Google estaba caducada (4xx) iOS Safari mostraba el placeholder roto.
+  - **Fix**: cascada de fallback `myGroup.image_url → myGroup.logo_url → user.picture → getDefaultAvatar()`. Cada `<img>` con onError dual-stage que swap a `getDefaultAvatar` ante fallo.
+  - **UX win extra**: ahora cuando subes una historia, el tile muestra la **miniatura de tu última story** (patrón Instagram) — no la foto estática de perfil.
+- **Bug 2 — `+` ovalado**: El badge `w-[22px] h-[22px] rounded-full bg-[#0077B6]` se estiraba a 22×44 px porque `/index.css` líneas 218-227 forzaban `min-height: 44px` a TODO `<button>` en mobile (touch-target rule).
+  - **Fix**: CSS rule actualizado para excluir `button:not(.no-min-touch)`. El badge `+` ahora lleva `className="no-min-touch ..."` y vuelve a ser un círculo perfecto.
+  - Misma rule de exclusión disponible para futuros mini-badges (e.g. "Member" pill, "delete" en stickers).
+
+### Tests
+- `test_iter119_v19_ui_fixes.py` (**8/8 verde**):
+  - V19.1: rename verificado en ComunidadLayout + GremiosPage + V8Enrichment.
+  - V19.2: onError + getDefaultAvatar referenciado en composer.
+  - V19.3: `myGroup.image_url` cascade, dual onError handlers, `no-min-touch` opt-out, CSS rule excludes esa clase.
+- Cumulativa V18+V19 (4 archivos: iter116/117/118/119): **29/29 verde**, cero regresiones.
+
+### Visual confirmation (Playwright 412×915 mobile portrait)
+- `/comunidad/gremios` → sidebar "Grupos" · header "Grupos" · description "del mismo grupo" · empty state "tus grupos" ✅.
+- `/comunidad` (logged in as Carlos client) → "Tu historia" tile muestra **miniatura real de la última story** dentro del gradient ring rose-orange · `+` badge **círculo perfecto azul** abajo-derecha · composer avatar **dibujo ilustrado** de Carlos (no más `?` roto) · post avatars hidratados correctamente ✅.
+
+## Previous Update — Jun 4, 2026 · V18.4/V18.5/V18.6 Pause overlay + Self-reshare + External native share
+
+Founder: "ok, adelante, quiero que agregues emoción... la función de compartir dentro del mismo reel no funciona... me gustaría compartirlo en Facebook o Insta, o TikTok, pero que se vea nativo..."
+
+### V18.4 · Premium pause overlay
+- `ReelsPage.PausedIndicator` — al pausar el video, overlay con `backdrop-blur-md bg-black/25` + giant gradient Play button (w-24 h-24 con drop-shadow). Fade-in opacity-only (no conditional render) para transición buttery smooth.
+- `pointer-events-none` para que el rail derecho siga clickable.
+
+### V18.5 · Self-reshare allowed
+- `routes/social_engagement.py` — quitada la validación que rechazaba self-reshare. La idempotencia se mantiene via unique index `(reel_id, user_id)`. Self-reshare se trata como un "pin to my profile" gesture.
+- Notification al original author solo se manda si `original.user_id !== user.user_id` (no auto-notifica al creator).
+
+### V18.6 · External native share (FB/X/WhatsApp/IG/TikTok)
+- **Backend** — nuevo endpoint `GET /api/og/reel/{reel_id}` retorna HTML SSR con:
+  - `og:title` = caption (o "Reel de {business}")
+  - `og:image` = thumbnail_url del reel
+  - `og:type` = "video.other"
+  - `og:image:width/height` = 720×1280 (vertical)
+  - Twitter card `summary_large_image`
+  - Meta-refresh + JS redirect a `/reels?r={id}` (humans ven el SPA en 100ms; crawlers ven la rich preview).
+  - Cache-Control 1h fresh + 24h stale-while-revalidate.
+- **Frontend** — nuevo `ReelShareModal.jsx`:
+  - Sheet desde abajo en mobile, modal centrado en desktop.
+  - Thumbnail preview del reel arriba.
+  - Grid de 6 botones marca-coloreados: Facebook (#1877F2), X (negro), WhatsApp (#25D366), Instagram (gradiente IG oficial), TikTok (gradiente TT oficial), "Más opciones" (charcoal, abre Web Share API native sheet).
+  - Copy-link button al fondo.
+  - El URL compartido apunta a `/api/og/reel/{id}` para que crawlers vean la rich preview.
+- **Action rail** — re-agregada la pill "Compartir en redes" (sky-cyan gradient activeGradient) al `ReelActionMenu` además de la pill "Compartir en mi perfil" (reshare interno verde). Las dos coexisten: una es viral externa, otra es engagement interno.
+
+### Tests
+- `test_iter118_v18_share_pause.py` (7/7 verde después de 2 fixes menores):
+  - Self-reshare allowed + idempotent.
+  - OG endpoint returns rich meta tags + uses thumbnail + 404 fallback HTML.
+  - Frontend source locks: 6 targets, dynamic testids, action menu pill, pause overlay structure.
+  - Cache-Control verifié hitting localhost:8001 directo (Cloudflare ingress strip-ea headers en dev preview).
+
+
 ## Latest Update — Jun 4, 2026 · V18.3 Scroll-In Animation (Reels + Stories)
 
 Founder: "agrega una animación de cuando scroleamos, un efecto que deslize tanto el reel como los botones de acción, aplica para las historias también."

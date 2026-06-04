@@ -13,7 +13,7 @@ import EmptyState from "../components/EmptyState";
 import StoriesCarousel from "../components/StoriesCarousel";
 import LikeButton from "../components/LikeButton";
 import { useAuth } from "../contexts/AuthContext";
-import { getDicebearAvatar, resolveAvatar } from "../lib/avatar";
+import { getDicebearAvatar, getDefaultAvatar, resolveAvatar } from "../lib/avatar";
 import MentionedText from "../components/MentionedText";
 import FollowingFeed from "../components/FollowingFeed";
 import { SeoHead } from "../components/seo/SeoHead";
@@ -124,7 +124,12 @@ function NewPostBox({ onPosted }) {
         <img
           src={resolveAvatar({picture: user.picture, user_id: user.user_id, name: user.name, gender: user.gender})}
           alt={user.name}
-          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+          className="w-10 h-10 rounded-full object-cover flex-shrink-0 bg-slate-100"
+          onError={(e) => {
+            if (e.currentTarget.dataset.fellback) return;
+            e.currentTarget.dataset.fellback = "1";
+            e.currentTarget.src = getDefaultAvatar({ user_id: user.user_id, name: user.name, gender: user.gender });
+          }}
         />
         <div className="flex-1 min-w-0">
           <textarea
@@ -304,7 +309,16 @@ function InlineComments({ post, expanded, onCommentCountChanged }) {
       {/* Composer */}
       {user ? (
         <div className="flex items-end gap-2">
-          <img src={resolveAvatar({picture: user.picture, user_id: user.user_id, name: user.name, gender: user.gender})} alt={user.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+          <img
+            src={resolveAvatar({picture: user.picture, user_id: user.user_id, name: user.name, gender: user.gender})}
+            alt={user.name}
+            className="w-7 h-7 rounded-full object-cover flex-shrink-0 bg-slate-100"
+            onError={(e) => {
+              if (e.currentTarget.dataset.fb === "1") return;
+              e.currentTarget.dataset.fb = "1";
+              e.currentTarget.src = getDefaultAvatar({ user_id: user.user_id, name: user.name, gender: user.gender });
+            }}
+          />
           <div className="flex-1 min-w-0 flex items-end gap-2 bg-slate-50 rounded-2xl px-3 py-1.5">
             <textarea
               ref={inputRef}

@@ -18,7 +18,7 @@ import Header from "./Header";
  * inside the page that selects the same content was duplicated nav.
  */
 const buildTabs = (lang) => [
-  { id: "gremios",      label: lang === "en" ? "Guilds"      : "Gremios",     shortLabel: lang === "en" ? "Guilds" : "Gremios",  Icon: Users,     path: "/comunidad/gremios" },
+  { id: "gremios",      label: lang === "en" ? "Groups"      : "Grupos",     shortLabel: lang === "en" ? "Groups" : "Grupos",  Icon: Users,     path: "/comunidad/gremios" },
   { id: "explorar",     label: lang === "en" ? "Explore"     : "Explorar",    shortLabel: lang === "en" ? "Explore" : "Explorar", Icon: Compass,   path: "/comunidad/explorar" },
   { id: "ranking",      label: lang === "en" ? "Ranking"     : "Ranking",     shortLabel: "Ranking", Icon: Trophy,    path: "/comunidad/ranking" },
   { id: "ecards",       label: lang === "en" ? "eCards"      : "eCards",      shortLabel: "eCards",  Icon: IdCard,    path: "/comunidad/ecards" },
