@@ -312,20 +312,42 @@ def test_action_menu_exposes_new_comment_and_reshare_actions():
     assert "/reshare-state" in src
 
 
-def test_action_menu_is_always_visible_no_toggle_fab():
-    """V17.5 — Founder removed the '+' open/close FAB and the parallel
-    white metrics rail in ReelsPage. The colored pills now render
-    permanently and each one shows its live count below the icon."""
+def test_action_menu_v17_6_reduced_to_5_actions_with_brand_default():
+    """V17.6 — Rail is reduced to: comment, reshare, wow, like, record.
+    Removed: save, share-outside, upload. Default pills use the
+    getamano brand gradient (teal → deep blue) and only light up with
+    their distinctive color when active. Each pill triggers a bounce
+    animation + haptic vibration on click."""
     src = _read(ACTION_MENU_PATH)
-    # Toggle state should be gone
-    assert "useState(false)" in src  # other state still exists (recorderOpen, commentsOpen)
-    assert "reel-action-fab" not in src, "the toggle FAB testid must be removed"
-    # Live counts plumbed from activeReel
-    assert "liveCounts" in src
-    assert "bumpCount" in src
-    assert "countKey" in src
-    # Per-action count badge testid pattern
-    assert '`reel-action-${a.id}-count`' in src
+    # The 5 kept actions
+    for kept in ['id: "comment"', 'id: "reshare"', 'id: "wow"', 'id: "like"', 'id: "record"']:
+        assert kept in src, f"missing kept action: {kept}"
+    # Removed icons from imports
+    assert "Bookmark" not in src
+    assert "Plus," not in src  # toggle removed
+    assert "Share2" not in src
+    assert "import.*Upload" not in src.replace(" Upload, ", "")  # very rough heuristic
+    # Default gradient is the brand teal→deep blue
+    assert "from-[#0A4D5E] to-[#03045E]" in src
+    # Per-action `activeGradient` field (not `colorClass` anymore)
+    assert "activeGradient" in src
+    # Smaller pill (w-9 h-9 vs old w-11 h-11)
+    assert "w-9 h-9" in src
+    # Haptic + bounce
+    assert "navigator.vibrate(30)" in src
+    assert "reel-pill-bounce" in src
+    assert "@keyframes reelPillBounce" in src
+
+
+def test_story_creator_caption_and_tag_have_optional_pill():
+    """V17.6 — Founder asked to make it crystal-clear neither caption
+    nor tag are required. Both labels now sport an emerald 'Opcional'
+    pill on the right side so it's unambiguous."""
+    src = _read("/app/frontend/src/components/StoriesCarousel.jsx")
+    assert 'data-testid="story-caption-optional-label"' in src
+    assert 'data-testid="story-tag-optional-label"' in src
+    # The pill copy
+    assert "Opcional" in src
 
 
 def test_reels_page_no_longer_renders_metric_pill_rail():

@@ -1129,11 +1129,18 @@ function StoryCreator({ onClose, onCreated }) {
 
         {/* Section 89 v4 — Tag a provider (testimonial mode).
             Clients can post a story that features a provider; we push
-            to that provider and surface a "Ver perfil →" CTA. */}
+            to that provider and surface a "Ver perfil →" CTA.
+            V17.6 — Explicit OPCIONAL pill matches the caption section
+            so the user knows neither field is required. */}
         <div className="mb-4" data-testid="story-creator-tag">
-          <label className="block text-[11px] uppercase tracking-widest font-bold text-slate-500 mb-1.5">
-            {lang === "en" ? "Tag a provider (optional)" : "Etiquetar a un proveedor (opcional)"}
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] uppercase tracking-widest font-bold text-slate-500">
+              {lang === "en" ? "Tag a provider" : "Etiquetar a un proveedor"}
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full" data-testid="story-tag-optional-label">
+              {lang === "en" ? "Optional" : "Opcional"}
+            </span>
+          </div>
           {taggedProvider ? (
             <div
               className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2"
@@ -1209,12 +1216,22 @@ function StoryCreator({ onClose, onCreated }) {
           )}
         </div>
 
-        {/* Caption */}
+        {/* Caption — V17.6: explicit OPCIONAL label above the textarea so
+            the user clearly knows nothing here is required. They can hit
+            the publish button as soon as a photo is selected. */}
         <div className="mb-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-slate-700">
+              {lang === "en" ? "Caption" : "Texto"}
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full" data-testid="story-caption-optional-label">
+              {lang === "en" ? "Optional" : "Opcional"}
+            </span>
+          </div>
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder={lang === "en" ? "Add a short caption (optional, 140 chars)" : "Agrega un texto corto (opcional, 140 chars)"}
+            placeholder={lang === "en" ? "Add a short caption (140 chars)" : "Agrega un texto corto (140 chars)"}
             maxLength={140}
             rows={2}
             className="w-full p-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100 resize-none"

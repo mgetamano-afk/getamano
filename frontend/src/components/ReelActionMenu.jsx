@@ -1,21 +1,18 @@
 /**
- * ReelActionMenu — V15 contextual FAB for /reels.
+ * ReelActionMenu — V17 contextual right-side action rail for /reels.
  *
- * Replaces the global QuickActionsFAB while on /reels. Renders a single
- * round "+" button bottom-right. Tap → fan-out of 5 round action chips:
+ * V17.6 — Stripped to 5 always-visible pills (comment, reshare, wow,
+ * like, record). Default state shows ALL pills in the getamano brand
+ * gradient (teal → deep blue) so the rail reads as one cohesive
+ * brand block; only the actively engaged ones (liked/wowed/reshared)
+ * light up with their distinct color. Each pill shows its live count
+ * below the icon, and clicks trigger a bounce + haptic vibration.
  *
- *   1. Subir Reel       → opens <ReelCreator>
- *   2. Grabar Reel      → opens <ReelCameraRecorder> (MediaRecorder API)
- *   3. Compartir Reel   → Web Share API + share count tracking
- *   4. Me gusta este reel → heart emoji + scale burst
- *   5. Guardar reel     → POST /reels/{id}/save + bookmark animation
- *
- * Owner of the current reel + their verified badge live ON the reel
- * itself (see ReelsPage). This menu only handles ACTIONS.
- *
- * The "Impresionante" reaction (Nota 1: emoji wow) is rendered as a
- * 6th action on long-press OR via the explicit wow button on the reel
- * surface. We use a sparkle-burst animation when fired.
+ * Removed in V17.6: save (bookmark), share-outside, upload, and the
+ * `+` open/close toggle FAB. Removed because the founder wanted a
+ * cleaner, brand-uniform rail focused on engagement loops that stay
+ * inside getamano (no external WhatsApp share, no bookmark — users
+ * who like a reel hit comment or reshare instead).
  */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +20,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  Plus, X, Upload, Video, Share2, Heart, Bookmark, Sparkles, Loader2,
+  Loader2, Heart, Sparkles, Video,
   MessageCircle, Repeat2,
 } from "lucide-react";
 import ReelCameraRecorder from "./ReelCameraRecorder";
@@ -89,34 +86,8 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
     return true;
   };
 
-  const onUploadClick = () => {
-    // Trigger the parent's reel-creator modal via a custom event so we
-    // don't have to pass refs all the way up.
-    window.dispatchEvent(new CustomEvent("reels:open-creator"));
-  };
-
   const onRecordClick = () => {
     setRecorderOpen(true);
-  };
-
-  const onShareClick = async () => {
-    if (!requireReel()) return;
-    setBusy("share");
-    const url = `${window.location.origin}/reels?r=${activeReel.reel_id}`;
-    const shareText = `Mira este reel en getamano${activeReel.business_name ? ` — ${activeReel.business_name}` : ""}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "getamano", text: shareText, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast.success("Enlace copiado");
-      }
-      await api.post(`/reels/${activeReel.reel_id}/share`).catch(() => {});
-    } catch (e) {
-      if (e?.name !== "AbortError") toast.error("No se pudo compartir");
-    } finally {
-      setBusy(null);
-    }
   };
 
   const onLikeClick = async () => {
@@ -158,6 +129,9 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
   };
 
   const onSaveClick = async () => {
+    // V17.6 — Kept on the surface in case the founder reverses the
+    // decision; not currently exposed via ACTIONS. Marked _unused for
+    // linter clarity.
     if (!requireReel()) return;
     setBusy("save");
     try {
@@ -172,6 +146,7 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
       setBusy(null);
     }
   };
+  void onSaveClick; // tell linter we keep this for future use
 
   // V17.2 — open comments sheet for the active reel.
   const onCommentsClick = () => {
@@ -206,22 +181,20 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
   };
 
   const ACTIONS = [
+    // V17.6 — Reduced to 5 actions per founder feedback. Removed: save,
+    // share-outside, upload. Kept the most "social" interactions plus
+    // record (creation entry-point). Ordered TOP→BOTTOM the way the
+    // user reads them visually: comment → reshare → wow → like → record.
     { id: "comment", Icon: MessageCircle, label: "Comentar", onClick: onCommentsClick,
-      colorClass: "from-sky-500 to-blue-600", countKey: "comment" },
+      activeGradient: "from-sky-500 to-blue-600", countKey: "comment" },
     { id: "reshare", Icon: Repeat2, label: "Compartir en mi perfil", onClick: onReshareClick,
-      colorClass: "from-green-500 to-emerald-600", active: reactions.reshared, countKey: "reshare" },
-    { id: "wow",    Icon: Sparkles, label: "Impresionante", onClick: onWowClick,
-      colorClass: "from-amber-400 to-rose-500", active: reactions.wowed, countKey: "wow" },
+      activeGradient: "from-green-500 to-emerald-600", active: reactions.reshared, countKey: "reshare" },
+    { id: "wow",    Icon: Sparkles, label: "Me sorprende", onClick: onWowClick,
+      activeGradient: "from-amber-400 to-rose-500", active: reactions.wowed, countKey: "wow" },
     { id: "like",   Icon: Heart,    label: "Me gusta",      onClick: onLikeClick,
-      colorClass: "from-rose-500 to-pink-500",  active: reactions.liked, countKey: "like" },
-    { id: "save",   Icon: Bookmark, label: "Guardar",       onClick: onSaveClick,
-      colorClass: "from-blue-500 to-indigo-500", active: reactions.saved, countKey: "save" },
-    { id: "share",  Icon: Share2,   label: "Compartir fuera", onClick: onShareClick,
-      colorClass: "from-emerald-500 to-teal-500", countKey: "share" },
+      activeGradient: "from-rose-500 to-pink-500",  active: reactions.liked, countKey: "like" },
     { id: "record", Icon: Video,    label: "Grabar Reel",   onClick: onRecordClick,
-      colorClass: "from-violet-500 to-fuchsia-600" },
-    { id: "upload", Icon: Upload,   label: "Subir Reel",    onClick: onUploadClick,
-      colorClass: "from-slate-700 to-slate-900" },
+      activeGradient: "from-violet-500 to-fuchsia-600" },
   ];
 
   return (
@@ -241,28 +214,52 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
             always visible (mimics Instagram/TikTok right-rail). Each
             pill now also shows its live count as a small bold label
             below the icon, so the user gets the metric WITHOUT a
-            separate column. */}
-        <div className="flex flex-col items-end gap-3">
+            separate column.
+
+            V17.6 — Pills shrunk (w-9 h-9), default state uses the
+            getamano brand gradient (teal→deep blue) so the rail
+            reads as a single brand block. ONLY when a pill is
+            actively engaged by the user (liked/wowed/reshared) does
+            it light up with its own gradient. Click triggers a
+            `pill-bounce` keyframe + `navigator.vibrate(30)` haptic
+            on supporting browsers (Chrome Android, Edge Mobile). */}
+        <div className="flex flex-col items-end gap-2.5">
             {ACTIONS.map((a, i) => {
               const Icon = a.Icon;
               const count = a.countKey != null ? (liveCounts[a.countKey] || 0) : null;
               const countLabel = count != null
                 ? (count > 999 ? `${(count / 1000).toFixed(1)}k` : count.toString())
                 : null;
+              const gradient = a.active ? a.activeGradient : "from-[#0A4D5E] to-[#03045E]";
+              const handleTap = (e) => {
+                // V17.6 — haptic pulse + bounce animation. We add the
+                // class then remove it after the keyframe completes so
+                // a rapid second tap re-triggers cleanly.
+                if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+                  try { navigator.vibrate(30); } catch { /* ignore — desktop / opt-out */ }
+                }
+                const el = e.currentTarget;
+                el.classList.remove("reel-pill-bounce");
+                // force reflow so re-adding the class re-triggers the animation
+                void el.offsetWidth;
+                el.classList.add("reel-pill-bounce");
+                a.onClick();
+              };
               return (
                 <button
                   key={a.id}
                   type="button"
-                  onClick={a.onClick}
+                  onClick={handleTap}
                   disabled={busy === a.id}
                   title={a.label}
                   aria-label={a.label}
-                  className="reel-action-chip active:scale-95 transition will-change-transform flex flex-col items-center gap-0.5"
+                  className="reel-action-chip flex flex-col items-center gap-0.5 will-change-transform"
                   style={{ animationDelay: `${i * 35}ms` }}
                   data-testid={`reel-action-${a.id}`}
+                  data-active={a.active ? "true" : "false"}
                 >
-                  <span className={`w-11 h-11 rounded-full bg-gradient-to-br ${a.colorClass} text-white flex items-center justify-center shadow-lg hover:scale-110 transition ${a.active ? "ring-2 ring-white/80" : ""}`}>
-                    {busy === a.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" strokeWidth={2.5} />}
+                  <span className={`w-9 h-9 rounded-full bg-gradient-to-br ${gradient} text-white flex items-center justify-center shadow-md transition-colors duration-300 ${a.active ? "ring-2 ring-white/70" : ""}`}>
+                    {busy === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" strokeWidth={2.5} />}
                   </span>
                   {countLabel != null && (
                     <span
@@ -311,6 +308,17 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
         @keyframes chipIn {
           from { opacity: 0; transform: translateY(12px) scale(0.85); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        /* V17.6 — bounce on tap. Triggered by JS adding the class on
+           click (and removed via reflow trick so rapid taps re-fire). */
+        .reel-pill-bounce span:first-child {
+          animation: reelPillBounce 360ms cubic-bezier(0.32, 0.72, 0.4, 1.6);
+        }
+        @keyframes reelPillBounce {
+          0%   { transform: scale(1); }
+          35%  { transform: scale(0.78); }
+          75%  { transform: scale(1.18); }
+          100% { transform: scale(1); }
         }
       `}</style>
     </>

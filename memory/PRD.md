@@ -3,7 +3,50 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — Jun 3, 2026 · V17.5 Unified Reels Action Rail
+## Latest Update — Jun 3, 2026 · V17.6 Reels Brand Rail + Story Optional Pills
+
+Founder feedback: "deja solo grabar reel, comentar, compartir interno, me gusta, me sorprende. Quita compartir fuera y la flecha hacia arriba. Buttons más chicos. Animación al click. Mantén color de getamano por default, solo cuando le des click que mantenga los colores actuales. En historias quitar que sea requerido comentar y etiquetar, que sea opcional."
+
+### Reels rail trimmed to 5 actions (V17.6)
+- **Mantenidas**: 💬 Comment · 🔁 Reshare interno · ✨ Wow · ❤️ Like · 📹 Record
+- **Eliminadas**: 🔖 Save (bookmark), 🔗 Share-outside, 📤 Upload (la "flecha hacia arriba"). Los handlers se borraron salvo `onSaveClick` que dejamos comentado con `void` por si el founder revierte la decisión.
+
+### Default brand color, only active pills light up
+- Cada pill ahora tiene `activeGradient` (color distintivo) en lugar de `colorClass`.
+- En el render: `const gradient = a.active ? a.activeGradient : "from-[#0A4D5E] to-[#03045E]"` — toda pila no-interactuada usa el gradient brand getamano (teal #0A4D5E → deep blue #03045E).
+- Cuando el usuario reacciona (like, wow, reshare), ese pill específico cambia a su gradiente histórico (rose-pink, amber-rose, green-emerald). Ring blanco/70 indica estado activo.
+- Resultado visual: el rail completo se lee como **un bloque de marca cohesivo** hasta que el usuario empieza a engager.
+
+### Pills más chicos
+- `w-11 h-11` → `w-9 h-9` (iconos `w-5` → `w-4`).
+- Spacing entre pills `gap-3` → `gap-2.5`.
+
+### Animación de click + haptic
+- Nueva keyframe `reelPillBounce` (360ms cubic-bezier scale 1 → 0.78 → 1.18 → 1) que se aplica al `<span>` del icono.
+- `handleTap` agrega `.reel-pill-bounce` al button + fuerza reflow + remueve → re-tap re-dispara cleanly.
+- `navigator.vibrate(30)` se llama si el browser lo soporta (Chrome Android, Edge Mobile, Samsung Internet). Try/catch para escritorio que no implementa.
+- Transición de color de gradient brand → active gradient: 300ms.
+
+### Story Creator (V17.6) — pill OPCIONAL explícito
+Founder reportó que caption y tag se "sentían requeridos". Backend ya los aceptaba como `Optional[str] = None` desde V8, pero la UI no comunicaba bien. Fix:
+- **Caption section**: Header reformado con label "Texto" + pill emerald `Opcional` a la derecha. `data-testid="story-caption-optional-label"`.
+- **Tag section**: Mismo tratamiento — label "Etiquetar a un proveedor" + pill emerald `Opcional`. `data-testid="story-tag-optional-label"`.
+- El placeholder del input ya no repite "(opcional)" — la pill lo dice claro arriba.
+
+### Tests
+- `test_iter115_v17_reels_social.py` extendido con 2 nuevos V17.6 tests:
+  - `test_action_menu_v17_6_reduced_to_5_actions_with_brand_default` (5 actions kept · no Bookmark/Plus/Share2 import · brand gradient default · activeGradient field · w-9 h-9 size · navigator.vibrate · reel-pill-bounce keyframe).
+  - `test_story_creator_caption_and_tag_have_optional_pill` (ambos data-testids + copy "Opcional").
+- Total: **23/23 verde**.
+
+### Smoke validation E2E
+Screenshot 412x915 mobile en `/reels`:
+- ✅ 5 pills teal-brand uniform por default (comment 0, reshare 0, wow 1, like 1, record).
+- ✅ Después de tap en like/wow: heart cambia a rose→pink + count 2, sparkle cambia a amber→rose + count 2.
+- ✅ Reshare correctamente NO se activa al click (rechaza 400 self-reshare del demo client al reel demo — error toast esperado, state local vuelve a brand teal).
+- ✅ Animaciones de bounce visibles en interacción, haptic dispara en móvil real.
+
+## Previous Update — Jun 3, 2026 · V17.5 Unified Reels Action Rail
 
 Founder envió 2 screenshots y dijo: "uno de los dos no tiene que estar, prefiero dejar el de color pero estático como el segundo, pero con los colores y las animaciones."
 
