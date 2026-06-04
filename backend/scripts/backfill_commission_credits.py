@@ -23,7 +23,7 @@ from motor.motor_asyncio import AsyncIOMotorClient  # noqa: E402
 from routes.credits import record_commission_credit  # noqa: E402
 
 
-async def main():
+async def main() -> None:
     client = AsyncIOMotorClient(os.environ["MONGO_URL"])
     db = client[os.environ["DB_NAME"]]
 

@@ -11,6 +11,7 @@ import asyncio
 import os
 import re
 import sys
+from datetime import datetime, timezone
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -42,7 +43,7 @@ def looks_like_test(p: dict) -> tuple[bool, str]:
     return False, ""
 
 
-async def main():
+async def main() -> None:
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
     archived = []
@@ -52,7 +53,11 @@ async def main():
         if suspicious:
             await db.provider_profiles.update_one(
                 {"provider_id": p["provider_id"]},
-                {"$set": {"is_active": False, "archived_reason": "test_data_cleanup_may22", "archived_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()}},
+                {"$set": {
+                    "is_active": False,
+                    "archived_reason": "test_data_cleanup_may22",
+                    "archived_at": datetime.now(timezone.utc).isoformat(),
+                }},
             )
             archived.append((p.get("business_name", "?"), reason))
         else:

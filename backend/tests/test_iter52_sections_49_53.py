@@ -13,6 +13,7 @@ from tests.test_config import (
     PROVIDER_PASSWORD,
     CLIENT_EMAIL,
     CLIENT_PASSWORD,
+    EPHEMERAL_TEST_PASSWORD,
 )
 
 PROVIDER_ID = "prov_10b9f21bf971"
@@ -86,7 +87,7 @@ class TestVerifiedReviews:
         s = requests.Session()
         suffix = str(int(time.time()))[-8:]
         email = f"TEST_iter52_{suffix}@getamano.com"
-        password = "TestPass!12345"
+        password = EPHEMERAL_TEST_PASSWORD
         r = s.post(f"{API}/auth/register", json={
             "email": email, "password": password, "name": f"TEST Iter52 {suffix}", "role": "client"
         }, timeout=20)

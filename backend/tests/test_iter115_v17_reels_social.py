@@ -9,10 +9,8 @@ Test scope:
 """
 from __future__ import annotations
 
-import re
 import time
 import requests
-import pytest
 
 from test_config import API, PROVIDER_EMAIL, PROVIDER_PASSWORD, CLIENT_EMAIL, CLIENT_PASSWORD
 
@@ -72,7 +70,7 @@ def _get_a_reel_id(provider_session: requests.Session) -> str:
     db_name = os.environ.get("DB_NAME", "test_database")
     cli = MongoClient(mongo_url)
     db = cli[db_name]
-    reel_id = f"reel_test_v17_seed"
+    reel_id = "reel_test_v17_seed"
     db.reels.update_one(
         {"reel_id": reel_id},
         {"$set": {

@@ -16,7 +16,7 @@ import time
 import requests
 from datetime import datetime, timezone
 
-from test_config import API, PROVIDER_EMAIL, PROVIDER_PASSWORD, CLIENT_EMAIL, CLIENT_PASSWORD
+from test_config import API, CLIENT_EMAIL, CLIENT_PASSWORD
 
 _TIMEOUT = 30
 

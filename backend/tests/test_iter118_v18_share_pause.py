@@ -10,11 +10,10 @@ V18.6 — External native-feeling share to FB/X/WhatsApp/IG/TikTok.
 from __future__ import annotations
 
 import os
-import time
 import requests
 from datetime import datetime, timezone
 
-from test_config import API, BASE_URL, PROVIDER_EMAIL, PROVIDER_PASSWORD, CLIENT_EMAIL, CLIENT_PASSWORD
+from test_config import API, BASE_URL, PROVIDER_EMAIL, PROVIDER_PASSWORD
 
 _TIMEOUT = 30
 

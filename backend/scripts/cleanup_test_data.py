@@ -16,19 +16,11 @@ PROTECTED_EMAILS = {
 }
 
 
-async def main():
+async def main() -> None:
     c = AsyncIOMotorClient(os.environ["MONGO_URL"])
     db = c[os.environ["DB_NAME"]]
 
     # 1) Find all test users
-    {
-        "$or": [
-            {"email": {"$regex": "@test\\.|^test_|@pytest\\.", "$options": "i"}},
-            {"name": {"$regex": "^TestUser", "$options": "i"}},
-        ],
-        "email": {"$nin": list(PROTECTED_EMAILS)},
-    }
-    # Need to combine carefully
     test_users = await db.users.find(
         {
             "$and": [

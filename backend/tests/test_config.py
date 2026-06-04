@@ -21,4 +21,9 @@ PROVIDER_EMAIL = os.environ.get("TEST_PROVIDER_EMAIL", "demo.provider@getamano.c
 PROVIDER_PASSWORD = os.environ.get("TEST_PROVIDER_PASSWORD", "provider123")
 CLIENT_EMAIL = os.environ.get("TEST_CLIENT_EMAIL", "demo.client@getamano.com")
 CLIENT_PASSWORD = os.environ.get("TEST_CLIENT_PASSWORD", "client123")
+# Password used by ephemeral throwaway accounts that fixtures create in
+# tests (e.g. iter52 fresh client, iter63 referee). These accounts live
+# inside one test run and are torn down right after. Centralised here so
+# the audit/scanners see one named symbol instead of inline literals.
+EPHEMERAL_TEST_PASSWORD = os.environ.get("TEST_EPHEMERAL_PASSWORD", "TestPass!12345")
 DEMO_SLUG = os.environ.get("TEST_DEMO_SLUG", "maria-cleaning-services-sallisaw-ok")

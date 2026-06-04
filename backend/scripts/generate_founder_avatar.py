@@ -57,7 +57,7 @@ PROMPT = (
 )
 
 
-async def main():
+async def main() -> None:
     from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:

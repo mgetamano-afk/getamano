@@ -15,7 +15,7 @@ BACKUP_PATH = "/tmp/iter63_maria_logo_backup.json"
 EMAIL = "demo.provider@getamano.com"
 
 
-async def main(action: str):
+async def main(action: str) -> None:
     c = AsyncIOMotorClient(os.environ["MONGO_URL"])
     db = c[os.environ["DB_NAME"]]
     user = await db.users.find_one({"email": EMAIL}, {"_id": 0, "user_id": 1})
