@@ -3,7 +3,61 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
-## Latest Update — Jun 4, 2026 · V17.7 Double-Tap Heart Magic + Rail Sync
+## Latest Update — Jun 4, 2026 · V18 Engagement Milestones + Owner Stats Pill
+
+Founder: "ok dale con eso [streak milestones], igual para las vistas de las historias, agrega un contador únicamente para el que subió el reel, cuántas vistas y reproducciones tiene ese reel o historia."
+
+### V18.1 · Engagement Milestones
+Nuevo módulo `services/engagement_milestone.py` con:
+- **Thresholds**: `[5, 10, 25, 50, 100, 250, 500, 1000]` reacciones.
+- **Freshness window**: 24h desde creación. Después de eso, ya no celebramos (no se siente viral si un reel de hace 1 año junta 100 likes lento).
+- **Idempotente** por `(subject_type, subject_id, threshold)` via `$addToSet` en `reels.milestones` / `stories.milestones`. Atomic claim: si `modified_count === 0`, no fire.
+- **Pick largest** crossed threshold — jump de 4→30 dispara UN milestone (25), no 3.
+- **In-app notification** `category=engagement` + push (best-effort). Sonner toast surge en el front via `NotificationBell`.
+
+Wireado en:
+- `routes/reels.py` `/like` y `/wow` endpoints.
+- `routes/stories.py` `/like` endpoint (reemplazó el legacy hardcoded `[10, 50, 100]`).
+
+### V18.2 · Owner-only Stats Pill
+Nuevo componente `OwnerStatsPill.jsx` (top-left de reels y stories):
+- Pill negro con backdrop-blur + label amber "SOLO TÚ" + tres counts:
+  - 👁 Vistas (`views_count`)
+  - ▶ Reproducciones (`plays_count`) — **solo reels**
+  - ❤️ Me gusta (`likes_count`)
+- Renderiza **ONLY si** `reel.provider_user_id === user.user_id || reel.user_id === user.user_id` (acepta ambos campos por compatibilidad con schema legacy/V4 social-first).
+- Stories: gate `{isOwner && ...}` ya existente.
+
+Nuevo endpoint backend `POST /api/reels/{id}/play`:
+- Cuenta una reproducción cuando el `<video>` empieza a reproducir.
+- Throttled a **1 por viewer cada 5 min** (vs `/view` que es 24h) — re-watch dentro de 5 min no es señal nueva.
+- Frontend dispara via `onPlay={() => api.post(.../play)}` (fire-and-forget, no bloquea playback).
+
+### Notification toast surface (V18.1 frontend)
+`NotificationBell.jsx` ahora:
+- Compara cada poll del endpoint `/notifications` contra el set previo.
+- Filtra `category === "engagement" && !is_read && !dismissed_at`.
+- Llama `toast.success(body, { duration: 8000, action: { label: "Ver", onClick: navegar }})`.
+- Dedupe via `sessionStorage("getamano.toastedMilestones")` set (límite 50 más recientes) + `seenToastsRef` para no repetir entre polls.
+- Skip primera carga (`isFirstLoadRef`) — si el user acaba de abrir el app, no surface milestones viejos.
+
+### Tests
+- `test_iter116_v18_engagement.py` (**10/10 verde**):
+  - 5 backend: thresholds constant + no-op debajo de 5 + idempotent + largest threshold pick + freshness 24h skip + /play throttle 5min.
+  - 4 frontend source locks: OwnerStatsPill component + reels page render + stories render + NotificationBell toast surface.
+  - 1 integration: full /play endpoint round-trip.
+- Cumulative V17+V18: **34/34 verde**, sin regresiones.
+
+### E2E validation con Playwright
+- Logged in como demo provider → navegado a `/reels?r=reel_v18_demo_maria` (reel seeded con María como owner + counts 187/142/42).
+- **Visual capturado**: pill amber "SOLO TÚ · 👁 187 · ▶ 142 · ❤ 42" arriba a la izquierda. Pill correctamente OCULTO en reels de otros owners (Carlos Demo, Taxas Pro).
+- Reels feed: counts sincronizan con el rail derecho (V17.5 brand teal default, active rose-pink cuando engagement positivo).
+
+### Bug encontrado y arreglado en V18.2
+- Reels usan `provider_user_id` (schema V4 social-first) no `user_id`. Frontend antes hacía `reel.user_id === user.user_id` lo que devolvía siempre `false` (los `_id` se strippean a None en feed).
+- Fix: check ambos campos. Test source-lock previene regresión.
+
+## Previous Update — Jun 4, 2026 · V17.7 Double-Tap Heart Magic + Rail Sync
 
 Founder: "si doble tap, para ambos, reels y historias, y que suceda la magia del corazón."
 

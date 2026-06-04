@@ -13,6 +13,7 @@ import { resolveAvatar } from "../lib/avatar";
 import ReelCreator from "../components/ReelCreator";
 import VerifiedBadge from "../components/VerifiedBadge";
 import ReelActionMenu, { LikeBurst } from "../components/ReelActionMenu";
+import OwnerStatsPill from "../components/OwnerStatsPill";
 
 /**
  * ReelsPage — Section 89 v4 Phase E.
@@ -301,11 +302,35 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
         playsInline
         muted={muted}
         onClick={onTapVideo}
+        onPlay={() => {
+          // V18.2 — Count one "play" the first time the video actually
+          // starts. The backend throttles to once per 5 min per viewer.
+          // Fire-and-forget — we don't await it because it shouldn't
+          // block playback.
+          if (user) {
+            api.post(`/reels/${reel.reel_id}/play`).catch(() => {});
+          }
+        }}
         data-testid={`reel-video-${reel.reel_id}`}
       />
       {/* V15.1 — Double-tap LikeBurst overlay (fullscreen but scoped to
           this slide so it disappears once the next reel snaps in). */}
       {showBurst && <LikeBurst />}
+
+      {/* V18.2 — Owner-only stats pill. The creator gets to see how
+          many people viewed/played/liked their reel without exposing
+          the numbers to everyone (privacy + cleaner UX for non-owners).
+          Reels are owned via `provider_user_id` (the legacy field name
+          predating V4's social-first rebrand). */}
+      {user && (reel.provider_user_id === user.user_id || reel.user_id === user.user_id) && (
+        <OwnerStatsPill
+          kind="reel"
+          views={reel.views_count || 0}
+          plays={reel.plays_count || 0}
+          likes={liveLikes}
+        />
+      )}
+
       {/* Bottom gradient + caption */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pb-6 pointer-events-none">
         <div className="flex items-end gap-3 max-w-md pointer-events-auto">

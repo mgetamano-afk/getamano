@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useI18n } from "../contexts/I18nContext";
 import { Plus, ShieldCheck, X, ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Send, Eye, Trash2, Heart, Clock, Phone, Flame, Sparkles } from "lucide-react";
 import VerifiedBadge from "./VerifiedBadge";
+import OwnerStatsPill from "./OwnerStatsPill";
 import { toast } from "sonner";
 import { buildFileUrl } from "./ImageUpload";
 import { lazyImg } from "../lib/imageHelpers";
@@ -607,6 +608,17 @@ function StoryViewer({ group, onClose, onNext, onPrev, hasNext, hasPrev }) {
           {/* Giant center-screen heart burst on like (Instagram-style) */}
           {centerHeart > 0 && (
             <CenterHeartBurst key={centerHeart} />
+          )}
+
+          {/* V18.2 — Owner-only stats pill. Visible ONLY to the story's
+              creator so they see views + likes without exposing the
+              numbers to other viewers. */}
+          {isOwner && (
+            <OwnerStatsPill
+              kind="story"
+              views={active.views_count || 0}
+              likes={active.likes_count || 0}
+            />
           )}
 
           {/* Caption */}

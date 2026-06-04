@@ -109,10 +109,14 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "caption": (payload.caption or "").strip() or None,
             "duration_s": payload.duration_s,
             "views_count": 0,
+            "plays_count": 0,
             "likes_count": 0,
             "wows_count": 0,
             "saves_count": 0,
             "shares_count": 0,
+            "comments_count": 0,
+            "reshares_count": 0,
+            "milestones": [],
             "is_public": True,
             "created_at": now_iso,
         }
@@ -183,6 +187,33 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"views_count": 1}})
         return {"ok": True, "counted": True}
 
+    @router.post("/reels/{reel_id}/play")
+    async def track_play(reel_id: str, user: User = Depends(get_current_user)) -> dict:
+        """V18.2 — Increment plays_count when the video actually starts
+        playing (vs `/view` which counts opening the reel surface).
+
+        Throttled to once per (reel, viewer) per 5 min so we don't
+        double-count autoplays / quick scrolls where the user goes back
+        to the same reel. The 5-min window is shorter than `/view`'s
+        24h because the same person watching the same reel twice in a
+        day IS meaningful engagement.
+        """
+        key = {"reel_id": reel_id, "viewer_user_id": user.user_id}
+        existed = await db.reel_plays.find_one(key, {"_id": 0, "played_at": 1})
+        now = datetime.now(timezone.utc)
+        if existed:
+            try:
+                last_dt = datetime.fromisoformat(str(existed.get("played_at")).replace("Z", "+00:00"))
+                if (now - last_dt).total_seconds() < 5 * 60:
+                    return {"ok": True, "counted": False}
+            except Exception:
+                pass
+        await db.reel_plays.update_one(
+            key, {"$set": {**key, "played_at": now.isoformat()}}, upsert=True,
+        )
+        await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"plays_count": 1}})
+        return {"ok": True, "counted": True}
+
     @router.post("/reels/{reel_id}/like")
     async def toggle_like(reel_id: str, user: User = Depends(get_current_user)) -> dict:
         existing = await db.reel_likes.find_one(
@@ -200,20 +231,22 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             })
             await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"likes_count": 1}})
             liked = True
-            # Push to the reel owner (fire-and-forget)
+            # V18.1 — fresh-content milestone (5/10/25/50/...) on the
+            # reel owner's notifications + push. Idempotent: only fires
+            # once per (reel, threshold) and within 24h of creation.
             try:
-                reel = await db.reels.find_one({"reel_id": reel_id}, {"_id": 0, "provider_user_id": 1, "likes_count": 1})
-                if reel and reel.get("provider_user_id") != user.user_id and (reel.get("likes_count") or 0) % 10 == 0:
-                    from routes.push import send_push_to_user
-                    await send_push_to_user(db, reel["provider_user_id"], {
-                        "title": "🔥 Tu reel está prendiendo",
-                        "body": f"Llevas {reel['likes_count']} likes",
-                        "icon": "/icon-192x192.png",
-                        "url": "/reels",
-                        "tag": f"reel_milestone_{reel_id}",
-                    })
+                fresh = await db.reels.find_one({"reel_id": reel_id}, {"_id": 0, "likes_count": 1, "user_id": 1})
+                if fresh:
+                    from services.engagement_milestone import maybe_fire_engagement_milestone
+                    await maybe_fire_engagement_milestone(
+                        db,
+                        subject_type="reel",
+                        subject_id=reel_id,
+                        new_count=fresh.get("likes_count") or 0,
+                        metric="like",
+                    )
             except Exception as _e:
-                logger.warning(f"reel like push failed: {_e}")
+                logger.warning(f"reel milestone failed: {_e}")
         return {"ok": True, "liked": liked}
 
     # ─── V15 — Wow / Save / Share toggles + metrics ──────────────────
@@ -234,6 +267,20 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
             "wowed_at": datetime.now(timezone.utc).isoformat(),
         })
         await db.reels.update_one({"reel_id": reel_id}, {"$inc": {"wows_count": 1}})
+        # V18.1 — fresh-content milestone celebration (wows count).
+        try:
+            fresh = await db.reels.find_one({"reel_id": reel_id}, {"_id": 0, "wows_count": 1})
+            if fresh:
+                from services.engagement_milestone import maybe_fire_engagement_milestone
+                await maybe_fire_engagement_milestone(
+                    db,
+                    subject_type="reel",
+                    subject_id=reel_id,
+                    new_count=fresh.get("wows_count") or 0,
+                    metric="wow",
+                )
+        except Exception as _e:
+            logger.warning(f"reel wow milestone failed: {_e}")
         return {"ok": True, "wowed": True}
 
     @router.post("/reels/{reel_id}/save")

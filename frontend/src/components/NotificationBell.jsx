@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
+import { toast } from "sonner";
 import {
   Bell, BellRing, X, CheckCheck, Image as ImageIcon, List as ListIcon, Edit3,
-  MessageCircle, Inbox, Share2, Crown, Star, Heart, Map, Sparkles, Search, Trophy, ArrowRight
+  MessageCircle, Inbox, Share2, Crown, Star, Heart, Map, Sparkles, Search, Trophy, ArrowRight, Flame,
 } from "lucide-react";
 
 const ICON_MAP = {
   image: ImageIcon, list: ListIcon, edit: Edit3, message: MessageCircle, inbox: Inbox,
   share: Share2, crown: Crown, star: Star, heart: Heart, map: Map, sparkle: Sparkles,
-  search: Search, trophy: Trophy,
+  search: Search, trophy: Trophy, flame: Flame,
 };
 
 const PRIO_DOT = { high: "bg-red-500", medium: "bg-amber-400", low: "bg-slate-400" };
@@ -21,11 +22,47 @@ export default function NotificationBell({ compact = false }) {
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
 
+  const seenToastsRef = useRef(new Set());
+  const isFirstLoadRef = useRef(true);
+
   const load = async () => {
     setLoading(true);
     try {
       const r = await api.get("/notifications");
-      setItems(r.data.items || []);
+      const newItems = r.data.items || [];
+      // V18.1 — Surface engagement-milestone notifications as a
+      // celebratory toast THE FIRST time the user lands on a fresh
+      // milestone. We skip the very first load (the user just opened
+      // the app — surfacing yesterday's milestone is confusing) and
+      // dedupe with a sessionStorage-backed Set so a page reload
+      // doesn't repeat the toast.
+      if (!isFirstLoadRef.current) {
+        const persisted = (() => {
+          try { return new Set(JSON.parse(sessionStorage.getItem("getamano.toastedMilestones") || "[]")); }
+          catch { return new Set(); }
+        })();
+        for (const n of newItems) {
+          if (n.category !== "engagement") continue;
+          if (n.is_read) continue;
+          if (n.dismissed_at) continue;
+          if (seenToastsRef.current.has(n.notification_id)) continue;
+          if (persisted.has(n.notification_id)) continue;
+          // Fire a Sonner toast with the milestone body + a CTA to the
+          // reels feed. We use `duration: 8000` because milestones
+          // deserve more dwell-time than ordinary toasts.
+          toast.success(n.body || "Tu contenido está prendiendo 🔥", {
+            description: n.title || undefined,
+            duration: 8000,
+            action: n.cta_url ? { label: n.cta_label || "Ver", onClick: () => { window.location.href = n.cta_url; } } : undefined,
+          });
+          seenToastsRef.current.add(n.notification_id);
+          persisted.add(n.notification_id);
+        }
+        try { sessionStorage.setItem("getamano.toastedMilestones", JSON.stringify([...persisted].slice(-50))); }
+        catch { /* incognito */ }
+      }
+      isFirstLoadRef.current = false;
+      setItems(newItems);
       setUnread(r.data.unread_count || 0);
     } catch (e) { console.error("notifications load failed", e); } finally { setLoading(false); }
   };

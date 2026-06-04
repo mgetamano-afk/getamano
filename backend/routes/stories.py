@@ -377,9 +377,26 @@ def make_router(*, db, User, get_current_user) -> APIRouter:
         fresh = await db.stories.find_one({"story_id": story_id}, {"_id": 0, "likes_count": 1})
         new_count = (fresh or {}).get("likes_count", 0)
 
-        # Milestone notifications — only on a *new* like that lands on a threshold.
-        if liked and new_count in (10, 50, 100):
-            await _emit_story_milestone(db, story, story_id, new_count)
+        # V18.1 — fresh-content milestone (5/10/25/50/100/...) within
+        # 24h of creation. Replaces the previous hardcoded (10/50/100)
+        # check so creators feel the dopamine earlier (first 5 likes).
+        # Idempotent — uses `stories.milestones` set to ensure each
+        # threshold fires once.
+        if liked:
+            try:
+                from services.engagement_milestone import maybe_fire_engagement_milestone
+                await maybe_fire_engagement_milestone(
+                    db,
+                    subject_type="story",
+                    subject_id=story_id,
+                    new_count=new_count,
+                    metric="like",
+                )
+            except Exception as _e:
+                # Keep the legacy emitter as a fallback for the old
+                # 10/50/100 thresholds in case the new pipeline errors.
+                if new_count in (10, 50, 100):
+                    await _emit_story_milestone(db, story, story_id, new_count)
 
         return {"liked": liked, "likes_count": new_count}
 
