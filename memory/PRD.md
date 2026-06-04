@@ -3,6 +3,50 @@
 ## Problem Statement
 Marketplace digital "getamano" que conecta a comunidad latina en USA con proveedores de productos y servicios verificados. Web app responsive, multi-rol, bilingüe ES/EN, con 4 zonas distintas.
 
+## Latest Update — Jun 4, 2026 · V19.3 Server.py Refactor Round 1 (self-introspection loop)
+
+Founder pidió: ejecutar el P0 que el Code Health dashboard se auto-flag-eó. Refactor incremental de `server.py` extrayendo módulos al directorio `routes/` que ya existe.
+
+### Resultado
+- **server.py: 11,413 → 10,852 LOC** (-561 LOC, -4.9% en una sola tanda). Cero regresiones.
+- **2 nuevos módulos extraídos** (siguiendo el patrón `make_router(...)` ya establecido por auth/community/reels):
+  - `routes/admin_insights.py` (518 LOC nuevas): `/admin/ceo-metrics`, `/admin/code-health`, `/admin/daily-brief`.
+  - `routes/admin_catalog.py` (122 LOC nuevas): `/admin/categories` (CRUD), `/admin/cities` (CRUD), `/cities` (público), `/admin/audit-log`.
+- **Cierre del loop de auto-mejora**: la propia dashboard que escribimos en V19.2 observó la mejora — el LOC count bajó <11,000 y el verdict siguió en VERDE. Test específico `test_code_health_dashboard_validates_refactor_impact` valida esto formalmente.
+
+### Gotcha técnico documentado
+En `routes/admin_catalog.py` NO se puede usar `from __future__ import annotations` porque FastAPI inspecciona tipos via `get_type_hints()` al registrar endpoints, y los modelos Pydantic capturados por closure del factory (`CategoryIn`, `CityIn`) son variables locales — las anotaciones string-deferred no las pueden resolver en el module namespace. Comentado en el docstring del file. Mismo razonamiento que `routes/auth.py` (línea 19-21).
+
+`routes/admin_insights.py` SÍ usa `from __future__ import annotations` porque ningún endpoint ahí recibe body Pydantic (todos son query params o no-args).
+
+### Tests
+- `test_iter121_v19_3_split.py` — **9 tests verde**:
+  - Wiring de los dos módulos nuevos (`make_router` callable, `PLAN_PRICES` exportado).
+  - Los 11 decoradores `@api_router.*` migrados YA NO viven en server.py (assertion lock).
+  - Endpoint round-trip de cada uno: ceo-metrics, code-health, categories CRUD (incl. duplicate guard + cascade delete refuse), cities (admin + public + auth), audit-log.
+  - Validación del loop de auto-mejora: el dashboard YA NO reporta server.py > 11K LOC.
+- Suite cumulativa V18.4-V18.5-V18.6-V19.1-V19.2-V19.3 (6 archivos): **48 tests verde**, cero regresiones.
+- Rate-limit fix: módulo-level `_TOKEN_CACHE` para no quemar el `/auth/login` brute-force protection cuando los 9 tests corren consecutivos.
+
+### Patrón validado para próximos rounds
+1. Identificar bloque self-contained (admin/* es lo más fácil).
+2. `mcp_view_file` líneas exactas + dependencias.
+3. Crear `routes/<group>.py` con `def make_router(*, db, User, require_admin, ...): return router`.
+4. Borrar bloque original con python script (`lines[:start] + [sentinel] + lines[end:]`).
+5. Agregar `from routes.<group> import make_router as _make_<group>_router` + `api_router.include_router(...)`.
+6. `mcp_lint_python` + restart backend.
+7. Round-trip test para cada endpoint extraído.
+
+### Próximos candidatos de extracción (prioridad por LOC)
+- **`routes/admin_providers.py`** (~250 LOC): `/admin/providers` GET/PATCH, `/admin/providers/{id}/verify`, `/admin/stats`, `/admin/ads` CRUD. Self-contained.
+- **`routes/messages.py`** (~150 LOC): `/messages`, `/messages/{conv}/reply`, `/conversations`, `/conversations/{id}/messages`. Tested extensively.
+- **`routes/upload_assets.py`** (~155 LOC): `/upload`, `/files/{path}`, `/reels/upload-video`. Storage helpers ya están en `services/storage.py`.
+- **`routes/galleries.py`** (~95 LOC): `/providers/me/gallery/*` (limit, add, reorder, category, delete).
+- **`routes/community_engagement.py`** (~75 LOC): `/community/leaderboard`, `/community/wall-of-fame`, `/public/stats`.
+
+Si seguimos a este ritmo (4-5% por round) y hacemos 3-4 rounds más, server.py baja debajo de 8K LOC (modular, mantenible, testeable por subdominio).
+
+
 ## Latest Update — Jun 4, 2026 · V19.2 Mega-Polish (4 in 1)
 
 Founder pidió 4 mejoras juntas en español:
