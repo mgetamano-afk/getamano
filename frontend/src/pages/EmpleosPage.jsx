@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Briefcase, Plus, MapPin, DollarSign, Clock, Flame, Loader2, Filter, X, Send, ChevronDown } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -318,11 +318,26 @@ export default function EmpleosPage({ embedded = false }) {
   const { user } = useAuth();
   const { lang } = useI18n();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [gigs, setGigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("Todas");
   const [showPost, setShowPost] = useState(false);
   const [applyTarget, setApplyTarget] = useState(null);
+
+  // V19.2 — Deep-link support: `/empleos?post=1` opens the compose modal
+  // directly. The profile page uses this to point clients straight at
+  // the "Publicar chamba" flow without forcing them to discover the
+  // floating action button on the listing.
+  useEffect(() => {
+    if (searchParams.get("post") === "1") {
+      setShowPost(true);
+      // Clean the query so refreshing doesn't keep re-opening it.
+      const next = new URLSearchParams(searchParams);
+      next.delete("post");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const load = async () => {
     setLoading(true);

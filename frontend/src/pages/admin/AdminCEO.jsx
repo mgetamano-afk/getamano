@@ -5,7 +5,8 @@ import { api } from "../../lib/api";
 import { buildFileUrl } from "../../components/ImageUpload";
 import {
   Crown, DollarSign, TrendingUp, Users, Briefcase, Sparkles, MapPin, Flame,
-  Eye, Phone, Star, MessageSquare, Award, Activity, RefreshCw, ArrowUpRight, ArrowDownRight
+  Eye, Phone, Star, MessageSquare, Award, Activity, RefreshCw, ArrowUpRight, ArrowDownRight,
+  ShieldCheck, AlertTriangle, FileCode2
 } from "lucide-react";
 import DailyBrief from "../../components/DailyBrief";
 
@@ -218,6 +219,11 @@ export default function AdminCEO() {
           })}
         </Section>
       </div>
+
+      {/* V19.2 — Code Health snapshot (founder-only insight into ruff /
+          test count / file-size hotspots). Lets the CEO sanity-check
+          external code audit reports without leaving the dashboard. */}
+      <CodeHealthSection />
     </AdminLayout>
   );
 }
@@ -249,6 +255,137 @@ function Section({ title, icon: Icon, testid, children, liveDot }) {
         {liveDot && <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-emerald-400"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />LIVE</span>}
       </div>
       <div>{children}</div>
+    </div>
+  );
+}
+
+// ─── V19.2 · CEO Code Health snapshot ───────────────────────────────
+function CodeHealthSection() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = (force = false) => {
+    setLoading(true);
+    const url = force ? "/admin/code-health?_=" + Date.now() : "/admin/code-health";
+    api.get(url).then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  if (!data) {
+    return (
+      <Section title="Salud del código (CEO Insight)" icon={FileCode2} testid="ceo-code-health">
+        <div className="text-xs text-slate-500 py-4 inline-flex items-center gap-2">
+          <RefreshCw className="w-3 h-3 animate-spin" /> Cargando análisis…
+        </div>
+      </Section>
+    );
+  }
+
+  const verdictColor = data.verdict === "green"
+    ? { bg: "bg-emerald-500/15", text: "text-emerald-300", ring: "ring-emerald-500/30", label: "✓ Verde" }
+    : data.verdict === "yellow"
+    ? { bg: "bg-amber-500/15", text: "text-amber-300", ring: "ring-amber-500/30", label: "⚠ Atención" }
+    : { bg: "bg-rose-500/15", text: "text-rose-300", ring: "ring-rose-500/30", label: "✗ Rojo" };
+
+  return (
+    <div className="mt-6">
+      <Section title="Salud del código (CEO Insight)" icon={FileCode2} testid="ceo-code-health">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <p className="text-xs text-slate-400">
+              Lectura en tiempo real del codebase. Cachea 10 min · commit <code className="text-slate-300">{data.commit}</code>
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {data.tests.total_tests_collected} tests · {data.tests.total_test_files} archivos · cubren backend, social, e-cards
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${verdictColor.bg} ${verdictColor.text} ring-1 ${verdictColor.ring}`} data-testid="code-health-verdict">
+              {verdictColor.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => load(true)}
+              disabled={loading}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-white/70 text-[10px] transition disabled:opacity-50"
+              data-testid="code-health-refresh"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} /> Recalcular
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          <CodeHealthKPI
+            Icon={ShieldCheck}
+            label="Pyflakes"
+            value={data.ruff.pyflakes_errors}
+            color={data.ruff.pyflakes_errors === 0 ? "text-emerald-300" : "text-rose-300"}
+            ok={data.ruff.pyflakes_errors === 0}
+            testid="code-health-pyflakes"
+          />
+          <CodeHealthKPI
+            Icon={AlertTriangle}
+            label="Findings totales"
+            value={data.ruff.total_findings}
+            color={data.ruff.total_findings === 0 ? "text-emerald-300" : data.ruff.total_findings < 50 ? "text-amber-300" : "text-rose-300"}
+            ok={data.ruff.total_findings < 50}
+            testid="code-health-findings"
+          />
+          <CodeHealthKPI
+            Icon={Sparkles}
+            label="Tests"
+            value={data.tests.total_tests_collected}
+            color="text-indigo-300"
+            ok
+            testid="code-health-tests"
+          />
+          <CodeHealthKPI
+            Icon={FileCode2}
+            label="Archivos de test"
+            value={data.tests.total_test_files}
+            color="text-sky-300"
+            ok
+            testid="code-health-test-files"
+          />
+        </div>
+
+        <div className="rounded-xl bg-slate-950/50 border border-slate-800 p-3" data-testid="code-health-hotspots">
+          <h4 className="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Hotspots de refactor (archivos &gt; 400 líneas)</h4>
+          {data.hotspots.length === 0 ? (
+            <p className="text-xs text-slate-500">Ningún archivo excede el umbral.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {data.hotspots.map((h, i) => (
+                <li key={h.file} className="flex items-center justify-between gap-2" data-testid={`code-health-hotspot-${i}`}>
+                  <code className="text-xs text-slate-300 truncate">{h.file}</code>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-[10px] tabular-nums text-slate-500">{h.loc.toLocaleString()} LOC</span>
+                    <div className="w-20 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className={`h-full ${h.loc > 1000 ? "bg-rose-400" : h.loc > 600 ? "bg-amber-400" : "bg-emerald-400"}`}
+                        style={{ width: `${Math.min(100, (h.loc / 1500) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function CodeHealthKPI({ Icon, label, value, color, ok, testid }) {
+  return (
+    <div className={`rounded-xl bg-slate-950/40 border ${ok ? "border-slate-800" : "border-rose-500/30"} p-3`} data-testid={testid}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon className={`w-3.5 h-3.5 ${color}`} />
+        <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">{label}</span>
+      </div>
+      <div className={`font-display text-xl font-bold ${color} tabular-nums leading-none`}>{typeof value === "number" ? value.toLocaleString() : value}</div>
     </div>
   );
 }

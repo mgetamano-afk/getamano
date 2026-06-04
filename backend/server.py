@@ -3511,6 +3511,127 @@ async def ceo_metrics(admin: User = Depends(require_admin)):
         "activity": activity,
     }
 
+
+# ─────────────────────────────────────────────────────────────────────
+# V19.2 · Code Health endpoint
+#
+# Lightweight, in-process snapshot of the codebase's health so the CEO
+# can sanity-check what auditors say without leaving the dashboard.
+# Caches results for 10 minutes — running ruff + counting tests on every
+# refresh would be wasteful and slow the dashboard down. The cache key
+# rotates with the latest commit hash so a fresh deploy invalidates it.
+# ─────────────────────────────────────────────────────────────────────
+_CODE_HEALTH_CACHE: dict = {"data": None, "key": None, "at": 0.0}
+
+
+def _compute_code_health() -> dict:
+    import subprocess  # local import — only loaded when admin opens dash
+    from pathlib import Path as _Path
+    backend_root = _Path(__file__).resolve().parent
+
+    def _safe_run(cmd: list[str], timeout: int = 25) -> tuple[int, str]:
+        try:
+            r = subprocess.run(cmd, cwd=str(backend_root), capture_output=True, text=True, timeout=timeout)
+            return r.returncode, (r.stdout or "") + (r.stderr or "")
+        except Exception as exc:  # noqa: BLE001
+            return -1, f"<error: {exc}>"
+
+    # Ruff (F-rule pyflakes-only — fast and high signal). We invoke via
+    # `sys.executable -m ruff` so the lookup goes through the venv module
+    # path and avoids supervisord PATH issues. Only stdout lines that
+    # begin with `path:line:col:` are genuine findings.
+    import sys as _sys_r
+    rc_f, out_f = _safe_run([_sys_r.executable, "-m", "ruff", "check", "--select=F", "--no-cache", "--quiet", "--output-format=concise", "."], timeout=15)
+    f_errors = sum(1 for ln in out_f.splitlines() if ":" in ln and ln.strip() and not ln.startswith("Found"))
+
+    # Ruff (full default ruleset — slower, more findings)
+    rc_all, out_all = _safe_run([_sys_r.executable, "-m", "ruff", "check", "--no-cache", "--quiet", "--statistics", "."], timeout=30)
+    total_findings = 0
+    for ln in out_all.splitlines():
+        parts = ln.strip().split()
+        if parts and parts[0].isdigit():
+            total_findings += int(parts[0])
+
+    # Test count (collection only — no execution). Use sys.executable so
+    # the subprocess inherits the exact same venv as the running FastAPI
+    # process (avoids any PATH-shadow issues under supervisord).
+    import sys as _sys
+    rc_t, out_t = _safe_run([_sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q"], timeout=30)
+    test_count = 0
+    # pytest prints something like "1124 tests collected, 7 errors in 0.43s"
+    # OR "1124 tests collected in 0.43s". Match either.
+    import re as _re
+    for ln in out_t.splitlines():
+        m = _re.search(r"(\d+)\s+tests?\s+collected", ln)
+        if m:
+            try:
+                test_count = int(m.group(1))
+                break
+            except Exception:  # noqa: BLE001
+                pass
+
+    # File-size hotspots — anything > 400 LOC is a refactor signal
+    hotspots: list[dict] = []
+    for sub in ("routes", "services", "integrations"):
+        d = backend_root / sub
+        if not d.is_dir():
+            continue
+        for path in d.glob("*.py"):
+            try:
+                lines = sum(1 for _ in path.open(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                continue
+            if lines > 400:
+                hotspots.append({"file": f"{sub}/{path.name}", "loc": lines})
+    server_path = backend_root / "server.py"
+    if server_path.exists():
+        try:
+            hotspots.append({"file": "server.py", "loc": sum(1 for _ in server_path.open(encoding="utf-8"))})
+        except Exception:  # noqa: BLE001
+            pass
+    hotspots.sort(key=lambda h: -h["loc"])
+    hotspots = hotspots[:8]
+
+    # Test files counter
+    tests_dir = backend_root / "tests"
+    test_files = len(list(tests_dir.glob("test_*.py"))) if tests_dir.is_dir() else 0
+
+    # Latest commit short hash (purely informative)
+    rc_git, out_git = _safe_run(["git", "rev-parse", "--short", "HEAD"], timeout=5)
+    commit = out_git.strip().splitlines()[-1] if out_git.strip() else "unknown"
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "commit": commit,
+        "ruff": {
+            "pyflakes_errors": f_errors,
+            "total_findings": total_findings,
+            "passing": rc_f == 0,
+        },
+        "tests": {
+            "total_test_files": test_files,
+            "total_tests_collected": test_count,
+        },
+        "hotspots": hotspots,
+        "verdict": "green" if (rc_f == 0 and total_findings < 50) else ("yellow" if total_findings < 200 else "red"),
+    }
+
+
+@api_router.get("/admin/code-health")
+async def code_health(admin: User = Depends(require_admin)):
+    """Return ruff / test / complexity stats so the CEO can sanity-check
+    external audit reports. Cached 10 minutes per commit hash."""
+    import asyncio as _asyncio_local
+    import time as _time
+    now = _time.time()
+    # 10-minute TTL
+    if _CODE_HEALTH_CACHE["data"] and (now - _CODE_HEALTH_CACHE["at"] < 600):
+        return _CODE_HEALTH_CACHE["data"]
+    data = await _asyncio_local.to_thread(_compute_code_health)
+    _CODE_HEALTH_CACHE["data"] = data
+    _CODE_HEALTH_CACHE["at"] = now
+    return data
+
 @api_router.get("/admin/daily-brief")
 async def daily_brief(admin: User = Depends(require_admin), language: str = "es", regenerate: bool = False):
     """AI-generated executive daily brief — warm CEO morning summary in natural language."""

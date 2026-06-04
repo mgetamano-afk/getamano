@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { X, Camera, Circle, Square, RefreshCcw, Loader2, Send } from "lucide-react";
+import { X, Camera, Circle, Square, RefreshCcw, Loader2, Send, ZoomIn } from "lucide-react";
 import MediaPermissionGate from "./MediaPermissionGate";
 
 const MAX_DURATION_S = 30;
@@ -47,6 +47,13 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
   // V17.1 — Privacy gate before triggering getUserMedia. We hold off the
   // native browser prompt until the user grants in our app-level prompt.
   const [permissionGranted, setPermissionGranted] = useState(false);
+  // V19.2 — Camera zoom. Capabilities are read from the active track once
+  // the camera stream lands. `zoomCaps = null` means the device doesn't
+  // expose zoom (most desktops / iPhones in browser); we hide the UI in
+  // that case to avoid showing a useless slider.
+  const [zoomCaps, setZoomCaps] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const pinchRef = useRef({ baseDist: 0, baseZoom: 1, active: false });
 
   // Acquire camera on mount + every facing-mode flip — BUT only after the
   // user accepted our app-level permission prompt.
@@ -54,6 +61,7 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
     if (!permissionGranted) return undefined;
     let alive = true;
     setPreviewBlob(null); setPreviewUrl(""); setElapsed(0);
+    setZoomCaps(null); setZoom(1);
     (async () => {
       try {
         const s = await navigator.mediaDevices.getUserMedia({
@@ -66,7 +74,20 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
           videoRef.current.srcObject = s;
           videoRef.current.play().catch(() => {});
         }
-      } catch (e) {
+        // V19.2 — Probe zoom capability from the video track. Chrome
+        // Android exposes `zoom` on most modern phones (range usually
+        // 1.0 → 4.0 or 1.0 → 10.0). Firefox + Safari iOS don't yet —
+        // we silently hide the UI when caps are missing.
+        try {
+          const track = s.getVideoTracks()[0];
+          const caps = track && typeof track.getCapabilities === "function" ? track.getCapabilities() : null;
+          if (caps && typeof caps.zoom === "object" && caps.zoom && "max" in caps.zoom) {
+            setZoomCaps({ min: caps.zoom.min ?? 1, max: caps.zoom.max ?? 1, step: caps.zoom.step ?? 0.1 });
+            const settings = typeof track.getSettings === "function" ? track.getSettings() : null;
+            if (settings && typeof settings.zoom === "number") setZoom(settings.zoom);
+          }
+        } catch { /* zoom not supported on this device */ }
+      } catch {
         toast.error("No se pudo abrir la cámara. Da permiso al navegador.");
         onClose?.();
       }
@@ -77,6 +98,46 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facing, permissionGranted]);
+
+  // V19.2 — Push zoom changes to the camera track. Cheap enough to debounce
+  // via React's batching; we re-apply on every value change.
+  useEffect(() => {
+    if (!stream || !zoomCaps) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      track.applyConstraints({ advanced: [{ zoom }] }).catch(() => {});
+    } catch { /* ignore — some browsers don't support advanced[] */ }
+  }, [zoom, zoomCaps, stream]);
+
+  // V19.2 — Pinch-to-zoom on the live preview. We only listen when the
+  // device actually exposes zoom — otherwise we let normal tap behaviour
+  // through (e.g. tap-to-focus in future).
+  const handleTouchStart = (e) => {
+    if (!zoomCaps || e.touches.length !== 2) return;
+    const [a, b] = e.touches;
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    pinchRef.current = {
+      baseDist: Math.hypot(dx, dy),
+      baseZoom: zoom,
+      active: true,
+    };
+  };
+  const handleTouchMove = (e) => {
+    if (!pinchRef.current.active || e.touches.length !== 2 || !zoomCaps) return;
+    e.preventDefault();
+    const [a, b] = e.touches;
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    const dist = Math.hypot(dx, dy);
+    const ratio = dist / Math.max(1, pinchRef.current.baseDist);
+    const next = Math.min(zoomCaps.max, Math.max(zoomCaps.min, pinchRef.current.baseZoom * ratio));
+    setZoom(Number(next.toFixed(2)));
+  };
+  const handleTouchEnd = () => {
+    pinchRef.current.active = false;
+  };
 
   // Stop everything on unmount.
   useEffect(() => () => {
@@ -209,7 +270,13 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
       </div>
 
       {/* Video preview */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+      <div
+        className="flex-1 relative flex items-center justify-center overflow-hidden"
+        onTouchStart={previewUrl ? undefined : handleTouchStart}
+        onTouchMove={previewUrl ? undefined : handleTouchMove}
+        onTouchEnd={previewUrl ? undefined : handleTouchEnd}
+        onTouchCancel={previewUrl ? undefined : handleTouchEnd}
+      >
         {previewUrl ? (
           <video
             src={previewUrl}
@@ -227,6 +294,38 @@ export default function ReelCameraRecorder({ onClose, onUploaded }) {
             className="h-full w-full object-cover"
             data-testid="reel-recorder-live"
           />
+        )}
+        {/* V19.2 — Zoom slider, only rendered when the active camera
+            track exposes zoom capabilities. Vertical on the right edge
+            of the preview, mimicking the native Camera app on iOS /
+            Android. Pinching the video also updates this value. */}
+        {!previewUrl && zoomCaps && zoomCaps.max > zoomCaps.min + 0.1 && (
+          <div
+            className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 select-none"
+            data-testid="reel-recorder-zoom"
+          >
+            <span className="px-2 py-0.5 rounded-full bg-black/55 text-white text-[11px] font-semibold tabular-nums">
+              {zoom.toFixed(1)}x
+            </span>
+            <input
+              type="range"
+              min={zoomCaps.min}
+              max={zoomCaps.max}
+              step={zoomCaps.step || 0.1}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="zoom-slider"
+              style={{
+                writingMode: "vertical-lr",
+                WebkitAppearance: "slider-vertical",
+                width: 22,
+                height: 180,
+              }}
+              aria-label="Zoom"
+              data-testid="reel-recorder-zoom-slider"
+            />
+            <ZoomIn className="w-4 h-4 text-white/70" />
+          </div>
         )}
       </div>
 

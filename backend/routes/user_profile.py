@@ -132,12 +132,17 @@ def _profile_dict(user: dict, is_provider: bool, provider_verified: bool, provid
         "city": user.get("city"),
         "bio": user.get("bio"),
         "avatar_url": user.get("avatar_url") or user.get("picture"),
+        # V19.2 — Cover banner for the personal profile page. Optional;
+        # if missing, the frontend shows the gradient placeholder + a
+        # "completa tu perfil" prompt that opens the uploader.
+        "cover_url": user.get("cover_url"),
         "social_links": user.get("social_links") or {},
         "is_public": user.get("is_public", True),
         "is_provider": is_provider,
         "provider_verified": provider_verified,
         "provider_slug": provider_slug,
         "getamano_code": getamano_code,
+        "role": user.get("role"),
         "created_at": user.get("created_at"),
     }
 
@@ -219,6 +224,31 @@ def make_router(
         url = f"/api/uploads/{fname}"
         await db.users.update_one({"user_id": me.user_id}, {"$set": {"avatar_url": url, "picture": url}})
         return {"avatar_url": url}
+
+    @router.post("/users/me/cover")
+    async def upload_cover(file: UploadFile = File(...), me: User = Depends(get_current_user)) -> dict:
+        """V19.2 — Cover/banner image for the personal profile page.
+
+        Mirrors the avatar upload but stores under `cover_url`. We accept
+        the same image formats; the frontend renders the file inside a
+        fixed-aspect banner so large landscape photos look correct.
+        """
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        ext = (file.filename or "").rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
+        if ext not in {"jpg", "jpeg", "png", "webp"}:
+            raise HTTPException(status_code=400, detail="Formato no soportado (jpg, png, webp).")
+        fname = f"cover_{me.user_id}_{uuid.uuid4().hex[:8]}.{ext}"
+        path = os.path.join(UPLOAD_DIR, fname)
+        with open(path, "wb") as out:
+            shutil.copyfileobj(file.file, out)
+        url = f"/api/uploads/{fname}"
+        await db.users.update_one({"user_id": me.user_id}, {"$set": {"cover_url": url}})
+        return {"cover_url": url}
+
+    @router.delete("/users/me/cover")
+    async def delete_cover(me: User = Depends(get_current_user)) -> dict:
+        await db.users.update_one({"user_id": me.user_id}, {"$unset": {"cover_url": ""}})
+        return {"ok": True}
 
     @router.delete("/users/me")
     async def delete_my_account(me: User = Depends(get_current_user)) -> dict:

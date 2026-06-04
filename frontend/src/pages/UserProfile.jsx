@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  Briefcase, ChevronRight, Loader2, Hash, Camera, Film,
-  Info, MapPin, Instagram, Music2, Facebook, Linkedin, Twitter,
-  Trash2, Upload, X, Edit3, ExternalLink, Globe2,
+  Briefcase, ChevronRight, Loader2, Hash, Camera, Film, Heart, ImagePlus,
+  Info, MapPin, Instagram, Music2, Facebook, Linkedin, Twitter, Mail, KeyRound,
+  Trash2, Upload, X, Edit3, ExternalLink, Globe2, LogOut, Star,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,13 +25,16 @@ import VerifiedBadge from "../components/VerifiedBadge";
  * the primary conversion path from regular user → provider.
  */
 export default function UserProfile() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const { lang } = useI18n();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
-  const [tab, setTab] = useState("photos"); // "photos" | "reels" | "about"
+  // V19.2 — Default tab depends on role: clients land on Favoritos (their
+  // most-frequent intent on the personal page), providers on Photos.
+  const [tab, setTab] = useState("photos");
   const [activating, setActivating] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -42,7 +45,13 @@ export default function UserProfile() {
     try {
       const r = await api.get("/users/me/profile");
       setProfile(r.data);
+      if (r.data && !r.data.is_provider && tab === "photos") {
+        // Clients land on favorites by default unless they manually
+        // switched to another tab earlier.
+        setTab((prev) => prev === "photos" ? "favoritos" : prev);
+      }
     } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (user) load(); }, [user, load]);
 
@@ -68,9 +77,16 @@ export default function UserProfile() {
     <div className="min-h-screen bg-slate-50">
       <Header />
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6" data-testid="user-profile-page">
+        {/* V19.2 — Completa tu perfil banner. Fires when the user hasn't
+            uploaded an avatar OR a cover yet — these are the two visual
+            assets that make the profile feel finished and trustworthy. */}
+        {(!profile.avatar_url || !profile.cover_url) && (
+          <CompleteProfileBanner profile={profile} lang={lang} onEdit={() => setEditOpen(true)} />
+        )}
+
         {/* Header */}
         <section className="rounded-2xl bg-white border border-slate-200 overflow-hidden" data-testid="user-profile-header">
-          <div className="h-20 bg-gradient-to-br from-[#03045E] via-[#0077B6] to-[#00B4D8]" />
+          <CoverUploader profile={profile} onChange={load} lang={lang} />
           <div className="px-5 pb-5 -mt-12">
             <AvatarUploader profile={profile} onChange={load} lang={lang} />
             <div className="mt-3 flex items-start justify-between gap-3">
@@ -147,7 +163,10 @@ export default function UserProfile() {
         <nav className="mt-4 flex items-center gap-1 bg-white rounded-2xl border border-slate-200 p-1" data-testid="user-profile-tabs">
           {[
             { id: "photos", label: lang === "en" ? "Photos" : "Fotos", Icon: Camera },
-            ...(profile.is_provider ? [{ id: "reels", label: "Reels", Icon: Film }] : []),
+            ...(profile.is_provider
+              ? [{ id: "reels", label: "Reels", Icon: Film }]
+              : [{ id: "favoritos", label: lang === "en" ? "Favorites" : "Favoritos", Icon: Heart }]
+            ),
             { id: "about",  label: lang === "en" ? "About"  : "Acerca de", Icon: Info },
           ].map(t => {
             const active = tab === t.id;
@@ -171,13 +190,23 @@ export default function UserProfile() {
 
         {/* Tab content */}
         <div className="mt-4">
-          {tab === "photos" && <PhotosTab lang={lang} />}
-          {tab === "reels"  && profile.is_provider && <ReelsTab lang={lang} />}
-          {tab === "about"  && <AboutTab profile={profile} onChange={load} lang={lang} />}
+          {tab === "photos"    && <PhotosTab lang={lang} />}
+          {tab === "reels"     && profile.is_provider && <ReelsTab lang={lang} />}
+          {tab === "favoritos" && !profile.is_provider && <FavoritesTab lang={lang} />}
+          {tab === "about"     && (
+            <AboutTab
+              profile={profile}
+              onChange={load}
+              lang={lang}
+              onChangePassword={() => setPasswordOpen(true)}
+              onLogout={async () => { await logout(); navigate("/"); }}
+            />
+          )}
         </div>
       </main>
 
       {editOpen && <EditProfileModal profile={profile} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); load(); }} lang={lang} />}
+      {passwordOpen && <ChangePasswordPrompt email={profile.email} onClose={() => setPasswordOpen(false)} lang={lang} />}
     </div>
   );
 }
@@ -328,7 +357,7 @@ function ReelsTab({ lang }) {
 }
 
 // ─── About tab ───────────────────────────────────────────────────────
-function AboutTab({ profile, onChange, lang }) {
+function AboutTab({ profile, onChange, lang, onChangePassword, onLogout }) {
   const social = profile.social_links || {};
   const items = [
     { k: "instagram", label: "Instagram", Icon: Instagram, prefix: "https://instagram.com/" },
@@ -356,6 +385,69 @@ function AboutTab({ profile, onChange, lang }) {
 
   return (
     <section className="space-y-4" data-testid="user-profile-about-tab">
+      {/* V19.2 — Account section. Email shown as read-only (changing it
+          requires re-verifying, which lives in the existing forgot/OTP
+          flow). Password change opens the modal that walks the user
+          through the email-OTP recovery flow. */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4" data-testid="user-profile-account-section">
+        <h3 className="font-display font-bold text-base text-[#03045E] mb-3">{lang === "en" ? "Account" : "Cuenta"}</h3>
+        <ul className="space-y-2.5">
+          <li className="flex items-center gap-3 text-sm">
+            <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="flex-1 min-w-0 truncate">{profile.email}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 flex-shrink-0">{lang === "en" ? "Email" : "Correo"}</span>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={onChangePassword}
+              className="w-full flex items-center gap-3 text-sm hover:bg-slate-50 -mx-2 px-2 py-2 rounded-lg transition"
+              data-testid="user-profile-change-password"
+            >
+              <KeyRound className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <span className="flex-1 text-left">{lang === "en" ? "Change password" : "Cambiar contraseña"}</span>
+              <ChevronRight className="w-4 h-4 text-slate-300" />
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 text-sm text-rose-600 hover:bg-rose-50 -mx-2 px-2 py-2 rounded-lg transition"
+              data-testid="user-profile-logout"
+            >
+              <LogOut className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1 text-left">{lang === "en" ? "Sign out" : "Cerrar sesión"}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      {/* V19.2 — Quick action: clients post a chamba (job request). Lives
+          here so the personal profile is the one-stop hub for everything
+          a client does on the platform. */}
+      {!profile.is_provider && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4" data-testid="user-profile-post-chamba">
+          <h3 className="font-display font-bold text-base text-amber-700 mb-2 inline-flex items-center gap-1.5">
+            <Briefcase className="w-4 h-4" /> {lang === "en" ? "Post a job" : "Publicar chamba"}
+          </h3>
+          <p className="text-xs text-amber-700/80 mb-3">
+            {lang === "en"
+              ? "Describe what you need and let providers come to you."
+              : "Describe lo que necesitas y deja que los proveedores te contacten."}
+          </p>
+          <Link
+            to="/empleos?post=1"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold"
+            data-testid="user-profile-post-chamba-cta"
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            {lang === "en" ? "Post a job" : "Publicar chamba"}
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="font-display font-bold text-base text-[#03045E] mb-2">{lang === "en" ? "Social links" : "Redes sociales"}</h3>
         {items.every(i => !social[i.k]) ? (
@@ -531,3 +623,221 @@ function Field({ label, value, onChange, testid, maxLength, multiline, hint }) {
 
 function Center({ children }) { return <div className="py-10 flex items-center justify-center">{children}</div>; }
 function Empty({ msg }) { return <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500" data-testid="user-profile-empty">{msg}</div>; }
+
+// ─── V19.2 · Complete-profile banner ────────────────────────────────
+function CompleteProfileBanner({ profile, lang, onEdit }) {
+  const steps = [
+    { id: "avatar", done: !!profile.avatar_url, label: lang === "en" ? "Add profile photo" : "Sube tu foto" },
+    { id: "cover",  done: !!profile.cover_url,  label: lang === "en" ? "Add cover image"   : "Sube tu portada" },
+    { id: "bio",    done: !!(profile.bio && profile.bio.trim()), label: lang === "en" ? "Write a short bio" : "Escribe una bio corta" },
+    { id: "city",   done: !!(profile.city && profile.city.trim()), label: lang === "en" ? "Add your city"   : "Agrega tu ciudad" },
+  ];
+  const remaining = steps.filter(s => !s.done);
+  if (remaining.length === 0) return null;
+  const total = steps.length;
+  const completed = total - remaining.length;
+  const pct = Math.round((completed / total) * 100);
+  return (
+    <section className="mb-4 rounded-2xl bg-gradient-to-br from-[#0077B6] to-[#00B4D8] text-white p-4 shadow-sm" data-testid="complete-profile-banner">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display font-extrabold text-lg leading-tight">
+            {lang === "en" ? "Finish setting up your profile" : "Completa tu perfil"}
+          </h2>
+          <p className="text-xs text-white/80 mt-0.5">
+            {lang === "en" ? `${completed} of ${total} steps done` : `${completed} de ${total} pasos listos`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="h-9 px-3.5 rounded-full bg-white text-[#0077B6] text-xs font-bold inline-flex items-center gap-1 hover:bg-white/90"
+          data-testid="complete-profile-cta"
+        >
+          {lang === "en" ? "Complete" : "Completar"}
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="mt-3 h-2 rounded-full bg-white/20 overflow-hidden">
+        <div className="h-full bg-white transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-1.5">
+        {remaining.map(s => (
+          <li key={s.id} className="text-[11px] px-2 py-1 rounded-full bg-white/15 backdrop-blur-sm border border-white/20">
+            {s.label}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ─── V19.2 · Cover banner uploader ──────────────────────────────────
+function CoverUploader({ profile, onChange, lang }) {
+  const [uploading, setUploading] = useState(false);
+
+  const pick = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    upload(f);
+    e.target.value = "";
+  };
+  const upload = async (file) => {
+    const fd = new FormData(); fd.append("file", file);
+    try {
+      setUploading(true);
+      await api.post("/users/me/cover", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      await onChange();
+      toast.success(lang === "en" ? "Cover updated" : "Portada actualizada");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Error"); }
+    finally { setUploading(false); }
+  };
+  const remove = async () => {
+    try {
+      await api.delete("/users/me/cover");
+      await onChange();
+    } catch { /* noop */ }
+  };
+
+  const url = profile.cover_url ? (profile.cover_url.startsWith("http") ? profile.cover_url : `${process.env.REACT_APP_BACKEND_URL}${profile.cover_url}`) : "";
+  return (
+    <div className="relative h-32 sm:h-40 bg-gradient-to-br from-[#03045E] via-[#0077B6] to-[#00B4D8]" data-testid="user-profile-cover">
+      {url && (
+        <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
+      <label className="absolute top-3 right-3 h-9 px-3 rounded-full bg-black/55 backdrop-blur-md text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer hover:bg-black/70 transition" data-testid="user-profile-cover-upload">
+        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+        {profile.cover_url ? (lang === "en" ? "Change cover" : "Cambiar portada") : (lang === "en" ? "Add cover" : "Agregar portada")}
+        <input type="file" accept="image/*" className="hidden" onChange={pick} disabled={uploading} />
+      </label>
+      {profile.cover_url && (
+        <button
+          type="button"
+          onClick={remove}
+          className="absolute top-3 right-3 -translate-y-[150%] h-7 w-7 rounded-full bg-black/55 backdrop-blur-md text-white inline-flex items-center justify-center hover:bg-black/70 transition"
+          aria-label={lang === "en" ? "Remove cover" : "Quitar portada"}
+          data-testid="user-profile-cover-remove"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── V19.2 · Favorites tab ──────────────────────────────────────────
+function FavoritesTab({ lang }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await api.get("/favorites");
+        if (alive) setItems(r.data || []);
+      } catch { if (alive) setItems([]); }
+    })();
+    return () => { alive = false; };
+  }, []);
+  if (items === null) return <Center><Loader2 className="w-5 h-5 animate-spin text-[#0077B6]" /></Center>;
+  if (items.length === 0) {
+    return (
+      <Empty
+        msg={
+          <span>
+            {lang === "en" ? "You haven't favorited any provider yet. " : "Aún no marcaste favorito a ningún proveedor. "}
+            <Link to="/proveedores" className="text-[#0077B6] font-bold hover:underline" data-testid="favorites-empty-cta">
+              {lang === "en" ? "Browse providers" : "Ver proveedores"}
+            </Link>
+          </span>
+        }
+      />
+    );
+  }
+  return (
+    <ul className="space-y-2" data-testid="favorites-list">
+      {items.map((f) => (
+        <li key={f.favorite_id || f.provider_id} className="rounded-xl border border-slate-200 bg-white p-3 hover:border-[#0077B6] transition" data-testid={`favorite-${f.provider_id}`}>
+          <Link to={`/p/${f.provider_slug}`} className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden flex-shrink-0">
+              {f.logo_url ? <img src={f.logo_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center font-bold text-teal-700">{(f.business_name || "?")[0]}</div>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-sm text-slate-900 truncate">{f.business_name}</p>
+              <p className="text-xs text-slate-500 truncate">{f.category || ""} {f.city ? `· ${f.city}` : ""}</p>
+              {typeof f.rating === "number" && f.rating > 0 && (
+                <p className="text-xs text-amber-500 inline-flex items-center gap-0.5 mt-0.5">
+                  <Star className="w-3 h-3 fill-amber-500 stroke-amber-500" />
+                  {f.rating.toFixed(1)}
+                </p>
+              )}
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ─── V19.2 · Change password prompt ─────────────────────────────────
+function ChangePasswordPrompt({ email, onClose, lang }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const trigger = async () => {
+    try {
+      setSending(true);
+      await api.post("/auth/forgot-password", { email });
+      setSent(true);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Error"); }
+    finally { setSending(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl" onClick={(e) => e.stopPropagation()} data-testid="change-password-modal">
+        <div className="flex items-start justify-between mb-2">
+          <h3 className="font-display font-bold text-lg text-[#03045E] inline-flex items-center gap-1.5">
+            <KeyRound className="w-5 h-5" />
+            {lang === "en" ? "Change password" : "Cambiar contraseña"}
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="close"><X className="w-5 h-5" /></button>
+        </div>
+        {sent ? (
+          <>
+            <p className="text-sm text-slate-700 mb-1">{lang === "en" ? "Check your inbox!" : "¡Revisa tu correo!"}</p>
+            <p className="text-xs text-slate-500 mb-4">
+              {lang === "en"
+                ? `We sent a 6-digit code to ${email}. Use it to set a new password.`
+                : `Enviamos un código de 6 dígitos a ${email}. Úsalo para crear una contraseña nueva.`}
+            </p>
+            <Link
+              to={`/reset-password?email=${encodeURIComponent(email)}`}
+              className="w-full h-11 rounded-full bg-[#0077B6] text-white font-bold text-sm inline-flex items-center justify-center"
+              data-testid="change-password-continue"
+            >
+              {lang === "en" ? "Enter the code" : "Ingresar el código"}
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-slate-700 mb-1">{email}</p>
+            <p className="text-xs text-slate-500 mb-4">
+              {lang === "en"
+                ? "For your safety, we'll email you a 6-digit code. Use it to set a new password."
+                : "Por tu seguridad, te enviaremos un código de 6 dígitos por correo. Úsalo para crear una contraseña nueva."}
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="flex-1 h-11 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50" data-testid="change-password-cancel">
+                {lang === "en" ? "Cancel" : "Cancelar"}
+              </button>
+              <button type="button" onClick={trigger} disabled={sending} className="flex-1 h-11 rounded-full bg-[#0077B6] hover:bg-[#0096C7] text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-60" data-testid="change-password-send">
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                {lang === "en" ? "Email me a code" : "Enviarme el código"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

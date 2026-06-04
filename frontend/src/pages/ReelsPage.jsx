@@ -308,7 +308,14 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
         poster={reel.thumbnail_url ? buildFileUrl(reel.thumbnail_url) : undefined}
         className={`w-full h-full object-cover ${isActive ? "reel-video-active" : ""}`}
         loop
+        // V19.1 — `autoPlay` makes mobile Safari/Chrome honour the play()
+        // call from the IntersectionObserver. Without it the first reel
+        // sits on its poster frame until the user taps. Combined with
+        // `muted` and `playsInline` this is the standard "feed autoplay"
+        // recipe used by Instagram/TikTok.
+        autoPlay
         playsInline
+        preload="auto"
         muted={muted}
         onClick={onTapVideo}
         onPlay={() => {

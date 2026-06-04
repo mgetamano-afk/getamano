@@ -79,6 +79,7 @@ export default function BottomNav() {
   const isActive = (path) => {
     if (path === "/") return pathname === "/";
     if (path === "/dashboard") return pathname.startsWith("/dashboard");
+    if (path === "/profile") return pathname.startsWith("/profile") || pathname.startsWith("/perfil");
     if (path === "/comunidad") return pathname.startsWith("/comunidad") || pathname.startsWith("/community");
     if (path === "/search") return pathname.startsWith("/search") || pathname.startsWith("/buscar");
     if (path === "/empleos") return pathname.startsWith("/empleos") || pathname.startsWith("/gigs");
@@ -115,7 +116,11 @@ export default function BottomNav() {
       { path: "/reels",              icon: Film,            label: lang === "en" ? "Reels"     : "Reels",     testid: "bottom-nav-reels" },
       { path: "/comunidad",          icon: HeartHandshake,  label: lang === "en" ? "Neighborhood" : "Barrio", testid: "bottom-nav-community", animate: "heartbeat" },
       { path: "/empleos",            icon: Briefcase,       label: lang === "en" ? "Jobs"      : "Chambas",   testid: "bottom-nav-empleos" },
-      { path: "/dashboard",          icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account", badge: unread },
+      // V19.2 — Clients now land on the unified personal profile page
+      // (/profile) instead of the bare-bones /dashboard. The hamburger
+      // "Mi perfil" link points to the same destination, so there's no
+      // duplicate experience anymore.
+      { path: "/profile",            icon: User,            label: lang === "en" ? "Profile"   : "Perfil",    testid: "bottom-nav-account", badge: unread },
     ];
   }
 
