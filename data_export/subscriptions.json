@@ -1,0 +1,1 @@
+{"_id":{"$oid":"6a1b53a09774c5289b741185"},"user_id":"user_3e47ee2b3526","plan":"pro","billing_cycle":"annual","amount":0,"annual_discount_applied":false,"status":"active","next_renewal_date":"2027-05-30T21:16:16.245301+00:00","updated_at":"2026-05-30T21:16:16.225538+00:00","last_reward_tier":"embajador_bronze","created_at":"2026-05-30T21:16:16.225538+00:00"}
