@@ -299,8 +299,11 @@ def make_router(*, db, get_current_user, get_current_user_optional) -> APIRouter
         original = await db.reels.find_one({"reel_id": reel_id, "is_deleted": {"$ne": True}}, {"_id": 0})
         if not original:
             raise HTTPException(status_code=404, detail="reel not found")
-        if original.get("user_id") == user.user_id:
-            raise HTTPException(status_code=400, detail="No puedes recompartir tu propio reel.")
+        # V18.5 — Self-reshare is now allowed. Founder feedback: "cualquier
+        # persona incluso quien posteó el reel" should be able to reshare
+        # it (think of it as the creator pinning their own work to the
+        # top of their feed for new followers). We keep the unique
+        # (reel_id, user_id) index so idempotency still holds.
         # Idempotency — if this user already reshared this reel, return
         # the existing reshare so the UI shows the unshare action instead.
         existing = await db.reel_reshares.find_one(
@@ -345,6 +348,9 @@ def make_router(*, db, get_current_user, get_current_user_optional) -> APIRouter
                 })
             except Exception:
                 pass
+        # V18.5 self-reshare path: just track the share event silently so
+        # the rail count bumps without sending a "someone shared your
+        # reel" notification to yourself (it would feel weird).
         await _notify_mentions(db, user.user_id, mentioned, "reel", reel_id, caption)
         return {"ok": True, "deduped": False, "reshare_id": reshare_id}
 

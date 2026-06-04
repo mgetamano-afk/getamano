@@ -11169,6 +11169,93 @@ async def og_provider_html(slug: str, request: Request):
     )
 
 
+# V18.6 — Reel-specific OG HTML so when someone pastes the reel link
+# into Facebook / X / WhatsApp the preview is native (thumbnail + brand
+# label + creator name) instead of "getamano.us" generic.
+#
+# Frontend `ReelShareModal` builds share URLs against this endpoint;
+# humans get a meta-refresh redirect to /reels?r={reel_id} while social
+# crawlers get the rich HTML with og:image=thumbnail.
+@app.get("/api/og/reel/{reel_id}", response_class=HTMLResponse)
+async def og_reel_html(reel_id: str, request: Request):
+    public_url = _request_public_url(request)
+    reel = await db.reels.find_one(
+        {"reel_id": reel_id, "is_deleted": {"$ne": True}},
+        {"_id": 0, "reel_id": 1, "thumbnail_url": 1, "caption": 1, "user_id": 1, "provider_user_id": 1, "business_name": 1, "provider_slug": 1, "duration_s": 1},
+    )
+    if not reel:
+        return HTMLResponse(
+            content=_build_og_reel_html({"caption": "Reel no disponible"}, public_url, reel_id),
+            status_code=404,
+        )
+    # Hydrate the creator label so the OG title shows their business name.
+    if not reel.get("business_name"):
+        owner_id = reel.get("provider_user_id") or reel.get("user_id")
+        if owner_id:
+            prof = await db.provider_profiles.find_one(
+                {"user_id": owner_id},
+                {"_id": 0, "business_name": 1, "slug": 1},
+            )
+            if prof:
+                reel["business_name"] = prof.get("business_name")
+                reel["provider_slug"] = reel.get("provider_slug") or prof.get("slug")
+    html = _build_og_reel_html(reel, public_url, reel_id)
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+            "X-Robots-Tag": "all",
+        },
+    )
+
+
+def _build_og_reel_html(reel: dict, public_url: str, reel_id: str) -> str:
+    """Section 56 / V18.6 — Render OG-rich HTML for a single reel."""
+    e = _html_escape
+    raw_caption = (reel.get("caption") or "").strip()
+    business = reel.get("business_name") or ""
+    title = (raw_caption[:80] if raw_caption else f"Reel de {business}").strip() or "Reel - getamano"
+    description = raw_caption or f"Mira este reel de {business} en getamano - Lo latino, a la mano."
+    if reel.get("duration_s"):
+        description = f"{description} - {int(reel['duration_s'])}s"
+    thumbnail = reel.get("thumbnail_url") or ""
+    if thumbnail and thumbnail.startswith("/"):
+        thumbnail = f"{public_url}{thumbnail}"
+    canonical = f"{public_url}/reels?r={reel_id}"
+    if not thumbnail:
+        thumbnail = f"{public_url}/getamano-og.png"
+
+    return f"""<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{e(title)} - getamano</title>
+<meta name="description" content="{e(description)}" />
+<link rel="canonical" href="{e(canonical)}" />
+<meta property="og:type" content="video.other" />
+<meta property="og:site_name" content="getamano" />
+<meta property="og:url" content="{e(canonical)}" />
+<meta property="og:title" content="{e(title)}" />
+<meta property="og:description" content="{e(description)}" />
+<meta property="og:image" content="{e(thumbnail)}" />
+<meta property="og:image:alt" content="{e(business or 'Reel en getamano')}" />
+<meta property="og:image:width" content="720" />
+<meta property="og:image:height" content="1280" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{e(title)}" />
+<meta name="twitter:description" content="{e(description)}" />
+<meta name="twitter:image" content="{e(thumbnail)}" />
+<meta http-equiv="refresh" content="0; url={e(canonical)}" />
+<script>window.location.replace({canonical!r});</script>
+</head>
+<body style="margin:0;background:#0b132b;color:#fff;font-family:-apple-system,system-ui,sans-serif;">
+<p style="padding:32px;text-align:center">Llevandote al reel... <a style="color:#2F9D94" href="{e(canonical)}">tocar para abrir</a></p>
+</body>
+</html>"""
+
+
+
 @app.middleware("http")
 async def og_bot_middleware(request, call_next):
     """Section 56 — Intercept social-bot fetches of /p/{slug} and /provider/{slug}

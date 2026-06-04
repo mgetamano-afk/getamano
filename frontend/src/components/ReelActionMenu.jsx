@@ -21,16 +21,18 @@ import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import {
   Loader2, Heart, Sparkles, Video,
-  MessageCircle, Repeat2,
+  MessageCircle, Repeat2, Share2,
 } from "lucide-react";
 import ReelCameraRecorder from "./ReelCameraRecorder";
 import CommentsSheet from "./CommentsSheet";
+import ReelShareModal from "./ReelShareModal";
 
 export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecord }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [busy, setBusy] = useState(null);
   const [reactions, setReactions] = useState({ liked: false, wowed: false, saved: false, reshared: false });
   // V17.5 — Live optimistic counts so the rail updates instantly when the
@@ -195,6 +197,17 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
     setCommentsOpen(true);
   };
 
+  // V18.6 — open the external share modal (FB/X/WhatsApp/IG/TikTok).
+  // Works for any user including the original creator (sharing your own
+  // reel to grow reach is the entire point of social).
+  const onShareExternalClick = () => {
+    if (!requireReel()) return;
+    setShareModalOpen(true);
+    // Fire-and-forget share-event so the dashboard share-count bumps.
+    api.post(`/reels/${activeReel.reel_id}/share`).catch(() => {});
+    bumpCount("share", 1);
+  };
+
   // V17.3 — toggle internal re-share. Owner-of-reel guard handled
   // server-side (returns 400 for self-reshare); we just surface the
   // error.
@@ -226,10 +239,17 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
     // share-outside, upload. Kept the most "social" interactions plus
     // record (creation entry-point). Ordered TOP→BOTTOM the way the
     // user reads them visually: comment → reshare → wow → like → record.
+    //
+    // V18.6 — Re-added "share-outside" (sky-blue gradient) because the
+    // founder explicitly asked for FB/IG/TikTok native sharing. This
+    // pill opens ReelShareModal — distinct from "reshare" which keeps
+    // the engagement inside getamano.
     { id: "comment", Icon: MessageCircle, label: "Comentar", onClick: onCommentsClick,
       activeGradient: "from-sky-500 to-blue-600", countKey: "comment" },
     { id: "reshare", Icon: Repeat2, label: "Compartir en mi perfil", onClick: onReshareClick,
       activeGradient: "from-green-500 to-emerald-600", active: reactions.reshared, countKey: "reshare" },
+    { id: "share",   Icon: Share2, label: "Compartir en redes", onClick: onShareExternalClick,
+      activeGradient: "from-cyan-500 to-sky-600", countKey: "share" },
     { id: "wow",    Icon: Sparkles, label: "Me sorprende", onClick: onWowClick,
       activeGradient: "from-amber-400 to-rose-500", active: reactions.wowed, countKey: "wow" },
     { id: "like",   Icon: Heart,    label: "Me gusta",      onClick: onLikeClick,
@@ -343,6 +363,16 @@ export default function ReelActionMenu({ activeReel, onAfterUpload, onAfterRecor
           subjectId={activeReel.reel_id}
           onCommentPosted={() => bumpCount("comment", 1)}
           onCommentDeleted={() => bumpCount("comment", -1)}
+        />
+      )}
+
+      {/* V18.6 — External share modal (FB/X/WhatsApp/IG/TikTok). Built
+          so any user can share — including the original creator. */}
+      {shareModalOpen && activeReel?.reel_id && (
+        <ReelShareModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          reel={activeReel}
         />
       )}
 

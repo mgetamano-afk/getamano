@@ -392,6 +392,16 @@ function ReelSlide({ reel, idx, isActive, muted, slideRef, videoRef, lang }) {
 }
 
 function PausedIndicator({ videoRef }) {
+  // V18.4 — Premium pause overlay (founder-requested "magic" moment).
+  // Tap the video → pause → backdrop-blur intensifies + a giant
+  // gradient Play button materialises in the center. Tap anywhere
+  // again → resume + overlay fades out smoothly.
+  //
+  // The overlay sits ABOVE the rail (z-30) but BELOW any open modals
+  // (the share/comments sheets get z-150+). pointer-events:none keeps
+  // every action (rail clicks, caption links) live — only the
+  // video element handles tap so a single tap continues to work as
+  // play/pause.
   const [paused, setPaused] = useState(false);
   useEffect(() => {
     const v = videoRef.current;
@@ -402,11 +412,19 @@ function PausedIndicator({ videoRef }) {
     v.addEventListener("play", off);
     return () => { v.removeEventListener("pause", on); v.removeEventListener("play", off); };
   }, [videoRef]);
-  if (!paused) return null;
   return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
-        <Play className="w-8 h-8 text-white" fill="currentColor" />
+    <div
+      className={`absolute inset-0 flex items-center justify-center pointer-events-none z-30 transition-all duration-400 ${paused ? "opacity-100 backdrop-blur-md bg-black/25" : "opacity-0 backdrop-blur-0 bg-black/0"}`}
+      data-testid="reel-paused-overlay"
+      data-paused={paused ? "true" : "false"}
+    >
+      <div
+        className={`w-24 h-24 rounded-full bg-gradient-to-br from-white/95 to-white/70 shadow-2xl flex items-center justify-center transition-transform duration-400 ${paused ? "scale-100" : "scale-50"}`}
+        style={{
+          filter: "drop-shadow(0 12px 32px rgba(0,0,0,0.45))",
+        }}
+      >
+        <Play className="w-12 h-12 text-slate-900 ml-1.5" fill="currentColor" strokeWidth={0} />
       </div>
     </div>
   );
